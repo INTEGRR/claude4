@@ -11,7 +11,8 @@
 | Kritische Buchungslogik | **Postgres-Funktionen** (über Drizzle/RPC aufgerufen) | Bestandsbuchungen, Belegnummern und Statusübergänge laufen atomar in der DB — kein halb gebuchter Zustand |
 | PDF-Erzeugung | **@react-pdf/renderer** (serverseitig) | Fertigungsauftrag-Beleg, Bestell-PDF, Etiketten |
 | Barcodes | **bwip-js** (Code 128) | Barcode auf MO-Beleg/Etiketten; gleiche Codes werden von USB-Scannern (Keyboard-Wedge) gelesen |
-| E-Mail-Versand | **Resend + React Email** | Bestellungen an Lieferanten senden; Vorlagen als React-Komponenten |
+| E-Mail-Versand | **Resend + React Email** | Bestellungen an Lieferanten, Retourenlabel an Kunden; Vorlagen als React-Komponenten |
+| Versand | **DHL Parcel DE Shipping API v2** (eigener typisierter Client, OAuth2 ROPC) | Labels, Tracking (Unified API), Retouren direkt bei DHL — kein Sendcloud dazwischen |
 | Hintergrund-Jobs | **Postgres-Job-Tabelle (Outbox) + Vercel Cron** | Webhook-Verarbeitung entkoppelt vom Empfang; Shopify-Tag-Pushes mit Retry; kein zusätzlicher Infrastruktur-Baustein |
 
 Bewusst **nicht** im ersten Ausbau: Redis/Queues, Microservices, Multi-Tenant, Buchhaltung (nur Belege, keine Journalbuchungen).
@@ -42,7 +43,8 @@ src/
     einkauf/
     fertigung/
     reparatur/
-    integrationen/          # Shopify, Sendcloud, E-Mail
+    versand/                # DHL (Label, Tracking, Retouren), Shopify-Fulfillment
+    integrationen/          # Shopify-Import, E-Mail
     shared/                 # Belegnummern, Status-Maschinen, PDF, Barcode
   db/
     schema/                 # Drizzle-Schema je Modul
@@ -72,12 +74,12 @@ Vorgesehene, aber **nicht** im ersten Ausbau enthaltene Erweiterungen — das Da
 - **Buchhaltung**: Rechnungen sind eigenständige Belege; eine spätere Journal-/Konten-Schicht dockt an `vendor_bills`/`customer_invoices` an.
 - **Kits (Bausatz-Stücklisten)**: `boms.bom_type` enthält `kit` bereits als Wert, Verhalten wird später implementiert.
 - **Weitere Vertriebskanäle**: Der Shopify-Import läuft über eine generische Import-Pipeline (`source`-Feld am Verkaufsauftrag).
-- **Sendcloud direkt (API v3)**: Zunächst Variante „Sendcloud-Shopify-Integration + Tag"; die Job-Infrastruktur kann später direkt Labels erzeugen.
+- **Versand-Ausbau**: Multicollo (mehrere Pakete je Lieferung — `shipments` ist 1:n modelliert), ZPL-Thermodruck, DHL-Tracking per Push-API statt Polling, weitere Carrier hinter einem Carrier-Interface, Zolldokumente für Nicht-EU-Versand.
 
 ## Sicherheit & Betrieb
 
 - **RLS**: Alle Tabellen mit Row Level Security; Zugriff nur für authentifizierte Teammitglieder (Single-Tenant, Rollen `admin`/`mitarbeiter` als App-Metadata). Service-Role-Key nur serverseitig.
-- **Secrets**: Shopify-Token (`shpat_…`), Webhook-Secret, Resend-Key, Sendcloud-Keys als Vercel-Env-Vars; nie im Client.
-- **Idempotenz**: Webhooks über `X-Shopify-Webhook-Id` + Order-ID; Sendcloud-Aufrufe (falls später direkt) über `external_reference_id`.
+- **Secrets**: Shopify-Token (`shpat_…`), Webhook-Secret, Resend-Key, DHL-API-Key/-Secret + GKP-Systembenutzer als Vercel-Env-Vars; nie im Client. DHL-Systembenutzer-Passwort läuft nach 365 Tagen ab — Erinnerung einplanen.
+- **Idempotenz**: Webhooks über `X-Shopify-Webhook-Id` + Order-ID; DHL-Label-Erstellung über Sendungs-Datensatz je Lieferung (kein Doppel-Label ohne vorherigen Storno).
 - **Zeitzone/Währung**: Europe/Berlin, EUR (einwährungsfähig; `currency`-Spalten vorhanden).
 - **Backups**: Supabase PITR aktivieren, sobald produktiv.

@@ -18,9 +18,9 @@ create table sequences (
 );
 -- Vergabe ausschließlich über SQL-Funktion next_sequence(code) mit row lock (atomar).
 
--- Ausgehende Jobs (Outbox): Shopify-Tag setzen, E-Mail senden, …
+-- Ausgehende Jobs (Outbox): Shopify-Fulfillment, E-Mail senden, …
 create table integration_jobs (
-  kind        text not null,          -- 'shopify_tag_add', 'send_po_email', …
+  kind        text not null,          -- 'shopify_fulfillment_create', 'shopify_tracking_update', 'send_po_email', 'send_return_label_email', …
   payload     jsonb not null,
   status      text not null default 'pending',  -- pending | running | done | failed
   attempts    int not null default 0,
@@ -228,7 +228,7 @@ create table sales_orders (                                  -- Odoo: sale.order
   source          text not null default 'manual',            -- manual | shopify
   shopify_order_id   text unique,
   shopify_order_name text,                                   -- '#1001'
-  shopify_tags_pushed text[],                                -- bereits gesetzte Tags (z. B. 'ready-to-ship')
+  shopify_tags_pushed text[],                                -- optional gesetzte Info-Tags (Feature default aus)
   currency        text not null default 'EUR',
   note            text
 );
@@ -395,7 +395,41 @@ create table repair_parts (
 );
 ```
 
-## 8. Shopify-Integration
+## 8. Versand (DHL)
+
+```sql
+create type shipment_state as enum ('created','manifested','transit','delivered','failure','cancelled');
+create table shipments (                                     -- 1..n je Lieferung (Multicollo-Erweiterung vorgesehen)
+  picking_id      uuid references stock_pickings not null,   -- die Lieferung (WH/OUT)
+  sales_order_id  uuid references sales_orders,
+  carrier         text not null default 'dhl',
+  dhl_product     text not null,                             -- 'V01PAK' | 'V54EPAK' | 'V53WPAK' | …
+  billing_number  text not null,
+  weight_g        int not null,
+  shipment_number text unique,                               -- = Trackingnummer (aus DHL-Response)
+  tracking_url    text,
+  state           shipment_state not null default 'created',
+  label_path      text,                                      -- Supabase Storage (DHL hält Labels nur ~3 Tage vor)
+  label_format    text not null default '910-300-700',
+  dhl_warnings    jsonb,                                     -- weiche Adressvalidierung der DHL-Response
+  last_tracking_event jsonb,                                 -- 30 Tage nach Zustellung löschen (DHL-Auflage)
+  shopify_fulfillment_id text,                               -- nach fulfillmentCreate
+  manifested_at   timestamptz,
+  delivered_at    timestamptz
+);
+
+create table return_labels (                                 -- DHL-Retourenlabels (Reparatur/Retoure)
+  repair_order_id uuid references repair_orders,
+  sales_order_id  uuid references sales_orders,
+  partner_id      uuid references partners not null,
+  shipment_number text unique,                               -- 'RET…'
+  label_path      text,                                      -- PDF im Storage
+  qr_link         text,
+  emailed_at      timestamptz
+);
+```
+
+## 9. Shopify-Integration
 
 ```sql
 create table shopify_webhook_events (
@@ -445,8 +479,8 @@ create table shopify_unmatched_lines (                       -- Zeilen ohne SKU-
 | `confirm_sales_order(id)` | Status → sale; Lieferung anlegen; je `route_manufacture`-Position MO anlegen |
 | `cancel_sales_order(id)` | Status → cancel; offene Lieferungen stornieren; verknüpfte MOs markieren (Warnhinweis, kein Auto-Storno — Odoo-Verhalten) |
 | `confirm_purchase_order(id)` | Status → purchase; Wareneingang anlegen |
-| `validate_picking(id, done_lines, backorder?)` | Moves buchen, Quants aktualisieren, qty_received/qty_delivered zurückschreiben, ggf. Backorder-Picking erzeugen |
-| `confirm_mo(id)` / `produce_mo(id, qty)` | Komponenten reservieren / Verbrauch + Zugang buchen, ggf. MO-Backorder; bei verknüpftem SO: Tag-Job einreihen, wenn alle MOs fertig |
+| `validate_picking(id, done_lines, backorder?)` | Moves buchen, Quants aktualisieren, qty_received/qty_delivered zurückschreiben, ggf. Backorder-Picking erzeugen; bei Shopify-Lieferung mit Sendung: `shopify_fulfillment_create`-Job einreihen |
+| `confirm_mo(id)` / `produce_mo(id, qty)` | Komponenten reservieren / Verbrauch + Zugang buchen, ggf. MO-Backorder; bei verknüpftem SO: wenn alle MOs fertig ⇒ Lieferung reservieren („versandbereit") |
 | `unbuild(id)` | Fertigprodukt −, Komponenten + (mit Negativbestands-Warnung) |
 | `apply_inventory_count(id)` | Korrektur-Move gegen Inventurdifferenz-Ort |
 | `repair_transition(id, action)` | Reparatur-Statusmaschine inkl. Teile-Buchungen |

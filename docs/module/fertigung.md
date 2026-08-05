@@ -29,7 +29,7 @@ Status-Maschine (Odoo 18): `draft → confirmed → progress → to_close → do
   - Bucht Komponentenverbrauch `WH/Stock → Virtuell/Produktion` (anteilig zur produzierten Menge) und Fertigprodukt-Zugang `Virtuell/Produktion → WH/Stock`.
   - Abweichender Ist-Verbrauch je Komponente editierbar; Verhalten gemäß BoM-Verbrauchsregel (blockieren/erlauben/warnen).
   - Teilmenge ⇒ Backorder-Dialog: Rest-MO (`backorder_of_id`) oder Rest verwerfen.
-  - Danach `done`; wenn `sales_order_id` gesetzt und alle MOs des Auftrags `done` ⇒ Integration-Job `shopify_tag_add` („ready-to-ship") einreihen und zugehörige Lieferung reservieren.
+  - Danach `done`; wenn `sales_order_id` gesetzt und alle MOs des Auftrags `done` ⇒ zugehörige Lieferung reservieren — der Auftrag erscheint damit in der „Versandbereit"-Liste des Versand-Moduls (DHL-Label + Shopify-Fulfillment, siehe [versand.md](versand.md)).
 - **Stornieren**: offene Komponenten-Moves → `cancel`, Reservierungen freigeben.
 
 ## Demontage (Unbuild)
@@ -52,4 +52,4 @@ Formular: Variante, BoM (auto), Menge, optionaler Ursprungs-MO, Quell-/Ziellager
 3. Teilproduktion 3 von 5: Backorder-MO über 2 entsteht, Originol-MO `done` mit `qty_produced = 3`.
 4. Unbuild von 1 Tastatur stellt die Komponentenmengen der passenden Variante wieder her.
 5. MO-PDF enthält scanbare MO-Nummer (Code 128) und die korrekte gefilterte Komponentenliste.
-6. Nach Abschluss des letzten MOs eines Shopify-Auftrags liegt ein `shopify_tag_add`-Job in der Outbox.
+6. Nach Abschluss des letzten MOs eines Shopify-Auftrags ist dessen Lieferung reserviert und erscheint in der „Versandbereit"-Liste.

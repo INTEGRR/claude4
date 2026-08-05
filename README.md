@@ -7,7 +7,8 @@ Eigenes, schlankes ERP-System, das die bei uns aktiv genutzten Odoo-Funktionen n
 - **Einkauf** — Lieferanten, Bestellungen (E-Mail-Versand, Sperren, Stornieren), Wareneingang, Lieferantenrechnungen
 - **Lager** — Lagerorte, Lagerbewegungen (Eingang, Ausgang, Fertigung, Storno), Bestände, Inventur, Barcodes
 - **Reparatur** — Reparaturaufträge mit Teileverbrauch
-- **Integrationen** — Shopify (Order-Import per Webhook, `ready-to-ship`-Tag) und Sendcloud (Versand)
+- **Versand** — direkte DHL-Anbindung (Label, Tracking, Retouren) statt Sendcloud
+- **Integrationen** — Shopify (Order-Import per Webhook, Fulfillment-/Tracking-Rückmeldung)
 
 ## Dokumente
 
@@ -18,6 +19,7 @@ Eigenes, schlankes ERP-System, das die bei uns aktiv genutzten Odoo-Funktionen n
 | [docs/datenmodell.md](docs/datenmodell.md) | Vollständiges Datenbankschema (Postgres/Supabase) |
 | [docs/module/](docs/module/) | Fachliche Spezifikation je Modul |
 | [docs/odoo-referenz/](docs/odoo-referenz/) | Recherche-Ergebnisse aus der offiziellen Odoo-18-Dokumentation (Referenzverhalten) |
+| [docs/api-referenz/](docs/api-referenz/) | API-Referenzen: Shopify, DHL, Sendcloud-Funktionsumfang (Nachbau-Vorlage) |
 
 ## Status
 
