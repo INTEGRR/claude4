@@ -49,6 +49,32 @@ export async function withRollback<T>(fn: (t: TransactionSql) => Promise<T>): Pr
   return result!
 }
 
+/**
+ * Erwartet, dass `fn` einen Datenbankfehler auslöst, und hält die umgebende
+ * Transaktion am Leben. Ohne Savepoint würde Postgres die gesamte Transaktion
+ * abbrechen und alle folgenden Anweisungen des Tests scheitern lassen.
+ */
+export async function expectError(
+  t: TransactionSql,
+  fn: (sp: TransactionSql) => Promise<unknown>,
+  pattern: RegExp,
+): Promise<void> {
+  let message: string | undefined
+  try {
+    await t.savepoint(async (sp) => {
+      await fn(sp as unknown as TransactionSql)
+    })
+  } catch (err) {
+    message = err instanceof Error ? err.message : String(err)
+  }
+  if (message === undefined) {
+    throw new Error(`Erwarteter Fehler (${pattern}) ist nicht aufgetreten`)
+  }
+  if (!pattern.test(message)) {
+    throw new Error(`Fehlermeldung passt nicht zu ${pattern}: ${message}`)
+  }
+}
+
 // --- Fixtures --------------------------------------------------------------
 
 export async function uomStueck(t: TransactionSql): Promise<string> {

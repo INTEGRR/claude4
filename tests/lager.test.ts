@@ -4,6 +4,7 @@ import type { TransactionSql } from 'postgres'
 import {
   assertLedgerConsistent,
   closeDb,
+  expectError,
   freeToUse,
   locationId,
   makeProduct,
@@ -155,11 +156,7 @@ describe('Lager: Bewegungs-Ledger', () => {
       await t`select picking_confirm(${pickingId})`
       await t`select picking_validate(${pickingId})`
 
-      await assert.rejects(
-        () => t`select picking_cancel(${pickingId})`,
-        /Retoure/,
-        'Fehlermeldung verweist auf die Retoure',
-      )
+      await expectError(t, (sp) => sp`select picking_cancel(${pickingId})`, /Retoure/)
     })
   })
 
@@ -228,7 +225,7 @@ describe('Lager: Inventur und Ausschuss', () => {
       await t`select picking_confirm(${pickingId})`
       await t`select picking_validate(${pickingId})`
 
-      await assert.rejects(() => t`select inventory_apply(${count.id})`, /geändert/)
+      await expectError(t, (sp) => sp`select inventory_apply(${count.id})`, /geändert/)
     })
   })
 
@@ -264,8 +261,9 @@ describe('Maßeinheiten', () => {
 
   test('verweigert die Umrechnung über Kategoriegrenzen', async () => {
     await withRollback(async (t) => {
-      await assert.rejects(
-        () => t`select uom_convert(1,
+      await expectError(
+        t,
+        (sp) => sp`select uom_convert(1,
           (select id from uoms where name = 'Stück'),
           (select id from uoms where name = 'kg'))`,
         /Kategorien/,
