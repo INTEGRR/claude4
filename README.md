@@ -9,7 +9,28 @@ Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 - **Reparatur** — Reparaturaufträge mit Teileverbrauch (einbauen / ausbauen / wiederverwenden)
 - **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren) und Fulfillment-Rückmeldung an Shopify
 
-## Schnellstart
+## Schnellstart mit Docker (empfohlen zum Ausprobieren)
+
+Voraussetzung ist nur Docker Desktop bzw. Docker Engine mit Compose:
+
+```bash
+docker compose up --build
+```
+
+Beim ersten Start werden Datenbank, Schema, Administrator und Beispieldaten
+angelegt — das dauert ein paar Minuten. Danach:
+
+**<http://localhost:3000>** · `admin@example.com` / `erp-admin`
+
+```bash
+docker compose down       # anhalten (Daten bleiben erhalten)
+docker compose down -v    # anhalten und alle Daten verwerfen
+docker compose logs -f app
+```
+
+## Schnellstart ohne Docker
+
+Voraussetzung: Node 22+ und ein erreichbarer PostgreSQL 16+.
 
 ```bash
 npm install

@@ -18,9 +18,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Kein Label gespeichert' }, { status: 404 })
   }
 
-  // Pfadprüfung: nur Dateien aus dem Ablageverzeichnis herausgeben.
-  const root = path.resolve(process.env.STORAGE_DIR ?? path.join(process.cwd(), 'storage'))
-  const file = path.resolve(process.cwd(), shipment.label_path)
+  // Pfadprüfung: nur Dateien aus dem Ablageverzeichnis herausgeben. Die Pfade
+  // stehen erst zur Laufzeit fest — der Bundler kann sie nicht auflösen und
+  // soll es auch nicht versuchen.
+  const root = path.resolve(/* turbopackIgnore: true */ process.env.STORAGE_DIR ?? path.join(process.cwd(), 'storage'))
+  const file = path.resolve(/* turbopackIgnore: true */ process.cwd(), shipment.label_path)
   if (!file.startsWith(root + path.sep)) {
     return NextResponse.json({ error: 'Ungültiger Pfad' }, { status: 400 })
   }

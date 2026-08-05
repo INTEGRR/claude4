@@ -84,6 +84,22 @@ später ohne Umbau ändern.
 
 ---
 
+## Lokal ausprobieren
+
+```bash
+docker compose up --build     # → http://localhost:3000
+```
+
+Startet Postgres und das ERP, spielt Migrationen ein und legt Administrator
+und Beispieldaten an. Shopify und DHL bleiben ohne Zugangsdaten deaktiviert —
+alle übrigen Module laufen vollständig. `docker compose down -v` verwirft alles
+wieder.
+
+Der Datenbank-Port wird bewusst **nicht** nach außen veröffentlicht (die App
+erreicht die Datenbank über das Compose-Netz). Wer mit `psql` hineinschauen
+möchte, entfernt in `docker-compose.yml` die Kommentarzeichen beim `ports`-Block
+des `db`-Dienstes.
+
 ## Betriebsaufgaben (unabhängig von der Variante)
 
 | Aufgabe | Frequenz | Aufruf |

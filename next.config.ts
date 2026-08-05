@@ -1,10 +1,12 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Schlankes Docker-Image: nur die tatsächlich genutzten Module werden gebündelt.
+  output: 'standalone',
   serverExternalPackages: ['postgres', 'bwip-js'],
   experimental: {
-    // Server Actions handle all mutations; keep the body limit generous for
-    // label PDFs coming back from DHL.
+    // Alle Änderungen laufen über Server Actions; das Limit ist großzügig
+    // gewählt, weil Label-PDFs von DHL durchgereicht werden.
     serverActions: { bodySizeLimit: '8mb' },
   },
 }

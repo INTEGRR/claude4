@@ -19,19 +19,25 @@ export default async function Dashboard() {
     }[]
   >`
     select
-      (select count(*) from sales_orders where state = 'sale' and delivery_status <> 'full')::int,
-      (select count(*) from manufacturing_orders where state not in ('done','cancel'))::int,
-      (select count(*) from shipping_ready)::int,
-      (select count(*) from stock_pickings p join operation_types ot on ot.id = p.operation_type_id
-        where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int,
-      (select count(*) from repair_orders where state not in ('repaired','cancel'))::int,
-      (select count(*) from product_variants pv join product_templates pt on pt.id = pv.template_id
-        where pv.active and pt.type = 'goods' and forecasted_qty(pv.id) < 0)::int,
+      (select count(*) from sales_orders
+        where state = 'sale' and delivery_status <> 'full')::int as open_orders,
+      (select count(*) from manufacturing_orders
+        where state not in ('done','cancel'))::int as open_mos,
+      (select count(*) from shipping_ready)::int as ready_to_ship,
+      (select count(*) from stock_pickings p
+         join operation_types ot on ot.id = p.operation_type_id
+        where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int as open_receipts,
+      (select count(*) from repair_orders
+        where state not in ('repaired','cancel'))::int as open_repairs,
+      (select count(*) from product_variants pv
+         join product_templates pt on pt.id = pv.template_id
+        where pv.active and pt.type = 'goods' and forecasted_qty(pv.id) < 0)::int as shortages,
       ((select count(*) from integration_jobs where status = 'failed')
-       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int,
+       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as failed,
       coalesce((select sum((select net from sales_order_total(so.id)))
                 from sales_orders so
-                where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)`
+                where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)
+        as revenue_month`
 
   const recentOrders = await sql<
     {

@@ -74,11 +74,11 @@ export default async function IntegrationenPage() {
     { pending_events: number; failed_events: number; pending_jobs: number; failed_jobs: number; unmatched: number }[]
   >`
     select
-      (select count(*) from shopify_webhook_events where status = 'pending')::int,
-      (select count(*) from shopify_webhook_events where status = 'failed')::int,
-      (select count(*) from integration_jobs where status = 'pending')::int,
-      (select count(*) from integration_jobs where status = 'failed')::int,
-      (select count(*) from shopify_unmatched_lines where resolved_at is null)::int`
+      (select count(*) from shopify_webhook_events where status = 'pending')::int as pending_events,
+      (select count(*) from shopify_webhook_events where status = 'failed')::int as failed_events,
+      (select count(*) from integration_jobs where status = 'pending')::int as pending_jobs,
+      (select count(*) from integration_jobs where status = 'failed')::int as failed_jobs,
+      (select count(*) from shopify_unmatched_lines where resolved_at is null)::int as unmatched`
 
   const [syncState] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`

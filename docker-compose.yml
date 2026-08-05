@@ -1,0 +1,51 @@
+# Lokales Komplettpaket zum Ausprobieren: Datenbank + ERP.
+#
+#   docker compose up --build
+#   → http://localhost:3000   (admin@example.com / erp-admin)
+#
+# Beim ersten Start werden Schema, Administrator und Beispieldaten angelegt.
+# Zum Zurücksetzen:  docker compose down -v
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+      POSTGRES_DB: erp
+    # Kein Port nach außen: die App erreicht die Datenbank über das
+    # Compose-Netz. Wer mit psql hineinschauen möchte, entfernt die
+    # Kommentarzeichen (Port ggf. anpassen, falls schon belegt):
+    # ports:
+    #   - '127.0.0.1:5433:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U erp -d erp']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://erp:erp@db:5432/erp
+      # Beispieldaten beim ersten Start (Tastatur mit Farbvarianten,
+      # 20-Positionen-Stückliste, Komponenten mit Bestand)
+      SEED_DEMO: 'true'
+      # Zugangsdaten des ersten Benutzers
+      SEED_ADMIN_EMAIL: admin@example.com
+      SEED_ADMIN_PASSWORD: erp-admin
+      # Shopify und DHL bleiben leer: alle Module laufen, nur Label-Erstellung
+      # und Bestellimport sind ohne Zugangsdaten deaktiviert.
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - label-storage:/app/storage
+
+volumes:
+  db-data:
+  label-storage:

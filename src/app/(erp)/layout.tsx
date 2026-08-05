@@ -25,14 +25,18 @@ async function badges() {
     }[]
   >`
     select
-      (select count(*) from sales_orders where state = 'sale' and delivery_status <> 'full')::int,
-      (select count(*) from manufacturing_orders where state not in ('done','cancel'))::int,
-      (select count(*) from stock_pickings p join operation_types ot on ot.id = p.operation_type_id
-        where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int,
-      (select count(*) from shipping_ready)::int,
-      (select count(*) from repair_orders where state not in ('repaired','cancel'))::int,
-      (select count(*) from integration_jobs where status = 'failed')::int
-        + (select count(*) from shopify_unmatched_lines where resolved_at is null)::int`
+      (select count(*) from sales_orders
+        where state = 'sale' and delivery_status <> 'full')::int as offene_auftraege,
+      (select count(*) from manufacturing_orders
+        where state not in ('done','cancel'))::int as offene_mos,
+      (select count(*) from stock_pickings p
+         join operation_types ot on ot.id = p.operation_type_id
+        where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int as offene_eingaenge,
+      (select count(*) from shipping_ready)::int as versandbereit,
+      (select count(*) from repair_orders
+        where state not in ('repaired','cancel'))::int as offene_reparaturen,
+      ((select count(*) from integration_jobs where status = 'failed')
+       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler`
   return row
 }
 
