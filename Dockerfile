@@ -37,7 +37,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/src/db/migrations ./src/db/migrat
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
 COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
 
-RUN mkdir -p /app/storage && chown -R nextjs:nodejs /app/storage
+# Zeilenenden normalisieren und ausführbar machen: Windows-Checkouts liefern
+# sonst CRLF, woran der Start im Container scheitert.
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh \
+ && mkdir -p /app/storage && chown -R nextjs:nodejs /app/storage
 USER nextjs
 
 EXPOSE 3000

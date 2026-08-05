@@ -1,0 +1,10 @@
+# Shell-Skripte laufen in Linux-Containern und brauchen LF-Zeilenenden.
+# Ohne diese Regel wandelt Git for Windows sie in CRLF um, und der Container
+# startet mit einer irreführenden Meldung nicht ("no such file or directory").
+*.sh text eol=lf
+docker/entrypoint.sh text eol=lf
+
+# SQL-Migrationen und Konfiguration ebenfalls einheitlich halten.
+*.sql text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

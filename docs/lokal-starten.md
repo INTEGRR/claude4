@@ -26,6 +26,19 @@ docker compose version
 Beide Befehle müssen eine Version ausgeben. Unter macOS und Windows muss
 Docker Desktop dabei **geöffnet** sein (Wal-Symbol in der Menüleiste).
 
+## 1b. Hinweis für Windows
+
+Nutze **PowerShell** (oder Git Bash) — nicht die alte Eingabeaufforderung.
+
+Die Befehle in dieser Anleitung funktionieren in PowerShell unverändert, mit
+einer Ausnahme: Mehrzeilige Befehle, die im Text mit `\` umbrochen sind,
+schreibst du in PowerShell **in eine Zeile** (oder nutzt Backticks `` ` `` statt
+`\`). Betroffen ist nur der optionale `docker run`-Befehl in Weg 2 — dort steht
+eine PowerShell-Fassung dabei.
+
+Zeilenenden musst du nicht beachten: Das Projekt erzwingt über `.gitattributes`
+LF für Shell-Skripte, und der Container-Build normalisiert sie zusätzlich.
+
 ## 2. Projekt holen
 
 ```bash
@@ -226,6 +239,12 @@ docker run -d --name erp-db \
   -p 5433:5432 postgres:17-alpine
 ```
 
+In PowerShell in einer Zeile:
+
+```powershell
+docker run -d --name erp-db -e POSTGRES_USER=erp -e POSTGRES_PASSWORD=erp -e POSTGRES_DB=erp -p 5433:5432 postgres:17-alpine
+```
+
 Alternativ nativ installiert (macOS: `brew install postgresql@17 && brew
 services start postgresql@17`), dann Datenbank anlegen:
 
@@ -362,6 +381,12 @@ Sie werden nur angelegt, wenn die Datenbank leer ist. Frisch aufsetzen mit
 
 **Apple Silicon (M1–M4)**
 Läuft ohne Anpassung; alle verwendeten Images gibt es für arm64.
+
+**`exec ./entrypoint.sh: no such file or directory` (Windows)**
+Das Startskript hat Windows-Zeilenenden bekommen. Sollte durch
+`.gitattributes` und den Build nicht mehr auftreten; falls doch:
+`git config core.autocrlf false`, dann `git rm --cached -r . && git reset --hard`
+und neu bauen.
 
 **Änderungen am Code werden nicht sichtbar (Docker)**
 Das Image enthält einen Produktions-Build. Nach Codeänderungen entweder
