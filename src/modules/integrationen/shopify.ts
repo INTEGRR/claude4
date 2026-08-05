@@ -1,5 +1,6 @@
 import 'server-only'
-import { createHmac, timingSafeEqual } from 'node:crypto'
+
+export { verifyWebhookHmac } from './shopify-hmac'
 
 /**
  * Shopify Admin API (GraphQL). Die REST-API ist Legacy; alles läuft über
@@ -25,24 +26,6 @@ export function shopifyConfig(): ShopifyConfig {
 export function shopifyConfigured(): boolean {
   const c = shopifyConfig()
   return Boolean(c.shop && c.token)
-}
-
-/**
- * Prüft die Webhook-Signatur gegen den ROHEN Request-Body. Wichtig: der Body
- * darf vorher nicht geparst werden, sonst stimmt der HMAC nicht mehr.
- */
-export function verifyWebhookHmac(rawBody: string, headerHmac: string | null): boolean {
-  const secret = shopifyConfig().webhookSecret
-  if (!secret || !headerHmac) return false
-
-  const digest = createHmac('sha256', secret).update(rawBody, 'utf8').digest()
-  let received: Buffer
-  try {
-    received = Buffer.from(headerHmac, 'base64')
-  } catch {
-    return false
-  }
-  return digest.length === received.length && timingSafeEqual(digest, received)
 }
 
 export class ShopifyError extends Error {

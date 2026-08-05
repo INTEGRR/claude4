@@ -1,7 +1,10 @@
 import 'server-only'
 import type { TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
+import { splitStreet } from '@/modules/shared/address'
 import { fetchOrder, type ShopifyOrder } from './shopify'
+
+export { splitStreet }
 
 /**
  * Import-Pipeline: aus einer Shopify-Order wird ein Verkaufsauftrag.
@@ -9,25 +12,6 @@ import { fetchOrder, type ShopifyOrder } from './shopify'
  * Verarbeitung läuft bewusst getrennt vom Webhook-Empfang - der Endpunkt
  * speichert nur und antwortet sofort (Shopify bricht nach 5 s ab).
  */
-
-/** Trennt "Musterstraße 12a" in Straße und Hausnummer (DHL braucht das getrennt). */
-export function splitStreet(input: string | null | undefined): {
-  street: string
-  houseNumber: string
-} {
-  const value = (input ?? '').trim()
-  if (!value) return { street: '', houseNumber: '' }
-
-  // Hausnummer am Ende: "Musterstr. 12", "Musterstr. 12a", "Musterstr. 12-14"
-  const trailing = value.match(/^(.*?)[\s,]+(\d+\s*[a-zA-Z]?(?:\s*[-/]\s*\d+\s*[a-zA-Z]?)?)$/)
-  if (trailing) return { street: trailing[1].trim(), houseNumber: trailing[2].replace(/\s+/g, '') }
-
-  // Hausnummer am Anfang (z. B. in NL/FR üblich): "12 Rue de la Paix"
-  const leading = value.match(/^(\d+\s*[a-zA-Z]?)[\s,]+(.*)$/)
-  if (leading) return { street: leading[2].trim(), houseNumber: leading[1].replace(/\s+/g, '') }
-
-  return { street: value, houseNumber: '' }
-}
 
 async function upsertCustomer(t: TransactionSql, order: ShopifyOrder): Promise<string> {
   const addr = order.shippingAddress

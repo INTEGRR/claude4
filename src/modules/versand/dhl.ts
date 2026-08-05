@@ -1,4 +1,7 @@
 import 'server-only'
+import { productForCountry, toAlpha3, trackingUrl } from './dhl-codes'
+
+export { productForCountry, toAlpha3, trackingUrl }
 
 /**
  * DHL Parcel DE Shipping API v2 (Post & Parcel Germany).
@@ -127,32 +130,6 @@ export interface CreatedShipment {
   labelBase64?: string
   labelUrl?: string
   warnings: string[]
-}
-
-/** ISO alpha-2 (unser Systemformat) -> alpha-3 (DHL-Format). */
-const ALPHA3: Record<string, string> = {
-  DE: 'DEU', AT: 'AUT', CH: 'CHE', NL: 'NLD', BE: 'BEL', LU: 'LUX', FR: 'FRA',
-  IT: 'ITA', ES: 'ESP', PT: 'PRT', DK: 'DNK', SE: 'SWE', FI: 'FIN', NO: 'NOR',
-  PL: 'POL', CZ: 'CZE', SK: 'SVK', HU: 'HUN', SI: 'SVN', HR: 'HRV', GB: 'GBR',
-  IE: 'IRL', EE: 'EST', LV: 'LVA', LT: 'LTU', RO: 'ROU', BG: 'BGR', GR: 'GRC',
-}
-
-export function toAlpha3(code: string): string {
-  const upper = (code ?? '').toUpperCase()
-  if (upper.length === 3) return upper
-  return ALPHA3[upper] ?? 'DEU'
-}
-
-/** DHL-Produkt aus dem Zielland ableiten. */
-export function productForCountry(countryAlpha2: string): string {
-  const code = (countryAlpha2 ?? 'DE').toUpperCase()
-  if (code === 'DE') return 'V01PAK'
-  const eu = new Set(Object.keys(ALPHA3))
-  return eu.has(code) ? 'V54EPAK' : 'V53WPAK'
-}
-
-export function trackingUrl(shipmentNumber: string): string {
-  return `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=${shipmentNumber}`
 }
 
 export async function createShipment(input: CreateShipmentInput): Promise<CreatedShipment> {

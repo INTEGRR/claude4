@@ -11,6 +11,11 @@ function createClient(): postgres.Sql {
   if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
   return postgres(url, {
     max: 10,
+    // Ohne Prepared Statements, aus zwei Gründen:
+    //  - Supabase/Supavisor im Transaction-Mode unterstützt sie nicht.
+    //  - Nach Migrationen, die Enums neu anlegen, zeigen zwischengespeicherte
+    //    Statements auf verschwundene Typ-OIDs ("cache lookup failed for type").
+    prepare: false,
     // numeric als String lesen und selbst in Number wandeln wäre verlustfrei,
     // aber für Mengen/Preise in dieser Größenordnung ist Number exakt genug
     // und macht die Anwendung deutlich einfacher.

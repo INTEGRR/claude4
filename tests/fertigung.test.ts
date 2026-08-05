@@ -20,15 +20,19 @@ after(closeDb)
  * Baut das reale Szenario nach: eine Tastatur mit Farbvarianten und einer
  * Stückliste, in der die Gehäuse-Positionen je Farbe gefiltert sind.
  */
+let scenarioCounter = 0
+
 async function keyboardScenario(t: TransactionSql) {
   const uom = await uomStueck(t)
+  // Eindeutige Namen, damit die Tests auch neben Seed-Daten laufen.
+  const suffix = `T${++scenarioCounter}`
 
   // Endprodukt mit Attribut Farbe (Weiß / Schwarz)
   const [tpl] = await t<{ id: string }[]>`
     insert into product_templates (name, uom_id, route_manufacture, route_mto, can_be_sold)
-    values ('Tastatur', ${uom}, true, true, true) returning id`
+    values (${`Tastatur ${suffix}`}, ${uom}, true, true, true) returning id`
   const [attr] = await t<{ id: string }[]>`
-    insert into product_attributes (name) values ('Farbe') returning id`
+    insert into product_attributes (name) values (${`Farbe ${suffix}`}) returning id`
   const values = await t<{ id: string; name: string }[]>`
     insert into product_attribute_values (attribute_id, name)
     values (${attr.id}, 'Weiß'), (${attr.id}, 'Schwarz')
@@ -49,10 +53,10 @@ async function keyboardScenario(t: TransactionSql) {
   const schwarz = variants.find((v) => v.display_name.includes('Schwarz'))!
 
   // Komponenten
-  const gehaeuseWeiss = await makeProduct(t, 'Gehäuse weiß')
-  const gehaeuseSchwarz = await makeProduct(t, 'Gehäuse schwarz')
-  const platine = await makeProduct(t, 'Platine')
-  const switches = await makeProduct(t, 'Switches')
+  const gehaeuseWeiss = await makeProduct(t, `Gehäuse weiß ${suffix}`)
+  const gehaeuseSchwarz = await makeProduct(t, `Gehäuse schwarz ${suffix}`)
+  const platine = await makeProduct(t, `Platine ${suffix}`)
+  const switches = await makeProduct(t, `Switches ${suffix}`)
 
   // Stückliste auf Vorlagen-Ebene (eine BoM für alle Varianten)
   const [bom] = await t<{ id: string }[]>`
