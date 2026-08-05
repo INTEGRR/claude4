@@ -1,6 +1,6 @@
 # Modul Integrationen (Shopify, Sendcloud, E-Mail)
 
-API-Referenz: [docs/odoo-referenz/shopify-sendcloud.md](../odoo-referenz/shopify-sendcloud.md)
+API-Referenz: [docs/api-referenz/shopify-sendcloud.md](../api-referenz/shopify-sendcloud.md) · [docs/api-referenz/dhl.md](../api-referenz/dhl.md)
 
 ## Shopify — Order-Import
 
