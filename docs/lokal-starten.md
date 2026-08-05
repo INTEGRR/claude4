@@ -1,0 +1,341 @@
+# ERP lokal starten — vollständige Anleitung
+
+Zwei Wege. **Weg 1 (Docker)** ist der schnellste zum Ausprobieren und braucht
+außer Docker nichts. **Weg 2 (ohne Docker)** ist der richtige, wenn du am Code
+arbeiten willst.
+
+---
+
+# Weg 1: Mit Docker
+
+## 1. Docker installieren
+
+| System | Vorgehen |
+|---|---|
+| **macOS** | [Docker Desktop](https://www.docker.com/products/docker-desktop/) laden (Apple Silicon oder Intel je nach Mac), installieren, starten |
+| **Windows** | [Docker Desktop](https://www.docker.com/products/docker-desktop/) laden und installieren; beim ersten Start WSL 2 aktivieren lassen |
+| **Linux** | `curl -fsSL https://get.docker.com \| sh`, danach `sudo usermod -aG docker $USER` und neu anmelden |
+
+Prüfen, ob es läuft:
+
+```bash
+docker --version
+docker compose version
+```
+
+Beide Befehle müssen eine Version ausgeben. Unter macOS und Windows muss
+Docker Desktop dabei **geöffnet** sein (Wal-Symbol in der Menüleiste).
+
+## 2. Projekt holen
+
+```bash
+git clone https://github.com/INTEGRR/claude4.git
+cd claude4
+git checkout claude/odo-erp-features-rebuild-3ukys2
+```
+
+Falls du das Repository schon hast:
+
+```bash
+cd claude4
+git checkout claude/odo-erp-features-rebuild-3ukys2
+git pull
+```
+
+## 3. Starten
+
+```bash
+docker compose up --build
+```
+
+Was jetzt passiert (alles automatisch):
+
+1. Ein Node-Image wird gebaut und die Anwendung kompiliert — **beim ersten Mal
+   3–8 Minuten**, danach Sekunden.
+2. PostgreSQL startet.
+3. Das Datenbankschema wird angelegt (10 Migrationen).
+4. Administrator und Beispieldaten werden erzeugt.
+
+Fertig ist es, wenn im Terminal steht:
+
+```
+app-1  | Administrator angelegt: admin@example.com / erp-admin
+app-1  | Beispieldaten angelegt:
+app-1  |   - 20 Komponenten mit Anfangsbestand und Lieferantenpreisen
+app-1  |   - Tastatur mit 3 Farbvarianten
+app-1  |   - Stückliste mit 20 Positionen, davon 6 farbabhängig gefiltert
+app-1  |   - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
+app-1  | → ERP startet auf Port 3000
+app-1  | ✓ Ready
+```
+
+## 4. Anmelden
+
+Browser öffnen: **<http://localhost:3000>**
+
+| | |
+|---|---|
+| E-Mail | `admin@example.com` |
+| Passwort | `erp-admin` |
+
+Das Terminal lässt du offen — dort laufen die Protokolle. Zum Beenden `Strg+C`.
+
+---
+
+# Rundgang: der Kernablauf in 5 Minuten
+
+Die Beispieldaten sind so gebaut, dass du den kompletten Weg von der
+Bestellung bis zum Versand durchspielen kannst.
+
+## Schritt 1 — Die Stückliste ansehen
+
+**Fertigung → Stücklisten → „Tastatur Modell One"**
+
+Du siehst 20 Positionen. Bei sechs davon steht in der Spalte
+**„Auf Varianten anwenden"** ein blaues Kennzeichen wie `Farbe: Weiß` — das
+sind die drei Gehäuse und die drei Keycap-Sets. Die übrigen 14 Positionen
+gelten für alle Varianten.
+
+Weiter unten bei **„Vorschau je Variante"** wählst du `Tastatur Modell One
+(Farbe: Weiß)` und klickst **Anzeigen**. Ergebnis: 16 Positionen — das weiße
+Gehäuse und die weißen Keycaps sind dabei, schwarz und blau fehlen. Genau das
+ist das Odoo-Verhalten „Apply on Variants".
+
+## Schritt 2 — Auftrag bestätigen
+
+**Verkauf → Verkaufsaufträge → S00001**
+
+Ein Angebot über 2 weiße Tastaturen. Klick auf **Bestätigen**. Es passiert:
+
+- Der Status wechselt auf „Verkaufsauftrag".
+- Unten erscheint eine **Lieferung** (`WH/OUT/00001`).
+- Unten erscheint ein **Fertigungsauftrag** (`MO/00001`) — weil das Produkt die
+  Routen „Fertigen" und „Auf Bestellung" trägt.
+
+## Schritt 3 — Fertigen
+
+Klick auf den Fertigungsauftrag **MO/00001**.
+
+Die Komponentenliste hat **16 Zeilen** — die gefilterte Stückliste, eingefroren
+zum Zeitpunkt der Anlage. Alle Mengen sind grün reserviert.
+
+Klick auf **Drucken** (öffnet sich in einem neuen Tab): der Werkstattbeleg mit
+scanbarem Barcode der Auftragsnummer, Komponenten-Checkliste zum Abhaken und
+Unterschriftszeilen. Über den Drucken-Knopf unten geht es in den Druckdialog.
+
+Zurück im Auftrag: **Fertig melden** klicken. Danach ist der Auftrag „Erledigt",
+2 Tastaturen sind im Bestand und das Material ist verbraucht.
+
+## Schritt 4 — Verbrauch prüfen
+
+**Lager → Bestand**
+
+Suche nach `Switch`: von 9.000 sind noch **8.826** da — genau 174 verbraucht
+(87 Stück pro Tastatur × 2). Beim weißen Gehäuse fehlen 2, beim schwarzen und
+blauen ist nichts abgegangen.
+
+Klick auf ein Produkt → **Bewegungen**: dort steht jede einzelne Buchung mit
+Datum, Von/Nach-Lagerort und Beleg. Nichts im System ändert Bestände am
+Protokoll vorbei.
+
+## Schritt 5 — Versand
+
+**Versand**
+
+Die Lieferung steht jetzt unter **„Versandbereit"** — sie erscheint dort, weil
+die Fertigung fertig ist und die Ware reserviert werden konnte. Der Knopf
+„Label erstellen" ist ohne DHL-Zugangsdaten deaktiviert; das ist erwartet
+(siehe unten).
+
+## Was du sonst noch ausprobieren kannst
+
+| Was | Wo |
+|---|---|
+| Bestellung beim Lieferanten, Wareneingang buchen | Einkauf → Neue Bestellung („Komponenten Handels GmbH") |
+| Lieferantenrechnung, Gutschrift | Einkauf → Bestellung → Rechnung erstellen |
+| Inventur mit Differenzbuchung | Lager → Inventur |
+| Ausschuss buchen | Lager → Bestand (unten) |
+| Tastatur wieder zerlegen | Fertigung → Demontage |
+| Reparatur mit Teileverbrauch | Reparaturen → Neuer Reparaturauftrag |
+| Neue Farbe anlegen und Varianten erzeugen | Produkte → Attribute, dann Produkte → Tastatur |
+| Barcode-Suche | Feld oben rechts (oder **F2**), z. B. `MO/00001` oder `TAST-W` eingeben |
+
+---
+
+# Alltagsbefehle (Docker)
+
+```bash
+docker compose up            # starten (ohne Neubau)
+docker compose up --build    # starten und vorher neu bauen (nach git pull)
+docker compose up -d         # im Hintergrund starten
+docker compose down          # anhalten, Daten bleiben erhalten
+docker compose down -v       # anhalten und ALLE Daten löschen (frischer Start)
+docker compose logs -f app   # Protokolle mitlesen
+docker compose restart app   # nur die Anwendung neu starten
+```
+
+**Ganz von vorn anfangen:**
+
+```bash
+docker compose down -v && docker compose up --build
+```
+
+**In die Datenbank schauen:** In `docker-compose.yml` beim Dienst `db` die drei
+Kommentarzeichen vor `ports` entfernen, dann `docker compose up -d`. Danach:
+
+```bash
+psql postgres://erp:erp@localhost:5433/erp
+```
+
+---
+
+# Weg 2: Ohne Docker
+
+Sinnvoll, wenn du am Code arbeitest: Änderungen sind sofort im Browser
+sichtbar, ohne Neubau.
+
+## 1. Voraussetzungen
+
+- **Node.js 22 oder neuer** — [nodejs.org](https://nodejs.org/) oder
+  `brew install node` / `nvm install 22`
+- **PostgreSQL 16 oder neuer**
+
+Prüfen:
+
+```bash
+node --version    # muss v22 oder höher sein
+```
+
+## 2. PostgreSQL bereitstellen
+
+Am einfachsten nur die Datenbank per Docker, den Rest nativ:
+
+```bash
+docker run -d --name erp-db \
+  -e POSTGRES_USER=erp -e POSTGRES_PASSWORD=erp -e POSTGRES_DB=erp \
+  -p 5433:5432 postgres:17-alpine
+```
+
+Alternativ nativ installiert (macOS: `brew install postgresql@17 && brew
+services start postgresql@17`), dann Datenbank anlegen:
+
+```bash
+createdb erp
+```
+
+## 3. Einrichten und starten
+
+```bash
+npm install
+cp .env.example .env
+```
+
+In `.env` die Zeile `DATABASE_URL` auf deine Datenbank zeigen lassen:
+
+```
+DATABASE_URL=postgres://erp:erp@localhost:5433/erp
+```
+
+(Bei nativer Installation ohne Passwort meist:
+`postgres://localhost:5432/erp`)
+
+Dann:
+
+```bash
+npm run db:migrate         # Schema anlegen
+npm run db:seed -- --demo  # Administrator + Beispieldaten
+npm run dev                # startet auf http://localhost:3000
+```
+
+## 4. Weitere Befehle
+
+```bash
+npm run db:reset           # Schema verwerfen und neu aufbauen (Daten weg!)
+npm run db:seed            # nur Administrator, ohne Beispieldaten
+npm test                   # 61 Tests (brauchen die Datenbank)
+npm run check              # Typprüfung + Tests
+npm run build && npm start # Produktionsmodus lokal testen
+```
+
+---
+
+# Shopify und DHL anbinden (optional)
+
+Ohne Zugangsdaten laufen **alle Module** — nur der Bestellimport und die
+Labelerstellung sind deaktiviert, mit sichtbarem Hinweis in der Oberfläche.
+Zum Aktivieren die Werte in `.env` eintragen (bzw. bei Docker in
+`docker-compose.yml` unter `environment`) und neu starten.
+
+**Shopify** — Custom App im Shopify Dev Dashboard anlegen, Scopes
+`read_orders`, `write_orders`, `write_merchant_managed_fulfillment_orders`:
+
+```
+SHOPIFY_SHOP_DOMAIN=deinshop.myshopify.com
+SHOPIFY_ADMIN_TOKEN=shpat_…
+SHOPIFY_WEBHOOK_SECRET=…      # Client Secret der App
+```
+
+**DHL** — Geschäftskundenvertrag mit Zugang zum Geschäftskundenportal, dort
+einen Systembenutzer anlegen, App im
+[DHL Developer Portal](https://developer.dhl.com/) erstellen:
+
+```
+DHL_API_BASE=https://api-sandbox.dhl.com   # zum Testen; produktiv: https://api-eu.dhl.com
+DHL_API_KEY=…
+DHL_API_SECRET=…
+DHL_GKP_USER=…
+DHL_GKP_PASSWORD=…
+DHL_BILLING_NUMBER=…          # 14-stellig
+```
+
+Zum Ausprobieren reicht die Sandbox mit den DHL-Testzugangsdaten — dort
+kommen Musterlabels zurück, es wird nichts versendet.
+
+Den Zustand beider Anbindungen zeigt die Seite **Integrationen**.
+
+---
+
+# Fehlerbehebung
+
+**`port is already allocated` / `address already in use`**
+Auf Port 3000 läuft schon etwas. Entweder das andere Programm beenden, oder in
+`docker-compose.yml` beim Dienst `app` den Port ändern:
+`- '127.0.0.1:3001:3000'` — dann läuft das ERP auf <http://localhost:3001>.
+
+**`Cannot connect to the Docker daemon`**
+Docker Desktop ist nicht gestartet (macOS/Windows) bzw. unter Linux fehlt die
+Gruppenmitgliedschaft: `sudo usermod -aG docker $USER`, danach abmelden und neu
+anmelden.
+
+**Der Build hängt bei `npm ci`**
+Meist die Netzwerkverbindung zur npm-Registry. Abbrechen (`Strg+C`) und
+`docker compose build --no-cache` erneut versuchen.
+
+**„Datenbank nach 120 Sekunden nicht erreichbar"**
+Selten, meist wenn der Rechner stark ausgelastet ist. `docker compose down`
+und erneut `docker compose up` lösen es in der Regel.
+
+**Anmeldung schlägt fehl**
+Prüfen, ob im Protokoll „Administrator angelegt" steht. Falls die Datenbank aus
+einem früheren Versuch stammt, hilft `docker compose down -v` und ein
+Neustart.
+
+**Beispieldaten fehlen**
+Sie werden nur angelegt, wenn die Datenbank leer ist. Frisch aufsetzen mit
+`docker compose down -v && docker compose up --build`.
+
+**Apple Silicon (M1–M4)**
+Läuft ohne Anpassung; alle verwendeten Images gibt es für arm64.
+
+**Änderungen am Code werden nicht sichtbar (Docker)**
+Das Image enthält einen Produktions-Build. Nach Codeänderungen entweder
+`docker compose up --build` oder besser Weg 2 (`npm run dev`) benutzen.
+
+---
+
+# Was als Nächstes?
+
+- **Weiterbetrieb im Team:** [betrieb.md](betrieb.md) — inklusive der Variante,
+  das ERP vollständig hinter einem VPN zu betreiben.
+- **Wie es funktioniert:** [architektur.md](architektur.md)
+- **Was jedes Modul kann:** [module/](module/)

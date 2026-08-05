@@ -86,6 +86,8 @@ später ohne Umbau ändern.
 
 ## Lokal ausprobieren
 
+Ausführlich in [lokal-starten.md](lokal-starten.md). Kurzfassung:
+
 ```bash
 docker compose up --build     # → http://localhost:3000
 ```

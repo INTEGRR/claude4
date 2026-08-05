@@ -9,6 +9,9 @@ Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 - **Reparatur** — Reparaturaufträge mit Teileverbrauch (einbauen / ausbauen / wiederverwenden)
 - **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren) und Fulfillment-Rückmeldung an Shopify
 
+> **Ausführliche Schritt-für-Schritt-Anleitung mit Rundgang durch die
+> Beispieldaten und Fehlerbehebung: [docs/lokal-starten.md](docs/lokal-starten.md)**
+
 ## Schnellstart mit Docker (empfohlen zum Ausprobieren)
 
 Voraussetzung ist nur Docker Desktop bzw. Docker Engine mit Compose:
@@ -65,6 +68,7 @@ fertig melden → Lieferung wird versandbereit.
 
 | Dokument | Inhalt |
 |---|---|
+| [docs/lokal-starten.md](docs/lokal-starten.md) | **Lokal starten** — vollständige Anleitung inkl. Rundgang und Fehlerbehebung |
 | [PLAN.md](PLAN.md) | Umsetzungsplan mit Phasen und Abnahmekriterien |
 | [docs/architektur.md](docs/architektur.md) | Tech-Stack, Prinzipien, Projektstruktur, Erweiterbarkeit |
 | [docs/datenmodell.md](docs/datenmodell.md) | Datenbankschema |
