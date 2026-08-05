@@ -1,0 +1,134 @@
+import Link from 'next/link'
+import { sql } from '@/db/client'
+import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { date, money } from '@/modules/shared/format'
+
+export const dynamic = 'force-dynamic'
+
+interface Row {
+  id: string
+  number: string
+  state: string
+  locked: boolean
+  delivery_status: string
+  invoice_status: string
+  source: string
+  shopify_order_name: string | null
+  partner_name: string
+  order_date: string
+  gross: number
+  open_mos: number
+}
+
+export default async function VerkaufPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; q?: string }>
+}) {
+  const { status, q } = await searchParams
+
+  const rows = await sql<Row[]>`
+    select so.id, so.number, so.state, so.locked, so.delivery_status, so.invoice_status,
+           so.source, so.shopify_order_name, p.name as partner_name, so.order_date,
+           (select gross from sales_order_total(so.id)) as gross,
+           (select count(*) from manufacturing_orders mo
+             where mo.sales_order_id = so.id and mo.state not in ('done','cancel'))::int as open_mos
+    from sales_orders so
+    join partners p on p.id = so.partner_id
+    where (${status ?? null}::text is null or so.state = ${status ?? null}::sale_state)
+      and (${q ?? null}::text is null
+           or so.number ilike ${'%' + (q ?? '') + '%'}
+           or coalesce(so.shopify_order_name, '') ilike ${'%' + (q ?? '') + '%'}
+           or p.name ilike ${'%' + (q ?? '') + '%'})
+    order by so.order_date desc, so.number desc
+    limit 200`
+
+  const filters = [
+    { key: undefined, label: 'Alle' },
+    { key: 'draft', label: 'Angebote' },
+    { key: 'sale', label: 'Aufträge' },
+    { key: 'cancel', label: 'Abgebrochen' },
+  ]
+
+  return (
+    <>
+      <PageHeader
+        title="Verkaufsaufträge"
+        subtitle="Aufträge aus Shopify und manuell erfasste Aufträge"
+        actions={
+          <Link className="btn primary" href="/verkauf/neu">
+            Neuer Auftrag
+          </Link>
+        }
+      />
+
+      <Card tight>
+        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {filters.map((f) => (
+            <Link
+              key={f.label}
+              href={f.key ? `/verkauf?status=${f.key}` : '/verkauf'}
+              className={`btn small${status === f.key ? ' primary' : ''}`}
+            >
+              {f.label}
+            </Link>
+          ))}
+          <form style={{ marginLeft: 'auto' }}>
+            <input
+              type="search"
+              name="q"
+              placeholder="Nummer oder Kunde"
+              defaultValue={q ?? ''}
+              style={{ width: 240 }}
+            />
+          </form>
+        </div>
+
+        {rows.length === 0 ? (
+          <Empty>Keine Aufträge gefunden.</Empty>
+        ) : (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nummer</th>
+                  <th>Kunde</th>
+                  <th>Datum</th>
+                  <th>Status</th>
+                  <th>Lieferung</th>
+                  <th>Fertigung</th>
+                  <th className="num">Summe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="mono">
+                      <Link href={`/verkauf/${r.id}`}>{r.number}</Link>
+                      {r.shopify_order_name && (
+                        <span className="muted small"> · {r.shopify_order_name}</span>
+                      )}
+                      {r.locked && <span className="badge neutral" style={{ marginLeft: 6 }}>Gesperrt</span>}
+                    </td>
+                    <td>{r.partner_name}</td>
+                    <td className="nowrap">{date(r.order_date)}</td>
+                    <td><Badge state={r.state} kind="sale" /></td>
+                    <td><Badge state={r.delivery_status} kind="delivery" /></td>
+                    <td>
+                      {r.open_mos > 0 ? (
+                        <span className="badge warn">{r.open_mos} offen</span>
+                      ) : (
+                        <span className="muted small">—</span>
+                      )}
+                    </td>
+                    <td className="num nowrap">{money(r.gross)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
+    </>
+  )
+}
