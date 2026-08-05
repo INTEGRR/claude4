@@ -208,7 +208,17 @@ node --version    # muss v22 oder höher sein
 
 ## 2. PostgreSQL bereitstellen
 
-Am einfachsten nur die Datenbank per Docker, den Rest nativ:
+**Windows ohne Docker:** [PostgreSQL-Installer](https://www.postgresql.org/download/windows/)
+ausführen und das vergebene Passwort merken. Danach in der PowerShell:
+
+```powershell
+createdb -U postgres erp
+```
+
+In `.env` dann:
+`DATABASE_URL=postgres://postgres:DEINPASSWORT@localhost:5432/erp`
+
+**Mit Docker** — am einfachsten nur die Datenbank im Container, den Rest nativ:
 
 ```bash
 docker run -d --name erp-db \
@@ -302,10 +312,36 @@ Auf Port 3000 läuft schon etwas. Entweder das andere Programm beenden, oder in
 `docker-compose.yml` beim Dienst `app` den Port ändern:
 `- '127.0.0.1:3001:3000'` — dann läuft das ERP auf <http://localhost:3001>.
 
-**`Cannot connect to the Docker daemon`**
-Docker Desktop ist nicht gestartet (macOS/Windows) bzw. unter Linux fehlt die
-Gruppenmitgliedschaft: `sudo usermod -aG docker $USER`, danach abmelden und neu
-anmelden.
+**`Cannot connect to the Docker daemon` / `failed to connect to the docker API
+at npipe:////./pipe/dockerDesktopLinuxEngine` (Windows)**
+
+Die Docker-Engine läuft nicht. Der Docker-Befehl selbst ist installiert, findet
+aber keinen laufenden Dienst.
+
+1. **Docker Desktop starten** (Startmenü → Docker Desktop) und warten, bis
+   unten links **„Engine running"** grün angezeigt wird — nach einem Neustart
+   des Rechners dauert das gut 1–2 Minuten.
+2. Prüfen mit `docker version`: Es muss ein Abschnitt **`Server:`** erscheinen.
+   Steht dort nur `Client:`, ist die Engine noch nicht oben.
+3. Dann erneut `docker compose up --build`.
+
+Startet Docker Desktop nicht oder beendet sich sofort wieder:
+
+- **WSL 2 fehlt oder ist veraltet** — häufigste Ursache. In PowerShell als
+  Administrator: `wsl --install`, danach `wsl --update`, Windows neu starten.
+- **Virtualisierung ist im BIOS deaktiviert** — im Task-Manager unter
+  *Leistung → CPU* muss „Virtualisierung: Aktiviert" stehen; sonst im BIOS/UEFI
+  Intel VT-x bzw. AMD-V einschalten.
+- **Windows- statt Linux-Container** — Rechtsklick auf das Wal-Symbol; falls
+  *„Switch to Linux containers"* angeboten wird, anklicken.
+- **Falscher Docker-Kontext** — `docker context ls`, dann
+  `docker context use desktop-linux`.
+- **Zurücksetzen** — Docker Desktop → Zahnrad → *Troubleshoot* → *Restart*.
+
+Unter **macOS** gilt dasselbe: Docker Desktop muss geöffnet sein.
+Unter **Linux** fehlt meist nur die Gruppenmitgliedschaft:
+`sudo usermod -aG docker $USER`, danach ab- und wieder anmelden. Prüfen, ob der
+Dienst läuft: `sudo systemctl status docker`.
 
 **Der Build hängt bei `npm ci`**
 Meist die Netzwerkverbindung zur npm-Registry. Abbrechen (`Strg+C`) und
