@@ -18,6 +18,16 @@
 
 ---
 
+## Stand der Umsetzung
+
+Alle Phasen sind umgesetzt. Die Fachlogik liegt in den SQL-Migrationen, die
+Oberfläche in `src/app/(erp)`. 61 Tests laufen gegen eine echte Postgres-
+Datenbank, darunter ein Invariantentest, der Bestand und Bewegungsledger
+abgleicht. Abweichungen von der ursprünglichen Stack-Wahl (kein ORM, eigene
+Anmeldung, HTML-Druckansichten statt PDF-Rendering) sind in
+[docs/architektur.md](docs/architektur.md) begründet; Deployment-Varianten
+inklusive VPN-Betrieb stehen in [docs/betrieb.md](docs/betrieb.md).
+
 ## Phasen
 
 ### Phase 0 — Fundament

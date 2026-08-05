@@ -4,18 +4,23 @@
 
 | Baustein | Wahl | Begründung |
 |---|---|---|
-| Frontend + Backend | **Next.js 15 (App Router, TypeScript)** auf **Vercel** | Ein Deployment für UI + API; Route Handler liefern den Raw Body für Shopify-HMAC; Vercel Cron für Reconciliation-Jobs; Stack ist im Team etabliert |
-| Datenbank | **Supabase Postgres (17)** | Relationales ERP-Datenmodell; Transaktionen für Bestandsbuchungen; Team hat bestehende Supabase-Projekte |
-| Auth | **Supabase Auth** | E-Mail-Login für das Team, Session-Handling out of the box |
-| ORM / Migrationen | **Drizzle ORM + drizzle-kit** (SQL-Migrationen im Repo) | Typsichere Queries in Server Actions; Migrationen versioniert im Git |
-| Kritische Buchungslogik | **Postgres-Funktionen** (über Drizzle/RPC aufgerufen) | Bestandsbuchungen, Belegnummern und Statusübergänge laufen atomar in der DB — kein halb gebuchter Zustand |
-| PDF-Erzeugung | **@react-pdf/renderer** (serverseitig) | Fertigungsauftrag-Beleg, Bestell-PDF, Etiketten |
+| Frontend + Backend | **Next.js (App Router, TypeScript)** — gehostet oder selbst betrieben | Ein Deployment für UI + API; Route Handler liefern den Raw Body für Shopify-HMAC; Route Handler liefern den Raw Body für die Shopify-HMAC-Prüfung; Betrieb wahlweise auf Vercel oder auf einem eigenen Host hinter VPN (siehe [betrieb.md](betrieb.md)) |
+| Datenbank | **Postgres 16+** (Supabase oder selbst betrieben) | Relationales ERP-Datenmodell; Transaktionen für Bestandsbuchungen; Team hat bestehende Supabase-Projekte |
+| Auth | **eigenständig** (scrypt-Hashes, Cookie-Sitzungen in Postgres) | Rund 150 Zeilen in `src/modules/auth`, dafür läuft das System ohne externen Anbieter — auch vollständig im privaten Netz (siehe [betrieb.md](betrieb.md)). Austauschbar, weil alle Aufrufer nur `currentUser()` / `requireUser()` kennen |
+| Datenzugriff / Migrationen | **postgres.js + eigener Migrations-Runner** (SQL-Dateien im Repo) | SQL-first: die Fachlogik liegt ohnehin in Postgres-Funktionen, die von Hand geschrieben werden müssen. Ein ORM daneben wäre eine zweite Schema-Wahrheit ohne Gegenwert. Der Runner sichert Migrationen über Prüfsummen gegen nachträgliche Änderungen ab |
+| Kritische Buchungslogik | **Postgres-Funktionen** (aus Server Actions aufgerufen) | Bestandsbuchungen, Belegnummern und Statusübergänge laufen atomar in der DB — kein halb gebuchter Zustand |
+| Belege | **Druckoptimierte HTML-Ansichten** (`@media print`) | Fertigungsauftrag und Etiketten drucken direkt aus dem Browser — kein PDF-Rendering im Server, dieselbe Darstellung am Bildschirm wie auf Papier |
 | Barcodes | **bwip-js** (Code 128) | Barcode auf MO-Beleg/Etiketten; gleiche Codes werden von USB-Scannern (Keyboard-Wedge) gelesen |
 | E-Mail-Versand | **Resend + React Email** | Bestellungen an Lieferanten, Retourenlabel an Kunden; Vorlagen als React-Komponenten |
 | Versand | **DHL Parcel DE Shipping API v2** (eigener typisierter Client, OAuth2 ROPC) | Labels, Tracking (Unified API), Retouren direkt bei DHL — kein Sendcloud dazwischen |
-| Hintergrund-Jobs | **Postgres-Job-Tabelle (Outbox) + Vercel Cron** | Webhook-Verarbeitung entkoppelt vom Empfang; Shopify-Tag-Pushes mit Retry; kein zusätzlicher Infrastruktur-Baustein |
+| Hintergrund-Jobs | **Postgres-Job-Tabelle (Outbox) + Cron** (Vercel Cron oder systemd-Timer) | Webhook-Verarbeitung entkoppelt vom Empfang; ausgehende Aufrufe mit Backoff wiederholt; kein zusätzlicher Infrastruktur-Baustein |
 
 Bewusst **nicht** im ersten Ausbau: Redis/Queues, Microservices, Multi-Tenant, Buchhaltung (nur Belege, keine Journalbuchungen).
+
+**Hinweis zum Datenzugriff:** `prepare: false` ist gesetzt. Prepared Statements
+brechen zum einen mit dem Supabase-Pooler im Transaction-Mode, zum anderen
+zeigen zwischengespeicherte Statements nach Migrationen, die Enums neu anlegen,
+auf verschwundene Typ-OIDs.
 
 ## Architekturprinzipien
 
@@ -36,21 +41,21 @@ src/
     api/
       webhooks/shopify/     # Route Handler (Raw Body, HMAC)
       cron/                 # Reconciliation, Job-Runner
+  components/               # Wiederverwendete UI-Bausteine
   modules/
-    stammdaten/             # Produkte, Varianten, Attribute, UoM, Partner
-    lager/                  # Locations, Pickings, Moves, Bestände, Inventur
-    verkauf/
-    einkauf/
-    fertigung/
-    reparatur/
-    versand/                # DHL (Label, Tracking, Retouren), Shopify-Fulfillment
-    integrationen/          # Shopify-Import, E-Mail
-    shared/                 # Belegnummern, Status-Maschinen, PDF, Barcode
+    auth/                   # Anmeldung, Sitzungen, Rollen
+    versand/                # DHL-Client, Label-/Tracking-Service
+    integrationen/          # Shopify-Client, Import-Pipeline, Outbox-Runner, E-Mail
+    shared/                 # Formatierung, Barcode, Formularauswertung, Adressen
   db/
-    schema/                 # Drizzle-Schema je Modul
-    migrations/
-    functions/              # SQL: Buchungsfunktionen, Trigger
+    client.ts
+    migrations/             # Schema UND Fachlogik (Buchungsfunktionen, Trigger)
 ```
+
+Die fachlichen Module (Verkauf, Fertigung, Einkauf, Lager, Reparatur) leben
+vollständig in `db/migrations` (Logik) und `app/(erp)/<modul>` (Seiten +
+Server Actions) — sie brauchen keine eigene Zwischenschicht, weil die Actions
+direkt die Postgres-Funktionen aufrufen.
 
 ### 2. Lagerbewegungen als einzige Wahrheit (Ledger-Prinzip)
 
@@ -78,8 +83,9 @@ Vorgesehene, aber **nicht** im ersten Ausbau enthaltene Erweiterungen — das Da
 
 ## Sicherheit & Betrieb
 
-- **RLS**: Alle Tabellen mit Row Level Security; Zugriff nur für authentifizierte Teammitglieder (Single-Tenant, Rollen `admin`/`mitarbeiter` als App-Metadata). Service-Role-Key nur serverseitig.
-- **Secrets**: Shopify-Token (`shpat_…`), Webhook-Secret, Resend-Key, DHL-API-Key/-Secret + GKP-Systembenutzer als Vercel-Env-Vars; nie im Client. DHL-Systembenutzer-Passwort läuft nach 365 Tagen ab — Erinnerung einplanen.
+- **Zugriffsschutz**: Die Anwendung ist die einzige Verbindung zur Datenbank; jede Seite und jede Server Action ruft `requireUser()` auf. Es gibt keinen direkten Datenbankzugang aus dem Browser, deshalb ersetzt das die RLS-Schicht. Zugangsdaten als scrypt-Hashes, Sitzungs-Token nur gehasht gespeichert.
+- **Secrets**: Shopify-Token (`shpat_…`), Webhook-Secret, Resend-Key, DHL-API-Key/-Secret + GKP-Systembenutzer als Umgebungsvariablen; nie im Client. DHL-Systembenutzer-Passwort läuft nach 365 Tagen ab — Erinnerung einplanen.
 - **Idempotenz**: Webhooks über `X-Shopify-Webhook-Id` + Order-ID; DHL-Label-Erstellung über Sendungs-Datensatz je Lieferung (kein Doppel-Label ohne vorherigen Storno).
 - **Zeitzone/Währung**: Europe/Berlin, EUR (einwährungsfähig; `currency`-Spalten vorhanden).
-- **Backups**: Supabase PITR aktivieren, sobald produktiv.
+- **Backups**: PITR bzw. regelmäßige Dumps aktivieren, sobald produktiv.
+- **Deployment**: Varianten inkl. vollständigem VPN-Betrieb in [betrieb.md](betrieb.md).

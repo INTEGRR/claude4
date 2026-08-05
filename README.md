@@ -1,26 +1,73 @@
 # ERP — Eigenentwicklung (Odoo-Nachbau)
 
-Eigenes, schlankes ERP-System, das die bei uns aktiv genutzten Odoo-Funktionen nachbaut:
+Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 
-- **Verkauf** — Verkaufsaufträge (v. a. aus Shopify), automatische Erzeugung von Lieferung und Fertigungsauftrag
-- **Fertigung** — Produkte mit Varianten, Stücklisten (inkl. „Auf Varianten anwenden"), Fertigungsaufträge (druckbar, mit Barcode), Demontage
+- **Verkauf** — Verkaufsaufträge (v. a. aus Shopify), Bestätigung erzeugt Lieferung und Fertigungsauftrag
+- **Fertigung** — Produkte mit Varianten, Stücklisten inkl. **„Auf Varianten anwenden"**, Fertigungsaufträge (druckbar, mit Barcode), Demontage
 - **Einkauf** — Lieferanten, Bestellungen (E-Mail-Versand, Sperren, Stornieren), Wareneingang, Lieferantenrechnungen
-- **Lager** — Lagerorte, Lagerbewegungen (Eingang, Ausgang, Fertigung, Storno), Bestände, Inventur, Barcodes
-- **Reparatur** — Reparaturaufträge mit Teileverbrauch
-- **Versand** — direkte DHL-Anbindung (Label, Tracking, Retouren) statt Sendcloud
-- **Integrationen** — Shopify (Order-Import per Webhook, Fulfillment-/Tracking-Rückmeldung)
+- **Lager** — Bewegungs-Ledger (Eingang, Ausgang, Fertigung, Inventur, Ausschuss, Retoure), Bestände mit Prognose, Barcodes
+- **Reparatur** — Reparaturaufträge mit Teileverbrauch (einbauen / ausbauen / wiederverwenden)
+- **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren) und Fulfillment-Rückmeldung an Shopify
+
+## Schnellstart
+
+```bash
+npm install
+cp .env.example .env          # DATABASE_URL eintragen
+npm run db:migrate            # Schema anlegen
+npm run db:seed -- --demo     # Administrator + Beispieldaten
+npm run dev                   # http://localhost:3000
+```
+
+Anmeldung mit den beim Seed ausgegebenen Zugangsdaten
+(Standard: `admin@example.com` / `erp-admin` — bitte danach ändern).
+
+Die Beispieldaten enthalten eine Tastatur mit drei Farbvarianten und eine
+Stückliste mit 20 Positionen, in der Gehäuse und Keycaps je Farbe gefiltert
+sind. Damit lässt sich der Kernablauf sofort durchspielen:
+Auftrag bestätigen → Fertigungsauftrag prüfen (nur die passenden Farbteile) →
+fertig melden → Lieferung wird versandbereit.
+
+## Befehle
+
+| Befehl | Zweck |
+|---|---|
+| `npm run dev` | Entwicklungsserver |
+| `npm run build` / `npm start` | Produktions-Build und -Start |
+| `npm run db:migrate` | Ausstehende Migrationen einspielen |
+| `npm run db:reset` | Schema verwerfen und neu aufbauen (nur Entwicklung) |
+| `npm run db:seed [-- --demo]` | Administrator anlegen, optional Beispieldaten |
+| `npm test` | Tests (brauchen eine erreichbare Datenbank) |
+| `npm run check` | Typprüfung + Tests |
 
 ## Dokumente
 
 | Dokument | Inhalt |
 |---|---|
-| [PLAN.md](PLAN.md) | **Master-Umsetzungsplan** mit Phasen und Abnahmekriterien |
-| [docs/architektur.md](docs/architektur.md) | Tech-Stack, Architekturprinzipien, Projektstruktur, Erweiterbarkeit |
-| [docs/datenmodell.md](docs/datenmodell.md) | Vollständiges Datenbankschema (Postgres/Supabase) |
+| [PLAN.md](PLAN.md) | Umsetzungsplan mit Phasen und Abnahmekriterien |
+| [docs/architektur.md](docs/architektur.md) | Tech-Stack, Prinzipien, Projektstruktur, Erweiterbarkeit |
+| [docs/datenmodell.md](docs/datenmodell.md) | Datenbankschema |
+| [docs/betrieb.md](docs/betrieb.md) | Deployment (auch hinter VPN), Cron-Aufgaben, Betriebspflichten |
 | [docs/module/](docs/module/) | Fachliche Spezifikation je Modul |
-| [docs/odoo-referenz/](docs/odoo-referenz/) | Recherche-Ergebnisse aus der offiziellen Odoo-18-Dokumentation (Referenzverhalten) |
-| [docs/api-referenz/](docs/api-referenz/) | API-Referenzen: Shopify, DHL, Sendcloud-Funktionsumfang (Nachbau-Vorlage) |
+| [docs/odoo-referenz/](docs/odoo-referenz/) | Recherche aus der offiziellen Odoo-18-Dokumentation |
+| [docs/api-referenz/](docs/api-referenz/) | Shopify- und DHL-APIs, Sendcloud-Funktionsumfang als Nachbau-Vorlage |
 
-## Status
+## Aufbau
 
-Planungsphase — die Umsetzung erfolgt anhand von [PLAN.md](PLAN.md), Phase für Phase.
+```
+src/
+  app/(erp)/…      Seiten je Modul (Server Components + Server Actions)
+  app/api/…        Webhooks, Cron, Barcode-Auflösung, Label-Auslieferung
+  db/migrations/   SQL-Migrationen — Schema UND Fachlogik
+  modules/         auth, integrationen (Shopify), versand (DHL), shared
+tests/             Tests gegen eine echte Postgres-Datenbank
+```
+
+Die Buchungslogik liegt bewusst als Postgres-Funktionen in den Migrationen:
+Bestandsbuchungen, Statusübergänge und Belegnummern laufen damit atomar in
+einer Transaktion. Die Anwendungsschicht ruft sie auf und kümmert sich um
+Anmeldung, Eingabeprüfung und Darstellung.
+
+**Grundregel:** Jede Bestandsänderung ist eine Bewegung in `stock_moves`.
+Bestände werden nie direkt geschrieben, sondern aus erledigten Bewegungen
+fortgeschrieben — abgesichert durch einen Invariantentest.
