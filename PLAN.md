@@ -4,7 +4,7 @@
 
 **Grundlage:** Das Zielverhalten wurde aus der offiziellen Odoo-18-Dokumentation erhoben (teilweise gegen den Odoo-Quellcode verifiziert) und liegt in [docs/odoo-referenz/](docs/odoo-referenz/) ab. Die fachlichen Spezifikationen je Modul stehen in [docs/module/](docs/module/), Architektur und Datenmodell in [docs/architektur.md](docs/architektur.md) und [docs/datenmodell.md](docs/datenmodell.md).
 
-**Stack (Kurzfassung):** Next.js 15 (TypeScript) auf Vercel · Supabase (Postgres 17, Auth, Storage) · Drizzle ORM mit SQL-Migrationen · kritische Buchungslogik als Postgres-Funktionen · @react-pdf/renderer + bwip-js (PDFs/Barcodes) · Resend (E-Mail) · DHL Parcel DE Shipping API v2 (Versand) · Outbox-Tabelle + Vercel Cron (Jobs). Begründungen: [docs/architektur.md](docs/architektur.md).
+**Stack (umgesetzt):** Next.js (TypeScript) · Postgres 16+ (Supabase oder selbst betrieben) · postgres.js mit SQL-Migrationen · Buchungslogik als Postgres-Funktionen · bwip-js (Barcodes) + druckoptimierte HTML-Belege · Resend (E-Mail) · DHL Parcel DE Shipping API v2 (Versand) · Outbox-Tabelle + Cron (Jobs). Begründungen: [docs/architektur.md](docs/architektur.md).
 
 ---
 
