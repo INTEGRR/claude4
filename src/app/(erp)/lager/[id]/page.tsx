@@ -1,14 +1,17 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { AuditLog, Badge, Card, type LogEntry, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
 import { cancelPicking, checkAvailability, confirmPicking, returnPicking, validatePicking } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PickingPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('lager')
   const { id } = await params
 
   const [picking] = await sql<
@@ -69,9 +72,6 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
     { id: string; shipment_number: string; state: string; tracking_url: string }[]
   >`select id, shipment_number, state, tracking_url from shipments where picking_id = ${id}`
 
-  const log = await sql<LogEntry[]>`
-    select id, kind, message, actor, created_at from audit_log
-    where model = 'stock_picking' and record_id = ${id} order by created_at desc limit 30`
 
   const open = picking.state !== 'done' && picking.state !== 'cancel'
   const originHref =
@@ -249,9 +249,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         </Card>
       )}
 
-      <Card title="Verlauf">
-        <AuditLog entries={log} />
-      </Card>
+      <RecordComments model="stock_picking" recordId={id} path={`/lager/${id}`} />
     </>
   )
 }

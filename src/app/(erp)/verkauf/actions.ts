@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 
 /**
  * Server Actions des Verkaufsmoduls. Die Fachlogik liegt in den
@@ -17,7 +17,7 @@ function fail(err: unknown): never {
 }
 
 export async function confirmOrder(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('verkauf')
   try {
     await sql`select confirm_sales_order(${orderId}, ${user.name})`
   } catch (err) {
@@ -28,7 +28,7 @@ export async function confirmOrder(orderId: string) {
 }
 
 export async function cancelOrder(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('verkauf')
   try {
     await sql`select cancel_sales_order(${orderId}, ${user.name})`
   } catch (err) {
@@ -39,7 +39,7 @@ export async function cancelOrder(orderId: string) {
 }
 
 export async function setLocked(orderId: string, locked: boolean) {
-  const user = await requireUser()
+  const user = await requireWrite('verkauf')
   await sql`update sales_orders set locked = ${locked} where id = ${orderId} and state = 'sale'`
   await sql`select log_event('sales_order', ${orderId}, 'state',
     ${locked ? 'Auftrag gesperrt' : 'Auftrag entsperrt'}, ${user.name})`
@@ -47,7 +47,7 @@ export async function setLocked(orderId: string, locked: boolean) {
 }
 
 export async function resetToDraft(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('verkauf')
   await sql`update sales_orders set state = 'draft', locked = false
             where id = ${orderId} and state in ('cancel', 'sent')`
   await sql`select log_event('sales_order', ${orderId}, 'state', 'Auf Angebot zurückgesetzt', ${user.name})`
@@ -55,7 +55,7 @@ export async function resetToDraft(orderId: string) {
 }
 
 export async function createOrder(formData: FormData) {
-  await requireUser()
+  await requireWrite('verkauf')
   const partnerId = String(formData.get('partner_id') ?? '')
   if (!partnerId) throw new Error('Bitte einen Kunden auswählen')
 
@@ -76,7 +76,7 @@ export async function createOrder(formData: FormData) {
 }
 
 export async function addLine(orderId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('verkauf')
   await sql`select sales_order_guard_editable(${orderId})`
 
   const variantId = String(formData.get('variant_id') ?? '')
@@ -106,17 +106,9 @@ export async function addLine(orderId: string, formData: FormData) {
 }
 
 export async function removeLine(orderId: string, lineId: string) {
-  await requireUser()
+  await requireWrite('verkauf')
   await sql`select sales_order_guard_editable(${orderId})`
   await sql`delete from sales_order_lines where id = ${lineId} and order_id = ${orderId}`
   await sql`select sales_order_recompute_status(${orderId})`
-  revalidatePath(`/verkauf/${orderId}`)
-}
-
-export async function addNote(orderId: string, formData: FormData) {
-  const user = await requireUser()
-  const note = String(formData.get('note') ?? '').trim()
-  if (!note) return
-  await sql`select log_event('sales_order', ${orderId}, 'note', ${note}, ${user.name})`
   revalidatePath(`/verkauf/${orderId}`)
 }

@@ -47,6 +47,17 @@ async function main() {
       return
     }
 
+    // --- Demo-Benutzer für die Rollen --------------------------------------
+    for (const [email, name, role] of [
+      ['lager@example.com', 'Lena Lager', 'lager'],
+      ['fertigung@example.com', 'Fred Fertigung', 'fertigung'],
+    ]) {
+      await sql`
+        insert into users (email, name, password_hash, role)
+        values (${email}, ${name}, ${await hashPassword(ADMIN_PASSWORD)}, ${role}::user_role)
+        on conflict (email) do nothing`
+    }
+
     const [{ count }] = await sql<{ count: number }[]>`
       select count(*)::int as count from product_templates`
     if (count > 0) {
@@ -126,7 +137,9 @@ async function main() {
       await sql`select generate_variants(${tpl.id})`
       const [variant] = await sql<{ id: string }[]>`
         select id from product_variants where template_id = ${tpl.id} limit 1`
-      await sql`update product_variants set sku = ${'K-' + String(compIds.size + 1).padStart(3, '0')}
+      await sql`update product_variants
+                set sku = ${'K-' + String(compIds.size + 1).padStart(3, '0')},
+                    barcode = ${'4260' + String(compIds.size + 1).padStart(9, '0')}
                 where id = ${variant.id}`
       compIds.set(c.name, variant.id)
 
@@ -220,10 +233,11 @@ async function main() {
     })} where key = 'company'`
 
     console.log(`Beispieldaten angelegt:
-  - 20 Komponenten mit Anfangsbestand und Lieferantenpreisen
+  - 20 Komponenten mit Anfangsbestand, Barcodes und Lieferantenpreisen
   - Tastatur mit 3 Farbvarianten
   - Stückliste mit 20 Positionen, davon 6 farbabhängig gefiltert
-  - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)`)
+  - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
+  - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)`)
   } finally {
     await sql.end()
   }

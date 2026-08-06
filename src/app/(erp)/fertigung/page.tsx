@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
@@ -12,6 +13,7 @@ export default async function FertigungPage({
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
+  await requireArea('fertigung')
   const { status } = await searchParams
 
   const rows = await sql<

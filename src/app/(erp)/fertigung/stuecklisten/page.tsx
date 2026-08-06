@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
@@ -8,6 +9,7 @@ import { createBom } from '../actions'
 export const dynamic = 'force-dynamic'
 
 export default async function BomListPage() {
+  await requireArea('fertigung')
   const boms = await sql<
     {
       id: string

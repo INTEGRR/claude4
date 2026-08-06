@@ -1,7 +1,7 @@
 'use server'
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 import { parseQtyMap } from '@/modules/shared/form'
 import { queueFulfillmentForPicking } from '@/modules/versand/service'
 
@@ -11,7 +11,7 @@ function fail(err: unknown): never {
 
 /** Validiert einen Transfer inkl. abweichender Ist-Mengen und Rückstand. */
 export async function validatePicking(pickingId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('lager')
 
   const done = parseQtyMap(formData, 'done_')
   const backorder = formData.get('backorder') !== 'no'
@@ -35,19 +35,19 @@ export async function validatePicking(pickingId: string, formData: FormData) {
 }
 
 export async function confirmPicking(pickingId: string) {
-  await requireUser()
+  await requireWrite('lager')
   await sql`select picking_confirm(${pickingId})`
   revalidatePath(`/lager/${pickingId}`)
 }
 
 export async function checkAvailability(pickingId: string) {
-  await requireUser()
+  await requireWrite('lager')
   await sql`select picking_check_availability(${pickingId})`
   revalidatePath(`/lager/${pickingId}`)
 }
 
 export async function cancelPicking(pickingId: string) {
-  await requireUser()
+  await requireWrite('lager')
   try {
     await sql`select picking_cancel(${pickingId})`
   } catch (err) {
@@ -58,7 +58,7 @@ export async function cancelPicking(pickingId: string) {
 }
 
 export async function returnPicking(pickingId: string) {
-  await requireUser()
+  await requireWrite('lager')
   let newId: string
   try {
     const [row] = await sql<{ picking_return: string }[]>`select picking_return(${pickingId})`
@@ -73,7 +73,7 @@ export async function returnPicking(pickingId: string) {
 // --- Inventur --------------------------------------------------------------
 
 export async function createCount(formData: FormData) {
-  await requireUser()
+  await requireWrite('lager')
   const variantId = String(formData.get('variant_id') ?? '')
   const counted = Number(formData.get('counted_qty') ?? NaN)
   if (!variantId) throw new Error('Bitte ein Produkt auswählen')
@@ -92,7 +92,7 @@ export async function createCount(formData: FormData) {
 }
 
 export async function applyCount(countId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('lager')
   try {
     await sql`select inventory_apply(${countId}, ${user.name})`
   } catch (err) {
@@ -103,7 +103,7 @@ export async function applyCount(countId: string) {
 }
 
 export async function deleteCount(countId: string) {
-  await requireUser()
+  await requireWrite('lager')
   await sql`delete from inventory_counts where id = ${countId} and applied_at is null`
   revalidatePath('/lager/inventur')
 }
@@ -111,7 +111,7 @@ export async function deleteCount(countId: string) {
 // --- Ausschuss -------------------------------------------------------------
 
 export async function scrapProduct(formData: FormData) {
-  await requireUser()
+  await requireWrite('lager')
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   const reason = String(formData.get('reason') ?? '').trim() || null

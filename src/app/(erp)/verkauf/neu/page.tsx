@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { Card, PageHeader } from '@/components/ui'
 import { createOrder } from '../actions'
@@ -5,6 +6,7 @@ import { createOrder } from '../actions'
 export const dynamic = 'force-dynamic'
 
 export default async function NewOrderPage() {
+  await requireArea('verkauf')
   const partners = await sql<{ id: string; name: string; city: string | null }[]>`
     select id, name, city from partners where is_customer and active order by name limit 500`
 

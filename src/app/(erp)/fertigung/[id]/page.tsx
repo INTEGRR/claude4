@@ -1,14 +1,17 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { AuditLog, Badge, Card, type LogEntry, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
 import { cancelMo, checkAvailability, confirmMo, produceMo, startMo } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function MoPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('fertigung')
   const { id } = await params
 
   const [mo] = await sql<
@@ -62,9 +65,6 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
     where m.production_id = ${id} and m.reference = 'Komponentenverbrauch'
     order by m.created_at`
 
-  const log = await sql<LogEntry[]>`
-    select id, kind, message, actor, created_at from audit_log
-    where model = 'manufacturing_order' and record_id = ${id} order by created_at desc limit 30`
 
   const open = mo.state !== 'done' && mo.state !== 'cancel'
   const remaining = Number(mo.qty_to_produce) - Number(mo.qty_produced)
@@ -237,9 +237,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         </Card>
       )}
 
-      <Card title="Verlauf">
-        <AuditLog entries={log} />
-      </Card>
+      <RecordComments model="manufacturing_order" recordId={id} path={`/fertigung/${id}`} />
     </>
   )
 }

@@ -1,0 +1,391 @@
+import { sql } from '@/db/client'
+import { requireArea } from '@/modules/auth'
+import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
+import { money, qty } from '@/modules/shared/format'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * Feste Auswertungen: Inventarwert, Produktion je Endvariante, verbaute
+ * Komponenten (z. B. "wie oft wurde weißes Gehäuse verbaut") und
+ * Abverkaufsquote. Reine SQL-Aggregationen über das Bewegungs-Ledger —
+ * keine Chart-Bibliothek, Balken sind schmale CSS-Divs.
+ */
+
+function monthKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+function monthsBetween(von: string, bis: string): string[] {
+  const months: string[] = []
+  const cursor = new Date(von + 'T00:00:00Z')
+  cursor.setUTCDate(1)
+  const end = new Date(bis + 'T00:00:00Z')
+  while (cursor <= end && months.length < 24) {
+    months.push(monthKey(cursor))
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+  }
+  return months
+}
+
+function Bar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: 'inline-block',
+        width: 90,
+        height: 8,
+        background: 'var(--border)',
+        borderRadius: 4,
+        verticalAlign: 'middle',
+      }}
+    >
+      <span
+        style={{
+          display: 'block',
+          width: `${pct}%`,
+          height: '100%',
+          background: 'var(--accent, #2f6fed)',
+          borderRadius: 4,
+        }}
+      />
+    </span>
+  )
+}
+
+interface MonthRow {
+  variant_id: string
+  product: string
+  sku: string | null
+  monat: string
+  menge: number
+}
+
+/** Zeilen (variant × Monat) zu einer Tabelle Variante → Monatsspalten drehen. */
+function pivot(rows: MonthRow[], months: string[]) {
+  const byVariant = new Map<
+    string,
+    { product: string; sku: string | null; total: number; perMonth: Map<string, number> }
+  >()
+  for (const r of rows) {
+    let entry = byVariant.get(r.variant_id)
+    if (!entry) {
+      entry = { product: r.product, sku: r.sku, total: 0, perMonth: new Map() }
+      byVariant.set(r.variant_id, entry)
+    }
+    const key = r.monat.slice(0, 7)
+    entry.perMonth.set(key, (entry.perMonth.get(key) ?? 0) + Number(r.menge))
+    entry.total += Number(r.menge)
+  }
+  return [...byVariant.entries()]
+    .map(([id, e]) => ({ id, ...e }))
+    .sort((a, b) => b.total - a.total)
+}
+
+function PivotTable({ rows, months, unit }: { rows: ReturnType<typeof pivot>; months: string[]; unit?: string }) {
+  if (rows.length === 0) return <Empty>Keine Buchungen im Zeitraum.</Empty>
+  const max = Math.max(...rows.map((r) => r.total))
+  return (
+    <TableWrap>
+      <table>
+        <thead>
+          <tr>
+            <th>Produkt</th>
+            <th className="num">Gesamt</th>
+            <th />
+            {months.map((m) => (
+              <th key={m} className="num small">{m}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td>
+                {r.product}
+                {r.sku && <span className="muted small"> · {r.sku}</span>}
+              </td>
+              <td className="num" style={{ fontWeight: 650 }}>
+                {qty(r.total)}
+                {unit ? ` ${unit}` : ''}
+              </td>
+              <td><Bar value={r.total} max={max} /></td>
+              {months.map((m) => (
+                <td key={m} className="num muted">
+                  {r.perMonth.has(m) ? qty(r.perMonth.get(m)!) : '·'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableWrap>
+  )
+}
+
+export default async function AuswertungenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ von?: string; bis?: string }>
+}) {
+  await requireArea('auswertungen')
+  const params = await searchParams
+
+  // Default: die letzten 6 Monate (der Kern der Abverkaufs-Frage).
+  const heute = new Date()
+  const defaultVon = new Date(heute)
+  defaultVon.setUTCMonth(defaultVon.getUTCMonth() - 6)
+  const von = params.von ?? defaultVon.toISOString().slice(0, 10)
+  const bis = params.bis ?? heute.toISOString().slice(0, 10)
+  const months = monthsBetween(von, bis)
+
+  // --- Inventarwert: Bestand × Kosten (Fallback: Summe der Stücklistenkosten)
+  const inventar = await sql<
+    { id: string; product: string; sku: string | null; on_hand: number; unit_cost: number; value: number }[]
+  >`
+    with kosten as (
+      select pv.id,
+             case
+               when pt.standard_cost > 0 then pt.standard_cost
+               else coalesce((
+                 select sum(comp.qty * cpt.standard_cost)
+                 from bom_components_for_variant(resolve_bom(pv.id), pv.id) comp
+                 join product_variants cpv on cpv.id = comp.component_variant_id
+                 join product_templates cpt on cpt.id = cpv.template_id), 0)
+             end as unit_cost
+      from product_variants pv
+      join product_templates pt on pt.id = pv.template_id
+      where pv.active and pt.type = 'goods'
+    )
+    select pv.id, coalesce(pv.display_name, pt.name) as product, pv.sku,
+           on_hand_qty(pv.id) as on_hand, k.unit_cost,
+           on_hand_qty(pv.id) * k.unit_cost as value
+    from product_variants pv
+    join product_templates pt on pt.id = pv.template_id
+    join kosten k on k.id = pv.id
+    where pv.active and pt.type = 'goods' and on_hand_qty(pv.id) <> 0
+    order by value desc`
+
+  const inventarSumme = inventar.reduce((sum, r) => sum + Number(r.value), 0)
+
+  // --- Produktion je Endvariante (Fertigmeldungen im Zeitraum)
+  const produktion = await sql<MonthRow[]>`
+    select m.variant_id, coalesce(pv.display_name, pt.name) as product, pv.sku,
+           to_char(date_trunc('month', m.date_done), 'YYYY-MM') as monat,
+           sum(m.qty_done) as menge
+    from stock_moves m
+    join product_variants pv on pv.id = m.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where m.production_id is not null and m.reference = 'Fertigmeldung'
+      and m.state = 'done'
+      and m.date_done >= ${von} and m.date_done < ${bis}::date + 1
+    group by 1, 2, 3, 4`
+
+  // --- Verbaute Komponenten je Variante (Komponentenverbrauch im Zeitraum)
+  const komponenten = await sql<MonthRow[]>`
+    select m.variant_id, coalesce(pv.display_name, pt.name) as product, pv.sku,
+           to_char(date_trunc('month', m.date_done), 'YYYY-MM') as monat,
+           sum(m.qty_done) as menge
+    from stock_moves m
+    join product_variants pv on pv.id = m.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where m.production_id is not null and m.reference = 'Komponentenverbrauch'
+      and m.state = 'done'
+      and m.date_done >= ${von} and m.date_done < ${bis}::date + 1
+    group by 1, 2, 3, 4`
+
+  // --- Abverkauf: verkauft ÷ (verkauft + Bestand) je verkaufter Variante
+  const abverkauf = await sql<
+    {
+      variant_id: string
+      product: string
+      sku: string | null
+      verkauft: number
+      geliefert: number
+      bestand: number
+    }[]
+  >`
+    select l.variant_id, coalesce(pv.display_name, pt.name) as product, pv.sku,
+           sum(l.qty) as verkauft, sum(l.qty_delivered) as geliefert,
+           on_hand_qty(l.variant_id) as bestand
+    from sales_order_lines l
+    join sales_orders so on so.id = l.order_id
+    join product_variants pv on pv.id = l.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where so.state = 'sale' and l.variant_id is not null
+      and so.order_date >= ${von} and so.order_date < ${bis}::date + 1
+    group by 1, 2, 3
+    order by verkauft desc`
+
+  const abverkaufMonate = await sql<MonthRow[]>`
+    select l.variant_id, coalesce(pv.display_name, pt.name) as product, pv.sku,
+           to_char(date_trunc('month', so.order_date), 'YYYY-MM') as monat,
+           sum(l.qty) as menge
+    from sales_order_lines l
+    join sales_orders so on so.id = l.order_id
+    join product_variants pv on pv.id = l.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where so.state = 'sale' and l.variant_id is not null
+      and so.order_date >= ${von} and so.order_date < ${bis}::date + 1
+    group by 1, 2, 3, 4`
+
+  const verkauftJeMonat = pivot(abverkaufMonate, months)
+
+  return (
+    <>
+      <PageHeader
+        title="Auswertungen"
+        subtitle="Bestand, Produktion, verbaute Komponenten und Abverkauf"
+        actions={
+          <form className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field">
+              <span>Von</span>
+              <input type="date" name="von" defaultValue={von} />
+            </label>
+            <label className="field">
+              <span>Bis</span>
+              <input type="date" name="bis" defaultValue={bis} />
+            </label>
+            <div className="shrink field">
+              <button type="submit">Anwenden</button>
+            </div>
+          </form>
+        }
+      />
+
+      <div className="grid-3" style={{ marginBottom: 16 }}>
+        <Stat label="Inventarwert" value={money(inventarSumme)} hint="Bestand × Einstandskosten" />
+        <Stat
+          label="Produziert im Zeitraum"
+          value={qty(produktion.reduce((s, r) => s + Number(r.menge), 0))}
+          hint="Fertigmeldungen, alle Varianten"
+        />
+        <Stat
+          label="Verkauft im Zeitraum"
+          value={qty(abverkauf.reduce((s, r) => s + Number(r.verkauft), 0))}
+          hint="bestätigte Aufträge"
+        />
+      </div>
+
+      <Card
+        title="Abverkauf (Sell-Through)"
+        actions={<span className="muted small">verkauft ÷ (verkauft + Bestand)</span>}
+        tight
+      >
+        {abverkauf.length === 0 ? (
+          <Empty>Keine bestätigten Aufträge im Zeitraum.</Empty>
+        ) : (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Produkt</th>
+                  <th className="num">Verkauft</th>
+                  <th className="num">Geliefert</th>
+                  <th className="num">Bestand</th>
+                  <th className="num">Quote</th>
+                  <th />
+                  {months.map((m) => (
+                    <th key={m} className="num small">{m}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {abverkauf.map((r) => {
+                  const quote =
+                    Number(r.verkauft) + Number(r.bestand) > 0
+                      ? Number(r.verkauft) / (Number(r.verkauft) + Number(r.bestand))
+                      : 0
+                  const monate = verkauftJeMonat.find((v) => v.id === r.variant_id)
+                  return (
+                    <tr key={r.variant_id}>
+                      <td>
+                        {r.product}
+                        {r.sku && <span className="muted small"> · {r.sku}</span>}
+                      </td>
+                      <td className="num">{qty(r.verkauft)}</td>
+                      <td className="num">{qty(r.geliefert)}</td>
+                      <td className="num">{qty(r.bestand)}</td>
+                      <td className="num" style={{ fontWeight: 650 }}>
+                        {(quote * 100).toFixed(0)} %
+                      </td>
+                      <td><Bar value={quote} max={1} /></td>
+                      {months.map((m) => (
+                        <td key={m} className="num muted">
+                          {monate?.perMonth.has(m) ? qty(monate.perMonth.get(m)!) : '·'}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
+
+      <Card title="Produktion je Endvariante" tight>
+        <PivotTable rows={pivot(produktion, months)} months={months} />
+      </Card>
+
+      <Card
+        title="Verbaute Komponenten"
+        actions={
+          <span className="muted small">
+            zählt den Komponentenverbrauch der Fertigung — z. B. „wie oft wurde weißes Gehäuse verbaut"
+          </span>
+        }
+        tight
+      >
+        <PivotTable rows={pivot(komponenten, months)} months={months} />
+      </Card>
+
+      <Card title="Inventarwert je Produkt" tight>
+        {inventar.length === 0 ? (
+          <Empty>Kein Bestand vorhanden.</Empty>
+        ) : (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Produkt</th>
+                  <th className="num">Bestand</th>
+                  <th className="num">Einstandskosten</th>
+                  <th className="num">Wert</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {inventar.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      {r.product}
+                      {r.sku && <span className="muted small"> · {r.sku}</span>}
+                    </td>
+                    <td className="num">{qty(r.on_hand)}</td>
+                    <td className="num">{money(r.unit_cost)}</td>
+                    <td className="num" style={{ fontWeight: 650 }}>{money(r.value)}</td>
+                    <td><Bar value={Number(r.value)} max={Number(inventar[0]?.value ?? 0)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} className="num muted">Gesamt</td>
+                  <td className="num" style={{ fontWeight: 650 }}>{money(inventarSumme)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </TableWrap>
+        )}
+        <div className="small muted" style={{ padding: '8px 12px' }}>
+          Kostenbasis: Einstandskosten des Produkts; ohne gepflegte Kosten wird die Summe der
+          Stücklisten-Komponentenkosten der Variante angesetzt.
+        </div>
+      </Card>
+    </>
+  )
+}

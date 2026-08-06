@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache'
+import Link from 'next/link'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 
@@ -20,7 +21,7 @@ interface Company {
 
 async function saveCompany(formData: FormData) {
   'use server'
-  await requireUser()
+  await requireAdmin()
   const value: Company = {
     name: String(formData.get('name') ?? ''),
     street: String(formData.get('street') ?? ''),
@@ -37,7 +38,7 @@ async function saveCompany(formData: FormData) {
 
 async function saveDhl(formData: FormData) {
   'use server'
-  await requireUser()
+  await requireAdmin()
   const value = {
     default_product: String(formData.get('default_product') ?? 'V01PAK'),
     print_format: String(formData.get('print_format') ?? '910-300-700'),
@@ -48,7 +49,7 @@ async function saveDhl(formData: FormData) {
 
 async function savePolicies(formData: FormData) {
   'use server'
-  await requireUser()
+  await requireAdmin()
   await sql`update settings set value = ${sql.json({
     lock_confirmed: formData.get('sales_lock') === 'on',
   })} where key = 'sales'`
@@ -59,6 +60,7 @@ async function savePolicies(formData: FormData) {
 }
 
 export default async function EinstellungenPage() {
+  await requireArea('einstellungen')
   const settings = await sql<{ key: string; value: Record<string, unknown> }[]>`
     select key, value from settings`
   const get = <T,>(key: string): T => (settings.find((s) => s.key === key)?.value ?? {}) as T
@@ -73,7 +75,11 @@ export default async function EinstellungenPage() {
 
   return (
     <>
-      <PageHeader title="Einstellungen" subtitle="Firmendaten, Versand und Belegverhalten" />
+      <PageHeader
+        title="Einstellungen"
+        subtitle="Firmendaten, Versand und Belegverhalten"
+        actions={<Link className="btn" href="/einstellungen/benutzer">Benutzer verwalten</Link>}
+      />
 
       <Card title="Firmendaten (Absender für DHL-Labels und Belege)">
         <ActionForm action={saveCompany}>

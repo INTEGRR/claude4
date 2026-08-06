@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -5,6 +6,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { addBomLine, removeBomLine, setBomConsumption } from '../../actions'
+import { RecordComments } from '@/components/record-comments'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +17,7 @@ export default async function BomPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ variante?: string }>
 }) {
+  await requireArea('fertigung')
   const { id } = await params
   const { variante } = await searchParams
 
@@ -268,6 +271,7 @@ export default async function BomPage({
             ))}
         </Card>
       )}
+      <RecordComments model="bom" recordId={id} path={`/fertigung/stuecklisten/${id}`} />
     </>
   )
 }

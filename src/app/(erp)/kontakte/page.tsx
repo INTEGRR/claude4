@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireArea, requireWrite } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 async function createPartner(formData: FormData) {
   'use server'
-  await requireUser()
+  await requireWrite('kontakte')
   const name = String(formData.get('name') ?? '').trim()
   if (!name) throw new Error('Bitte einen Namen angeben')
 
@@ -39,6 +39,7 @@ export default async function KontaktePage({
 }: {
   searchParams: Promise<{ q?: string; art?: string }>
 }) {
+  await requireArea('kontakte')
   const { q, art } = await searchParams
 
   const rows = await sql<
@@ -157,7 +158,7 @@ export default async function KontaktePage({
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.name}</td>
+                    <td><Link href={`/kontakte/${r.id}`}>{r.name}</Link></td>
                     <td>
                       {r.is_customer && <span className="badge info" style={{ marginRight: 4 }}>Kunde</span>}
                       {r.is_vendor && <span className="badge neutral">Lieferant</span>}

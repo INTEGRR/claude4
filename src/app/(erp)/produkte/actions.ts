@@ -2,14 +2,14 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 
 function fail(err: unknown): never {
   throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
 }
 
 export async function createProduct(formData: FormData) {
-  await requireUser()
+  await requireWrite('produkte')
   const name = String(formData.get('name') ?? '').trim()
   if (!name) throw new Error('Bitte einen Namen angeben')
 
@@ -42,7 +42,7 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(templateId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('produkte')
   try {
     await sql`
       update product_templates set
@@ -67,7 +67,7 @@ export async function updateProduct(templateId: string, formData: FormData) {
 
 /** Weist der Vorlage ein Attribut mit Werten zu und erzeugt die Varianten. */
 export async function addAttribute(templateId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('produkte')
   const attributeId = String(formData.get('attribute_id') ?? '')
   const valueIds = formData.getAll('value_ids').map(String).filter(Boolean)
   if (!attributeId) throw new Error('Bitte ein Attribut auswählen')
@@ -89,7 +89,7 @@ export async function addAttribute(templateId: string, formData: FormData) {
 }
 
 export async function setVariantCodes(variantId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('produkte')
   const sku = String(formData.get('sku') ?? '').trim() || null
   const barcode = String(formData.get('barcode') ?? '').trim() || null
   const shopifyId = String(formData.get('shopify_variant_id') ?? '').trim() || null
@@ -116,7 +116,7 @@ export async function setVariantCodes(variantId: string, formData: FormData) {
 // --- Attribute (Stammdaten) ------------------------------------------------
 
 export async function createAttribute(formData: FormData) {
-  await requireUser()
+  await requireWrite('produkte')
   const name = String(formData.get('name') ?? '').trim()
   const values = String(formData.get('values') ?? '')
     .split(/[,\n]/)

@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -6,6 +7,7 @@ import { createAttribute } from '../actions'
 export const dynamic = 'force-dynamic'
 
 export default async function AttributePage() {
+  await requireArea('produkte')
   const attributes = await sql<{ id: string; name: string; values: string[]; used: number }[]>`
     select a.id, a.name,
            coalesce(array_agg(av.name order by av.sequence) filter (where av.id is not null), '{}') as values,

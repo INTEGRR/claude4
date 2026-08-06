@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 import { parseQtyMap } from '@/modules/shared/form'
 
 function fail(err: unknown): never {
@@ -10,7 +10,7 @@ function fail(err: unknown): never {
 }
 
 export async function createMo(formData: FormData) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   if (!variantId) throw new Error('Bitte ein Produkt auswählen')
@@ -28,7 +28,7 @@ export async function createMo(formData: FormData) {
 }
 
 export async function confirmMo(moId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   try {
     await sql`select mo_confirm(${moId}, ${user.name})`
   } catch (err) {
@@ -38,20 +38,20 @@ export async function confirmMo(moId: string) {
 }
 
 export async function startMo(moId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   await sql`select mo_start(${moId}, ${user.name})`
   revalidatePath(`/fertigung/${moId}`)
 }
 
 export async function checkAvailability(moId: string) {
-  await requireUser()
+  await requireWrite('fertigung')
   await sql`select mo_check_availability(${moId})`
   revalidatePath(`/fertigung/${moId}`)
 }
 
 /** Fertigmeldung inkl. abweichender Ist-Mengen aus dem Formular. */
 export async function produceMo(moId: string, formData: FormData) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   const qtyRaw = formData.get('qty')
   const qty = qtyRaw ? Number(qtyRaw) : null
   const backorder = formData.get('backorder') !== 'no'
@@ -69,7 +69,7 @@ export async function produceMo(moId: string, formData: FormData) {
 }
 
 export async function cancelMo(moId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   try {
     await sql`select mo_cancel(${moId}, ${user.name})`
   } catch (err) {
@@ -81,7 +81,7 @@ export async function cancelMo(moId: string) {
 // --- Demontage -------------------------------------------------------------
 
 export async function createUnbuild(formData: FormData) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   if (!variantId) throw new Error('Bitte ein Produkt auswählen')
@@ -104,7 +104,7 @@ export async function createUnbuild(formData: FormData) {
 }
 
 export async function applyUnbuild(unbuildId: string, force: boolean) {
-  const user = await requireUser()
+  const user = await requireWrite('fertigung')
   try {
     await sql`select unbuild_apply(${unbuildId}, ${force}, ${user.name})`
   } catch (err) {
@@ -116,7 +116,7 @@ export async function applyUnbuild(unbuildId: string, force: boolean) {
 // --- Stücklisten -----------------------------------------------------------
 
 export async function createBom(formData: FormData) {
-  await requireUser()
+  await requireWrite('fertigung')
   const templateId = String(formData.get('template_id') ?? '')
   const qty = Number(formData.get('qty') ?? 1)
   if (!templateId) throw new Error('Bitte ein Produkt auswählen')
@@ -132,7 +132,7 @@ export async function createBom(formData: FormData) {
 }
 
 export async function addBomLine(bomId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('fertigung')
   const variantId = String(formData.get('component_variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   if (!variantId) throw new Error('Bitte eine Komponente auswählen')
@@ -160,13 +160,13 @@ export async function addBomLine(bomId: string, formData: FormData) {
 }
 
 export async function removeBomLine(bomId: string, lineId: string) {
-  await requireUser()
+  await requireWrite('fertigung')
   await sql`delete from bom_lines where id = ${lineId} and bom_id = ${bomId}`
   revalidatePath(`/fertigung/stuecklisten/${bomId}`)
 }
 
 export async function setBomConsumption(bomId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('fertigung')
   const value = String(formData.get('consumption') ?? 'warning')
   await sql`update boms set consumption = ${value}::consumption_rule where id = ${bomId}`
   revalidatePath(`/fertigung/stuecklisten/${bomId}`)

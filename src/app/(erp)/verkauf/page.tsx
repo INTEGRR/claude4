@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -25,6 +26,7 @@ export default async function VerkaufPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string }>
 }) {
+  await requireArea('verkauf')
   const { status, q } = await searchParams
 
   const rows = await sql<Row[]>`

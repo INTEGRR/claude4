@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -7,6 +8,7 @@ import { applyUnbuild, createUnbuild } from '../actions'
 export const dynamic = 'force-dynamic'
 
 export default async function DemontagePage() {
+  await requireArea('fertigung')
   const orders = await sql<
     {
       id: string

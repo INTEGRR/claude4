@@ -1,8 +1,10 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { AuditLog, Badge, Card, Empty, type LogEntry, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { RecordComments } from '@/components/record-comments'
 import { date, money, qty } from '@/modules/shared/format'
 import {
   addPoLine,
@@ -17,6 +19,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('einkauf')
   const { id } = await params
 
   const [order] = await sql<
@@ -68,9 +71,6 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     select id, number, state, bill_date from vendor_bills
     where purchase_order_id = ${id} order by created_at`
 
-  const log = await sql<LogEntry[]>`
-    select id, kind, message, actor, created_at from audit_log
-    where model = 'purchase_order' and record_id = ${id} order by created_at desc limit 30`
 
   const products = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) || coalesce(' · ' || pv.sku, '') as label
@@ -268,9 +268,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         </Card>
       </div>
 
-      <Card title="Verlauf">
-        <AuditLog entries={log} />
-      </Card>
+      <RecordComments model="purchase_order" recordId={id} path={`/einkauf/${id}`} />
     </>
   )
 }

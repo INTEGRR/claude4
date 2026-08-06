@@ -1,12 +1,13 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { AuditLog, Badge, Card, Empty, type LogEntry, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { RecordComments } from '@/components/record-comments'
 import { date, money, qty } from '@/modules/shared/format'
 import {
   addLine,
-  addNote,
   cancelOrder,
   confirmOrder,
   removeLine,
@@ -17,6 +18,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('verkauf')
   const { id } = await params
 
   const [order] = await sql<
@@ -94,10 +96,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   >`
     select s.id, s.shipment_number, s.state, s.tracking_url
     from shipments s where s.sales_order_id = ${id} order by s.created_at`
-
-  const log = await sql<LogEntry[]>`
-    select id, kind, message, actor, created_at from audit_log
-    where model = 'sales_order' and record_id = ${id} order by created_at desc limit 40`
 
   const products = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) ||
@@ -337,17 +335,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </Card>
       )}
 
-      <Card title="Verlauf">
-        <ActionForm action={addNote.bind(null, id)} style={{ marginBottom: 12 }}>
-          <div className="row">
-            <input name="note" placeholder="Notiz hinzufügen…" />
-            <div className="shrink">
-              <button type="submit">Speichern</button>
-            </div>
-          </div>
-        </ActionForm>
-        <AuditLog entries={log} />
-      </Card>
+      <RecordComments model="sales_order" recordId={id} path={`/verkauf/${id}`} />
     </>
   )
 }

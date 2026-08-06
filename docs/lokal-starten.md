@@ -109,6 +109,11 @@ Browser öffnen: **<http://localhost:3000>** (bzw. der Port, den du über
 | E-Mail | `admin@example.com` |
 | Passwort | `erp-admin` |
 
+Für die Rollen liegen zwei weitere Demo-Konten bei (Passwort jeweils
+`erp-admin`): **`lager@example.com`** sieht nur Lager, Versand, Reparatur
+und den Scanner; **`fertigung@example.com`** nur Fertigung, Reparatur und
+den Scanner. Eigene Konten legst du unter **Einstellungen → Benutzer** an.
+
 Das Terminal lässt du offen — dort laufen die Protokolle. Zum Beenden `Strg+C`.
 
 ---
@@ -178,10 +183,42 @@ die Fertigung fertig ist und die Ware reserviert werden konnte. Der Knopf
 „Label erstellen" ist ohne DHL-Zugangsdaten deaktiviert; das ist erwartet
 (siehe unten).
 
+## Schritt 6 — Am Scanner-Arbeitsplatz (optional, ohne Scanner spielbar)
+
+**Scanner** in der Navigation öffnen. Die Seite lauscht auf Tastatureingaben —
+ein Barcodescanner im Tastatur-Modus tippt einfach Code + Enter, zum
+Ausprobieren geht das genauso von Hand:
+
+1. `MO/00002` eintippen und Enter (einen neuen Fertigungsauftrag bekommst du,
+   indem du z. B. einen weiteren Auftrag bestätigst oder unter Fertigung
+   einen anlegst und bestätigst). Die Positionsliste erscheint.
+2. Komponenten-Barcodes scannen bzw. eintippen (z. B. `4260000000001` für
+   das weiße Gehäuse — die Barcodes stehen an jeder Zeile). Jede Eingabe
+   zählt die Zeile hoch, volle Zeilen werden grün, ein Scan zu viel gibt
+   einen Warnton.
+3. Die Belegnummer **erneut** eintippen (Doppelscan) → Bestätigen-Ansicht.
+   Standard beim Fertigungsauftrag: es werden die **Sollmengen** verbraucht;
+   die Scans dienen als Kontrolle.
+4. Belegnummer ein drittes Mal eintippen (oder den großen Knopf drücken) —
+   der Auftrag ist gebucht, die Anzeige springt zurück auf „Beleg scannen".
+
+Lieferungen (`WH/OUT/…`) funktionieren genauso — dort gilt: gescannt =
+erledigt, der Rest wandert automatisch in einen Rückstand.
+
+## Schritt 7 — Auswertungen ansehen
+
+**Auswertungen** in der Navigation öffnen: Inventarwert, „Produktion je
+Endvariante" (die zwei gefertigten weißen Tastaturen), „Verbaute
+Komponenten" (u. a. 2× Gehäuse weiß — genau die Frage „wie oft wurde
+weißes Case verbaut") und die Abverkaufsquote der letzten 6 Monate.
+
 ## Was du sonst noch ausprobieren kannst
 
 | Was | Wo |
 |---|---|
+| Kommentar an einem Beleg hinterlassen | jede Detailseite, Karte „Verlauf & Kommentare" |
+| Benutzer und Rollen verwalten | Einstellungen → Benutzer (als Admin) |
+| KI-Analyse (braucht `ANTHROPIC_API_KEY`) | KI-Analyse in der Navigation |
 | Bestellung beim Lieferanten, Wareneingang buchen | Einkauf → Neue Bestellung („Komponenten Handels GmbH") |
 | Lieferantenrechnung, Gutschrift | Einkauf → Bestellung → Rechnung erstellen |
 | Inventur mit Differenzbuchung | Lager → Inventur |
@@ -339,6 +376,18 @@ Zum Ausprobieren reicht die Sandbox mit den DHL-Testzugangsdaten — dort
 kommen Musterlabels zurück, es wird nichts versendet.
 
 Den Zustand beider Anbindungen zeigt die Seite **Integrationen**.
+
+**KI-Analyse** — API-Schlüssel in der
+[Anthropic Console](https://console.anthropic.com/) erstellen:
+
+```
+ANTHROPIC_API_KEY=sk-ant-…
+```
+
+Danach beantwortet die Seite **KI-Analyse** freie Fragen zu allen ERP-Daten
+(„Welche Komponenten reichen nicht mehr aus?") — der Agent liest die
+Datenbank ausschließlich lesend, Ergebnisse lassen sich als CSV
+herunterladen. Jede ausgeführte SQL-Abfrage wird protokolliert.
 
 ---
 

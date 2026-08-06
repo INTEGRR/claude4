@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
@@ -12,6 +13,7 @@ export default async function EinkaufPage({
 }: {
   searchParams: Promise<{ filter?: string }>
 }) {
+  await requireArea('einkauf')
   const { filter } = await searchParams
 
   const rows = await sql<

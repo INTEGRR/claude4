@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
@@ -14,21 +14,21 @@ export const dynamic = 'force-dynamic'
 
 async function runJobs() {
   'use server'
-  await requireUser()
+  await requireAdmin()
   await runDueJobs()
   revalidatePath('/integrationen')
 }
 
 async function processWebhooks() {
   'use server'
-  await requireUser()
+  await requireAdmin()
   await processPendingWebhooks()
   revalidatePath('/integrationen')
 }
 
 async function runReconcile() {
   'use server'
-  await requireUser()
+  await requireAdmin()
   try {
     await reconcileOrders()
   } catch (err) {
@@ -39,7 +39,7 @@ async function runReconcile() {
 
 async function retry(jobId: string) {
   'use server'
-  await requireUser()
+  await requireAdmin()
   await retryJob(jobId)
   revalidatePath('/integrationen')
 }
@@ -47,7 +47,7 @@ async function retry(jobId: string) {
 /** Ordnet eine unbekannte Shopify-SKU einer Variante zu. */
 async function resolveUnmatched(lineId: string, formData: FormData) {
   'use server'
-  await requireUser()
+  await requireAdmin()
   const variantId = String(formData.get('variant_id') ?? '')
   if (!variantId) throw new Error('Bitte eine Variante auswählen')
 
@@ -70,6 +70,7 @@ async function resolveUnmatched(lineId: string, formData: FormData) {
 }
 
 export default async function IntegrationenPage() {
+  await requireArea('integrationen')
   const [stats] = await sql<
     { pending_events: number; failed_events: number; pending_jobs: number; failed_jobs: number; unmatched: number }[]
   >`

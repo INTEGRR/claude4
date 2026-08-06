@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
@@ -8,6 +9,7 @@ import { createRepair } from './actions'
 export const dynamic = 'force-dynamic'
 
 export default async function ReparaturPage() {
+  await requireArea('reparatur')
   const rows = await sql<
     {
       id: string

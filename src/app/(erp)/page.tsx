@@ -1,11 +1,21 @@
 import Link from 'next/link'
 import { sql } from '@/db/client'
+import { requireUser } from '@/modules/auth'
+import { type Area, canAccess } from '@/modules/auth/permissions'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { date, money, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ verweigert?: string }>
+}) {
+  const user = await requireUser()
+  const { verweigert } = await searchParams
+  const sees = (area: Area) => canAccess(user.role, area)
+
   const [stats] = await sql<
     {
       open_orders: number
@@ -70,7 +80,13 @@ export default async function Dashboard() {
     <>
       <PageHeader title="Übersicht" subtitle="Was heute ansteht" />
 
-      {stats.failed > 0 && (
+      {verweigert && (
+        <div className="notice danger">
+          Für den Bereich „{verweigert}" fehlt Ihrer Rolle die Berechtigung.
+        </div>
+      )}
+
+      {sees('integrationen') && stats.failed > 0 && (
         <div className="notice danger">
           {stats.failed} Vorgang/Vorgänge brauchen Aufmerksamkeit (fehlgeschlagene Jobs oder nicht
           zugeordnete Shopify-Positionen). <Link href="/integrationen">Zu den Integrationen</Link>
@@ -78,24 +94,36 @@ export default async function Dashboard() {
       )}
 
       <div className="grid-3" style={{ marginBottom: 16 }}>
-        <Stat label="Offene Aufträge" value={stats.open_orders} href="/verkauf?status=sale" />
-        <Stat label="Offene Fertigung" value={stats.open_mos} href="/fertigung" />
-        <Stat
-          label="Versandbereit"
-          value={stats.ready_to_ship}
-          hint="fertig, wartet aufs Label"
-          href="/versand"
-        />
-        <Stat label="Erwartete Eingänge" value={stats.open_receipts} href="/lager?art=receipt" />
-        <Stat label="Offene Reparaturen" value={stats.open_repairs} href="/reparatur" />
-        <Stat
-          label="Umsatz laufender Monat"
-          value={money(stats.revenue_month)}
-          hint="netto, bestätigte Aufträge"
-        />
+        {sees('verkauf') && (
+          <Stat label="Offene Aufträge" value={stats.open_orders} href="/verkauf?status=sale" />
+        )}
+        {sees('fertigung') && <Stat label="Offene Fertigung" value={stats.open_mos} href="/fertigung" />}
+        {sees('versand') && (
+          <Stat
+            label="Versandbereit"
+            value={stats.ready_to_ship}
+            hint="fertig, wartet aufs Label"
+            href="/versand"
+          />
+        )}
+        {sees('lager') && (
+          <Stat label="Erwartete Eingänge" value={stats.open_receipts} href="/lager?art=receipt" />
+        )}
+        {sees('reparatur') && (
+          <Stat label="Offene Reparaturen" value={stats.open_repairs} href="/reparatur" />
+        )}
+        {sees('scanner') && <Stat label="Scanner" value="→" hint="Belege per Barcode abarbeiten" href="/scanner" />}
+        {sees('verkauf') && (
+          <Stat
+            label="Umsatz laufender Monat"
+            value={money(stats.revenue_month)}
+            hint="netto, bestätigte Aufträge"
+          />
+        )}
       </div>
 
       <div className="grid-2">
+        {sees('verkauf') && (
         <Card
           title="Aktuelle Aufträge"
           actions={<Link className="btn small" href="/verkauf">Alle</Link>}
@@ -125,7 +153,9 @@ export default async function Dashboard() {
             </TableWrap>
           )}
         </Card>
+        )}
 
+        {sees('produkte') && (
         <Card
           title="Unterdeckung"
           actions={<Link className="btn small" href="/lager/bestand?filter=unterdeckung">Alle</Link>}
@@ -156,6 +186,7 @@ export default async function Dashboard() {
             </TableWrap>
           )}
         </Card>
+        )}
       </div>
     </>
   )

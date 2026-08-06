@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 import { parseQtyMap } from '@/modules/shared/form'
 
 function fail(err: unknown): never {
@@ -10,7 +10,7 @@ function fail(err: unknown): never {
 }
 
 export async function createRepair(formData: FormData) {
-  await requireUser()
+  await requireWrite('reparatur')
   const partnerId = String(formData.get('partner_id') ?? '')
   const variantId = String(formData.get('variant_id') ?? '')
   if (!partnerId) throw new Error('Bitte einen Kunden auswählen')
@@ -28,7 +28,7 @@ export async function createRepair(formData: FormData) {
 }
 
 export async function addPart(repairId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('reparatur')
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   const partType = String(formData.get('part_type') ?? 'add')
@@ -50,7 +50,7 @@ export async function addPart(repairId: string, formData: FormData) {
 }
 
 export async function removePart(repairId: string, partId: string) {
-  await requireUser()
+  await requireWrite('reparatur')
   const [part] = await sql<{ move_id: string | null }[]>`
     select move_id from repair_parts where id = ${partId} and repair_id = ${repairId}`
   if (part?.move_id) {
@@ -61,7 +61,7 @@ export async function removePart(repairId: string, partId: string) {
 }
 
 export async function confirmRepair(repairId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('reparatur')
   try {
     await sql`select repair_confirm(${repairId}, ${user.name})`
   } catch (err) {
@@ -71,13 +71,13 @@ export async function confirmRepair(repairId: string) {
 }
 
 export async function startRepair(repairId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('reparatur')
   await sql`select repair_start(${repairId}, ${user.name})`
   revalidatePath(`/reparatur/${repairId}`)
 }
 
 export async function endRepair(repairId: string, formData: FormData) {
-  const user = await requireUser()
+  const user = await requireWrite('reparatur')
 
   const done = parseQtyMap(formData, 'done_')
 
@@ -91,7 +91,7 @@ export async function endRepair(repairId: string, formData: FormData) {
 }
 
 export async function cancelRepair(repairId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('reparatur')
   try {
     await sql`select repair_cancel(${repairId}, ${user.name})`
   } catch (err) {
@@ -101,7 +101,7 @@ export async function cancelRepair(repairId: string) {
 }
 
 export async function createQuotation(repairId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('reparatur')
   let orderId: string
   try {
     const [row] = await sql<{ repair_create_quotation: string }[]>`

@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { code128 } from '@/modules/shared/barcode'
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic'
  * die eingefrorene, variantengefilterte Komponentenliste zum Abhaken.
  */
 export default async function MoPrintPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('fertigung')
   const { id } = await params
 
   const [mo] = await sql<

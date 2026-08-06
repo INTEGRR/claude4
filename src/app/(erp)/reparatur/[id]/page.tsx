@@ -1,8 +1,10 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { AuditLog, Badge, Card, Empty, type LogEntry, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
 import {
   addPart,
@@ -23,6 +25,7 @@ const PART_TYPES = {
 } as const
 
 export default async function RepairPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('reparatur')
   const { id } = await params
 
   const [repair] = await sql<
@@ -71,9 +74,6 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
     left join stock_moves m on m.id = rp.move_id
     where rp.repair_id = ${id} order by rp.sequence`
 
-  const log = await sql<LogEntry[]>`
-    select id, kind, message, actor, created_at from audit_log
-    where model = 'repair_order' and record_id = ${id} order by created_at desc limit 30`
 
   const products = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) as label
@@ -248,9 +248,7 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
         )}
       </Card>
 
-      <Card title="Verlauf">
-        <AuditLog entries={log} />
-      </Card>
+      <RecordComments model="repair_order" recordId={id} path={`/reparatur/${id}`} />
     </>
   )
 }

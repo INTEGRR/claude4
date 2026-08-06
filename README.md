@@ -8,6 +8,10 @@ Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 - **Lager** — Bewegungs-Ledger (Eingang, Ausgang, Fertigung, Inventur, Ausschuss, Retoure), Bestände mit Prognose, Barcodes
 - **Reparatur** — Reparaturaufträge mit Teileverbrauch (einbauen / ausbauen / wiederverwenden)
 - **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren) und Fulfillment-Rückmeldung an Shopify
+- **Scanner-Arbeitsplatz** — Belege per Barcode öffnen, Positionen scannen, Doppelscan bestätigt und bucht
+- **Auswertungen** — Inventarwert, Produktion je Variante, verbaute Komponenten, Abverkaufsquote
+- **KI-Analyse** — Ad-hoc-Auswertungen auf Zuruf: Claude-Agent mit Nur-Lese-Zugriff auf die Datenbank
+- **Rollen & Kommentare** — Lager-/Fertigungs-/Büro-/Admin-Rollen mit passendem Menü; Verlauf + Kommentare an jedem Beleg
 
 > **Ausführliche Schritt-für-Schritt-Anleitung mit Rundgang durch die
 > Beispieldaten und Fehlerbehebung: [docs/lokal-starten.md](docs/lokal-starten.md)**
@@ -24,6 +28,9 @@ Beim ersten Start werden Datenbank, Schema, Administrator und Beispieldaten
 angelegt — das dauert ein paar Minuten. Danach:
 
 **<http://localhost:3000>** · `admin@example.com` / `erp-admin`
+
+Zum Ausprobieren der Rollen liegen zwei weitere Demo-Konten bei:
+`lager@example.com` und `fertigung@example.com` (Passwort jeweils wie beim Administrator).
 
 Ist Port 3000 belegt: `ERP_PORT=3001 docker compose up --build`
 (Windows PowerShell: `$env:ERP_PORT=3001; docker compose up --build`).

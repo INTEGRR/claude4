@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
@@ -15,6 +16,7 @@ const PRODUCTS = [
 ]
 
 export default async function VersandPage() {
+  await requireArea('versand')
   const ready = await sql<
     {
       picking_id: string

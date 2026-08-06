@@ -1,14 +1,17 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { AuditLog, Badge, Card, type LogEntry, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { RecordComments } from '@/components/record-comments'
 import { money, qty } from '@/modules/shared/format'
 import { cancelBill, payBill, postBill, setBillDate } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BillPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('einkauf')
   const { id } = await params
 
   const [bill] = await sql<
@@ -44,9 +47,6 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
     select id, name, qty, price_unit, tax_rate from vendor_bill_lines
     where bill_id = ${id} order by created_at`
 
-  const log = await sql<LogEntry[]>`
-    select id, kind, message, actor, created_at from audit_log
-    where model = 'vendor_bill' and record_id = ${id} order by created_at desc limit 20`
 
   return (
     <>
@@ -153,9 +153,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
         </TableWrap>
       </Card>
 
-      <Card title="Verlauf">
-        <AuditLog entries={log} />
-      </Card>
+      <RecordComments model="vendor_bill" recordId={id} path={`/einkauf/rechnungen/${id}`} />
     </>
   )
 }

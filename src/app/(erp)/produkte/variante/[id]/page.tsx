@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -6,10 +7,12 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { barcodeSvg } from '@/modules/shared/barcode'
 import { dateTime, qty } from '@/modules/shared/format'
 import { setVariantCodes } from '../../actions'
+import { RecordComments } from '@/components/record-comments'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VariantPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('produkte')
   const { id } = await params
 
   const [variant] = await sql<
@@ -159,6 +162,7 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
           </TableWrap>
         )}
       </Card>
+      <RecordComments model="product_variant" recordId={id} path={`/produkte/variante/${id}`} />
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -17,6 +18,7 @@ export default async function LagerPage({
 }: {
   searchParams: Promise<{ art?: string; offen?: string }>
 }) {
+  await requireArea('lager')
   const { art, offen } = await searchParams
   const onlyOpen = offen !== '0'
 

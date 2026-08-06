@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 import { money, qty } from '@/modules/shared/format'
 
 function fail(err: unknown): never {
@@ -10,7 +10,7 @@ function fail(err: unknown): never {
 }
 
 export async function createPurchaseOrder(formData: FormData) {
-  await requireUser()
+  await requireWrite('einkauf')
   const vendorId = String(formData.get('vendor_id') ?? '')
   if (!vendorId) throw new Error('Bitte einen Lieferanten auswählen')
 
@@ -21,7 +21,7 @@ export async function createPurchaseOrder(formData: FormData) {
 }
 
 export async function addPoLine(orderId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('einkauf')
   await sql`select purchase_order_guard_editable(${orderId})`
 
   const variantId = String(formData.get('variant_id') ?? '')
@@ -59,14 +59,14 @@ export async function addPoLine(orderId: string, formData: FormData) {
 }
 
 export async function removePoLine(orderId: string, lineId: string) {
-  await requireUser()
+  await requireWrite('einkauf')
   await sql`select purchase_order_guard_editable(${orderId})`
   await sql`delete from purchase_order_lines where id = ${lineId} and order_id = ${orderId}`
   revalidatePath(`/einkauf/${orderId}`)
 }
 
 export async function confirmPo(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   try {
     await sql`select confirm_purchase_order(${orderId}, ${user.name})`
   } catch (err) {
@@ -78,7 +78,7 @@ export async function confirmPo(orderId: string) {
 }
 
 export async function cancelPo(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   try {
     await sql`select cancel_purchase_order(${orderId}, ${user.name})`
   } catch (err) {
@@ -88,14 +88,14 @@ export async function cancelPo(orderId: string) {
 }
 
 export async function lockPo(orderId: string, locked: boolean) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   await sql`select ${locked ? sql`purchase_order_lock` : sql`purchase_order_unlock`}(${orderId}, ${user.name})`
   revalidatePath(`/einkauf/${orderId}`)
 }
 
 /** Stellt die Bestellung als E-Mail mit PDF-Anhang in die Outbox. */
 export async function sendPoEmail(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
 
   const [order] = await sql<
     { number: string; vendor: string; email: string | null; expected_arrival: string | null }[]
@@ -139,7 +139,7 @@ export async function sendPoEmail(orderId: string) {
 // --- Rechnungen ------------------------------------------------------------
 
 export async function createBill(orderId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   let billId: string
   try {
     const [row] = await sql<{ create_vendor_bill: string }[]>`
@@ -152,7 +152,7 @@ export async function createBill(orderId: string) {
 }
 
 export async function setBillDate(billId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('einkauf')
   const billDate = String(formData.get('bill_date') ?? '')
   const reference = String(formData.get('vendor_bill_reference') ?? '')
   await sql`
@@ -164,7 +164,7 @@ export async function setBillDate(billId: string, formData: FormData) {
 }
 
 export async function postBill(billId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   try {
     await sql`select post_vendor_bill(${billId}, ${user.name})`
   } catch (err) {
@@ -174,13 +174,13 @@ export async function postBill(billId: string) {
 }
 
 export async function payBill(billId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   await sql`select pay_vendor_bill(${billId}, ${user.name})`
   revalidatePath(`/einkauf/rechnungen/${billId}`)
 }
 
 export async function cancelBill(billId: string) {
-  const user = await requireUser()
+  const user = await requireWrite('einkauf')
   let creditId: string | null = null
   try {
     const [row] = await sql<{ cancel_vendor_bill: string | null }[]>`

@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -8,6 +9,7 @@ import { createReturnLabel } from '../actions'
 export const dynamic = 'force-dynamic'
 
 export default async function RetourenPage() {
+  await requireArea('versand')
   const labels = await sql<
     {
       id: string

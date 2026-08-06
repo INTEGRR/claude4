@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -5,10 +6,12 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { addAttribute, updateProduct } from '../actions'
+import { RecordComments } from '@/components/record-comments'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireArea('produkte')
   const { id } = await params
 
   const [tpl] = await sql<
@@ -245,6 +248,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </TableWrap>
         )}
       </Card>
+      <RecordComments model="product_template" recordId={id} path={`/produkte/${id}`} />
     </>
   )
 }

@@ -1,7 +1,7 @@
 'use server'
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
-import { requireUser } from '@/modules/auth'
+import { requireWrite } from '@/modules/auth'
 import {
   cancelShipmentById,
   createLabelForPicking,
@@ -14,7 +14,7 @@ function fail(err: unknown): never {
 }
 
 export async function createLabel(pickingId: string, formData: FormData) {
-  await requireUser()
+  await requireWrite('versand')
   const weightRaw = formData.get('weight_g')
   const product = String(formData.get('dhl_product') ?? '') || undefined
 
@@ -36,7 +36,7 @@ export async function createLabel(pickingId: string, formData: FormData) {
 }
 
 export async function cancelLabel(shipmentId: string) {
-  await requireUser()
+  await requireWrite('versand')
   try {
     await cancelShipmentById(shipmentId)
   } catch (err) {
@@ -46,7 +46,7 @@ export async function cancelLabel(shipmentId: string) {
 }
 
 export async function refreshTracking() {
-  await requireUser()
+  await requireWrite('versand')
   try {
     await syncTracking(10)
   } catch (err) {
@@ -56,7 +56,7 @@ export async function refreshTracking() {
 }
 
 export async function createReturnLabel(formData: FormData) {
-  await requireUser()
+  await requireWrite('versand')
   const partnerId = String(formData.get('partner_id') ?? '')
   if (!partnerId) throw new Error('Bitte einen Kunden auswählen')
 

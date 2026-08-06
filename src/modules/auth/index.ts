@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
+import { type Area, type Role, canAccess, canWrite } from './permissions'
 
 const scrypt = promisify(scryptCb) as (
   password: string,
@@ -14,7 +15,7 @@ const scrypt = promisify(scryptCb) as (
 const COOKIE = 'erp_session'
 const SESSION_DAYS = 30
 
-export type Role = 'admin' | 'mitarbeiter'
+export type { Area, Role } from './permissions'
 export interface User {
   id: string
   email: string
@@ -105,6 +106,25 @@ export async function requireAdmin(): Promise<User> {
   const user = await requireUser()
   if (user.role !== 'admin') {
     throw new Error('Diese Aktion ist Administratoren vorbehalten')
+  }
+  return user
+}
+
+/**
+ * Für Seiten: Besucher ohne Zugriff auf den Bereich landen auf der Übersicht.
+ * Für Server Actions besser requireWrite verwenden (wirft statt umzuleiten).
+ */
+export async function requireArea(area: Area): Promise<User> {
+  const user = await requireUser()
+  if (!canAccess(user.role, area)) redirect('/?verweigert=' + area)
+  return user
+}
+
+/** Für Server Actions: wirft, wenn die Rolle im Bereich nicht arbeiten darf. */
+export async function requireWrite(area: Area): Promise<User> {
+  const user = await requireUser()
+  if (!canWrite(user.role, area)) {
+    throw new Error('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
   return user
 }

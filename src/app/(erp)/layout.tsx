@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { currentUser, logout } from '@/modules/auth'
+import { type Area, ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { NavLink } from '@/components/nav-link'
 import { ScanBox } from '@/components/scan-box'
@@ -44,44 +45,74 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const user = await currentUser()
   if (!user) redirect('/login')
   const counts = await badges()
+  const sees = (area: Area) => canAccess(user.role, area)
 
   return (
     <div className="app">
       <nav className="sidebar">
         <div className="brand">ERP</div>
         <NavLink href="/">Übersicht</NavLink>
+        {sees('scanner') && <NavLink href="/scanner">Scanner</NavLink>}
 
-        <div className="group">Verkauf</div>
-        <NavLink href="/verkauf" count={counts.offene_auftraege}>Verkaufsaufträge</NavLink>
-        <NavLink href="/versand" count={counts.versandbereit}>Versand</NavLink>
+        {(sees('verkauf') || sees('versand')) && <div className="group">Verkauf</div>}
+        {sees('verkauf') && (
+          <NavLink href="/verkauf" count={counts.offene_auftraege}>Verkaufsaufträge</NavLink>
+        )}
+        {sees('versand') && <NavLink href="/versand" count={counts.versandbereit}>Versand</NavLink>}
 
-        <div className="group">Fertigung</div>
-        <NavLink href="/fertigung" count={counts.offene_mos}>Fertigungsaufträge</NavLink>
-        <NavLink href="/fertigung/stuecklisten">Stücklisten</NavLink>
+        {sees('fertigung') && (
+          <>
+            <div className="group">Fertigung</div>
+            <NavLink href="/fertigung" count={counts.offene_mos}>Fertigungsaufträge</NavLink>
+            <NavLink href="/fertigung/stuecklisten">Stücklisten</NavLink>
+          </>
+        )}
 
-        <div className="group">Einkauf</div>
-        <NavLink href="/einkauf" >Bestellungen</NavLink>
-        <NavLink href="/einkauf/rechnungen">Rechnungen</NavLink>
+        {sees('einkauf') && (
+          <>
+            <div className="group">Einkauf</div>
+            <NavLink href="/einkauf" >Bestellungen</NavLink>
+            <NavLink href="/einkauf/rechnungen">Rechnungen</NavLink>
+          </>
+        )}
 
-        <div className="group">Lager</div>
-        <NavLink href="/lager" count={counts.offene_eingaenge}>Transfers</NavLink>
-        <NavLink href="/lager/bestand">Bestand</NavLink>
-        <NavLink href="/lager/inventur">Inventur</NavLink>
+        {sees('lager') && (
+          <>
+            <div className="group">Lager</div>
+            <NavLink href="/lager" count={counts.offene_eingaenge}>Transfers</NavLink>
+            <NavLink href="/lager/bestand">Bestand</NavLink>
+            <NavLink href="/lager/inventur">Inventur</NavLink>
+          </>
+        )}
 
-        <div className="group">Service</div>
-        <NavLink href="/reparatur" count={counts.offene_reparaturen}>Reparaturen</NavLink>
+        {sees('reparatur') && (
+          <>
+            <div className="group">Service</div>
+            <NavLink href="/reparatur" count={counts.offene_reparaturen}>Reparaturen</NavLink>
+          </>
+        )}
 
-        <div className="group">Stammdaten</div>
-        <NavLink href="/produkte">Produkte</NavLink>
-        <NavLink href="/kontakte">Kontakte</NavLink>
+        {(sees('auswertungen') || sees('ki')) && <div className="group">Auswertungen</div>}
+        {sees('auswertungen') && <NavLink href="/auswertungen">Auswertungen</NavLink>}
+        {sees('ki') && <NavLink href="/ki">KI-Analyse</NavLink>}
 
-        <div className="group">System</div>
-        <NavLink href="/integrationen" count={counts.fehler}>Integrationen</NavLink>
-        <NavLink href="/einstellungen">Einstellungen</NavLink>
+        {(sees('produkte') || sees('kontakte')) && <div className="group">Stammdaten</div>}
+        {sees('produkte') && <NavLink href="/produkte">Produkte</NavLink>}
+        {sees('kontakte') && <NavLink href="/kontakte">Kontakte</NavLink>}
+
+        {(sees('integrationen') || sees('einstellungen')) && <div className="group">System</div>}
+        {sees('integrationen') && (
+          <NavLink href="/integrationen" count={counts.fehler}>Integrationen</NavLink>
+        )}
+        {sees('einstellungen') && <NavLink href="/einstellungen">Einstellungen</NavLink>}
 
         <div className="spacer" />
         <form action={signOut} style={{ padding: '8px 10px' }}>
-          <div className="small muted" style={{ marginBottom: 6 }}>{user.name}</div>
+          <div className="small muted" style={{ marginBottom: 6 }}>
+            {user.name}
+            <br />
+            <span style={{ opacity: 0.7 }}>{ROLE_LABELS[user.role]}</span>
+          </div>
           <button className="small" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
             Abmelden
           </button>

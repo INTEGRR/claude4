@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -7,6 +8,7 @@ import { applyCount, createCount, deleteCount } from '../actions'
 export const dynamic = 'force-dynamic'
 
 export default async function InventurPage() {
+  await requireArea('lager')
   const counts = await sql<
     {
       id: string

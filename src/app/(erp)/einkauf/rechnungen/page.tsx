@@ -1,3 +1,4 @@
+import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -6,6 +7,7 @@ import { date, money } from '@/modules/shared/format'
 export const dynamic = 'force-dynamic'
 
 export default async function BillsPage() {
+  await requireArea('einkauf')
   const bills = await sql<
     {
       id: string
