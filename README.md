@@ -25,6 +25,9 @@ angelegt — das dauert ein paar Minuten. Danach:
 
 **<http://localhost:3000>** · `admin@example.com` / `erp-admin`
 
+Ist Port 3000 belegt: `ERP_PORT=3001 docker compose up --build`
+(Windows PowerShell: `$env:ERP_PORT=3001; docker compose up --build`).
+
 ```bash
 docker compose down       # anhalten (Daten bleiben erhalten)
 docker compose down -v    # anhalten und alle Daten verwerfen

@@ -42,7 +42,10 @@ services:
       # Shopify und DHL bleiben leer: alle Module laufen, nur Label-Erstellung
       # und Bestellimport sind ohne Zugangsdaten deaktiviert.
     ports:
-      - '127.0.0.1:3000:3000'
+      # Port auf dem Rechner ist umstellbar, falls 3000 schon belegt ist:
+      #   ERP_PORT=3001 docker compose up
+      # oder dauerhaft eine Zeile ERP_PORT=3001 in die Datei .env schreiben.
+      - '127.0.0.1:${ERP_PORT:-3000}:3000'
     volumes:
       - label-storage:/app/storage
 

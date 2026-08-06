@@ -61,6 +61,23 @@ git pull
 docker compose up --build
 ```
 
+**Ist Port 3000 bei dir schon belegt?** Dann einen anderen wählen — die
+Anwendung ist danach unter genau diesem Port erreichbar:
+
+```powershell
+# Windows (PowerShell)
+$env:ERP_PORT=3001; docker compose up --build
+```
+
+```bash
+# macOS / Linux
+ERP_PORT=3001 docker compose up --build
+```
+
+Dauerhaft: eine Zeile `ERP_PORT=3001` in die Datei `.env` im Projektordner
+schreiben (anlegen, falls nicht vorhanden) — dann reicht wieder
+`docker compose up`.
+
 Was jetzt passiert (alles automatisch):
 
 1. Ein Node-Image wird gebaut und die Anwendung kompiliert — **beim ersten Mal
@@ -84,7 +101,8 @@ app-1  | ✓ Ready
 
 ## 4. Anmelden
 
-Browser öffnen: **<http://localhost:3000>**
+Browser öffnen: **<http://localhost:3000>** (bzw. der Port, den du über
+`ERP_PORT` gesetzt hast)
 
 | | |
 |---|---|
@@ -326,10 +344,24 @@ Den Zustand beider Anbindungen zeigt die Seite **Integrationen**.
 
 # Fehlerbehebung
 
-**`port is already allocated` / `address already in use`**
-Auf Port 3000 läuft schon etwas. Entweder das andere Programm beenden, oder in
-`docker-compose.yml` beim Dienst `app` den Port ändern:
-`- '127.0.0.1:3001:3000'` — dann läuft das ERP auf <http://localhost:3001>.
+**`port is already allocated` / `address already in use` (Port 3000)**
+Auf Port 3000 läuft schon etwas anderes. Einfach einen anderen Port nehmen:
+
+```powershell
+$env:ERP_PORT=3001; docker compose up --build      # Windows
+```
+```bash
+ERP_PORT=3001 docker compose up --build            # macOS / Linux
+```
+
+Damit es dauerhaft gilt, `ERP_PORT=3001` in die Datei `.env` im Projektordner
+schreiben. Die Anwendung ist dann unter <http://localhost:3001> erreichbar.
+
+Wer wissen will, was den Port belegt:
+`netstat -ano | findstr :3000` (Windows) bzw. `lsof -i :3000` (macOS/Linux).
+
+**Auch bei Weg 2 (ohne Docker)** lässt sich der Port setzen:
+`PORT=3001 npm run dev` bzw. `$env:PORT=3001; npm run dev`.
 
 **`Cannot connect to the Docker daemon` / `failed to connect to the docker API
 at npipe:////./pipe/dockerDesktopLinuxEngine` (Windows)**
