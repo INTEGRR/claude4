@@ -3,6 +3,7 @@ import { sql } from '@/db/client'
 import { requireUser } from '@/modules/auth'
 import { type Area, canAccess } from '@/modules/auth/permissions'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
+import { ColumnChart } from '@/components/charts'
 import { date, money, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
@@ -69,6 +70,23 @@ export default async function Dashboard({
     where so.state = 'sale'
     order by so.order_date desc limit 8`
 
+  // Umsatz der letzten 6 Monate (netto, bestätigte Aufträge) fürs Diagramm;
+  // Monate ohne Umsatz erscheinen als Lücke auf der Achse, nicht gar nicht.
+  const umsatzRows = await sql<{ monat: string; netto: number }[]>`
+    select to_char(date_trunc('month', so.order_date), 'YYYY-MM') as monat,
+           coalesce(sum((select net from sales_order_total(so.id))), 0) as netto
+    from sales_orders so
+    where so.state = 'sale'
+      and so.order_date >= date_trunc('month', now()) - interval '5 months'
+    group by 1 order by 1`
+  const umsatzMonate = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date()
+    d.setUTCDate(1)
+    d.setUTCMonth(d.getUTCMonth() - (5 - i))
+    const monat = d.toISOString().slice(0, 7)
+    return { monat, netto: Number(umsatzRows.find((r) => r.monat === monat)?.netto ?? 0) }
+  })
+
   const shortages = await sql<{ id: string; product: string; forecasted: number; on_hand: number }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) as product,
            forecasted_qty(pv.id) as forecasted, on_hand_qty(pv.id) as on_hand
@@ -121,6 +139,17 @@ export default async function Dashboard({
           />
         )}
       </div>
+
+      {sees('verkauf') && umsatzMonate.some((m) => m.netto > 0) && (
+        <Card title="Umsatz je Monat" actions={<span className="muted small">netto, bestätigte Aufträge</span>}>
+          <ColumnChart
+            categories={umsatzMonate.map((m) => m.monat)}
+            series={[{ name: 'Umsatz', values: umsatzMonate.map((m) => Number(m.netto)) }]}
+            unit="€"
+            height={150}
+          />
+        </Card>
+      )}
 
       <div className="grid-2">
         {sees('verkauf') && (

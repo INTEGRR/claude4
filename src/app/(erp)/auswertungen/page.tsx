@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
+import { type ColumnSeries, ColumnChart, HBars, ShareBar } from '@/components/charts'
 import { money, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
@@ -82,6 +83,26 @@ function pivot(rows: MonthRow[], months: string[]) {
   return [...byVariant.entries()]
     .map(([id, e]) => ({ id, ...e }))
     .sort((a, b) => b.total - a.total)
+}
+
+/**
+ * Pivot-Zeilen in Diagrammserien drehen: die stärksten Varianten einzeln,
+ * der Rest gebündelt als „Übrige" — mehr als vier Serien trägt kein Diagramm.
+ */
+function toSeries(rows: ReturnType<typeof pivot>, months: string[], cap = 3): ColumnSeries[] {
+  const head = rows.slice(0, cap)
+  const tail = rows.slice(cap)
+  const series: ColumnSeries[] = head.map((r) => ({
+    name: r.product,
+    values: months.map((m) => r.perMonth.get(m) ?? 0),
+  }))
+  if (tail.length > 0) {
+    series.push({
+      name: `Übrige (${tail.length})`,
+      values: months.map((m) => tail.reduce((sum, r) => sum + (r.perMonth.get(m) ?? 0), 0)),
+    })
+  }
+  return series
 }
 
 function PivotTable({ rows, months, unit }: { rows: ReturnType<typeof pivot>; months: string[]; unit?: string }) {
@@ -232,6 +253,8 @@ export default async function AuswertungenPage({
     group by 1, 2, 3, 4`
 
   const verkauftJeMonat = pivot(abverkaufMonate, months)
+  const produktionRows = pivot(produktion, months)
+  const komponentenRows = pivot(komponenten, months)
 
   return (
     <>
@@ -277,6 +300,10 @@ export default async function AuswertungenPage({
         {abverkauf.length === 0 ? (
           <Empty>Keine bestätigten Aufträge im Zeitraum.</Empty>
         ) : (
+          <>
+          <div style={{ padding: '12px 12px 0' }}>
+            <ColumnChart categories={months} series={toSeries(verkauftJeMonat, months)} unit="Stk." />
+          </div>
           <TableWrap>
             <table>
               <thead>
@@ -323,11 +350,17 @@ export default async function AuswertungenPage({
               </tbody>
             </table>
           </TableWrap>
+          </>
         )}
       </Card>
 
       <Card title="Produktion je Endvariante" tight>
-        <PivotTable rows={pivot(produktion, months)} months={months} />
+        {produktionRows.length > 0 && (
+          <div style={{ padding: '12px 12px 0' }}>
+            <ColumnChart categories={months} series={toSeries(produktionRows, months)} unit="Stk." />
+          </div>
+        )}
+        <PivotTable rows={produktionRows} months={months} />
       </Card>
 
       <Card
@@ -339,13 +372,31 @@ export default async function AuswertungenPage({
         }
         tight
       >
-        <PivotTable rows={pivot(komponenten, months)} months={months} />
+        {komponentenRows.length > 0 && (
+          <div style={{ padding: '12px 12px 0' }}>
+            <HBars
+              rows={komponentenRows.slice(0, 10).map((r) => ({ label: r.product, value: r.total }))}
+            />
+          </div>
+        )}
+        <PivotTable rows={komponentenRows} months={months} />
       </Card>
 
       <Card title="Inventarwert je Produkt" tight>
         {inventar.length === 0 ? (
           <Empty>Kein Bestand vorhanden.</Empty>
         ) : (
+          <>
+          <div style={{ padding: '12px 12px 0' }}>
+            <ShareBar
+              parts={(() => {
+                const top = inventar.slice(0, 5).map((r) => ({ label: r.product, value: Number(r.value) }))
+                const rest = inventar.slice(5).reduce((sum, r) => sum + Number(r.value), 0)
+                return rest > 0 ? [...top, { label: `Übrige (${inventar.length - 5})`, value: rest }] : top
+              })()}
+              format={(v) => money(v)}
+            />
+          </div>
           <TableWrap>
             <table>
               <thead>
@@ -380,6 +431,7 @@ export default async function AuswertungenPage({
               </tfoot>
             </table>
           </TableWrap>
+          </>
         )}
         <div className="small muted" style={{ padding: '8px 12px' }}>
           Kostenbasis: Einstandskosten des Produkts; ohne gepflegte Kosten wird die Summe der

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { currentUser, logout } from '@/modules/auth'
 import { type Area, ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
-import { NavLink } from '@/components/nav-link'
+import { type NavGroup, SidebarNav } from '@/components/sidebar-nav'
 import { ScanBox } from '@/components/scan-box'
 
 export const dynamic = 'force-dynamic'
@@ -47,64 +47,90 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const counts = await badges()
   const sees = (area: Area) => canAccess(user.role, area)
 
+  // Navigation als Datenstruktur: rollengefiltert hier, Aufklapp-Logik im Client.
+  const groups: NavGroup[] = [
+    {
+      label: null,
+      items: [
+        { href: '/', label: 'Übersicht' },
+        ...(sees('scanner') ? [{ href: '/scanner', label: 'Scanner' }] : []),
+      ],
+    },
+    {
+      label: 'Verkauf',
+      items: [
+        ...(sees('verkauf')
+          ? [{ href: '/verkauf', label: 'Verkaufsaufträge', count: counts.offene_auftraege }]
+          : []),
+        ...(sees('versand')
+          ? [{ href: '/versand', label: 'Versand', count: counts.versandbereit }]
+          : []),
+      ],
+    },
+    {
+      label: 'Fertigung',
+      items: sees('fertigung')
+        ? [
+            { href: '/fertigung', label: 'Fertigungsaufträge', count: counts.offene_mos },
+            { href: '/fertigung/stuecklisten', label: 'Stücklisten' },
+          ]
+        : [],
+    },
+    {
+      label: 'Einkauf',
+      items: sees('einkauf')
+        ? [
+            { href: '/einkauf', label: 'Bestellungen' },
+            { href: '/einkauf/rechnungen', label: 'Rechnungen' },
+          ]
+        : [],
+    },
+    {
+      label: 'Lager',
+      items: sees('lager')
+        ? [
+            { href: '/lager', label: 'Transfers', count: counts.offene_eingaenge },
+            { href: '/lager/bestand', label: 'Bestand' },
+            { href: '/lager/inventur', label: 'Inventur' },
+          ]
+        : [],
+    },
+    {
+      label: 'Service',
+      items: sees('reparatur')
+        ? [{ href: '/reparatur', label: 'Reparaturen', count: counts.offene_reparaturen }]
+        : [],
+    },
+    {
+      label: 'Auswertungen',
+      items: [
+        ...(sees('auswertungen') ? [{ href: '/auswertungen', label: 'Auswertungen' }] : []),
+        ...(sees('ki') ? [{ href: '/ki', label: 'KI-Analyse' }] : []),
+      ],
+    },
+    {
+      label: 'Stammdaten',
+      items: [
+        ...(sees('produkte') ? [{ href: '/produkte', label: 'Produkte' }] : []),
+        ...(sees('kontakte') ? [{ href: '/kontakte', label: 'Kontakte' }] : []),
+      ],
+    },
+    {
+      label: 'System',
+      items: [
+        ...(sees('integrationen')
+          ? [{ href: '/integrationen', label: 'Integrationen', count: counts.fehler }]
+          : []),
+        ...(sees('einstellungen') ? [{ href: '/einstellungen', label: 'Einstellungen' }] : []),
+      ],
+    },
+  ].filter((g) => g.items.length > 0)
+
   return (
     <div className="app">
       <nav className="sidebar">
         <div className="brand">ERP</div>
-        <NavLink href="/">Übersicht</NavLink>
-        {sees('scanner') && <NavLink href="/scanner">Scanner</NavLink>}
-
-        {(sees('verkauf') || sees('versand')) && <div className="group">Verkauf</div>}
-        {sees('verkauf') && (
-          <NavLink href="/verkauf" count={counts.offene_auftraege}>Verkaufsaufträge</NavLink>
-        )}
-        {sees('versand') && <NavLink href="/versand" count={counts.versandbereit}>Versand</NavLink>}
-
-        {sees('fertigung') && (
-          <>
-            <div className="group">Fertigung</div>
-            <NavLink href="/fertigung" count={counts.offene_mos}>Fertigungsaufträge</NavLink>
-            <NavLink href="/fertigung/stuecklisten">Stücklisten</NavLink>
-          </>
-        )}
-
-        {sees('einkauf') && (
-          <>
-            <div className="group">Einkauf</div>
-            <NavLink href="/einkauf" >Bestellungen</NavLink>
-            <NavLink href="/einkauf/rechnungen">Rechnungen</NavLink>
-          </>
-        )}
-
-        {sees('lager') && (
-          <>
-            <div className="group">Lager</div>
-            <NavLink href="/lager" count={counts.offene_eingaenge}>Transfers</NavLink>
-            <NavLink href="/lager/bestand">Bestand</NavLink>
-            <NavLink href="/lager/inventur">Inventur</NavLink>
-          </>
-        )}
-
-        {sees('reparatur') && (
-          <>
-            <div className="group">Service</div>
-            <NavLink href="/reparatur" count={counts.offene_reparaturen}>Reparaturen</NavLink>
-          </>
-        )}
-
-        {(sees('auswertungen') || sees('ki')) && <div className="group">Auswertungen</div>}
-        {sees('auswertungen') && <NavLink href="/auswertungen">Auswertungen</NavLink>}
-        {sees('ki') && <NavLink href="/ki">KI-Analyse</NavLink>}
-
-        {(sees('produkte') || sees('kontakte')) && <div className="group">Stammdaten</div>}
-        {sees('produkte') && <NavLink href="/produkte">Produkte</NavLink>}
-        {sees('kontakte') && <NavLink href="/kontakte">Kontakte</NavLink>}
-
-        {(sees('integrationen') || sees('einstellungen')) && <div className="group">System</div>}
-        {sees('integrationen') && (
-          <NavLink href="/integrationen" count={counts.fehler}>Integrationen</NavLink>
-        )}
-        {sees('einstellungen') && <NavLink href="/einstellungen">Einstellungen</NavLink>}
+        <SidebarNav groups={groups} />
 
         <div className="spacer" />
         <form action={signOut} style={{ padding: '8px 10px' }}>
