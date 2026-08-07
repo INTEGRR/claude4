@@ -4,6 +4,7 @@ import { type Area, ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { type NavGroup, SidebarNav } from '@/components/sidebar-nav'
 import { ScanBox } from '@/components/scan-box'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/login')
   const counts = await badges()
   const sees = (area: Area) => canAccess(user.role, area)
+
+  const [company] = await sql<{ name: string }[]>`
+    select value ->> 'name' as name from settings where key = 'company'`
+  const firma = company?.name ?? 'ERP'
 
   // Navigation als Datenstruktur: rollengefiltert hier, Aufklapp-Logik im Client.
   const groups: NavGroup[] = [
@@ -133,15 +138,18 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="brand">ERP</div>
+        <div className="brand">
+          erp<span className="dot">.system</span>
+        </div>
+        <div className="brand-sub">{firma}</div>
         <SidebarNav groups={groups} />
 
         <div className="spacer" />
-        <form action={signOut} style={{ padding: '8px 10px' }}>
-          <div className="small muted" style={{ marginBottom: 6 }}>
+        <form action={signOut} style={{ padding: '10px 8px 4px' }}>
+          <div className="small muted" style={{ marginBottom: 8, lineHeight: 1.4 }}>
             {user.name}
             <br />
-            <span style={{ opacity: 0.7 }}>{ROLE_LABELS[user.role]}</span>
+            <span className="mono-label">{ROLE_LABELS[user.role]}</span>
           </div>
           <button className="small" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
             Abmelden
@@ -151,8 +159,17 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
       <div className="main">
         <div className="topbar">
-          <div />
-          <ScanBox />
+          {/* Zustandszeile wie auf einem Typenschild: was gerade anliegt. */}
+          <div className="mono-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={`led ${counts.fehler > 0 ? 'on' : 'ok'}`} />
+            {counts.fehler > 0
+              ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
+              : 'Alle Systeme im Normalbetrieb'}
+          </div>
+          <div className="actions">
+            <ScanBox />
+            <ThemeToggle />
+          </div>
         </div>
         <div className="content">{children}</div>
       </div>
