@@ -136,6 +136,7 @@ export async function addBomLine(bomId: string, formData: FormData) {
   await requireWrite('fertigung')
   const variantId = String(formData.get('component_variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
+  const issueMethod = formData.get('issue_method') === 'manual' ? 'manual' : 'backflush'
   if (!variantId) throw new Error('Bitte eine Komponente auswählen')
   if (!(qty > 0)) throw new Error('Die Menge muss größer als 0 sein')
 
@@ -144,10 +145,10 @@ export async function addBomLine(bomId: string, formData: FormData) {
     join product_templates pt on pt.id = pv.template_id where pv.id = ${variantId}`
 
   const [line] = await sql<{ id: string }[]>`
-    insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+    insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
     values (${bomId},
             coalesce((select max(sequence) + 10 from bom_lines where bom_id = ${bomId}), 10),
-            ${variantId}, ${qty}, ${info.uom_id})
+            ${variantId}, ${qty}, ${info.uom_id}, ${issueMethod}::component_issue_method)
     returning id`
 
   // "Auf Varianten anwenden": ausgewählte Attributwerte übernehmen.
@@ -181,5 +182,118 @@ export async function updateMoDetails(moId: string, formData: FormData) {
       user_id = ${String(formData.get('user_id') ?? '') || null},
       priority = ${formData.get('priority') === 'on' ? '1' : '0'}
     where id = ${moId}`
+  revalidatePath(`/fertigung/${moId}`)
+}
+
+/** Verbrauchsart einer Stücklistenposition umstellen (Backflush ⇄ manuell). */
+export async function setBomLineIssueMethod(bomId: string, lineId: string, method: string) {
+  await requireWrite('fertigung')
+  const value = method === 'manual' ? 'manual' : 'backflush'
+  await sql`
+    update bom_lines
+       set issue_method = ${value}::component_issue_method,
+           manual_consumption = ${value === 'manual'}
+     where id = ${lineId} and bom_id = ${bomId}`
+  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+}
+
+// --- Arbeitsplätze ---------------------------------------------------------
+
+export async function createWorkCenter(formData: FormData) {
+  await requireWrite('fertigung')
+  const code = String(formData.get('code') ?? '').trim().toUpperCase()
+  const name = String(formData.get('name') ?? '').trim()
+  if (!code) throw new Error('Bitte ein Kürzel vergeben')
+  if (!name) throw new Error('Bitte einen Namen vergeben')
+
+  try {
+    await sql`
+      insert into work_centers (code, name, cost_per_hour, capacity, time_efficiency, note)
+      values (${code}, ${name},
+              ${Number(formData.get('cost_per_hour') ?? 0) || 0},
+              ${Number(formData.get('capacity') ?? 1) || 1},
+              ${Number(formData.get('time_efficiency') ?? 100) || 100},
+              ${String(formData.get('note') ?? '').trim() || null})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath('/fertigung/arbeitsplaetze')
+}
+
+export async function updateWorkCenter(workCenterId: string, formData: FormData) {
+  await requireWrite('fertigung')
+  try {
+    await sql`
+      update work_centers set
+        name = ${String(formData.get('name') ?? '').trim()},
+        cost_per_hour = ${Number(formData.get('cost_per_hour') ?? 0) || 0},
+        capacity = ${Number(formData.get('capacity') ?? 1) || 1},
+        time_efficiency = ${Number(formData.get('time_efficiency') ?? 100) || 100},
+        active = ${formData.get('active') === 'on'},
+        note = ${String(formData.get('note') ?? '').trim() || null}
+      where id = ${workCenterId}`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath('/fertigung/arbeitsplaetze')
+}
+
+// --- Arbeitsgänge an der Stückliste ---------------------------------------
+
+export async function addBomOperation(bomId: string, formData: FormData) {
+  await requireWrite('fertigung')
+  const name = String(formData.get('name') ?? '').trim()
+  const workCenter = String(formData.get('work_center_id') ?? '')
+  if (!name) throw new Error('Bitte den Arbeitsgang benennen')
+  if (!workCenter) throw new Error('Bitte einen Arbeitsplatz auswählen')
+
+  try {
+    await sql`
+      insert into bom_operations (bom_id, sequence, name, work_center_id,
+                                  duration_minutes, setup_minutes)
+      values (${bomId},
+              coalesce((select max(sequence) + 10 from bom_operations where bom_id = ${bomId}), 10),
+              ${name}, ${workCenter},
+              ${Number(formData.get('duration_minutes') ?? 0) || 0},
+              ${Number(formData.get('setup_minutes') ?? 0) || 0})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+}
+
+export async function removeBomOperation(bomId: string, operationId: string) {
+  await requireWrite('fertigung')
+  await sql`delete from bom_operations where id = ${operationId} and bom_id = ${bomId}`
+  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+}
+
+// --- Arbeitsgänge am Auftrag ----------------------------------------------
+
+export async function startOperation(moId: string, operationId: string) {
+  const user = await requireWrite('fertigung')
+  try {
+    await sql`select mo_operation_start(${operationId}, ${user.name})`
+    await sql`update mo_operations set user_id = ${user.id} where id = ${operationId}`
+    await sql`select mo_start(${moId}, ${user.name})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath(`/fertigung/${moId}`)
+}
+
+/** Arbeitsgang beenden — ohne Minutenangabe zählt die Zeit seit dem Start. */
+export async function finishOperation(moId: string, operationId: string, formData: FormData) {
+  const user = await requireWrite('fertigung')
+  const raw = String(formData.get('minutes') ?? '').trim()
+  const minutes = raw === '' ? null : Number(raw)
+  if (minutes !== null && (!Number.isFinite(minutes) || minutes < 0)) {
+    throw new Error('Bitte eine gültige Dauer in Minuten erfassen')
+  }
+  try {
+    await sql`select mo_operation_finish(${operationId}, ${minutes}, ${user.name})`
+  } catch (err) {
+    fail(err)
+  }
   revalidatePath(`/fertigung/${moId}`)
 }

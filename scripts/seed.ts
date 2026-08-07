@@ -100,6 +100,8 @@ async function main() {
       color?: string
       uom?: string
       stock: number
+      manual?: boolean      // muss bei der Fertigmeldung erfasst werden
+      packaging?: boolean   // gehört ins Verpackungsset (Phantom-Baugruppe)
     }
 
     const components: Comp[] = [
@@ -109,7 +111,7 @@ async function main() {
       { name: 'Keycap-Set weiß', qty: 1, cost: 24.0, weight: 180, color: 'Weiß', stock: 30 },
       { name: 'Keycap-Set schwarz', qty: 1, cost: 24.0, weight: 180, color: 'Schwarz', stock: 28 },
       { name: 'Keycap-Set blau', qty: 1, cost: 26.0, weight: 180, color: 'Blau', stock: 15 },
-      { name: 'PCB Hauptplatine', qty: 1, cost: 32.0, weight: 90, stock: 60 },
+      { name: 'PCB Hauptplatine', qty: 1, cost: 32.0, weight: 90, stock: 60, manual: true },
       { name: 'Controller MCU', qty: 1, cost: 6.4, weight: 3, stock: 120 },
       { name: 'Mechanischer Switch', qty: 87, cost: 0.35, weight: 4, uom: 'Stück', stock: 9000 },
       { name: 'Stabilisator-Set', qty: 1, cost: 8.9, weight: 25, stock: 80 },
@@ -121,8 +123,8 @@ async function main() {
       { name: 'Daughterboard USB-C', qty: 1, cost: 3.8, weight: 8, stock: 140 },
       { name: 'Flachbandkabel', qty: 1, cost: 1.1, weight: 5, stock: 200 },
       { name: 'Dämpfungsband', qty: 1, cost: 2.4, weight: 15, stock: 110 },
-      { name: 'Verpackungskarton', qty: 1, cost: 1.8, weight: 220, stock: 250 },
-      { name: 'Handbuch', qty: 1, cost: 0.35, weight: 30, stock: 300 },
+      { name: 'Verpackungskarton', qty: 1, cost: 1.8, weight: 220, stock: 250, packaging: true },
+      { name: 'Handbuch', qty: 1, cost: 0.35, weight: 30, stock: 300, packaging: true },
     ]
 
     const compIds = new Map<string, string>()
@@ -192,9 +194,12 @@ async function main() {
 
     let sequence = 10
     for (const c of components) {
+      // Verpackungsteile stecken in der Baugruppe weiter unten.
+      if (c.packaging) continue
       const [bomLine] = await sql<{ id: string }[]>`
-        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
-        values (${bom.id}, ${sequence}, ${compIds.get(c.name) ?? ''}, ${c.qty}, ${stueck.id})
+        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
+        values (${bom.id}, ${sequence}, ${compIds.get(c.name) ?? ''}, ${c.qty}, ${stueck.id},
+                ${c.manual ? 'manual' : 'backflush'}::component_issue_method)
         returning id`
       sequence += 10
 
@@ -206,6 +211,57 @@ async function main() {
                     values (${bomLine.id}, ${ptav.id})`
         }
       }
+    }
+
+    // --- Phantom-Baugruppe "Verpackungsset" ---------------------------------
+    // Das Set liegt nie im Regal: In Fertigungsaufträgen und Lieferungen
+    // treten immer Karton und Handbuch an seine Stelle.
+    const [setTpl] = await sql<{ id: string }[]>`
+      insert into product_templates (name, uom_id, weight_g, can_be_sold, can_be_purchased)
+      values ('Verpackungsset', ${stueck.id}, 250, false, false)
+      returning id`
+    await sql`select generate_variants(${setTpl.id})`
+    const [setVariant] = await sql<{ id: string }[]>`
+      select id from product_variants where template_id = ${setTpl.id} limit 1`
+    await sql`update product_variants set sku = 'K-SET-VP' where id = ${setVariant.id}`
+
+    const [setBom] = await sql<{ id: string }[]>`
+      insert into boms (template_id, qty, uom_id, bom_type)
+      values (${setTpl.id}, 1, ${stueck.id}, 'kit') returning id`
+    for (const c of components.filter((x) => x.packaging)) {
+      await sql`
+        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+        values (${setBom.id}, ${sequence}, ${compIds.get(c.name) ?? ''}, ${c.qty}, ${stueck.id})`
+      sequence += 10
+    }
+    await sql`
+      insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+      values (${bom.id}, ${sequence}, ${setVariant.id}, 1, ${stueck.id})`
+
+    // --- Arbeitsplätze und Arbeitsgänge -------------------------------------
+    const workCenters = [
+      { code: 'LOETEN', name: 'Lötplatz', rate: 55 },
+      { code: 'MONTAGE', name: 'Montagetisch', rate: 45 },
+      { code: 'PRUEFUNG', name: 'Prüfplatz', rate: 38 },
+    ]
+    const wcIds = new Map<string, string>()
+    for (const w of workCenters) {
+      const [row] = await sql<{ id: string }[]>`
+        insert into work_centers (code, name, cost_per_hour)
+        values (${w.code}, ${w.name}, ${w.rate}) returning id`
+      wcIds.set(w.code, row.id)
+    }
+
+    const operations = [
+      { seq: 10, name: 'Switches löten', wc: 'LOETEN', minutes: 18, setup: 10 },
+      { seq: 20, name: 'Gehäuse montieren', wc: 'MONTAGE', minutes: 25, setup: 5 },
+      { seq: 30, name: 'Endprüfung und Verpacken', wc: 'PRUEFUNG', minutes: 9, setup: 0 },
+    ]
+    for (const o of operations) {
+      await sql`
+        insert into bom_operations (bom_id, sequence, name, work_center_id,
+                                    duration_minutes, setup_minutes)
+        values (${bom.id}, ${o.seq}, ${o.name}, ${wcIds.get(o.wc) ?? ''}, ${o.minutes}, ${o.setup})`
     }
 
     // --- Beispielauftrag ----------------------------------------------------
@@ -238,7 +294,9 @@ async function main() {
     console.log(`Beispieldaten angelegt:
   - 20 Komponenten mit Anfangsbestand, Barcodes und Lieferantenpreisen
   - Tastatur mit 3 Farbvarianten
-  - Stückliste mit 20 Positionen, davon 6 farbabhängig gefiltert
+  - Stückliste mit 19 Positionen, davon 6 farbabhängig gefiltert
+  - Phantom-Baugruppe "Verpackungsset" (Karton + Handbuch), die beim Fertigen aufgelöst wird
+  - 3 Arbeitsplätze mit Stundensatz und 3 Arbeitsgänge (52 Min. je Tastatur)
   - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
   - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)
   - Anfangsbestand zum Einstandspreis bewertet`)

@@ -3,11 +3,20 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { RecordComments } from '@/components/record-comments'
-import { LABELS, date, qty } from '@/modules/shared/format'
-import { cancelMo, checkAvailability, confirmMo, produceMo, startMo, updateMoDetails } from '../actions'
+import { LABELS, date, dateTime, money, qty } from '@/modules/shared/format'
+import {
+  cancelMo,
+  checkAvailability,
+  confirmMo,
+  finishOperation,
+  produceMo,
+  startMo,
+  startOperation,
+  updateMoDetails,
+} from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,11 +44,15 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       priority: string
       origin: string | null
       tracking: string
+      material_cost: number
+      labor_cost: number
+      unit_cost: number | null
     }[]
   >`
     select mo.id, mo.number, variant_display_name(mo.variant_id) as product, mo.variant_id,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date, mo.date_done,
            mo.user_id, mo.priority, mo.origin,
+           mo.material_cost, mo.labor_cost, mo.unit_cost,
            product_tracking(mo.variant_id) as tracking,
            mo.sales_order_id, so.number as sales_order_number,
            bo.number as backorder_of_number, u.name as uom, b.consumption
@@ -62,15 +75,43 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       uom: string
       state: string
       available: number
+      issue_method: string | null
+      phantom_path: string | null
     }[]
   >`
     select m.id, variant_display_name(m.variant_id) as product, m.qty, m.qty_done,
            m.reserved_qty, u.name as uom, m.state,
-           free_to_use(m.variant_id) + m.reserved_qty as available
+           free_to_use(m.variant_id) + m.reserved_qty as available,
+           m.issue_method, m.phantom_path
     from stock_moves m
     join uoms u on u.id = m.uom_id
     where m.production_id = ${id} and m.reference = 'Komponentenverbrauch'
     order by m.created_at`
+
+  const operations = await sql<
+    {
+      id: string
+      sequence: number
+      name: string
+      work_center: string
+      code: string
+      cost_per_hour: number
+      duration_expected: number
+      duration_real: number
+      state: string
+      date_start: string | null
+      date_done: string | null
+      worker: string | null
+    }[]
+  >`
+    select o.id, o.sequence, o.name, w.name as work_center, w.code, o.cost_per_hour,
+           o.duration_expected, o.duration_real, o.state::text, o.date_start, o.date_done,
+           us.name as worker
+    from mo_operations o
+    join work_centers w on w.id = o.work_center_id
+    left join users us on us.id = o.user_id
+    where o.mo_id = ${id}
+    order by o.sequence, o.id`
 
 
   const open = mo.state !== 'done' && mo.state !== 'cancel'
@@ -196,8 +237,10 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
             <thead>
               <tr>
                 <th>Komponente</th>
+                <th>Aus Baugruppe</th>
                 <th className="num">Bedarf</th>
                 <th>Einheit</th>
+                <th>Verbrauch</th>
                 <th className="num">Reserviert</th>
                 <th className="num">Verfügbar</th>
                 <th className="num">Verbraucht</th>
@@ -209,8 +252,12 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                 return (
                   <tr key={c.id}>
                     <td>{c.product}</td>
+                    <td className="small muted">{c.phantom_path ?? '—'}</td>
                     <td className="num">{qty(c.qty)}</td>
                     <td>{c.uom}</td>
+                    <td className="small muted nowrap">
+                      {c.issue_method === 'manual' ? 'manuell erfassen' : 'automatisch'}
+                    </td>
                     {/* Zustand als LED plus Wort — die Zahl bleibt rechtsbündig
                         ausgerichtet und trägt keine Farbe. */}
                     <td className="num">
@@ -227,6 +274,129 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
           </table>
         </TableWrap>
       </Card>
+
+      <Card
+        title="Arbeitsgänge"
+        actions={
+          operations.length > 0 ? (
+            <span className="mono-label">
+              {qty(operations.reduce((sum, o) => sum + Number(o.duration_real), 0))} von{' '}
+              {qty(operations.reduce((sum, o) => sum + Number(o.duration_expected), 0))} Min. erfasst
+            </span>
+          ) : null
+        }
+        tight
+      >
+        {operations.length === 0 ? (
+          <Empty>
+            Keine Arbeitsgänge hinterlegt — der Auftrag trägt nur Materialkosten. Arbeitsgänge werden
+            an der <Link href="/fertigung/stuecklisten">Stückliste</Link> gepflegt.
+          </Empty>
+        ) : (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nr.</th>
+                  <th>Arbeitsgang</th>
+                  <th>Arbeitsplatz</th>
+                  <th className="num">Vorgabe</th>
+                  <th className="num">Erfasst</th>
+                  <th className="num">Lohnkosten</th>
+                  <th>Zustand</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {operations.map((o) => {
+                  const led =
+                    o.state === 'done' ? 'ok' : o.state === 'progress' ? 'on' : o.state === 'cancel' ? 'off' : 'off'
+                  const label =
+                    o.state === 'done'
+                      ? 'erledigt'
+                      : o.state === 'progress'
+                        ? 'läuft'
+                        : o.state === 'cancel'
+                          ? 'storniert'
+                          : 'offen'
+                  return (
+                    <tr key={o.id}>
+                      <td className="mono small">{o.sequence}</td>
+                      <td>
+                        {o.name}
+                        {o.worker && <div className="small muted">{o.worker}</div>}
+                      </td>
+                      <td>
+                        <span className="mono small">{o.code}</span> {o.work_center}
+                        <div className="small muted">{money(o.cost_per_hour)} / Std.</div>
+                      </td>
+                      <td className="num mono muted">{qty(o.duration_expected)} Min.</td>
+                      <td className="num mono">
+                        {Number(o.duration_real) > 0 ? `${qty(o.duration_real)} Min.` : '—'}
+                        {o.date_start && o.state === 'progress' && (
+                          <div className="small muted nowrap">seit {dateTime(o.date_start)}</div>
+                        )}
+                      </td>
+                      <td className="num mono">
+                        {money((Number(o.duration_real) / 60) * Number(o.cost_per_hour))}
+                      </td>
+                      <td className="nowrap">
+                        <span className={`led ${led}`} /> <span className="small muted">{label}</span>
+                      </td>
+                      <td className="num">
+                        {open && o.state !== 'done' && o.state !== 'cancel' && (
+                          <span className="actions" style={{ justifyContent: 'flex-end' }}>
+                            {o.state === 'pending' && (
+                              <ActionButton className="small" action={startOperation.bind(null, id, o.id)}>
+                                Starten
+                              </ActionButton>
+                            )}
+                            <ActionForm action={finishOperation.bind(null, id, o.id)}>
+                              <span className="actions">
+                                <input
+                                  className="mono"
+                                  type="number"
+                                  name="minutes"
+                                  step="0.01"
+                                  min="0"
+                                  style={{ width: 90 }}
+                                  placeholder={
+                                    o.state === 'progress' ? 'Uhr' : String(Number(o.duration_expected))
+                                  }
+                                  title="Dauer in Minuten — leer lassen: bei laufendem Arbeitsgang zählt die Uhr, sonst die Vorgabezeit"
+                                />
+                                <button className="small" type="submit">Fertig</button>
+                              </span>
+                            </ActionForm>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
+
+      {mo.state === 'done' && Number(mo.unit_cost ?? 0) > 0 && (
+        <Card title="Herstellkosten" tight>
+          <div className="grid-3" style={{ padding: 12 }}>
+            <Stat label="Material" value={money(mo.material_cost)} hint="Wert der verbrauchten Komponenten" />
+            <Stat label="Lohn" value={money(mo.labor_cost)} hint="aus den erfassten Arbeitsgangzeiten" />
+            <Stat
+              label="Je Stück"
+              value={money(mo.unit_cost ?? 0)}
+              hint={`${qty(mo.qty_produced)} ${mo.uom} · ${money(Number(mo.material_cost) + Number(mo.labor_cost))} gesamt`}
+            />
+          </div>
+          <p className="muted small" style={{ padding: '0 12px 12px', margin: 0 }}>
+            Mit diesem Wert ist das Fertigprodukt eingebucht — er geht in den gleitenden
+            Durchschnittspreis der Variante ein, nicht der gepflegte Standardpreis.
+          </p>
+        </Card>
+      )}
 
       {open && (
         <Card title="Fertig melden">
@@ -263,7 +433,14 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
               </label>
             </div>
 
-            <details>
+            {components.some((c) => c.issue_method === 'manual' && c.state !== 'done' && c.state !== 'cancel') && (
+              <div className="notice warn">
+                Positionen mit Verbrauchsart <strong>manuell</strong> müssen unten erfasst werden —
+                ohne Eingabe verweigert die Fertigmeldung den Dienst.
+              </div>
+            )}
+
+            <details open={components.some((c) => c.issue_method === 'manual' && c.state !== 'done' && c.state !== 'cancel')}>
               <summary className="muted small" style={{ cursor: 'pointer', marginBottom: 8 }}>
                 Ist-Verbrauch anpassen (z. B. Ausschuss beim Einbau)
               </summary>
@@ -272,6 +449,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                   <thead>
                     <tr>
                       <th>Komponente</th>
+                      <th>Verbrauch</th>
                       <th className="num">Soll</th>
                       <th className="num" style={{ width: 160 }}>Ist</th>
                     </tr>
@@ -281,7 +459,21 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                       .filter((c) => c.state !== 'done' && c.state !== 'cancel')
                       .map((c) => (
                         <tr key={c.id}>
-                          <td>{c.product}</td>
+                          <td>
+                            {c.product}
+                            {c.phantom_path && (
+                              <div className="small muted">aus {c.phantom_path}</div>
+                            )}
+                          </td>
+                          <td className="small">
+                            {c.issue_method === 'manual' ? (
+                              <>
+                                <span className="led warn" /> <span className="muted">manuell</span>
+                              </>
+                            ) : (
+                              <span className="muted">automatisch</span>
+                            )}
+                          </td>
                           <td className="num">{qty(c.qty)} {c.uom}</td>
                           <td>
                             <input
@@ -290,6 +482,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                               step="0.001"
                               min="0"
                               placeholder={String(c.qty)}
+                              required={c.issue_method === 'manual'}
                             />
                           </td>
                         </tr>

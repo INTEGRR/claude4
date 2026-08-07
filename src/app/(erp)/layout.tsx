@@ -80,6 +80,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ? [
             { href: '/fertigung', label: 'Fertigungsaufträge', count: counts.offene_mos },
             { href: '/fertigung/stuecklisten', label: 'Stücklisten' },
+            { href: '/fertigung/arbeitsplaetze', label: 'Arbeitsplätze' },
           ]
         : [],
     },

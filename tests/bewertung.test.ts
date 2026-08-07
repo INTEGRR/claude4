@@ -293,6 +293,26 @@ describe('Bestandsbewertung (0018)', () => {
         select sum(value) as value from stock_valuation_layers
         where variant_id = ${komponente} and layer_type = 'production'`
       assert.equal(Number(verbrauch.value), -20, 'Materialabgang zum Durchschnitt')
+
+      // Und der Materialwert landet als Herstellkosten am Fertigprodukt.
+      const wFertig = await wert(t, fertig)
+      assert.equal(wFertig.total, 20, '2 Stück à 10 € Material')
+    })
+  })
+
+  describe('Geldbeträge im Verlauf', () => {
+    test('money_text schreibt deutsch, unabhängig von der Locale', async () => {
+      await withRollback(async (t) => {
+        const [row] = await t<
+          { a: string; b: string; c: string; d: string; e: string }[]
+        >`select money_text(311.52) as a, money_text(1234567.5) as b,
+                 money_text(-5.256) as c, money_text(0) as d, money_text(null) as e`
+        assert.equal(row.a, '311,52 €')
+        assert.equal(row.b, '1.234.567,50 €')
+        assert.equal(row.c, '-5,26 €')
+        assert.equal(row.d, '0,00 €')
+        assert.equal(row.e, '0,00 €', 'NULL zählt als 0')
+      })
     })
   })
 })

@@ -14,7 +14,9 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **product_variants**: Varianten je Template (template_id). sku, barcode, display_name, price_extra, active. Anzeigename: variant_display_name(variant_id).
 - **product_attributes / product_attribute_values**: Attribute (z. B. Farbe) und Werte (z. B. Weiß).
 - **product_template_attribute_values (ptav)** & **product_variant_attribute_values**: verknüpfen Varianten mit Attributwerten.
-- **vendor_prices**: Lieferantenpreise je Template (vendor_id → partners, price, lead_time_days, min_qty).
+- **vendor_prices**: Lieferantenpreise je Template (vendor_id → partners, price, discount, lead_time_days, min_qty, date_start, date_end).
+- **product_categories**: Produktkategorien (name, parent_id, full_path). **taxes**: Steuersätze (name, amount, type_tax_use 'sale'|'purchase'). **payment_terms**: Zahlungsbedingungen inkl. Skonto. **incoterms**: Lieferbedingungen.
+- **tags** (kind 'partner'|'product'|'sale'|'repair') mit den Verknüpfungen partner_tag_links, product_tag_links, sales_order_tag_links, repair_order_tag_links.
 
 ### Lager (Bewegungs-Ledger — Kernprinzip: jede Bestandsänderung ist eine Zeile in stock_moves)
 - **stock_locations**: Orte, full_path z. B. 'WH/Stock', 'Virtuell/Produktion', 'Virtuell/Inventurdifferenz', 'Virtuell/Ausschuss', 'Partner/Kunden', 'Partner/Lieferanten'.
@@ -23,15 +25,30 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **stock_quants**: aktueller Bestand je (location_id, variant_id): on_hand, reserved. Nur über Funktionen gepflegt — für Auswertungen besser die Helfer nutzen:
   on_hand_qty(variant_id), free_to_use(variant_id), incoming_qty(variant_id), outgoing_qty(variant_id), forecasted_qty(variant_id).
 - **inventory_counts**: Inventuren (counted_qty, book_qty, applied_at).
+- **stock_orderpoints**: Meldebestände (variant_id, location_id, min_qty, max_qty, qty_multiple, route 'buy'|'manufacture', snoozed_until). Vorschläge: orderpoint_suggestions().
+
+### Los- und Seriennummern
+- **product_templates.tracking**: 'none'|'lot'|'serial'. Helfer: product_tracking(variant_id).
+- **stock_lots**: Lose/Seriennummern (variant_id, name, ref, note). **move_lot_assignments**: (move_id, lot_id, qty) — welche Nummer in welcher Bewegung. **stock_lot_quants**: Bestand je (location_id, variant_id, lot_id).
+- Rückverfolgung: von move_lot_assignments über stock_moves auf picking_id / production_id joinen.
+
+### Bestandsbewertung (gleitender Durchschnitt / AVCO)
+- **stock_valuation_layers**: unveränderliche Wertschichten. variant_id, move_id, layer_type ('receipt','issue','landed_cost','revaluation','production'), quantity (+Zugang/−Abgang), unit_cost, value, qty_after, value_after, note, created_at.
+- **product_variants.moving_avg_cost / valued_qty / valuation_total**: fortgeschriebener Durchschnittspreis und Bestandswert. View **stock_value** (variant_id, product, sku, on_hand, valued_qty, moving_avg_cost, valuation_total, qty_difference).
+- **landed_costs** + **landed_cost_allocations**: Einstandsnebenkosten (Fracht, Zoll) verteilt nach basis 'weight'|'value'|'quantity'.
+- **currencies** / **exchange_rates**: Fremdwährung; Kurs zum Stichtag: exchange_rate_at(code, datum). purchase_orders.exchange_rate friert den Kurs bei Bestätigung ein.
 
 ### Verkauf
 - **sales_orders**: number ('S00001'), partner_id, state ('draft','sent','sale','cancel'), locked, delivery_status ('nothing','partial','full'), invoice_status, order_date, source ('manuell'|'shopify'), shopify_order_id/name, ship_*-Adressfelder. Summen: sales_order_total(order_id) → (net, tax, gross).
 - **sales_order_lines**: order_id, variant_id, name, qty, qty_delivered, uom_id, price_unit, discount, tax_rate. Netto je Zeile: sale_line_subtotal(zeile).
 
 ### Fertigung
-- **boms**: Stücklisten je Template (template_id, qty, consumption 'blocked'|'allowed'|'warning'). Auflösung je Variante: resolve_bom(variant_id) → bom_id.
-- **bom_lines**: Positionen (component_variant_id, qty, uom_id). Variantenfilter: bom_line_variant_filters (bom_line_id, ptav_id) — Position gilt nur für Varianten mit dem Attributwert. Gefilterte Liste: bom_components_for_variant(bom_id, variant_id).
-- **manufacturing_orders**: number ('MO/00001'), variant_id, qty_to_produce, qty_produced, state ('draft','confirmed','progress','to_close','done','cancel'), sales_order_id, backorder_of_id, date_done. Komponentenbedarf = stock_moves mit production_id und reference='Komponentenverbrauch'; Fertigmeldung = reference='Fertigmeldung'.
+- **boms**: Stücklisten je Template (template_id, qty, bom_type 'manufacture'|'kit', consumption 'blocked'|'allowed'|'warning'). Auflösung je Variante: resolve_bom(variant_id) → bom_id (nur 'manufacture'), resolve_kit(variant_id) → bom_id (nur 'kit'/Phantom).
+- **bom_lines**: Positionen (component_variant_id, qty, uom_id, issue_method 'backflush'|'manual'). Variantenfilter: bom_line_variant_filters (bom_line_id, ptav_id) — Position gilt nur für Varianten mit dem Attributwert. Einstufig gefilterte Liste: bom_components_for_variant(bom_id, variant_id); **mehrstufig mit aufgelösten Baugruppen: bom_explode(bom_id, variant_id, menge)** → (component_variant_id, qty, uom_id, issue_method, depth, phantom_path).
+- **work_centers**: Arbeitsplätze (code, name, cost_per_hour, capacity, time_efficiency). **bom_operations**: Arbeitsgänge der Stückliste (name, work_center_id, duration_minutes je Referenzmenge, setup_minutes je Auftrag).
+- **mo_operations**: Arbeitsgänge des Auftrags (mo_id, name, work_center_id, cost_per_hour als Schnappschuss, duration_expected, duration_real, state 'pending'|'progress'|'done'|'cancel', date_start, date_done, user_id). Lohnkosten: mo_labor_cost(mo_id).
+- **manufacturing_orders**: number ('MO/00001'), variant_id, qty_to_produce, qty_produced, state ('draft','confirmed','progress','to_close','done','cancel'), sales_order_id, backorder_of_id, date_done, material_cost, labor_cost, unit_cost. Komponentenbedarf = stock_moves mit production_id und reference='Komponentenverbrauch' (mit issue_method und phantom_path); Fertigmeldung = reference='Fertigmeldung'.
+- View **production_cost**: je erledigtem Auftrag number, product, qty_produced, material_cost, labor_cost, total_cost, unit_cost, minutes.
 - **unbuild_orders**: Demontage (variant_id, qty, state).
 
 ### Einkauf
@@ -48,7 +65,8 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 
 ### Sonstiges
 - **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at).
-- **sequences**: Nummernkreise. **integration_jobs**: Outbox für Shopify/E-Mail.
+- **sequences**: Nummernkreise. **integration_jobs**: Outbox für Shopify/E-Mail (nicht abfragbar).
+- **api_transactions**: Protokoll aller Aufrufe an Shopify/DHL/Mail (system, kind, reference, ok, status_code, error, duration_ms, created_at).
 
 Konventionen: Geldwerte sind netto in EUR, sofern nicht anders benannt. 'state' immer als Text vergleichen. Monatsauswertungen mit date_trunc('month', …).
 `
