@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
@@ -178,31 +179,16 @@ export default async function AuswertungenPage({
   const bis = params.bis ?? heute.toISOString().slice(0, 10)
   const months = monthsBetween(von, bis)
 
-  // --- Inventarwert: Bestand × Kosten (Fallback: Summe der Stücklistenkosten)
+  // --- Inventarwert aus der Bewertung (gleitender Durchschnitt, Migration 0018).
+  // Bis dahin war das eine Schätzung aus gepflegten Einstandspreisen; jetzt
+  // steht dort der Wert, mit dem der Bestand tatsächlich im Buch steht.
   const inventar = await sql<
     { id: string; product: string; sku: string | null; on_hand: number; unit_cost: number; value: number }[]
   >`
-    with kosten as (
-      select pv.id,
-             case
-               when pt.standard_cost > 0 then pt.standard_cost
-               else coalesce((
-                 select sum(comp.qty * cpt.standard_cost)
-                 from bom_components_for_variant(resolve_bom(pv.id), pv.id) comp
-                 join product_variants cpv on cpv.id = comp.component_variant_id
-                 join product_templates cpt on cpt.id = cpv.template_id), 0)
-             end as unit_cost
-      from product_variants pv
-      join product_templates pt on pt.id = pv.template_id
-      where pv.active and pt.type = 'goods'
-    )
-    select pv.id, coalesce(pv.display_name, pt.name) as product, pv.sku,
-           on_hand_qty(pv.id) as on_hand, k.unit_cost,
-           on_hand_qty(pv.id) * k.unit_cost as value
-    from product_variants pv
-    join product_templates pt on pt.id = pv.template_id
-    join kosten k on k.id = pv.id
-    where pv.active and pt.type = 'goods' and on_hand_qty(pv.id) <> 0
+    select variant_id as id, product, sku, on_hand,
+           moving_avg_cost as unit_cost, valuation_total as value
+    from stock_value
+    where on_hand <> 0 or valuation_total <> 0
     order by value desc`
 
   const inventarSumme = inventar.reduce((sum, r) => sum + Number(r.value), 0)
@@ -275,7 +261,7 @@ export default async function AuswertungenPage({
   return (
     <>
       <PageHeader
-        title="Auswertungen"
+        title="Mengen & Abverkauf"
         subtitle="Bestand, Produktion, verbaute Komponenten und Abverkauf"
         actions={
           <form className="row">
@@ -290,12 +276,19 @@ export default async function AuswertungenPage({
             <div className="shrink field">
               <button type="submit">Anwenden</button>
             </div>
+            <div className="shrink field">
+              <Link className="btn" href="/auswertungen/kennzahlen">Zu den Kennzahlen</Link>
+            </div>
           </form>
         }
       />
 
       <div className="grid-3" style={{ marginBottom: 16 }}>
-        <Stat label="Inventarwert" value={money(inventarSumme)} hint="Bestand × Einstandskosten" />
+        <Stat
+          label="Inventarwert"
+          value={money(inventarSumme)}
+          hint="bewerteter Bestand (gleitender Durchschnitt)"
+        />
         <Stat
           label="Produziert im Zeitraum"
           value={qty(produktion.reduce((s, r) => s + Number(r.menge), 0))}

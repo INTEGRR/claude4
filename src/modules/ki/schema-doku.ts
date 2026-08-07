@@ -69,6 +69,15 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **shipments**: DHL-Sendungen (shipment_number, picking_id, sales_order_id, state 'created'|'manifested'|'transit'|'delivered'|'failure'|'cancelled', tracking_url).
 - **shipping_ready** (View): versandbereite Lieferungen (Lieferung 'assigned', keine offenen MOs).
 
+### Kennzahlen (materialisierte Sichten, per Cron neu berechnet)
+- **mv_stock_value_history**: Bestandsmenge und -wert je Variante zum Monatsende (monat, variant_id, qty_end, value_end).
+- **mv_contribution_margin**: Deckungsbeitrag je Monat und Variante (monat, variant_id, qty, revenue, cost). Realisiert bei der Auslieferung, Retouren gegengerechnet.
+- **mv_inventory_turnover**: je Variante on_hand, value_now, avg_value_12m, cogs_12m, revenue_12m, margin_12m, turnover (Umschlag), daily_use, days_of_supply (Reichweite in Tagen).
+- **mv_supplier_otd**: Liefertreue je Lieferant und Monat (vendor_id, vendor, lines, delivered, on_time, overdue, avg_delay_days, qty_ordered, qty_received).
+- **mv_rma_analysis**: RMA je Monat und Variante (rma_count, repaired, cancelled, parts_used, qty_delivered, rma_rate in Prozent).
+- **mv_labor_hours**: Minuten und Lohnkosten je Monat, Mitarbeiter, Art und Arbeitsplatz.
+- Stand der Berechnung: `select value ->> 'refreshed_at' from settings where key = 'analytics'`.
+
 ### Sonstiges
 - **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at).
 - **sequences**: Nummernkreise. **integration_jobs**: Outbox für Shopify/E-Mail (nicht abfragbar).

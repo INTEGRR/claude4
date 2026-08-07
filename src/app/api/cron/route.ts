@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { sql } from '@/db/client'
 import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen/import'
 import { runDueJobs } from '@/modules/integrationen/jobs'
 import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
@@ -16,6 +17,7 @@ export const maxDuration = 60
  *   /api/cron?task=jobs          jede Minute   - Outbox abarbeiten
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
+ *   /api/cron?task=analytics     nachts        - Kennzahlen neu berechnen
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
  */
 export async function GET(request: Request) {
@@ -45,6 +47,10 @@ export async function GET(request: Request) {
       case 'tracking': {
         if (!dhlConfigured()) return NextResponse.json({ skipped: 'DHL nicht konfiguriert' })
         return NextResponse.json({ task, ...(await syncTracking()) })
+      }
+      case 'analytics': {
+        const [row] = await sql<{ refresh_analytics: string }[]>`select refresh_analytics('cron')`
+        return NextResponse.json({ task, dauer: row.refresh_analytics })
       }
       case 'housekeeping':
         return NextResponse.json({

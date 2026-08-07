@@ -135,7 +135,12 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     {
       label: 'Auswertungen',
       items: [
-        ...(sees('auswertungen') ? [{ href: '/auswertungen', label: 'Auswertungen' }] : []),
+        ...(sees('auswertungen')
+          ? [
+              { href: '/auswertungen', label: 'Mengen & Abverkauf' },
+              { href: '/auswertungen/kennzahlen', label: 'Kennzahlen' },
+            ]
+          : []),
         ...(sees('ki') ? [{ href: '/ki', label: 'KI-Analyse' }] : []),
       ],
     },
