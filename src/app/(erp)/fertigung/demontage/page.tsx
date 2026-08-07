@@ -88,26 +88,30 @@ export default async function DemontagePage() {
                       <td className="mono">{o.number}</td>
                       <td>{o.product}</td>
                       <td className="num">{qty(o.qty)}</td>
+                      {/* Deckung als LED plus Wort — die Zahl bleibt ausgerichtet. */}
                       <td className="num">
                         {o.state === 'done' ? (
                           <span className="muted">{qty(o.on_hand)}</span>
-                        ) : short ? (
-                          <span className="badge warn">{qty(o.on_hand)}</span>
                         ) : (
-                          <span className="badge success">{qty(o.on_hand)}</span>
+                          <>
+                            <span className={`led ${short ? 'warn' : 'ok'}`} />{' '}
+                            <span className="muted small">{short ? 'zu wenig' : 'gedeckt'}</span>{' '}
+                            {qty(o.on_hand)}
+                          </>
                         )}
                       </td>
-                      <td>
-                        <span className={`badge ${o.state === 'done' ? 'success' : 'neutral'}`}>
-                          {o.state === 'done' ? 'Demontiert' : 'Entwurf'}
-                        </span>
+                      <td className="nowrap">
+                        <span className={`led ${o.state === 'done' ? 'ok' : 'off'}`} />{' '}
+                        {o.state === 'done' ? 'Demontiert' : 'Entwurf'}
                       </td>
-                      <td className="nowrap small">{dateTime(o.created_at)}</td>
+                      <td className="mono nowrap small">{dateTime(o.created_at)}</td>
                       <td className="num">
                         {o.state !== 'done' && (
                           <div className="actions" style={{ justifyContent: 'flex-end' }}>
+                            {/* Neutral statt Primär: die Taste steht in jeder Zeile,
+                                der Akzent bleibt dem Formular oben vorbehalten. */}
                             <ActionButton
-                              className="small primary"
+                              className="small"
                               action={applyUnbuild.bind(null, o.id, false)}
                             >
                               Demontieren

@@ -50,13 +50,15 @@ export default async function LosePage({
       <Card tight>
         <div style={{ padding: 12 }}>
           <form>
-            <input
-              type="search"
-              name="q"
-              placeholder="Los-/Seriennummer oder Produkt suchen"
-              defaultValue={q ?? ''}
-              style={{ maxWidth: 340 }}
-            />
+            <label className="field" style={{ maxWidth: 340, marginBottom: 0 }}>
+              <span>Suche</span>
+              <input
+                type="search"
+                name="q"
+                placeholder="Los-/Seriennummer oder Produkt suchen"
+                defaultValue={q ?? ''}
+              />
+            </label>
           </form>
         </div>
         {lose.length === 0 ? (
@@ -89,13 +91,13 @@ export default async function LosePage({
                       </span>
                     </td>
                     <td className="num">
-                      {Number(l.on_hand) > 0 ? (
-                        <span className="badge success">{qty(l.on_hand)}</span>
-                      ) : (
-                        <span className="muted">0</span>
-                      )}
+                      {qty(l.on_hand)}
+                      <div className="small muted nowrap">
+                        <span className={Number(l.on_hand) > 0 ? 'led ok' : 'led off'} />{' '}
+                        {Number(l.on_hand) > 0 ? 'auf Lager' : 'leer'}
+                      </div>
                     </td>
-                    <td className="nowrap small muted">{dateTime(l.created_at)}</td>
+                    <td className="nowrap small muted mono">{dateTime(l.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -96,13 +96,17 @@ export default async function FertigungPage({
       </Card>
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Filter: der aktive Zustand wird von der LED getragen, nicht von einer
+            orangen Fläche — der Akzent bleibt der Primärtaste vorbehalten. */}
+        <div className="actions" style={{ padding: 12 }}>
           {filters.map((f) => (
             <Link
               key={f.label}
               href={f.key ? `/fertigung?status=${f.key}` : '/fertigung'}
-              className={`btn small${status === f.key ? ' primary' : ''}`}
+              className="btn small"
+              aria-current={status === f.key ? 'page' : undefined}
             >
+              <span className={`led ${status === f.key ? 'on' : 'off'}`} />
               {f.label}
             </Link>
           ))}
@@ -129,7 +133,7 @@ export default async function FertigungPage({
                   <tr key={r.id}>
                     <td className="mono"><Link href={`/fertigung/${r.id}`}>{r.number}</Link></td>
                     <td>{r.product}</td>
-                    <td className="num">
+                    <td className="num mono">
                       {qty(r.qty_produced)} / {qty(r.qty_to_produce)}
                     </td>
                     <td><Badge state={r.state} kind="mo" /></td>
@@ -149,7 +153,7 @@ export default async function FertigungPage({
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td className="nowrap">{date(r.scheduled_date)}</td>
+                    <td className="mono nowrap">{date(r.scheduled_date)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -68,7 +68,7 @@ export default async function ProduktePage({
             </label>
             <label className="field">
               <span>Artikelnummer</span>
-              <input name="sku" placeholder="optional" />
+              <input name="sku" className="mono" placeholder="optional" />
             </label>
             <label className="field">
               <span>Einheit</span>
@@ -100,9 +100,14 @@ export default async function ProduktePage({
 
       <Card tight>
         <div style={{ padding: 12 }}>
-          <form style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
-            <input type="search" name="q" placeholder="Produkt suchen" defaultValue={q ?? ''} />
-            <button type="submit">Suchen</button>
+          <form className="row" style={{ maxWidth: 420 }}>
+            <label className="field" style={{ marginBottom: 0 }}>
+              <span>Suche</span>
+              <input type="search" name="q" placeholder="Produkt suchen" defaultValue={q ?? ''} />
+            </label>
+            <div className="shrink field">
+              <button type="submit">Suchen</button>
+            </div>
           </form>
         </div>
 
@@ -127,15 +132,17 @@ export default async function ProduktePage({
                     <td><Link href={`/produkte/${r.id}`}>{r.name}</Link></td>
                     <td className="num">{r.variants}</td>
                     <td className="num">{qty(r.on_hand)}</td>
-                    <td>{r.uom}</td>
+                    <td className="mono small">{r.uom}</td>
                     <td className="num">{money(r.list_price)}</td>
                     <td>
-                      {r.route_manufacture && (
-                        <span className={`badge ${r.has_bom ? 'info' : 'warn'}`}>
-                          {r.has_bom ? 'Fertigung' : 'Fertigung ohne Stückliste'}
-                        </span>
-                      )}{' '}
-                      {r.route_buy && <span className="badge neutral">Einkauf</span>}
+                      <span className="actions">
+                        {r.route_manufacture && (
+                          <span className={`badge ${r.has_bom ? 'info' : 'warn'}`}>
+                            {r.has_bom ? 'Fertigung' : 'Fertigung ohne Stückliste'}
+                          </span>
+                        )}
+                        {r.route_buy && <span className="badge neutral">Einkauf</span>}
+                      </span>
                     </td>
                   </tr>
                 ))}

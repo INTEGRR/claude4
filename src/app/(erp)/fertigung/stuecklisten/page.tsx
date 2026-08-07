@@ -80,6 +80,7 @@ export default async function BomListPage() {
                   <th className="num">Referenzmenge</th>
                   <th className="num">Positionen</th>
                   <th>Variantenabhängig</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -95,6 +96,11 @@ export default async function BomListPage() {
                       ) : (
                         <span className="muted small">—</span>
                       )}
+                    </td>
+                    {/* Inaktive Stücklisten sahen bisher aus wie aktive. */}
+                    <td className="nowrap">
+                      <span className={`led ${b.active ? 'ok' : 'off'}`} />{' '}
+                      {b.active ? 'aktiv' : 'inaktiv'}
                     </td>
                   </tr>
                 ))}

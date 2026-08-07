@@ -2,7 +2,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { qty, money } from '@/modules/shared/format'
+import { date, qty, money } from '@/modules/shared/format'
 import {
   createOrderpoint,
   deleteOrderpoint,
@@ -94,12 +94,15 @@ export default async function BeschaffungPage() {
                     <td>{v.product}</td>
                     <td className="num">{qty(v.qty_on_hand)}</td>
                     <td className="num">
-                      <span className="badge danger">{qty(v.qty_forecast)}</span>
+                      {qty(v.qty_forecast)}
+                      <div className="small muted nowrap">
+                        <span className="led warn" /> unter Minimum
+                      </div>
                     </td>
                     <td className="num small muted">
                       {qty(v.min_qty)} / {qty(v.max_qty)}
                     </td>
-                    <td className="num" style={{ fontWeight: 650 }}>{qty(v.qty_to_order)}</td>
+                    <td className="num mono">{qty(v.qty_to_order)}</td>
                     <td>
                       <span className="badge neutral">
                         {v.route === 'manufacture' ? 'Fertigen' : 'Einkaufen'}
@@ -107,7 +110,9 @@ export default async function BeschaffungPage() {
                     </td>
                     <td className="small">
                       {v.vendor_name ?? '—'}
-                      {v.unit_price != null && ` · ${money(v.unit_price)}`}
+                      {v.unit_price != null && (
+                        <> · <span className="mono nowrap">{money(v.unit_price)}</span></>
+                      )}
                     </td>
                     <td className="num">
                       <div className="actions">
@@ -153,14 +158,14 @@ export default async function BeschaffungPage() {
                 {regeln.map((r) => (
                   <tr key={r.id}>
                     <td>{r.product}</td>
-                    <td className="small muted">{r.location}</td>
+                    <td className="small muted mono">{r.location}</td>
                     <td className="num">{qty(r.min_qty)}</td>
                     <td className="num">{qty(r.max_qty)}</td>
                     <td className="num">{qty(r.qty_multiple)}</td>
                     <td className="small">
                       {r.route === 'manufacture' ? 'Fertigen' : r.route === 'buy' ? 'Einkaufen' : 'aus Produktrouten'}
                     </td>
-                    <td className="small muted">{r.snoozed_until ?? '—'}</td>
+                    <td className="small muted mono nowrap">{r.snoozed_until ? date(r.snoozed_until) : '—'}</td>
                     <td className="num">
                       <ActionButton
                         className="small danger"

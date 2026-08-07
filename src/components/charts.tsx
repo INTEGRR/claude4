@@ -1,4 +1,5 @@
 import { qty } from '@/modules/shared/format'
+import { Empty } from '@/components/ui'
 
 /**
  * Kleine SVG-/HTML-Diagramme (Server Components, keine Bibliothek).
@@ -7,9 +8,17 @@ import { qty } from '@/modules/shared/format'
  * Serienfarben aus der validierten Palette (--viz-1 … --viz-6), Text trägt
  * nie die Serienfarbe. Unter jedem Diagramm bleibt die Tabelle als
  * vollständige Datensicht bestehen.
+ *
+ * Alle Zahlen und Kategorien im Diagramm sind Beschriftung und laufen deshalb
+ * in Mono — dieselbe Schrift wie Legende, Balkenwerte und Tabellenköpfe.
  */
 
+// --viz-1 ist praktisch der Akzent. Er gehört der führenden Serie, nie dem
+// Zufall der Sortierung.
 const SERIES_COLORS = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)', 'var(--viz-5)', 'var(--viz-6)']
+
+/** Beschriftungsschrift im SVG. */
+const TICK = { className: 'mono', fontSize: '10', fill: 'var(--text-muted)', letterSpacing: '.05em' } as const
 
 function fmt(value: number, unit?: string): string {
   const text = qty(value)
@@ -41,8 +50,10 @@ export interface ColumnSeries {
 
 /**
  * Säulendiagramm über Kategorien (z. B. Monate); eine oder mehrere Serien.
- * Serienfarben in fester Reihenfolge nach Serienname (alphabetisch), damit
- * ein geänderter Zeitraum die Farben nicht umverteilt.
+ * Zeichen- und Legendenreihenfolge nach Serienname (alphabetisch), damit die
+ * Balken bei geändertem Zeitraum nicht die Plätze tauschen. Die Farbe folgt
+ * dagegen dem Datenrang: die größte Serie bekommt --viz-1 (den Akzent), sonst
+ * würde Orange nur den Anfangsbuchstaben belohnen.
  */
 export function ColumnChart({
   categories,
@@ -55,9 +66,17 @@ export function ColumnChart({
   unit?: string
   height?: number
 }) {
-  const sorted = [...series].sort((a, b) => a.name.localeCompare(b.name, 'de')).slice(0, 6)
+  const summe = (s: ColumnSeries) => s.values.reduce((a, b) => a + b, 0)
+  // Die sechs größten Serien — nicht die sechs alphabetisch ersten.
+  const ranked = [...series]
+    .sort((a, b) => summe(b) - summe(a) || a.name.localeCompare(b.name, 'de'))
+    .slice(0, 6)
+  const farbrang = new Map(ranked.map((s, i) => [s.name, i]))
+  const farbe = (s: ColumnSeries) => SERIES_COLORS[farbrang.get(s.name) ?? 0]
+  const sorted = [...ranked].sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  const verworfen = series.length - ranked.length
   const max = Math.max(0, ...sorted.flatMap((s) => s.values))
-  if (max === 0) return null
+  if (max === 0) return <Empty>Keine Daten im Zeitraum.</Empty>
   const ticks = niceTicks(max)
   const top = ticks.at(-1)!
 
@@ -86,32 +105,37 @@ export function ColumnChart({
     <div>
       {n > 1 && (
         <div className="chart-legend">
-          {sorted.map((s, i) => (
+          {sorted.map((s) => (
             <span key={s.name}>
-              <span className="swatch" style={{ background: SERIES_COLORS[i] }} />
+              <span className="swatch" style={{ background: farbe(s) }} />
               {s.name}
             </span>
           ))}
+          {/* Datenehrlichkeit: gekappte Serien werden benannt, nicht verschwiegen. */}
+          {verworfen > 0 && <span>+{verworfen} weitere nicht gezeigt</span>}
         </div>
       )}
-      <svg viewBox={`0 0 ${W} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">
+      <svg
+        viewBox={`0 0 ${W} ${height}`}
+        style={{ width: '100%', height: 'auto', display: 'block' }}
+        role="img"
+        aria-label={
+          n > 1
+            ? `Säulendiagramm über ${categories.length} Kategorien, Serien: ${sorted.map((s) => s.name).join(', ')}`
+            : `Säulendiagramm über ${categories.length} Kategorien`
+        }
+      >
         {ticks.map((t) => (
           <g key={t}>
             <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeWidth="1" />
-            <text x={padL - 6} y={y(t) + 3.5} textAnchor="end" fontSize="10" fill="var(--text-muted)">
+            <text x={padL - 6} y={y(t) + 3.5} textAnchor="end" {...TICK}>
               {qty(t)}
             </text>
           </g>
         ))}
         {categories.map((cat, ci) => (
           <g key={cat}>
-            <text
-              x={padL + band * ci + band / 2}
-              y={height - 6}
-              textAnchor="middle"
-              fontSize="10"
-              fill="var(--text-muted)"
-            >
+            <text x={padL + band * ci + band / 2} y={height - 6} textAnchor="middle" {...TICK} letterSpacing=".06em">
               {cat}
             </text>
             {sorted.map((s, si) => {
@@ -121,7 +145,7 @@ export function ColumnChart({
               const h = ((v / top) * plotH)
               return (
                 <g key={s.name}>
-                  <path d={barPath(x, y(v), barW, h)} fill={SERIES_COLORS[si]}>
+                  <path d={barPath(x, y(v), barW, h)} fill={farbe(s)}>
                     <title>{`${n > 1 ? s.name + ' · ' : ''}${cat}: ${fmt(v, unit)}`}</title>
                   </path>
                   {single && labelIdx.has(ci) && (
@@ -129,6 +153,7 @@ export function ColumnChart({
                       x={x + barW / 2}
                       y={y(v) - 4}
                       textAnchor="middle"
+                      className="mono"
                       fontSize="10.5"
                       fontWeight="600"
                       fill="var(--text)"
@@ -157,7 +182,7 @@ export function HBars({
   max?: number
 }) {
   const max = maxProp ?? Math.max(0, ...rows.map((r) => r.value))
-  if (max === 0) return null
+  if (max === 0) return <Empty>Keine Daten vorhanden.</Empty>
   return (
     <div>
       {rows.map((r) => (
@@ -173,7 +198,14 @@ export function HBars({
   )
 }
 
-/** Ein horizontaler Anteilsbalken (Teil-vom-Ganzen) mit Legende. */
+/**
+ * Ein horizontaler Anteilsbalken (Teil-vom-Ganzen) mit Legende.
+ *
+ * Vertrag an den Aufrufer: `parts` kommt absteigend sortiert, der führende
+ * Anteil steht vorn — er bekommt --viz-1, den Akzent. Bewusst KEINE Sortierung
+ * in der Komponente: ein Sammelposten wie "Übrige" gehört ans Ende, auch wenn
+ * er in Summe größer ist als der größte Einzelposten. Sonst glühte der Rest.
+ */
 export function ShareBar({
   parts,
   format = (v: number) => qty(v),
@@ -182,8 +214,10 @@ export function ShareBar({
   format?: (v: number) => string
 }) {
   const total = parts.reduce((sum, p) => sum + p.value, 0)
-  if (total <= 0) return null
+  if (total <= 0) return <Empty>Keine Daten vorhanden.</Empty>
   const shown = parts.slice(0, 6)
+  const verworfen = parts.length - shown.length
+  const gezeigt = shown.reduce((sum, p) => sum + p.value, 0)
   return (
     <div>
       <div className="share-bar">
@@ -202,6 +236,12 @@ export function ShareBar({
             {p.label} · {((p.value / total) * 100).toFixed(0)} %
           </span>
         ))}
+        {/* Der Balken endet vor 100 % — die Lücke wird benannt. */}
+        {verworfen > 0 && (
+          <span>
+            +{verworfen} weitere · {(((total - gezeigt) / total) * 100).toFixed(0)} %
+          </span>
+        )}
       </div>
     </div>
   )

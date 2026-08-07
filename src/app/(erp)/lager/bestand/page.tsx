@@ -64,16 +64,22 @@ export default async function BestandPage({
 
       {under > 0 && filter !== 'unterdeckung' && (
         <div className="notice warn">
+          <span className="led warn" />{' '}
           {under} Produkt(e) laufen in eine Unterdeckung.{' '}
           <Link href="/lager/bestand?filter=unterdeckung">Nur diese anzeigen</Link>
         </div>
       )}
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <form style={{ flex: 1, display: 'flex', gap: 8 }}>
-            <input type="search" name="q" placeholder="Produkt oder Artikelnummer" defaultValue={q ?? ''} />
-            <button type="submit">Suchen</button>
+        <div className="actions" style={{ padding: 12 }}>
+          <form className="row" style={{ flex: 1 }}>
+            <label className="field" style={{ maxWidth: 340, marginBottom: 0 }}>
+              <span>Suche</span>
+              <input type="search" name="q" placeholder="Produkt oder Artikelnummer" defaultValue={q ?? ''} />
+            </label>
+            <div className="shrink field">
+              <button type="submit">Suchen</button>
+            </div>
           </form>
           {filter === 'unterdeckung' && (
             <Link className="btn small" href="/lager/bestand">Filter aufheben</Link>
@@ -107,13 +113,14 @@ export default async function BestandPage({
                     <td className="num muted">{qty(r.incoming)}</td>
                     <td className="num muted">{qty(r.outgoing)}</td>
                     <td className="num">
-                      {Number(r.forecasted) < 0 ? (
-                        <span className="badge danger">{qty(r.forecasted)}</span>
-                      ) : (
-                        qty(r.forecasted)
+                      {qty(r.forecasted)}
+                      {Number(r.forecasted) < 0 && (
+                        <div className="small muted nowrap">
+                          <span className="led warn" /> Unterdeckung
+                        </div>
                       )}
                     </td>
-                    <td>{r.uom}</td>
+                    <td className="mono small">{r.uom}</td>
                   </tr>
                 ))}
               </tbody>

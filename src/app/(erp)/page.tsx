@@ -106,6 +106,7 @@ export default async function Dashboard({
 
       {sees('integrationen') && stats.failed > 0 && (
         <div className="notice danger">
+          <span className="led on" />{' '}
           {stats.failed} Vorgang/Vorgänge brauchen Aufmerksamkeit (fehlgeschlagene Jobs oder nicht
           zugeordnete Shopify-Positionen). <Link href="/integrationen">Zu den Integrationen</Link>
         </div>
@@ -130,7 +131,16 @@ export default async function Dashboard({
         {sees('reparatur') && (
           <Stat label="Offene Reparaturen" value={stats.open_repairs} href="/reparatur" />
         )}
-        {sees('scanner') && <Stat label="Scanner" value="→" hint="Belege per Barcode abarbeiten" href="/scanner" />}
+        {sees('scanner') && (
+          // Kein Zahlenwert, deshalb auch nicht im 28-px-Kennzahlenslot: ein
+          // Verweis in Mono, damit der Slot den Kennzahlen vorbehalten bleibt.
+          <Stat
+            label="Scanner"
+            value={<span className="mono" style={{ fontSize: 15, fontWeight: 500 }}>öffnen →</span>}
+            hint="Belege per Barcode abarbeiten"
+            href="/scanner"
+          />
+        )}
         {sees('verkauf') && (
           <Stat
             label="Umsatz laufender Monat"
@@ -163,6 +173,15 @@ export default async function Dashboard({
           ) : (
             <TableWrap>
               <table>
+                <thead>
+                  <tr>
+                    <th>Beleg</th>
+                    <th>Kunde</th>
+                    <th>Lieferung</th>
+                    <th>Fertigung</th>
+                    <th>Datum</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {recentOrders.map((o) => (
                     <tr key={o.id}>
@@ -171,10 +190,15 @@ export default async function Dashboard({
                       </td>
                       <td>{o.customer}</td>
                       <td><Badge state={o.delivery_status} kind="delivery" /></td>
-                      <td>
-                        {o.open_mos > 0 && <span className="badge warn">{o.open_mos} in Fertigung</span>}
+                      <td className="nowrap small">
+                        {o.open_mos > 0 && (
+                          <>
+                            <span className="led on" /> <span className="mono">{o.open_mos}</span> in
+                            Fertigung
+                          </>
+                        )}
                       </td>
-                      <td className="nowrap small muted">{date(o.order_date)}</td>
+                      <td className="nowrap small muted mono">{date(o.order_date)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -205,9 +229,13 @@ export default async function Dashboard({
                 <tbody>
                   {shortages.map((s) => (
                     <tr key={s.id}>
-                      <td><Link href={`/produkte/variante/${s.id}`}>{s.product}</Link></td>
+                      <td>
+                        {/* Zustand als Leuchte; das Wort dazu steht im Kartentitel. */}
+                        <span className="led warn" />{' '}
+                        <Link href={`/produkte/variante/${s.id}`}>{s.product}</Link>
+                      </td>
                       <td className="num">{qty(s.on_hand)}</td>
-                      <td className="num"><span className="badge danger">{qty(s.forecasted)}</span></td>
+                      <td className="num mono">{qty(s.forecasted)}</td>
                     </tr>
                   ))}
                 </tbody>

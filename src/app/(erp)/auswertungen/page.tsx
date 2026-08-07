@@ -29,6 +29,11 @@ function monthsBetween(von: string, bis: string): string[] {
   return months
 }
 
+/**
+ * Größenanzeige in einer Tabellenzelle — Geometrie wie `.hbar-row` (Spur in
+ * `--surface-2`, 3 px Radius), Füllung aber bewusst neutral: der Akzent bleibt
+ * den Diagrammen und kritischen Zuständen vorbehalten, nicht 40 Tabellenzeilen.
+ */
 function Bar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0
   return (
@@ -37,24 +42,35 @@ function Bar({ value, max }: { value: number; max: number }) {
       style={{
         display: 'inline-block',
         width: 90,
-        height: 8,
-        background: 'var(--border)',
-        borderRadius: 4,
+        height: 10,
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 3,
         verticalAlign: 'middle',
       }}
     >
+      {/* Führende Serienfarbe wie bei allen Größenbalken der Anwendung —
+          grau auf grau wäre auf Papier kaum ablesbar. */}
       <span
         style={{
           display: 'block',
           width: `${pct}%`,
           height: '100%',
-          background: 'var(--accent, #2f6fed)',
-          borderRadius: 4,
+          background: 'var(--viz-1)',
+          borderRadius: 2,
         }}
       />
     </span>
   )
 }
+
+/** Einheitlicher Rahmen für die Diagramme in `tight`-Karten. */
+function ChartBox({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: '12px 12px 0' }}>{children}</div>
+}
+
+/** Summen- und Quotenzellen tragen überall dasselbe Gewicht. */
+const summe = { fontWeight: 650 } as const
 
 interface MonthRow {
   variant_id: string
@@ -126,15 +142,15 @@ function PivotTable({ rows, months, unit }: { rows: ReturnType<typeof pivot>; mo
             <tr key={r.id}>
               <td>
                 {r.product}
-                {r.sku && <span className="muted small"> · {r.sku}</span>}
+                {r.sku && <span className="muted small mono"> · {r.sku}</span>}
               </td>
-              <td className="num" style={{ fontWeight: 650 }}>
+              <td className="num" style={summe}>
                 {qty(r.total)}
                 {unit ? ` ${unit}` : ''}
               </td>
               <td><Bar value={r.total} max={max} /></td>
               {months.map((m) => (
-                <td key={m} className="num muted">
+                <td key={m} className="num muted mono">
                   {r.perMonth.has(m) ? qty(r.perMonth.get(m)!) : '·'}
                 </td>
               ))}
@@ -262,7 +278,7 @@ export default async function AuswertungenPage({
         title="Auswertungen"
         subtitle="Bestand, Produktion, verbaute Komponenten und Abverkauf"
         actions={
-          <form className="row" style={{ alignItems: 'flex-end' }}>
+          <form className="row">
             <label className="field">
               <span>Von</span>
               <input type="date" name="von" defaultValue={von} />
@@ -301,9 +317,9 @@ export default async function AuswertungenPage({
           <Empty>Keine bestätigten Aufträge im Zeitraum.</Empty>
         ) : (
           <>
-          <div style={{ padding: '12px 12px 0' }}>
+          <ChartBox>
             <ColumnChart categories={months} series={toSeries(verkauftJeMonat, months)} unit="Stk." />
-          </div>
+          </ChartBox>
           <TableWrap>
             <table>
               <thead>
@@ -330,17 +346,17 @@ export default async function AuswertungenPage({
                     <tr key={r.variant_id}>
                       <td>
                         {r.product}
-                        {r.sku && <span className="muted small"> · {r.sku}</span>}
+                        {r.sku && <span className="muted small mono"> · {r.sku}</span>}
                       </td>
                       <td className="num">{qty(r.verkauft)}</td>
                       <td className="num">{qty(r.geliefert)}</td>
                       <td className="num">{qty(r.bestand)}</td>
-                      <td className="num" style={{ fontWeight: 650 }}>
+                      <td className="num" style={summe}>
                         {(quote * 100).toFixed(0)} %
                       </td>
                       <td><Bar value={quote} max={1} /></td>
                       {months.map((m) => (
-                        <td key={m} className="num muted">
+                        <td key={m} className="num muted mono">
                           {monate?.perMonth.has(m) ? qty(monate.perMonth.get(m)!) : '·'}
                         </td>
                       ))}
@@ -356,9 +372,9 @@ export default async function AuswertungenPage({
 
       <Card title="Produktion je Endvariante" tight>
         {produktionRows.length > 0 && (
-          <div style={{ padding: '12px 12px 0' }}>
+          <ChartBox>
             <ColumnChart categories={months} series={toSeries(produktionRows, months)} unit="Stk." />
-          </div>
+          </ChartBox>
         )}
         <PivotTable rows={produktionRows} months={months} />
       </Card>
@@ -373,11 +389,11 @@ export default async function AuswertungenPage({
         tight
       >
         {komponentenRows.length > 0 && (
-          <div style={{ padding: '12px 12px 0' }}>
+          <ChartBox>
             <HBars
               rows={komponentenRows.slice(0, 10).map((r) => ({ label: r.product, value: r.total }))}
             />
-          </div>
+          </ChartBox>
         )}
         <PivotTable rows={komponentenRows} months={months} />
       </Card>
@@ -387,7 +403,7 @@ export default async function AuswertungenPage({
           <Empty>Kein Bestand vorhanden.</Empty>
         ) : (
           <>
-          <div style={{ padding: '12px 12px 0' }}>
+          <ChartBox>
             <ShareBar
               parts={(() => {
                 const top = inventar.slice(0, 5).map((r) => ({ label: r.product, value: Number(r.value) }))
@@ -396,7 +412,7 @@ export default async function AuswertungenPage({
               })()}
               format={(v) => money(v)}
             />
-          </div>
+          </ChartBox>
           <TableWrap>
             <table>
               <thead>
@@ -413,11 +429,11 @@ export default async function AuswertungenPage({
                   <tr key={r.id}>
                     <td>
                       {r.product}
-                      {r.sku && <span className="muted small"> · {r.sku}</span>}
+                      {r.sku && <span className="muted small mono"> · {r.sku}</span>}
                     </td>
                     <td className="num">{qty(r.on_hand)}</td>
                     <td className="num">{money(r.unit_cost)}</td>
-                    <td className="num" style={{ fontWeight: 650 }}>{money(r.value)}</td>
+                    <td className="num" style={summe}>{money(r.value)}</td>
                     <td><Bar value={Number(r.value)} max={Number(inventar[0]?.value ?? 0)} /></td>
                   </tr>
                 ))}
@@ -425,7 +441,7 @@ export default async function AuswertungenPage({
               <tfoot>
                 <tr>
                   <td colSpan={3} className="num muted">Gesamt</td>
-                  <td className="num" style={{ fontWeight: 650 }}>{money(inventarSumme)}</td>
+                  <td className="num" style={summe}>{money(inventarSumme)}</td>
                   <td />
                 </tr>
               </tfoot>

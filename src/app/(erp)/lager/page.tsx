@@ -60,20 +60,27 @@ export default async function LagerPage({
       />
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {KINDS.map((k) => (
-            <Link
-              key={k.label}
-              href={k.key ? `/lager?art=${k.key}${onlyOpen ? '' : '&offen=0'}` : `/lager${onlyOpen ? '' : '?offen=0'}`}
-              className={`btn small${art === k.key ? ' primary' : ''}`}
-            >
-              {k.label}
-            </Link>
-          ))}
+        <div className="actions" style={{ padding: 12 }}>
+          {KINDS.map((k) => {
+            const aktiv = art === k.key
+            return (
+              <Link
+                key={k.label}
+                href={k.key ? `/lager?art=${k.key}${onlyOpen ? '' : '&offen=0'}` : `/lager${onlyOpen ? '' : '?offen=0'}`}
+                className="btn small"
+                aria-current={aktiv ? 'page' : undefined}
+              >
+                <span className={aktiv ? 'led on' : 'led off'} />
+                {k.label}
+              </Link>
+            )
+          })}
+          <span className="mono-label" style={{ marginLeft: 'auto' }}>
+            <span className={onlyOpen ? 'led on' : 'led off'} /> {onlyOpen ? 'nur offene' : 'alle Zustände'}
+          </span>
           <Link
             href={`/lager?${art ? `art=${art}&` : ''}offen=${onlyOpen ? '0' : '1'}`}
             className="btn small"
-            style={{ marginLeft: 'auto' }}
           >
             {onlyOpen ? 'Auch erledigte zeigen' : 'Nur offene zeigen'}
           </Link>
@@ -104,7 +111,7 @@ export default async function LagerPage({
                     <td className="mono small">{r.origin_label ?? '—'}</td>
                     <td className="num">{r.lines}</td>
                     <td><Badge state={r.state} kind="picking" /></td>
-                    <td className="nowrap">{date(r.scheduled_date)}</td>
+                    <td className="nowrap mono small">{date(r.scheduled_date)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,9 +1,39 @@
 import Link from 'next/link'
 import { LABELS, dateTime, money, tone } from '@/modules/shared/format'
 
-export function Badge({ state, kind }: { state: string; kind: keyof typeof LABELS }) {
+/**
+ * Leuchte je Tonlage. Konvention im ganzen Haus:
+ *   on   = läuft gerade / kritisch (der einzige legitime Orange-Fall)
+ *   ok   = gut, erledigt
+ *   warn = Ausnahme, Fehler, Abbruch
+ *   off  = neutral, inaktiv
+ * Für "info" gibt es keine eigene Klasse — die Farbe kommt als Token dazu.
+ */
+const LED_BY_TONE: Record<ReturnType<typeof tone>, { cls: string; color?: string }> = {
+  success: { cls: 'led ok' },
+  info: { cls: 'led', color: 'var(--info)' },
+  warn: { cls: 'led warn' },
+  danger: { cls: 'led warn' },
+  neutral: { cls: 'led off' },
+}
+
+/**
+ * Status-Typenschild. Mit `led` kommt die Statusleuchte davor — gedacht für
+ * den Kopf-Status einer Detailseite. In Tabellen bleibt das Schild allein,
+ * sonst flimmert die ganze Liste.
+ */
+export function Badge({ state, kind, led }: { state: string; kind: keyof typeof LABELS; led?: boolean }) {
   const labels = LABELS[kind] as Record<string, string>
-  return <span className={`badge ${tone(state)}`}>{labels[state] ?? state}</span>
+  const t = tone(state)
+  const badge = <span className={`badge ${t}`}>{labels[state] ?? state}</span>
+  if (!led) return badge
+  const lamp = LED_BY_TONE[t]
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span className={lamp.cls} style={lamp.color ? { background: lamp.color } : undefined} />
+      {badge}
+    </span>
+  )
 }
 
 export function Card({
@@ -30,14 +60,23 @@ export function Card({
   )
 }
 
+/**
+ * Seitenkopf. `kicker` ist die Typenschild-Zeile über dem Titel (Belegart,
+ * z. B. "Warenausgang"), `mono` setzt den Titel in Monospace — für
+ * Belegnummern wie WH/OUT/00001, die keine Fließtextschrift vertragen.
+ */
 export function PageHeader({
   title,
   subtitle,
   actions,
+  kicker,
+  mono,
 }: {
   title: React.ReactNode
   subtitle?: React.ReactNode
   actions?: React.ReactNode
+  kicker?: React.ReactNode
+  mono?: boolean
 }) {
   return (
     <div
@@ -51,7 +90,18 @@ export function PageHeader({
       }}
     >
       <div>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 650, letterSpacing: '-0.01em' }}>{title}</h1>
+        {kicker && <div className="mono-label" style={{ marginBottom: 3 }}>{kicker}</div>}
+        <h1
+          className={mono ? 'mono' : undefined}
+          style={{
+            margin: 0,
+            fontSize: mono ? 19 : 20,
+            fontWeight: 650,
+            letterSpacing: mono ? '0.01em' : '-0.01em',
+          }}
+        >
+          {title}
+        </h1>
         {subtitle && (
           <div className="muted small" style={{ marginTop: 2 }}>
             {subtitle}
@@ -113,14 +163,33 @@ export interface LogEntry {
   created_at: string
 }
 
-/** Beleg-Verlauf: Statuswechsel, Notizen, E-Mails. */
+/** Art des Eintrags als Typenschild vor der Meldung. */
+const LOG_LABELS: Record<string, string> = {
+  state: 'Status',
+  note: 'Notiz',
+  email: 'E-Mail',
+  error: 'Fehler',
+}
+
+/**
+ * Beleg-Verlauf: Statuswechsel, Notizen, E-Mails.
+ * Die Meldung bleibt Fließtext und umbricht; die Art der Zeile steht als
+ * Mono-Label davor. Eine Leuchte bekommt nur der Fehler — bei allen anderen
+ * Zeilen wäre sie nur ein zweiter Punkt neben dem Verlaufspunkt.
+ */
 export function AuditLog({ entries }: { entries: LogEntry[] }) {
   if (entries.length === 0) return <Empty>Noch keine Einträge.</Empty>
   return (
     <ul className="log">
       {entries.map((e) => (
         <li key={e.id}>
-          <div className={e.kind === 'error' ? 'badge danger' : undefined}>{e.message}</div>
+          <div>
+            {e.kind === 'error' && <span className="led warn" style={{ marginRight: 6 }} />}
+            <span className="mono-label" style={{ marginRight: 6 }}>
+              {LOG_LABELS[e.kind] ?? e.kind}
+            </span>
+            {e.message}
+          </div>
           <div className="meta">
             {dateTime(e.created_at)} · {e.actor ?? 'system'}
           </div>

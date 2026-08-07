@@ -5,7 +5,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { money, qty } from '@/modules/shared/format'
+import { date, money, qty } from '@/modules/shared/format'
 import { cancelBill, payBill, postBill, setBillChecked, setBillDate } from '../../actions'
 
 export const dynamic = 'force-dynamic'
@@ -55,12 +55,13 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
   const terms = await sql<{ id: string; name: string }[]>`
     select id, name from payment_terms where active order by sequence, nb_days`
 
-  // 3-Way-Matching-Ampel: Bestellung <-> Wareneingang <-> Rechnung
+  // 3-Way-Matching-Ampel: Bestellung <-> Wareneingang <-> Rechnung.
+  // Echte Ampel: LED plus Wort. Nur der Ausnahmefall glüht orange.
   const MATCH = {
-    yes: { label: 'Zahlung freigegeben', tone: 'success' },
-    no: { label: 'Wareneingang fehlt', tone: 'warn' },
-    exception: { label: 'Mehr berechnet als erhalten', tone: 'danger' },
-  } as Record<string, { label: string; tone: string }>
+    yes: { label: 'Zahlung freigegeben', led: 'ok' },
+    no: { label: 'Wareneingang fehlt', led: 'warn' },
+    exception: { label: 'Mehr berechnet als erhalten', led: 'on' },
+  } as Record<string, { label: string; led: string }>
   const match = MATCH[bill.match_state] ?? MATCH.yes
 
 
@@ -68,31 +69,51 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
     <>
       <PageHeader
         title={
-          <>
-            {bill.number}
-            {bill.is_credit_note && <span className="badge info" style={{ marginLeft: 8 }}>Gutschrift</span>}
-          </>
+          <span className="actions" style={{ gap: 8 }}>
+            <span className="mono">{bill.number}</span>
+            {bill.is_credit_note && <span className="badge info">Gutschrift</span>}
+          </span>
         }
         subtitle={
           <>
             {bill.vendor}
             {bill.po_number && (
-              <> · Bestellung <Link href={`/einkauf/${bill.purchase_order_id}`}>{bill.po_number}</Link></>
+              <>
+                {' '}· Bestellung{' '}
+                <Link className="mono" href={`/einkauf/${bill.purchase_order_id}`}>{bill.po_number}</Link>
+              </>
             )}
-            {bill.reversed_number && <> · storniert {bill.reversed_number}</>}
-            {bill.due_date && <> · fällig {bill.due_date}</>}
-            {bill.payment_reference && <> · Verwendungszweck {bill.payment_reference}</>}
+            {bill.vendor_bill_reference && (
+              <> · Lieferantenbeleg <span className="mono">{bill.vendor_bill_reference}</span></>
+            )}
+            {bill.reversed_number && (
+              <> · storniert <span className="mono">{bill.reversed_number}</span></>
+            )}
+            {bill.due_date && <> · fällig <span className="mono">{date(bill.due_date)}</span></>}
+            {bill.payment_reference && (
+              <> · Verwendungszweck <span className="mono">{bill.payment_reference}</span></>
+            )}
           </>
         }
         actions={
           <>
             <Badge state={bill.state} kind="bill" />
-            {bill.po_number && <span className={`badge ${match.tone}`}>{match.label}</span>}
-            {bill.checked ? (
-              <ActionButton action={setBillChecked.bind(null, id, false)}>✓ Geprüft</ActionButton>
-            ) : (
-              <ActionButton action={setBillChecked.bind(null, id, true)}>Als geprüft markieren</ActionButton>
+            {bill.po_number && (
+              <span className="actions" style={{ gap: 6 }} title="3-Way-Matching">
+                <span className={`led ${match.led}`} />
+                <span className="mono-label">{match.label}</span>
+              </span>
             )}
+            {/* Zustand und Bedienung getrennt: LED zeigt den Prüfstand, die Taste schaltet ihn. */}
+            {bill.checked && (
+              <span className="actions" style={{ gap: 6 }}>
+                <span className="led ok" />
+                <span className="mono-label">Geprüft</span>
+              </span>
+            )}
+            <ActionButton action={setBillChecked.bind(null, id, !bill.checked)}>
+              {bill.checked ? 'Prüfung aufheben' : 'Als geprüft markieren'}
+            </ActionButton>
             {bill.state === 'draft' && (
               <ActionButton className="primary" action={postBill.bind(null, id)}>Buchen</ActionButton>
             )}
@@ -126,7 +147,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
               </label>
               <label className="field" style={{ flex: 2 }}>
                 <span>Rechnungsnummer des Lieferanten</span>
-                <input name="vendor_bill_reference" defaultValue={bill.vendor_bill_reference ?? ''} />
+                <input className="mono" name="vendor_bill_reference" defaultValue={bill.vendor_bill_reference ?? ''} />
               </label>
               <label className="field">
                 <span>Zahlungsbedingung</span>
@@ -139,7 +160,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
               </label>
               <label className="field">
                 <span>Verwendungszweck</span>
-                <input name="payment_reference" defaultValue={bill.payment_reference ?? ''} />
+                <input className="mono" name="payment_reference" defaultValue={bill.payment_reference ?? ''} />
               </label>
               <div className="shrink field">
                 <button type="submit">Speichern</button>
@@ -174,15 +195,15 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4} className="num muted">Netto</td>
+                <td colSpan={4} className="num mono-label">Netto</td>
                 <td className="num">{money(bill.net, bill.currency)}</td>
               </tr>
               <tr>
-                <td colSpan={4} className="num muted">MwSt.</td>
+                <td colSpan={4} className="num mono-label">MwSt.</td>
                 <td className="num">{money(bill.tax, bill.currency)}</td>
               </tr>
               <tr>
-                <td colSpan={4} className="num" style={{ fontWeight: 650 }}>Gesamt</td>
+                <td colSpan={4} className="num mono-label">Gesamt</td>
                 <td className="num" style={{ fontWeight: 650 }}>{money(bill.gross, bill.currency)}</td>
               </tr>
             </tfoot>

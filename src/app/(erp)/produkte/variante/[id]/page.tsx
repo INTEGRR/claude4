@@ -87,25 +87,41 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
         <Stat
           label="Prognose"
           value={qty(variant.forecasted)}
-          hint={`+${qty(variant.incoming)} eingehend / −${qty(variant.outgoing)} ausgehend`}
+          hint={
+            <>
+              {Number(variant.forecasted) < 0 && (
+                <>
+                  <span className="led warn" /> Unterdeckung ·{' '}
+                </>
+              )}
+              {`+${qty(variant.incoming)} eingehend / −${qty(variant.outgoing)} ausgehend`}
+            </>
+          }
         />
       </div>
 
       <div className="grid-2">
         <Card title="Kennzeichnung">
           <ActionForm action={setVariantCodes.bind(null, id)}>
-            <label className="field">
-              <span>Artikelnummer (SKU) — muss der Shopify-SKU entsprechen</span>
-              <input name="sku" defaultValue={variant.sku ?? ''} />
+            <label className="field" style={{ marginBottom: 4 }}>
+              <span>Artikelnummer (SKU)</span>
+              <input name="sku" className="mono" defaultValue={variant.sku ?? ''} />
             </label>
-            <label className="field">
-              <span>Barcode (EAN oder frei)</span>
-              <input name="barcode" defaultValue={variant.barcode ?? ''} />
+            <div className="small muted" style={{ marginBottom: 12 }}>
+              muss der Shopify-SKU entsprechen
+            </div>
+            <label className="field" style={{ marginBottom: 4 }}>
+              <span>Barcode</span>
+              <input name="barcode" className="mono" defaultValue={variant.barcode ?? ''} />
             </label>
+            <div className="small muted" style={{ marginBottom: 12 }}>
+              EAN oder frei
+            </div>
             <label className="field">
               <span>Shopify-Varianten-ID</span>
               <input
                 name="shopify_variant_id"
+                className="mono"
                 defaultValue={variant.shopify_variant_id ?? ''}
                 placeholder="gid://shopify/ProductVariant/…"
               />
@@ -114,12 +130,26 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
           </ActionForm>
         </Card>
 
-        <Card title="Etikett" actions={codeValue && <span className="muted small">zum Drucken scannen</span>}>
+        <Card title="Etikett" actions={codeValue && <span className="mono-label">zum Drucken scannen</span>}>
           {codeValue ? (
-            <div
-              style={{ textAlign: 'center', background: '#fff', padding: 12, borderRadius: 6 }}
-              dangerouslySetInnerHTML={{ __html: barcodeSvg(codeValue) }}
-            />
+            <div className="display-panel">
+              <div className="display-head">
+                <span>Etikett</span>
+                <span>{codeValue}</span>
+              </div>
+              {/* Der Barcode kommt schwarz auf transparent. Er sitzt daher auf
+                  einem hellen Feld (--display-bright ist in beiden Themes gleich),
+                  damit die Striche kontrastreich und scannbar bleiben. */}
+              <div
+                style={{
+                  textAlign: 'center',
+                  background: 'var(--display-bright)',
+                  padding: 12,
+                  borderRadius: 'var(--radius-sm)',
+                }}
+                dangerouslySetInnerHTML={{ __html: barcodeSvg(codeValue) }}
+              />
+            </div>
           ) : (
             <Empty>Hinterlege eine Artikelnummer oder einen Barcode, dann erscheint hier das Etikett.</Empty>
           )}
@@ -143,8 +173,8 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
               <tbody>
                 {moves.map((m) => (
                   <tr key={m.id}>
-                    <td className="nowrap small">{dateTime(m.date_done)}</td>
-                    <td className="small">{m.src} → {m.dest}</td>
+                    <td className="nowrap small mono">{dateTime(m.date_done)}</td>
+                    <td className="small muted mono">{m.src} → {m.dest}</td>
                     <td className="num">{qty(m.qty_done)}</td>
                     <td className="mono small">
                       {m.picking_id ? (

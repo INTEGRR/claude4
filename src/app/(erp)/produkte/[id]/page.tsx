@@ -94,14 +94,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={tpl.name}
-        subtitle={`${variants.length} Variante(n) · Einheit ${tpl.uom}`}
+        subtitle={
+          <>
+            {variants.length} Variante(n) · Einheit <span className="mono">{tpl.uom}</span>
+          </>
+        }
         actions={
           boms.length > 0 ? (
             <Link className="btn" href={`/fertigung/stuecklisten/${boms[0].id}`}>
               Stückliste ({boms[0].lines} Positionen)
             </Link>
           ) : tpl.route_manufacture ? (
-            <Link className="btn primary" href="/fertigung/stuecklisten">Stückliste anlegen</Link>
+            <Link className="btn" href="/fertigung/stuecklisten">Stückliste anlegen</Link>
           ) : null
         }
       />
@@ -224,7 +228,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </label>
           </div>
           <details style={{ marginBottom: 12 }}>
-            <summary className="small muted" style={{ cursor: 'pointer' }}>
+            <summary className="mono-label" style={{ cursor: 'pointer' }}>
               Weitere Belegtexte (Einkauf, Lieferschein)
             </summary>
             <div className="row" style={{ marginTop: 8 }}>
@@ -260,6 +264,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
         {tpl.route_manufacture && tpl.route_mto && boms.length === 0 && (
           <div className="notice warn" style={{ marginTop: 12, marginBottom: 0 }}>
+            <span className="led warn" />{' '}
             Route „Fertigen auf Bestellung" ist aktiv, aber es existiert keine Stückliste. Ohne
             Stückliste entsteht bei der Auftragsbestätigung kein Fertigungsauftrag.
           </div>
@@ -281,9 +286,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   <tr key={a.attribute}>
                     <td>{a.attribute}</td>
                     <td>
-                      {a.values.map((v) => (
-                        <span key={v} className="badge neutral" style={{ marginRight: 4 }}>{v}</span>
-                      ))}
+                      <span className="actions">
+                        {a.values.map((v) => (
+                          <span key={v} className="badge neutral">{v}</span>
+                        ))}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -318,6 +325,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </ActionForm>
         {allAttributes.length === 0 && (
           <div className="notice info" style={{ marginBottom: 0 }}>
+            {/* Für „info" gibt es keine LED-Klasse — die Farbe kommt als Token
+                dazu (wie in ui.tsx). Ohne sie stünde hier ein grauer Punkt
+                ohne Bedeutung auf der info-getönten Fläche. */}
+            <span className="led" style={{ background: 'var(--info)' }} />{' '}
             Noch keine Attribute definiert. Lege sie unter <Link href="/produkte/attribute">Attribute</Link> an.
           </div>
         )}

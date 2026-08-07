@@ -106,7 +106,7 @@ function Markdown({ text }: { text: string }) {
     }
 
     if (/^#{1,4} /.test(line)) {
-      blocks.push(<div key={key++} style={{ fontWeight: 700, margin: '10px 0 4px' }}>{inline(line.replace(/^#+ /, ''))}</div>)
+      blocks.push(<div key={key++} style={{ fontWeight: 650, margin: '10px 0 4px' }}>{inline(line.replace(/^#+ /, ''))}</div>)
       i++
       continue
     }
@@ -229,19 +229,38 @@ export function KiChat() {
           <div key={i} className={`ki-msg ${m.role}`}>
             {m.sqls.length > 0 && (
               <details className="ki-sql">
-                <summary className="small muted">
+                <summary className="mono-label" style={{ cursor: 'pointer' }}>
                   {m.sqls.length} SQL-Abfrage{m.sqls.length > 1 ? 'n' : ''}
                 </summary>
+                {/* Roh-SQL ist eine Datenfläche, kein Fließtext: Display mit Typenschild-Kopf. */}
                 {m.sqls.map((q, j) => (
-                  <pre key={j}>{q}</pre>
+                  <div key={j} className="display-panel" style={{ margin: '4px 0 8px' }}>
+                    <div className="display-head">
+                      <span>
+                        SQL · Abfrage {j + 1}/{m.sqls.length}
+                      </span>
+                      <span>nur lesend</span>
+                    </div>
+                    <pre style={{ background: 'transparent', border: 0, padding: 0, margin: 0 }}>
+                      {q}
+                    </pre>
+                  </div>
                 ))}
               </details>
             )}
             {m.role === 'user' ? <p style={{ margin: 0 }}>{m.text}</p> : <Markdown text={m.text} />}
-            {m.role === 'assistant' && m.text === '' && !status && <span className="muted">…</span>}
+            {m.role === 'assistant' && m.text === '' && !status && (
+              <span className="mono-label">
+                <span className="led on" /> wartet
+              </span>
+            )}
           </div>
         ))}
-        {status && <div className="ki-status muted small">⚙ {status}</div>}
+        {status && (
+          <div className="ki-status muted small">
+            <span className="led on" /> {status}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

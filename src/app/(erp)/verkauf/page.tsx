@@ -65,20 +65,35 @@ export default async function VerkaufPage({
       />
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="actions" style={{ padding: 12 }}>
           {filters.map((f) => (
+            // Der aktive Ansichtsfilter wird wie die Navigation markiert (Rille + Akzentkante),
+            // nicht als gefüllte Primärtaste — Orange bleibt der echten Primäraktion vorbehalten.
             <Link
               key={f.label}
               href={f.key ? `/verkauf?status=${f.key}` : '/verkauf'}
-              className={`btn small${status === f.key ? ' primary' : ''}`}
+              className="btn small"
+              aria-current={status === f.key ? 'page' : undefined}
+              style={
+                status === f.key
+                  ? {
+                      background: 'var(--surface-2)',
+                      borderLeft: '2px solid var(--accent)',
+                      fontWeight: 600,
+                    }
+                  : // gleiche Kantenbreite im Ruhezustand, damit nichts springt
+                    { borderLeft: '2px solid transparent' }
+              }
             >
               {f.label}
             </Link>
           ))}
-          <form style={{ marginLeft: 'auto' }}>
+          <form className="actions" style={{ marginLeft: 'auto', gap: 6 }}>
+            <span className="mono-label">Suche</span>
             <input
               type="search"
               name="q"
+              aria-label="Suche nach Nummer oder Kunde"
               placeholder="Nummer oder Kunde"
               defaultValue={q ?? ''}
               style={{ width: 240 }}
@@ -110,10 +125,15 @@ export default async function VerkaufPage({
                       {r.shopify_order_name && (
                         <span className="muted small"> · {r.shopify_order_name}</span>
                       )}
-                      {r.locked && <span className="badge neutral" style={{ marginLeft: 6 }}>Gesperrt</span>}
+                      {/* Sperre ist ein Betriebszustand: Leuchte plus Wort, nicht nur ein graues Chip. */}
+                      {r.locked && (
+                        <span className="nowrap" style={{ marginLeft: 8 }}>
+                          <span className="led warn" /> <span className="mono-label">Gesperrt</span>
+                        </span>
+                      )}
                     </td>
                     <td>{r.partner_name}</td>
-                    <td className="nowrap">{date(r.order_date)}</td>
+                    <td className="mono nowrap">{date(r.order_date)}</td>
                     <td><Badge state={r.state} kind="sale" /></td>
                     <td><Badge state={r.delivery_status} kind="delivery" /></td>
                     <td>

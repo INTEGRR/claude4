@@ -83,6 +83,53 @@ async function resolveUnmatched(lineId: string, formData: FormData) {
   revalidatePath('/integrationen')
 }
 
+/** Deutsche Beschriftungen der technischen Queue-Zustände. */
+const JOB_STATUS: Record<string, string> = {
+  pending: 'wartet',
+  running: 'läuft',
+  done: 'erledigt',
+  failed: 'fehlgeschlagen',
+}
+
+const EVENT_STATUS: Record<string, string> = {
+  pending: 'wartet',
+  running: 'läuft',
+  done: 'erledigt',
+  failed: 'fehlgeschlagen',
+  skipped: 'übersprungen',
+}
+
+/**
+ * Zustand einer Warteschlange: „läuft" ist ein Betriebszustand und bekommt
+ * die Leuchte, alles andere bleibt ein abgeschlossenes Ergebnis (Chip).
+ */
+function QueueStatus({ status, labels }: { status: string; labels: Record<string, string> }) {
+  const wort = labels[status] ?? status
+  if (status === 'running') {
+    return (
+      <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span className="led on" />
+        {wort}
+      </span>
+    )
+  }
+  const ton = status === 'done' ? 'success' : status === 'failed' ? 'danger' : 'warn'
+  return <span className={`badge ${ton}`}>{wort}</span>
+}
+
+/** Verbindungszustand einer Anbindung: Leuchte plus Wort, nicht als Kennzahl. */
+function Verbindung({ ok }: { ok: boolean }) {
+  return (
+    <span
+      className="mono-label"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12 }}
+    >
+      <span className={ok ? 'led ok' : 'led off'} />
+      {ok ? 'verbunden' : 'nicht konfiguriert'}
+    </span>
+  )
+}
+
 export default async function IntegrationenPage() {
   await requireArea('integrationen')
   const [stats] = await sql<
@@ -163,12 +210,17 @@ export default async function IntegrationenPage() {
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Stat
           label="Shopify"
-          value={shopifyConfigured() ? 'verbunden' : 'nicht konfiguriert'}
-          hint={`Letzter Abgleich: ${syncState ? dateTime(syncState.value) : '—'}`}
+          value={<Verbindung ok={shopifyConfigured()} />}
+          hint={
+            <>
+              Letzter Abgleich:{' '}
+              <span className="mono">{syncState ? dateTime(syncState.value) : '—'}</span>
+            </>
+          }
         />
         <Stat
           label="DHL"
-          value={dhlConfigured() ? 'verbunden' : 'nicht konfiguriert'}
+          value={<Verbindung ok={dhlConfigured()} />}
           hint="Parcel DE Shipping API v2"
         />
         <Stat
@@ -188,6 +240,7 @@ export default async function IntegrationenPage() {
 
       {(stats.failed_events + stats.failed_jobs > 0 || stats.tx_failed_24h > 0 || stats.running_stuck > 0) && (
         <div className="notice danger">
+          <span className="led on" />{' '}
           {stats.failed_jobs > 0 && <>{stats.failed_jobs} Job(s) endgültig fehlgeschlagen. </>}
           {stats.failed_events > 0 && <>{stats.failed_events} Webhook(s) fehlgeschlagen. </>}
           {stats.running_stuck > 0 && <>{stats.running_stuck} Job(s) hängen in „running". </>}
@@ -203,9 +256,10 @@ export default async function IntegrationenPage() {
       {!shopifyConfigured() && (
         <div className="notice warn">
           Shopify ist nicht konfiguriert. Lege im Shopify Dev Dashboard eine Custom App an (Scopes{' '}
-          <code>read_orders</code>, <code>write_orders</code>,{' '}
-          <code>write_merchant_managed_fulfillment_orders</code>), trage Token und Webhook-Secret als
-          Umgebungsvariablen ein und registriere den Webhook auf <code>/api/webhooks/shopify</code>.
+          <code className="mono">read_orders</code>, <code className="mono">write_orders</code>,{' '}
+          <code className="mono">write_merchant_managed_fulfillment_orders</code>), trage Token und
+          Webhook-Secret als Umgebungsvariablen ein und registriere den Webhook auf{' '}
+          <code className="mono">/api/webhooks/shopify</code>.
         </div>
       )}
 
@@ -243,7 +297,7 @@ export default async function IntegrationenPage() {
                             ))}
                           </select>
                           <div className="shrink">
-                            <button className="small primary" type="submit">Zuordnen</button>
+                            <button className="small" type="submit">Zuordnen</button>
                           </div>
                         </div>
                       </ActionForm>
@@ -277,26 +331,21 @@ export default async function IntegrationenPage() {
                   <tr key={j.id}>
                     <td className="mono small">{j.kind}</td>
                     <td>
-                      <span
-                        className={`badge ${
-                          j.status === 'done' ? 'success' : j.status === 'failed' ? 'danger' : 'warn'
-                        }`}
-                      >
-                        {j.status}
-                      </span>
+                      <QueueStatus status={j.status} labels={JOB_STATUS} />
                       {j.status === 'running' && j.started_at && (
-                        <span className="muted small"> seit {dateTime(j.started_at)}</span>
+                        <span className="muted small mono"> seit {dateTime(j.started_at)}</span>
                       )}
                     </td>
                     <td className="num">{j.attempts}</td>
                     <td className="small" style={{ maxWidth: 380 }}>
                       {j.last_error ? (
-                        <span className="badge danger">{j.last_error}</span>
+                        // Freitext bleibt Freitext — der Chip ist dem Statuswort vorbehalten.
+                        <span style={{ color: 'var(--danger)' }}>{j.last_error}</span>
                       ) : (
                         j.last_result ?? '—'
                       )}
                     </td>
-                    <td className="nowrap small">{dateTime(j.next_run_at)}</td>
+                    <td className="nowrap small mono">{dateTime(j.next_run_at)}</td>
                     <td className="num">
                       {j.status === 'failed' && (
                         <ActionButton className="small" action={retry.bind(null, j.id)}>
@@ -340,17 +389,11 @@ export default async function IntegrationenPage() {
               <tbody>
                 {events.map((e) => (
                   <tr key={e.id}>
-                    <td className="nowrap small">{dateTime(e.received_at)}</td>
+                    <td className="nowrap small mono">{dateTime(e.received_at)}</td>
                     <td className="mono small">{e.topic}</td>
                     <td className="mono small">{e.order_id?.split('/').pop() ?? '—'}</td>
                     <td>
-                      <span
-                        className={`badge ${
-                          e.status === 'done' ? 'success' : e.status === 'failed' ? 'danger' : 'warn'
-                        }`}
-                      >
-                        {e.status}
-                      </span>
+                      <QueueStatus status={e.status} labels={EVENT_STATUS} />
                     </td>
                     <td className="small" style={{ maxWidth: 420 }}>{e.error ?? '—'}</td>
                     <td className="num">
@@ -371,17 +414,19 @@ export default async function IntegrationenPage() {
       <Card title="Einrichtung">
         <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
           <li>
-            Shopify-Webhook-Ziel: <code>/api/webhooks/shopify</code> für die Ereignisse{' '}
-            <code>orders/create</code>, <code>orders/paid</code>, <code>orders/updated</code>,{' '}
-            <code>orders/cancelled</code>
+            Shopify-Webhook-Ziel: <code className="mono">/api/webhooks/shopify</code> für die
+            Ereignisse <code className="mono">orders/create</code>,{' '}
+            <code className="mono">orders/paid</code>, <code className="mono">orders/updated</code>,{' '}
+            <code className="mono">orders/cancelled</code>
           </li>
           <li>
-            Geplante Aufgaben laufen über <code>/api/cron?task=…</code> (siehe{' '}
-            <code>vercel.json</code>): Webhooks und Jobs minütlich, Abgleich alle 15 Minuten,
-            Sendungsverfolgung stündlich
+            Geplante Aufgaben laufen über <code className="mono">/api/cron?task=…</code> (siehe{' '}
+            <code className="mono">vercel.json</code>): Webhooks und Jobs minütlich, Abgleich alle 15
+            Minuten, Sendungsverfolgung stündlich
           </li>
           <li>
-            Zugangsdaten werden als Umgebungsvariablen gesetzt — Vorlage in <code>.env.example</code>
+            Zugangsdaten werden als Umgebungsvariablen gesetzt — Vorlage in{' '}
+            <code className="mono">.env.example</code>
           </li>
           <li>
             Produkt-Zuordnung: die <Link href="/produkte">SKU der Variante</Link> muss der Shopify-SKU

@@ -6,7 +6,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { RecordComments } from '@/components/record-comments'
-import { date, qty } from '@/modules/shared/format'
+import { LABELS, date, qty } from '@/modules/shared/format'
 import { cancelMo, checkAvailability, confirmMo, produceMo, startMo, updateMoDetails } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -75,20 +75,27 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
 
   const open = mo.state !== 'done' && mo.state !== 'cancel'
   const remaining = Number(mo.qty_to_produce) - Number(mo.qty_produced)
+  // Statusleuchte der Werkstattanzeige: erledigt = grün, storniert = aus,
+  // laufend = Akzent (der einzige Punkt der Seite, der glüht).
+  const moLed = mo.state === 'done' ? 'ok' : mo.state === 'cancel' ? 'off' : 'on'
 
   return (
     <>
       <PageHeader
-        title={mo.number}
+        title={<span className="mono">{mo.number}</span>}
         subtitle={
           <>
-            {mo.product} · {qty(mo.qty_to_produce)} {mo.uom} · Termin {date(mo.scheduled_date)}
+            {mo.product} · {qty(mo.qty_to_produce)} {mo.uom} · Termin{' '}
+            <span className="mono">{date(mo.scheduled_date)}</span>
             {mo.sales_order_id && (
               <>
-                {' '}· Auftrag <Link href={`/verkauf/${mo.sales_order_id}`}>{mo.sales_order_number}</Link>
+                {' '}· Auftrag{' '}
+                <Link className="mono" href={`/verkauf/${mo.sales_order_id}`}>{mo.sales_order_number}</Link>
               </>
             )}
-            {mo.backorder_of_number && <> · Rückstand zu {mo.backorder_of_number}</>}
+            {mo.backorder_of_number && (
+              <> · Rückstand zu <span className="mono">{mo.backorder_of_number}</span></>
+            )}
           </>
         }
         actions={
@@ -122,23 +129,65 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         <ResponsibleForm action={updateMoDetails.bind(null, id)} userId={mo.user_id} priority={mo.priority} />
       </div>
 
-      {mo.state === 'done' && (
-        <div className="notice success">
-          Fertig gemeldet: {qty(mo.qty_produced)} {mo.uom} am {date(mo.date_done)}.
+      {/* Werkstattanzeige: die drei Zahlen des Auftrags auf einen Blick. */}
+      <div className="display-panel" style={{ marginBottom: 16 }}>
+        <div className="display-head">
+          <span>{mo.number}</span>
+          <span>
+            <span className={`led ${moLed}`} /> {LABELS.mo[mo.state as keyof typeof LABELS.mo] ?? mo.state}
+          </span>
         </div>
-      )}
+        <div className="grid-3" style={{ gap: 12, padding: '0 6px 2px' }}>
+          <div>
+            <div className="mono-label">Soll</div>
+            <div className="mono" style={{ fontSize: 22, fontWeight: 600, color: 'var(--display-bright)' }}>
+              {qty(mo.qty_to_produce)} <span style={{ fontSize: 12, fontWeight: 400 }}>{mo.uom}</span>
+            </div>
+          </div>
+          <div>
+            <div className="mono-label">Ist</div>
+            <div className="mono" style={{ fontSize: 22, fontWeight: 600, color: 'var(--display-bright)' }}>
+              {qty(mo.qty_produced)} <span style={{ fontSize: 12, fontWeight: 400 }}>{mo.uom}</span>
+            </div>
+            {mo.state === 'done' && (
+              <div className="mono" style={{ fontSize: 11 }}>fertig gemeldet {date(mo.date_done)}</div>
+            )}
+          </div>
+          <div>
+            <div className="mono-label">Rest</div>
+            <div
+              className="mono"
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: open && remaining > 0 ? 'var(--accent)' : 'var(--display-bright)',
+              }}
+            >
+              {open ? (
+                <>
+                  {qty(remaining)} <span style={{ fontSize: 12, fontWeight: 400 }}>{mo.uom}</span>
+                </>
+              ) : (
+                '—'
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <Card
         title="Komponenten"
         actions={
-          <span className="muted small">
-            Verbrauchsregel:{' '}
-            {mo.consumption === 'blocked'
-              ? 'Abweichung gesperrt'
-              : mo.consumption === 'allowed'
-                ? 'Abweichung erlaubt'
-                : 'Abweichung mit Warnung'}
-          </span>
+          <>
+            <span className="mono-label">Verbrauchsregel</span>
+            <span className="small">
+              {mo.consumption === 'blocked'
+                ? 'Abweichung gesperrt'
+                : mo.consumption === 'allowed'
+                  ? 'Abweichung erlaubt'
+                  : 'Abweichung mit Warnung'}
+            </span>
+          </>
         }
         tight
       >
@@ -162,12 +211,12 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                     <td>{c.product}</td>
                     <td className="num">{qty(c.qty)}</td>
                     <td>{c.uom}</td>
+                    {/* Zustand als LED plus Wort — die Zahl bleibt rechtsbündig
+                        ausgerichtet und trägt keine Farbe. */}
                     <td className="num">
-                      {short ? (
-                        <span className="badge warn">{qty(c.reserved_qty)}</span>
-                      ) : (
-                        <span className="badge success">{qty(c.reserved_qty)}</span>
-                      )}
+                      <span className={`led ${short ? 'warn' : 'ok'}`} />{' '}
+                      <span className="muted small">{short ? 'fehlt' : 'gedeckt'}</span>{' '}
+                      {qty(c.reserved_qty)}
                     </td>
                     <td className="num muted">{qty(c.available)}</td>
                     <td className="num">{c.state === 'done' ? qty(c.qty_done) : '—'}</td>
@@ -198,7 +247,11 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
               {mo.tracking !== 'none' && (
                 <label className="field" style={{ maxWidth: 260 }}>
                   <span>{mo.tracking === 'serial' ? 'Seriennummer (leer = automatisch)' : 'Losnummer (leer = automatisch)'}</span>
-                  <input name="lot" placeholder={mo.tracking === 'serial' ? 'nur bei Menge 1' : 'z. B. CHARGE-2026-01'} />
+                  <input
+                    className="mono"
+                    name="lot"
+                    placeholder={mo.tracking === 'serial' ? 'nur bei Menge 1' : 'z. B. CHARGE-2026-01'}
+                  />
                 </label>
               )}
               <label className="field">

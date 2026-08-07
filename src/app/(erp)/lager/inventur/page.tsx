@@ -94,20 +94,25 @@ export default async function InventurPage() {
                   return (
                     <tr key={c.id}>
                       <td>{c.product}</td>
-                      <td className="small muted">{c.location}</td>
+                      <td className="small muted mono">{c.location}</td>
                       <td className="num">{qty(c.book_qty)}</td>
                       <td className="num">{qty(c.counted_qty)}</td>
                       <td className="num">
-                        <span className={`badge ${diff === 0 ? 'neutral' : diff > 0 ? 'success' : 'warn'}`}>
+                        <span className="mono">
                           {diff > 0 ? '+' : ''}
                           {qty(diff)}
                         </span>
+                        <div className="small muted nowrap">
+                          <span className={diff === 0 ? 'led off' : diff > 0 ? 'led ok' : 'led warn'} />{' '}
+                          {diff === 0 ? 'keine Differenz' : diff > 0 ? 'Überschuss' : 'Fehlmenge'}
+                        </div>
                       </td>
                       <td className="num">
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
                           {changed && (
-                            <span className="badge danger" title="Bestand hat sich seit der Zählung geändert">
-                              jetzt {qty(c.current_qty)}
+                            <span className="small muted nowrap" title="Bestand hat sich seit der Zählung geändert">
+                              <span className="led warn" /> Bestand geändert — jetzt{' '}
+                              <span className="mono">{qty(c.current_qty)}</span>
                             </span>
                           )}
                           <ActionButton className="small primary" action={applyCount.bind(null, c.id)}>
@@ -146,7 +151,7 @@ export default async function InventurPage() {
                     <td>{c.product}</td>
                     <td className="num muted">{qty(c.book_qty)}</td>
                     <td className="num">{qty(c.counted_qty)}</td>
-                    <td className="nowrap small">{dateTime(c.applied_at)}</td>
+                    <td className="nowrap small mono">{dateTime(c.applied_at)}</td>
                     <td className="small">{c.applied_by}</td>
                   </tr>
                 ))}

@@ -36,6 +36,14 @@ export default async function RetourenPage() {
       <PageHeader
         title="Retourenlabels"
         subtitle="DHL-Retourenlabel erzeugen und dem Kunden per E-Mail zusenden"
+        actions={
+          <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
+            <span className={dhlConfigured() ? 'led ok' : 'led warn'} />
+            <span className="mono-label">
+              {dhlConfigured() ? 'DHL verbunden' : 'DHL nicht konfiguriert'}
+            </span>
+          </span>
+        }
       />
 
       {!dhlConfigured() && (
@@ -72,7 +80,26 @@ export default async function RetourenPage() {
         </ActionForm>
       </Card>
 
-      <Card tight>
+      {/* Der QR-Link des zuletzt erzeugten Labels ist Scanner-Datum — dunkle Datenfläche. */}
+      {labels[0]?.qr_link && (
+        <div className="display-panel" style={{ marginBottom: 16 }}>
+          <div className="display-head">
+            <span>Retoure · QR</span>
+            <span className="mono">{labels[0].shipment_number}</span>
+          </div>
+          <a
+            className="mono small"
+            href={labels[0].qr_link}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: 'var(--display-bright)', wordBreak: 'break-all' }}
+          >
+            {labels[0].qr_link}
+          </a>
+        </div>
+      )}
+
+      <Card title={`Erzeugte Retourenlabels (${labels.length})`} tight>
         {labels.length === 0 ? (
           <Empty>Noch keine Retourenlabels.</Empty>
         ) : (
@@ -94,13 +121,20 @@ export default async function RetourenPage() {
                     <td>{l.partner}</td>
                     <td className="mono small">{l.repair_number ?? '—'}</td>
                     <td>
+                      {/* Zustand als Leuchte plus Wort; der Zeitstempel bleibt lesbares Mono. */}
                       {l.emailed_at ? (
-                        <span className="badge success">{dateTime(l.emailed_at)}</span>
+                        <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                          <span className="led ok" />
+                          <span className="mono small">versendet {dateTime(l.emailed_at)}</span>
+                        </span>
                       ) : (
-                        <span className="badge warn">in Warteschlange</span>
+                        <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                          <span className="led warn" />
+                          <span className="mono small">in Warteschlange</span>
+                        </span>
                       )}
                     </td>
-                    <td className="nowrap small">{dateTime(l.created_at)}</td>
+                    <td className="mono nowrap small">{dateTime(l.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

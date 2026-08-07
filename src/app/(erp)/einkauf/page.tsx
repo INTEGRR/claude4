@@ -51,11 +51,12 @@ export default async function EinkaufPage({
   const vendors = await sql<{ id: string; name: string }[]>`
     select id, name from partners where is_vendor and active order by name limit 500`
 
-  const filters = [
+  // Zähler getrennt vom Text, damit die Zahl in Mono gesetzt werden kann.
+  const filters: { key?: string; label: string; count?: number }[] = [
     { key: undefined, label: 'Alle' },
-    { key: 'to_send', label: `Zu senden (${rows.filter((r) => r.state === 'draft').length})` },
-    { key: 'waiting', label: `Wartend (${rows.filter((r) => r.state === 'sent').length})` },
-    { key: 'late', label: `Verspätet (${rows.filter((r) => r.late).length})` },
+    { key: 'to_send', label: 'Zu senden', count: rows.filter((r) => r.state === 'draft').length },
+    { key: 'waiting', label: 'Wartend', count: rows.filter((r) => r.state === 'sent').length },
+    { key: 'late', label: 'Verspätet', count: rows.filter((r) => r.late).length },
   ]
 
   return (
@@ -91,16 +92,32 @@ export default async function EinkaufPage({
       </Card>
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {filters.map((f) => (
-            <Link
-              key={f.label}
-              href={f.key ? `/einkauf?filter=${f.key}` : '/einkauf'}
-              className={`btn small${filter === f.key ? ' primary' : ''}`}
-            >
-              {f.label}
-            </Link>
-          ))}
+        <div className="actions" style={{ padding: 12 }}>
+          {filters.map((f) => {
+            // Der aktive Filter bekommt eine schmale Akzentkante statt einer
+            // orangen Fläche — die Primärtaste bleibt das einzige Orange.
+            const aktiv = filter === f.key
+            return (
+              <Link
+                key={f.label}
+                href={f.key ? `/einkauf?filter=${f.key}` : '/einkauf'}
+                className="btn small"
+                aria-current={aktiv ? 'page' : undefined}
+                style={
+                  aktiv
+                    ? {
+                        background: 'var(--surface-2)',
+                        borderLeft: '2px solid var(--accent)',
+                        fontWeight: 600,
+                      }
+                    : undefined
+                }
+              >
+                {f.label}
+                {f.count !== undefined && <span className="mono">({f.count})</span>}
+              </Link>
+            )
+          })}
         </div>
 
         {filtered.length === 0 ? (
@@ -122,13 +139,21 @@ export default async function EinkaufPage({
                 {filtered.map((r) => (
                   <tr key={r.id}>
                     <td className="mono">
-                      <Link href={`/einkauf/${r.id}`}>{r.number}</Link>
-                      {r.late && <span className="badge danger" style={{ marginLeft: 6 }}>verspätet</span>}
+                      <span className="actions" style={{ gap: 6 }}>
+                        <Link href={`/einkauf/${r.id}`}>{r.number}</Link>
+                        {r.late && (
+                          <>
+                            {/* Einziger echter Alarmzustand der Liste: LED plus Wort. */}
+                            <span className="led on" />
+                            <span className="badge danger">verspätet</span>
+                          </>
+                        )}
+                      </span>
                     </td>
                     <td>{r.vendor}</td>
                     <td><Badge state={r.state} kind="purchase" /></td>
                     <td><Badge state={r.billing_status} kind="billing" /></td>
-                    <td className="nowrap">{date(r.expected_arrival)}</td>
+                    <td className="mono nowrap">{date(r.expected_arrival)}</td>
                     <td className="num nowrap">{money(r.gross)}</td>
                   </tr>
                 ))}

@@ -25,10 +25,16 @@ export async function RecordComments({
     order by created_at desc limit 60`
 
   return (
-    <Card title={title}>
+    <Card
+      title={title}
+      actions={<span className="mono-label">{log.length === 1 ? '1 Eintrag' : `${log.length} Einträge`}</span>}
+    >
       <ActionForm action={addComment.bind(null, model, recordId, path)} style={{ marginBottom: 12 }}>
         <div className="row">
-          <input name="note" placeholder="Kommentar hinzufügen…" maxLength={2000} required />
+          <label className="field" style={{ marginBottom: 0 }}>
+            <span>Kommentar</span>
+            <input name="note" placeholder="Kommentar hinzufügen…" maxLength={2000} required />
+          </label>
           <div className="shrink">
             <button type="submit">Speichern</button>
           </div>

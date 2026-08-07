@@ -19,7 +19,9 @@ export async function ResponsibleForm({
 
   return (
     <ActionForm action={action} style={{ marginBottom: 0 }}>
-      <div className="row" style={{ alignItems: 'center', marginBottom: 0 }}>
+      {/* .row richtet standardmäßig an der Unterkante aus — damit sitzen
+          Auswahl, Schalter und Taste auf einer Linie, ohne geratene Abstände. */}
+      <div className="row" style={{ marginBottom: 0 }}>
         <label className="field" style={{ marginBottom: 0, minWidth: 180 }}>
           <span>Verantwortlich</span>
           <select name="user_id" defaultValue={userId ?? ''}>
@@ -29,10 +31,13 @@ export async function ResponsibleForm({
             ))}
           </select>
         </label>
-        <label className="shrink" style={{ marginTop: 16 }}>
-          <input type="checkbox" name="priority" defaultChecked={priority === '1'} /> Dringend
+        {/* "Dringend" ist ein kritischer Zustand — hier darf die Leuchte glühen. */}
+        <label className="shrink" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingBottom: 7 }}>
+          <input type="checkbox" name="priority" defaultChecked={priority === '1'} />
+          {priority === '1' && <span className="led on" />}
+          <span className="mono-label">Dringend</span>
         </label>
-        <div className="shrink" style={{ marginTop: 16 }}>
+        <div className="shrink">
           <button className="small" type="submit">Übernehmen</button>
         </div>
       </div>

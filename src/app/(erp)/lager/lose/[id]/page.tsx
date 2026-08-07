@@ -59,11 +59,11 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
   return (
     <>
       <PageHeader
-        title={los.name}
+        title={<span className="mono">{los.name}</span>}
         subtitle={
           <>
-            {los.product} · angelegt {dateTime(los.created_at)}
-            {los.ref && <> · Referenz {los.ref}</>}
+            {los.product} · angelegt <span className="mono">{dateTime(los.created_at)}</span>
+            {los.ref && <> · Referenz <span className="mono">{los.ref}</span></>}
           </>
         }
       />
@@ -75,10 +75,16 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
           ) : (
             <TableWrap>
               <table>
+                <thead>
+                  <tr>
+                    <th>Ort</th>
+                    <th className="num">Bestand</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {bestand.map((b) => (
                     <tr key={b.location}>
-                      <td>{b.location}</td>
+                      <td className="mono small">{b.location}</td>
                       <td className="num">{qty(b.on_hand)}</td>
                     </tr>
                   ))}
@@ -106,11 +112,11 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
                 <tbody>
                   {bewegungen.map((b) => (
                     <tr key={b.move_id}>
-                      <td className="nowrap small">{b.date_done ? dateTime(b.date_done) : '—'}</td>
+                      <td className="nowrap small mono">{b.date_done ? dateTime(b.date_done) : '—'}</td>
                       <td className="mono small">
                         {b.beleg_link ? <Link href={b.beleg_link}>{b.beleg}</Link> : (b.reference ?? '—')}
                       </td>
-                      <td className="small muted">{b.src} → {b.dest}</td>
+                      <td className="small muted mono">{b.src} → {b.dest}</td>
                       <td className="num">{qty(b.qty)}</td>
                       <td><Badge state={b.state} kind="picking" /></td>
                     </tr>

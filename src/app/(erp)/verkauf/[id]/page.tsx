@@ -129,22 +129,28 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       <PageHeader
         title={
           <>
-            {order.number}
+            <span className="mono">{order.number}</span>
             {order.shopify_order_name && (
-              <span className="muted" style={{ fontWeight: 400 }}> · {order.shopify_order_name}</span>
+              <span className="mono muted"> · {order.shopify_order_name}</span>
             )}
           </>
         }
         subtitle={
           <>
-            {order.partner_name} · {date(order.order_date)}
+            {order.partner_name} · <span className="mono">{date(order.order_date)}</span>
             {order.source === 'shopify' && <> · aus Shopify importiert</>}
           </>
         }
         actions={
           <>
             <Badge state={order.state} kind="sale" />
-            {order.locked && <span className="badge neutral">Gesperrt</span>}
+            {/* Sperre: Leuchte plus Wort statt grauem Chip. */}
+            {order.locked && (
+              <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                <span className="led warn" />
+                <span className="mono-label">Gesperrt</span>
+              </span>
+            )}
             {(order.state === 'draft' || order.state === 'sent') && (
               <ActionButton className="primary" action={confirmOrder.bind(null, id)}>
                 Bestätigen
@@ -182,22 +188,50 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <TagEditor model="sales_order" recordId={id} path={`/verkauf/${id}`} />
       </div>
 
+      {/* Kennzahlenreihe: .stat mit Mono-Typenschild statt drei Kartenkopfleisten. */}
       <div className="grid-3" style={{ marginBottom: 16 }}>
-        <Card title="Lieferstatus">
-          <Badge state={order.delivery_status} kind="delivery" />
-        </Card>
-        <Card title="Abrechnung">
-          <Badge state={order.invoice_status} kind="invoice" />
-        </Card>
-        <Card title="Lieferadresse">
-          <div className="small">
-            {order.ship_name ?? order.partner_name}
-            <br />
-            {order.ship_street} {order.ship_house_number}
-            <br />
-            {order.ship_zip} {order.ship_city} {order.ship_country_code}
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div className="stat">
+            <div className="label">Lieferstatus</div>
+            <div style={{ marginTop: 6 }}>
+              <Badge state={order.delivery_status} kind="delivery" />
+            </div>
           </div>
-        </Card>
+        </div>
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div className="stat">
+            <div className="label">Abrechnung</div>
+            <div style={{ marginTop: 6 }}>
+              <Badge state={order.invoice_status} kind="invoice" />
+            </div>
+          </div>
+        </div>
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div className="stat">
+            <div className="label">Lieferadresse</div>
+            <div className="small" style={{ marginTop: 6 }}>
+              {order.ship_name ?? order.partner_name}
+              <br />
+              {order.ship_street} {order.ship_house_number}
+              <br />
+              {/* PLZ und Ländercode sind Codes, Ort bleibt Fließtext. */}
+              <span className="mono">{order.ship_zip}</span> {order.ship_city}{' '}
+              <span className="mono">{order.ship_country_code}</span>
+            </div>
+          </div>
+        </div>
+        {order.source === 'shopify' && order.shopify_order_id && (
+          <div className="display-panel">
+            <div className="display-head">
+              <span>Shopify-Verknüpfung</span>
+              <span>ID</span>
+            </div>
+            <div className="mono" style={{ fontSize: 15, color: 'var(--display-bright)' }}>
+              {order.shopify_order_name ?? '—'}
+            </div>
+            <div className="mono small">{order.shopify_order_id}</div>
+          </div>
+        )}
       </div>
 
       <Card title="Details">
@@ -290,11 +324,18 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <td className="num">{qty(l.qty)}</td>
                     <td>{l.uom}</td>
                     <td className="num">
-                      {Number(l.qty_delivered) >= Number(l.qty) ? (
-                        <span className="badge success">{qty(l.qty_delivered)}</span>
-                      ) : (
-                        qty(l.qty_delivered)
-                      )}
+                      {/* Vollständig geliefert zeigt die Leuchte, nicht die Farbe der Zahl. */}
+                      <span
+                        className="nowrap"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <span
+                          className={
+                            Number(l.qty_delivered) >= Number(l.qty) ? 'led ok' : 'led off'
+                          }
+                        />
+                        <span className="mono">{qty(l.qty_delivered)}</span>
+                      </span>
                     </td>
                     <td className="num">{money(l.price_unit, order.currency)}</td>
                     <td className="num">{qty(l.tax_rate)} %</td>
@@ -309,20 +350,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   </tr>
                 ))}
               </tbody>
+              {/* Summenzeilen: Kennzahlen-Labels als Typenschild, die Gesamtsumme
+                  trennt eine Linie ab — keine Fettung. */}
               <tfoot>
                 <tr>
-                  <td colSpan={6} className="num muted">Netto</td>
+                  <td colSpan={6} className="num mono-label">Netto</td>
                   <td className="num">{money(order.net, order.currency)}</td>
                   {editable && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={6} className="num muted">MwSt.</td>
+                  <td colSpan={6} className="num mono-label">MwSt.</td>
                   <td className="num">{money(order.tax, order.currency)}</td>
                   {editable && <td />}
                 </tr>
-                <tr>
-                  <td colSpan={6} className="num" style={{ fontWeight: 650 }}>Gesamt</td>
-                  <td className="num" style={{ fontWeight: 650 }}>{money(order.gross, order.currency)}</td>
+                <tr style={{ borderTop: '2px solid var(--border-strong)' }}>
+                  <td colSpan={6} className="num mono-label">Gesamt</td>
+                  <td className="num">{money(order.gross, order.currency)}</td>
                   {editable && <td />}
                 </tr>
               </tfoot>
@@ -367,12 +410,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           ) : (
             <TableWrap>
               <table>
+                <thead>
+                  <tr>
+                    <th>Nummer</th>
+                    <th>Status</th>
+                    <th>Datum</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {pickings.map((p) => (
                     <tr key={p.id}>
                       <td className="mono"><Link href={`/lager/${p.id}`}>{p.number}</Link></td>
                       <td><Badge state={p.state} kind="picking" /></td>
-                      <td className="nowrap">{date(p.date_done)}</td>
+                      <td className="mono nowrap">{date(p.date_done)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -387,6 +437,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           ) : (
             <TableWrap>
               <table>
+                <thead>
+                  <tr>
+                    <th>Nummer</th>
+                    <th>Produkt</th>
+                    <th className="num">Menge</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {mos.map((m) => (
                     <tr key={m.id}>
@@ -407,6 +465,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <Card title="Sendungen" tight>
           <TableWrap>
             <table>
+              <thead>
+                <tr>
+                  <th>Sendungsnummer</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
                 {shipments.map((s) => (
                   <tr key={s.id}>

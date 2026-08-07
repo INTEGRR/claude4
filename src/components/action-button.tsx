@@ -2,6 +2,23 @@
 import { useState, useTransition } from 'react'
 
 /**
+ * Fehlerzeile: Leuchte plus Wort, dann die Meldung im Klartext. Bewusst
+ * `.notice` und kein `.badge` — Badges sind Typenschilder für kurze
+ * Zustandswörter, keine Behälter für Fließtext.
+ */
+function ErrorNotice({ message, style }: { message: string; style?: React.CSSProperties }) {
+  return (
+    <div className="notice danger" role="alert" style={{ marginBottom: 0, maxWidth: 460, ...style }}>
+      <span className="led warn" style={{ marginRight: 6 }} />
+      <span className="mono-label" style={{ marginRight: 6, color: 'inherit' }}>
+        Fehler
+      </span>
+      {message}
+    </div>
+  )
+}
+
+/**
  * Schaltfläche für Server Actions: zeigt Fehler aus der Fachlogik direkt an,
  * statt sie in einer Fehlerseite verschwinden zu lassen. Genau diese
  * Meldungen ("Erledigte Transfers können nicht storniert werden") sind für
@@ -39,14 +56,17 @@ export function ActionButton({
 
   return (
     <>
+      {/* Beschriftung bleibt stehen, die Leuchte zeigt den laufenden Vorgang —
+          so springt die Knopfbreite nicht und der Zustand hat ein Zeichen.
+          Die Leuchte trägt bewusst NICHT `.led.on`: auf der Primärtaste stünde
+          dann der Akzent auf dem Akzent und der Punkt wäre unsichtbar. Mit
+          `currentColor` nimmt sie die Schriftfarbe der jeweiligen Taste an —
+          weiß auf Primär, --text auf neutral, --danger auf der roten. */}
       <button type="button" className={className} onClick={run} disabled={disabled || pending} title={title}>
-        {pending ? '…' : children}
+        {pending && <span className="led" style={{ background: 'currentColor' }} />}
+        {children}
       </button>
-      {error && (
-        <span className="badge danger" role="alert" style={{ whiteSpace: 'normal', maxWidth: 460 }}>
-          {error}
-        </span>
-      )}
+      {error && <ErrorNotice message={error} />}
     </>
   )
 }
@@ -86,11 +106,7 @@ export function ActionForm({
       <fieldset disabled={pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         {children}
       </fieldset>
-      {error && (
-        <div className="notice danger" style={{ marginTop: 8, marginBottom: 0 }} role="alert">
-          {error}
-        </div>
-      )}
+      {error && <ErrorNotice message={error} style={{ marginTop: 8 }} />}
     </form>
   )
 }

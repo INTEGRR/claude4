@@ -116,7 +116,7 @@ export default async function BomPage({
 
       {ptavs.length > 0 && (
         <div className="notice info">
-          Dieses Produkt hat Varianten. Positionen ohne Auswahl bei „Auf Varianten anwenden" gelten für{' '}
+          Dieses Produkt hat Varianten. Positionen ohne Auswahl bei „Auf Varianten anwenden“ gelten für{' '}
           <strong>alle</strong> Varianten; mit Auswahl nur für die passenden — so kommt z. B. das weiße
           Gehäuse nur in die weiße Tastatur.
         </div>
@@ -127,11 +127,15 @@ export default async function BomPage({
         actions={
           <ActionForm action={setBomConsumption.bind(null, id)}>
             <div className="row">
-              <select name="consumption" defaultValue={bom.consumption} style={{ width: 220 }}>
-                <option value="warning">Abweichender Verbrauch: Warnung</option>
-                <option value="allowed">Abweichender Verbrauch: erlaubt</option>
-                <option value="blocked">Abweichender Verbrauch: gesperrt</option>
-              </select>
+              {/* Label statt dreifach wiederholtem Präfix in den Optionen. */}
+              <label className="field" style={{ marginBottom: 0, width: 220 }}>
+                <span>Verbrauchsregel</span>
+                <select name="consumption" defaultValue={bom.consumption}>
+                  <option value="warning">Abweichung mit Warnung</option>
+                  <option value="allowed">Abweichung erlaubt</option>
+                  <option value="blocked">Abweichung gesperrt</option>
+                </select>
+              </label>
               <div className="shrink">
                 <button className="small" type="submit">Speichern</button>
               </div>
@@ -166,9 +170,11 @@ export default async function BomPage({
                       {l.filters.length === 0 ? (
                         <span className="muted small">alle Varianten</span>
                       ) : (
-                        l.filters.map((f) => (
-                          <span key={f} className="badge info" style={{ marginRight: 4 }}>{f}</span>
-                        ))
+                        <span className="actions">
+                          {l.filters.map((f) => (
+                            <span key={f} className="badge info">{f}</span>
+                          ))}
+                        </span>
                       )}
                     </td>
                     <td className="num">
@@ -251,20 +257,22 @@ export default async function BomPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.map((p, i) => (
-                      <tr key={i}>
-                        <td>{p.component}</td>
-                        <td className="num">{qty(p.qty)}</td>
-                        <td>{p.uom}</td>
-                        <td className="num">
-                          {Number(p.available) >= Number(p.qty) ? (
-                            <span className="badge success">{qty(p.available)}</span>
-                          ) : (
-                            <span className="badge warn">{qty(p.available)}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {preview.map((p, i) => {
+                      const covered = Number(p.available) >= Number(p.qty)
+                      return (
+                        <tr key={i}>
+                          <td>{p.component}</td>
+                          <td className="num">{qty(p.qty)}</td>
+                          <td>{p.uom}</td>
+                          {/* LED plus Wort statt eingefärbter Zahl. */}
+                          <td className="num">
+                            <span className={`led ${covered ? 'ok' : 'warn'}`} />{' '}
+                            <span className="muted small">{covered ? 'gedeckt' : 'zu wenig'}</span>{' '}
+                            {qty(p.available)}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </TableWrap>

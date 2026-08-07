@@ -68,6 +68,13 @@ export default async function VersandPage() {
         subtitle="Fertige Aufträge etikettieren, Sendungen verfolgen"
         actions={
           <>
+            {/* Verbindungszustand des Geräts: Leuchte plus Wort, in beiden Richtungen sichtbar. */}
+            <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <span className={configured ? 'led ok' : 'led warn'} />
+              <span className="mono-label">
+                {configured ? 'DHL verbunden' : 'DHL nicht konfiguriert'}
+              </span>
+            </span>
             <Link className="btn" href="/versand/retouren">Retourenlabels</Link>
             <ActionButton action={refreshTracking}>Tracking aktualisieren</ActionButton>
           </>
@@ -77,7 +84,7 @@ export default async function VersandPage() {
       {!configured && (
         <div className="notice warn">
           DHL ist noch nicht konfiguriert. Hinterlege API-Key, GKP-Zugangsdaten und Abrechnungsnummer
-          als Umgebungsvariablen (siehe <code>.env.example</code>), dann lassen sich hier Labels erzeugen.
+          als Umgebungsvariablen (siehe <code className="mono">.env.example</code>), dann lassen sich hier Labels erzeugen.
         </div>
       )}
 
@@ -97,7 +104,7 @@ export default async function VersandPage() {
                   <th>Kunde</th>
                   <th>Ziel</th>
                   <th className="num">Gewicht</th>
-                  <th style={{ width: 320 }}>Label</th>
+                  <th style={{ width: 360 }}>Label</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,7 +124,9 @@ export default async function VersandPage() {
                     </td>
                     <td>{r.customer_name ?? '—'}</td>
                     <td className="small">
-                      {r.ship_zip} {r.ship_city} {r.ship_country_code}
+                      {/* PLZ und Ländercode sind Codes, der Ort bleibt Fließtext. */}
+                      <span className="mono">{r.ship_zip}</span> {r.ship_city}{' '}
+                      <span className="mono">{r.ship_country_code}</span>
                     </td>
                     <td className="num nowrap">{qty(Number(r.weight_g) / 1000)} kg</td>
                     <td>
@@ -126,22 +135,38 @@ export default async function VersandPage() {
                       ) : (
                         <ActionForm action={createLabel.bind(null, r.picking_id)}>
                           <div className="row" style={{ gap: 6 }}>
-                            <input
-                              type="number"
-                              name="weight_g"
-                              defaultValue={Math.max(Number(r.weight_g), 1)}
-                              min={1}
-                              title="Gewicht in Gramm"
-                              style={{ maxWidth: 100 }}
-                            />
-                            <select name="dhl_product" defaultValue="" style={{ maxWidth: 110 }}>
-                              <option value="">automatisch</option>
-                              {PRODUCTS.map((p) => (
-                                <option key={p.code} value={p.code}>{p.code}</option>
-                              ))}
-                            </select>
+                            {/* Einheit sichtbar machen statt nur im title-Attribut. */}
+                            <div
+                              className="shrink"
+                              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <input
+                                type="number"
+                                name="weight_g"
+                                aria-label="Gewicht in Gramm"
+                                defaultValue={Math.max(Number(r.weight_g), 1)}
+                                min={1}
+                                style={{ width: 84 }}
+                              />
+                              <span className="mono-label">g</span>
+                            </div>
                             <div className="shrink">
-                              <button className="primary small" type="submit" disabled={!configured}>
+                              <select
+                                name="dhl_product"
+                                className="mono"
+                                aria-label="DHL-Produkt"
+                                defaultValue=""
+                                style={{ width: 132 }}
+                              >
+                                <option value="">automatisch</option>
+                                {PRODUCTS.map((p) => (
+                                  <option key={p.code} value={p.code}>{p.code} — {p.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="shrink">
+                              {/* Zeilenaktion bleibt neutral — Orange ist der Kopfzeile vorbehalten. */}
+                              <button className="small" type="submit" disabled={!configured}>
                                 Label erstellen
                               </button>
                             </div>
@@ -189,13 +214,15 @@ export default async function VersandPage() {
                     <td>{s.customer ?? '—'}</td>
                     <td><Badge state={s.state} kind="shipment" /></td>
                     <td>
-                      {s.shopify_fulfillment_id ? (
-                        <span className="badge success">gemeldet</span>
-                      ) : (
-                        <span className="muted small">—</span>
-                      )}
+                      {/* Beide Zustände sind beschriftet — „nicht gemeldet" ist auch ein Zustand. */}
+                      <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                        <span className={s.shopify_fulfillment_id ? 'led ok' : 'led off'} />
+                        <span className="mono small">
+                          {s.shopify_fulfillment_id ? 'gemeldet' : 'offen'}
+                        </span>
+                      </span>
                     </td>
-                    <td className="nowrap small">{dateTime(s.created_at)}</td>
+                    <td className="mono nowrap small">{dateTime(s.created_at)}</td>
                     <td className="num">
                       <div className="actions" style={{ justifyContent: 'flex-end' }}>
                         {s.label_path && (

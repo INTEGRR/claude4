@@ -113,7 +113,7 @@ export default async function KonfigurationPage() {
               <tbody>
                 {categories.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.full_path}</td>
+                    <td className="mono small">{c.full_path}</td>
                     <td className="num">{qty(c.products)}</td>
                   </tr>
                 ))}
@@ -123,13 +123,19 @@ export default async function KonfigurationPage() {
           <div style={{ padding: 12 }}>
             <ActionForm action={createCategory}>
               <div className="row">
-                <input name="name" placeholder="Neue Kategorie" required />
-                <select name="parent_id" defaultValue="">
-                  <option value="">— oberste Ebene —</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.full_path}</option>
-                  ))}
-                </select>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Neue Kategorie</span>
+                  <input name="name" required />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Übergeordnet</span>
+                  <select name="parent_id" defaultValue="">
+                    <option value="">— oberste Ebene —</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.full_path}</option>
+                    ))}
+                  </select>
+                </label>
                 <div className="shrink">
                   <button type="submit">Anlegen</button>
                 </div>
@@ -159,12 +165,21 @@ export default async function KonfigurationPage() {
           <div style={{ padding: 12 }}>
             <ActionForm action={createTax}>
               <div className="row">
-                <input name="name" placeholder="Name" required style={{ flex: 2 }} />
-                <input type="number" name="amount" step="0.01" placeholder="%" required />
-                <select name="type_tax_use" defaultValue="sale">
-                  <option value="sale">Verkauf</option>
-                  <option value="purchase">Einkauf</option>
-                </select>
+                <label className="field" style={{ flex: 2, marginBottom: 0 }}>
+                  <span>Name</span>
+                  <input name="name" required />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Satz %</span>
+                  <input type="number" name="amount" step="0.01" required />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Verwendung</span>
+                  <select name="type_tax_use" defaultValue="sale">
+                    <option value="sale">Verkauf</option>
+                    <option value="purchase">Einkauf</option>
+                  </select>
+                </label>
                 <label className="shrink"><input type="checkbox" name="price_include" /> inkl.</label>
                 <div className="shrink">
                   <button type="submit">Anlegen</button>
@@ -188,7 +203,9 @@ export default async function KonfigurationPage() {
                     <td>{t.name}</td>
                     <td className="num">
                       {t.nb_days}
-                      {t.delay_type === 'days_after_end_of_month' ? ' (nach Monatsende)' : ''}
+                      {t.delay_type === 'days_after_end_of_month' && (
+                        <div className="small muted nowrap">nach Monatsende</div>
+                      )}
                     </td>
                     <td className="small muted">
                       {t.early_discount
@@ -203,17 +220,32 @@ export default async function KonfigurationPage() {
           <div style={{ padding: 12 }}>
             <ActionForm action={createPaymentTerm}>
               <div className="row">
-                <input name="name" placeholder="Name" required style={{ flex: 2 }} />
-                <input type="number" name="nb_days" placeholder="Tage" required />
-                <select name="delay_type" defaultValue="days_after">
-                  <option value="days_after">nach Rechnungsdatum</option>
-                  <option value="days_after_end_of_month">nach Monatsende</option>
-                </select>
+                <label className="field" style={{ flex: 2, marginBottom: 0 }}>
+                  <span>Name</span>
+                  <input name="name" required />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Tage</span>
+                  <input type="number" name="nb_days" required />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Fälligkeit</span>
+                  <select name="delay_type" defaultValue="days_after">
+                    <option value="days_after">nach Rechnungsdatum</option>
+                    <option value="days_after_end_of_month">nach Monatsende</option>
+                  </select>
+                </label>
               </div>
-              <div className="row" style={{ alignItems: 'center' }}>
+              <div className="row">
                 <label className="shrink"><input type="checkbox" name="early_discount" /> Skonto</label>
-                <input type="number" name="discount_percentage" step="0.1" placeholder="Skonto %" />
-                <input type="number" name="discount_days" placeholder="binnen Tagen" />
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Skonto %</span>
+                  <input type="number" name="discount_percentage" step="0.1" />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>binnen Tagen</span>
+                  <input type="number" name="discount_days" />
+                </label>
                 <div className="shrink">
                   <button type="submit">Anlegen</button>
                 </div>
@@ -235,7 +267,7 @@ export default async function KonfigurationPage() {
                   {tags.map((t) => (
                     <tr key={t.id}>
                       <td>{KIND_LABEL[t.kind] ?? t.kind}</td>
-                      <td><span className="badge info">{t.name}</span></td>
+                      <td><span className="badge neutral">{t.name}</span></td>
                       <td className="num">{qty(t.used)}</td>
                       <td className="num">
                         <ActionForm action={deleteTag.bind(null, t.id)}>

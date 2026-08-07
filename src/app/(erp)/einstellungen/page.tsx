@@ -59,6 +59,19 @@ async function savePolicies(formData: FormData) {
   revalidatePath('/einstellungen')
 }
 
+/**
+ * Gespeicherter Zustand einer Belegregel — Leuchte plus Wort, nicht nur der
+ * Haken. Zeigt den zuletzt gespeicherten Stand, nicht die Vorwahl im Formular.
+ */
+function Zustand({ an }: { an: boolean }) {
+  return (
+    <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span className={an ? 'led ok' : 'led off'} />
+      {an ? 'gesperrt' : 'offen'}
+    </span>
+  )
+}
+
 export default async function EinstellungenPage() {
   await requireArea('einstellungen')
   const settings = await sql<{ key: string; value: Record<string, unknown> }[]>`
@@ -116,7 +129,7 @@ export default async function EinstellungenPage() {
             </label>
             <label className="field">
               <span>Land (ISO alpha-3)</span>
-              <input name="country" defaultValue={company.country} maxLength={3} required />
+              <input className="mono" name="country" defaultValue={company.country} maxLength={3} required />
             </label>
           </div>
           <button className="primary" type="submit">Speichern</button>
@@ -158,13 +171,15 @@ export default async function EinstellungenPage() {
       <Card title="Belegverhalten">
         <ActionForm action={savePolicies}>
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 8 }}>
-              <input type="checkbox" name="sales_lock" defaultChecked={sales.lock_confirmed ?? false} />{' '}
-              Verkaufsaufträge beim Bestätigen automatisch sperren
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <input type="checkbox" name="sales_lock" defaultChecked={sales.lock_confirmed ?? false} />
+              <span>Verkaufsaufträge beim Bestätigen automatisch sperren</span>
+              <Zustand an={sales.lock_confirmed ?? false} />
             </label>
-            <label style={{ display: 'block' }}>
-              <input type="checkbox" name="purchase_lock" defaultChecked={purchase.lock_confirmed ?? false} />{' '}
-              Bestellungen beim Bestätigen automatisch sperren
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" name="purchase_lock" defaultChecked={purchase.lock_confirmed ?? false} />
+              <span>Bestellungen beim Bestätigen automatisch sperren</span>
+              <Zustand an={purchase.lock_confirmed ?? false} />
             </label>
           </div>
           <button className="primary" type="submit">Speichern</button>
@@ -186,7 +201,7 @@ export default async function EinstellungenPage() {
                 <tr key={s.code}>
                   <td className="mono small">{s.code}</td>
                   <td className="mono">{s.prefix}</td>
-                  <td className="num">{s.next_number}</td>
+                  <td className="num mono">{s.next_number}</td>
                 </tr>
               ))}
             </tbody>

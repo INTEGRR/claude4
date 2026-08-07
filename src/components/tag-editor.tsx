@@ -33,9 +33,12 @@ export async function TagEditor({
     select id, name from tags where kind = ${target.kind} order by name`
 
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="actions">
+      {/* Tags sind Etiketten, keine Zustände — deshalb grau. Die Statusfarben
+          bleiben dem Status vorbehalten, sonst stehen beide gleichrangig. */}
+      {assigned.length === 0 && <span className="mono-label">Keine Tags</span>}
       {assigned.map((t) => (
-        <span key={t.id} className="badge info">{t.name}</span>
+        <span key={t.id} className="badge neutral">{t.name}</span>
       ))}
       <details style={{ display: 'inline-block' }}>
         <summary className="btn small">Tags…</summary>
@@ -46,7 +49,7 @@ export async function TagEditor({
             zIndex: 20,
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            borderRadius: 8,
+            borderRadius: 'var(--radius)',
             padding: 12,
             marginTop: 4,
             minWidth: 240,
@@ -69,7 +72,10 @@ export async function TagEditor({
             </div>
           )}
           <div className="row">
-            <input name="new_tag" placeholder="Neues Tag…" />
+            <label className="field" style={{ marginBottom: 0 }}>
+              <span>Neues Tag</span>
+              <input name="new_tag" placeholder="Neues Tag…" />
+            </label>
             <div className="shrink">
               <button className="small" type="submit">Speichern</button>
             </div>

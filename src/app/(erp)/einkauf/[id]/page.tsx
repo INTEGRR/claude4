@@ -102,12 +102,16 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   return (
     <>
       <PageHeader
-        title={order.number}
+        title={<span className="mono">{order.number}</span>}
         subtitle={
           <>
             {order.vendor}
-            {order.vendor_reference && <> · Referenz {order.vendor_reference}</>}
-            {order.expected_arrival && <> · erwartet {date(order.expected_arrival)}</>}
+            {order.vendor_reference && (
+              <> · Referenz <span className="mono">{order.vendor_reference}</span></>
+            )}
+            {order.expected_arrival && (
+              <> · erwartet <span className="mono">{date(order.expected_arrival)}</span></>
+            )}
           </>
         }
         actions={
@@ -147,7 +151,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
       <Card title="Details">
         <ActionForm action={updatePoHeader.bind(null, id)}>
-          <div className="row" style={{ alignItems: 'flex-end' }}>
+          <div className="row">
             <label className="field">
               <span>Einkäufer</span>
               <select name="user_id" defaultValue={kopf.user_id ?? ''}>
@@ -222,48 +226,60 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 </tr>
               </thead>
               <tbody>
-                {lines.map((l) => (
-                  <tr key={l.id}>
-                    <td>{l.name}</td>
-                    <td className="num">{qty(l.qty)}</td>
-                    <td>{l.uom}</td>
-                    <td className="num">
-                      {Number(l.qty_received) >= Number(l.qty) ? (
-                        <span className="badge success">{qty(l.qty_received)}</span>
-                      ) : Number(l.qty_received) > 0 ? (
-                        <span className="badge warn">{qty(l.qty_received)}</span>
-                      ) : (
-                        <span className="muted">0</span>
-                      )}
-                    </td>
-                    <td className="num">
-                      {Number(l.qty_billed) >= Number(l.qty) ? (
-                        <span className="badge success">{qty(l.qty_billed)}</span>
-                      ) : (
-                        qty(l.qty_billed)
-                      )}
-                    </td>
-                    <td className="num">{money(l.price_unit, order.currency)}</td>
-                    <td className="num">{Number(l.discount) > 0 ? `${qty(l.discount)} %` : '—'}</td>
-                    <td className="num">{money(l.subtotal, order.currency)}</td>
-                    {editable && (
+                {lines.map((l) => {
+                  // Fortschritt als LED plus Zahl ("3 / 5") statt als Farbchip:
+                  // vollständig / teilweise / offen bleibt ohne Farbe lesbar.
+                  const fortschritt = (ist: number) =>
+                    Number(ist) >= Number(l.qty)
+                      ? { led: 'ok', wort: 'vollständig' }
+                      : Number(ist) > 0
+                        ? { led: 'warn', wort: 'teilweise' }
+                        : { led: 'off', wort: 'offen' }
+                  const erhalten = fortschritt(l.qty_received)
+                  const abgerechnet = fortschritt(l.qty_billed)
+                  return (
+                    <tr key={l.id}>
+                      <td>{l.name}</td>
+                      <td className="num">{qty(l.qty)}</td>
+                      <td>{l.uom}</td>
                       <td className="num">
-                        <ActionButton className="small danger" action={removePoLine.bind(null, id, l.id)}>
-                          Entfernen
-                        </ActionButton>
+                        <span className="actions" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                          <span className={`led ${erhalten.led}`} title={erhalten.wort} />
+                          <span className="mono nowrap">
+                            {qty(l.qty_received)} / {qty(l.qty)}
+                          </span>
+                        </span>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="num">
+                        <span className="actions" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                          <span className={`led ${abgerechnet.led}`} title={abgerechnet.wort} />
+                          <span className="mono nowrap">
+                            {qty(l.qty_billed)} / {qty(l.qty)}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="num">{money(l.price_unit, order.currency)}</td>
+                      <td className="num">{Number(l.discount) > 0 ? `${qty(l.discount)} %` : '—'}</td>
+                      <td className="num">{money(l.subtotal, order.currency)}</td>
+                      {editable && (
+                        <td className="num">
+                          <ActionButton className="small danger" action={removePoLine.bind(null, id, l.id)}>
+                            Entfernen
+                          </ActionButton>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={7} className="num muted">Netto</td>
+                  <td colSpan={7} className="num mono-label">Netto</td>
                   <td className="num">{money(order.net, order.currency)}</td>
                   {editable && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={7} className="num" style={{ fontWeight: 650 }}>Gesamt (brutto)</td>
+                  <td colSpan={7} className="num mono-label">Gesamt (brutto)</td>
                   <td className="num" style={{ fontWeight: 650 }}>{money(order.gross, order.currency)}</td>
                   {editable && <td />}
                 </tr>
@@ -318,7 +334,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                     <tr key={r.id}>
                       <td className="mono"><Link href={`/lager/${r.id}`}>{r.number}</Link></td>
                       <td><Badge state={r.state} kind="picking" /></td>
-                      <td className="nowrap">{date(r.date_done)}</td>
+                      <td className="mono nowrap">{date(r.date_done)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -340,7 +356,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                         <Link href={`/einkauf/rechnungen/${b.id}`}>{b.number}</Link>
                       </td>
                       <td><Badge state={b.state} kind="bill" /></td>
-                      <td className="nowrap">{date(b.bill_date)}</td>
+                      <td className="mono nowrap">{date(b.bill_date)}</td>
                     </tr>
                   ))}
                 </tbody>

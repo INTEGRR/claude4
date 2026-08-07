@@ -87,7 +87,7 @@ export default async function KontaktePage({
             </label>
             <label className="field">
               <span>USt-ID</span>
-              <input name="vat" />
+              <input className="mono" name="vat" />
             </label>
           </div>
           <div className="row">
@@ -101,7 +101,7 @@ export default async function KontaktePage({
             </label>
             <label className="field">
               <span>PLZ</span>
-              <input name="zip" />
+              <input className="mono" name="zip" />
             </label>
             <label className="field">
               <span>Ort</span>
@@ -109,35 +109,52 @@ export default async function KontaktePage({
             </label>
             <label className="field">
               <span>Land</span>
-              <input name="country_code" defaultValue="DE" maxLength={2} />
+              <input className="mono" name="country_code" defaultValue="DE" maxLength={2} />
             </label>
           </div>
           <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
-            <label className="shrink"><input type="checkbox" name="is_company" defaultChecked /> Firma</label>
-            <label className="shrink"><input type="checkbox" name="is_customer" defaultChecked /> Kunde</label>
-            <label className="shrink"><input type="checkbox" name="is_vendor" /> Lieferant</label>
+            <label className="shrink field"><input type="checkbox" name="is_company" defaultChecked /> Firma</label>
+            <label className="shrink field"><input type="checkbox" name="is_customer" defaultChecked /> Kunde</label>
+            <label className="shrink field"><input type="checkbox" name="is_vendor" /> Lieferant</label>
           </div>
           <button className="primary" type="submit">Kontakt anlegen</button>
         </ActionForm>
       </Card>
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="actions" style={{ padding: 12, alignItems: 'flex-end' }}>
           {[
             { key: undefined, label: 'Alle' },
             { key: 'kunden', label: 'Kunden' },
             { key: 'lieferanten', label: 'Lieferanten' },
-          ].map((f) => (
-            <Link
-              key={f.label}
-              href={f.key ? `/kontakte?art=${f.key}` : '/kontakte'}
-              className={`btn small${art === f.key ? ' primary' : ''}`}
-            >
-              {f.label}
-            </Link>
-          ))}
+          ].map((f) => {
+            // Aktiver Filter: Akzentkante statt oranger Fläche.
+            const aktiv = art === f.key
+            return (
+              <Link
+                key={f.label}
+                href={f.key ? `/kontakte?art=${f.key}` : '/kontakte'}
+                className="btn small"
+                aria-current={aktiv ? 'page' : undefined}
+                style={
+                  aktiv
+                    ? {
+                        background: 'var(--surface-2)',
+                        borderLeft: '2px solid var(--accent)',
+                        fontWeight: 600,
+                      }
+                    : undefined
+                }
+              >
+                {f.label}
+              </Link>
+            )
+          })}
           <form style={{ marginLeft: 'auto' }}>
-            <input type="search" name="q" placeholder="Suchen" defaultValue={q ?? ''} style={{ width: 220 }} />
+            <label className="field" style={{ marginBottom: 0 }}>
+              <span>Suche</span>
+              <input type="search" name="q" placeholder="Name oder E-Mail" defaultValue={q ?? ''} style={{ width: 220 }} />
+            </label>
           </form>
         </div>
 
@@ -160,11 +177,21 @@ export default async function KontaktePage({
                   <tr key={r.id}>
                     <td><Link href={`/kontakte/${r.id}`}>{r.name}</Link></td>
                     <td>
-                      {r.is_customer && <span className="badge info" style={{ marginRight: 4 }}>Kunde</span>}
-                      {r.is_vendor && <span className="badge neutral">Lieferant</span>}
+                      <span className="actions" style={{ gap: 6 }}>
+                        {r.is_customer && <span className="badge info">Kunde</span>}
+                        {r.is_vendor && <span className="badge neutral">Lieferant</span>}
+                      </span>
                     </td>
                     <td className="small">{r.email ?? <span className="muted">—</span>}</td>
-                    <td className="small">{r.city ? `${r.city} (${r.country_code})` : '—'}</td>
+                    <td className="small">
+                      {r.city ? (
+                        <>
+                          {r.city} <span className="mono">({r.country_code})</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="num">{r.orders}</td>
                   </tr>
                 ))}

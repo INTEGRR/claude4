@@ -52,7 +52,7 @@ export default async function AttributePage() {
                 <tr>
                   <th>Attribut</th>
                   <th>Werte</th>
-                  <th className="num">Verwendet in</th>
+                  <th className="num">Verwendet in Produkten</th>
                 </tr>
               </thead>
               <tbody>
@@ -60,11 +60,13 @@ export default async function AttributePage() {
                   <tr key={a.id}>
                     <td>{a.name}</td>
                     <td>
-                      {a.values.map((v) => (
-                        <span key={v} className="badge neutral" style={{ marginRight: 4 }}>{v}</span>
-                      ))}
+                      <span className="actions">
+                        {a.values.map((v) => (
+                          <span key={v} className="badge neutral">{v}</span>
+                        ))}
+                      </span>
                     </td>
-                    <td className="num">{a.used} Produkt(e)</td>
+                    <td className="num">{a.used}</td>
                   </tr>
                 ))}
               </tbody>

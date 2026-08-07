@@ -92,13 +92,15 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
   return (
     <>
       <PageHeader
-        title={repair.number}
+        title={<span className="mono">{repair.number}</span>}
         subtitle={
           <>
-            {repair.customer} · {repair.product} ({qty(repair.qty)}) · {date(repair.scheduled_date)}
+            {repair.customer} · {repair.product} ({qty(repair.qty)}) ·{' '}
+            <span className="mono">{date(repair.scheduled_date)}</span>
             {repair.sales_order_id && (
               <>
-                {' '}· Angebot <Link href={`/verkauf/${repair.sales_order_id}`}>{repair.sales_order_number}</Link>
+                {' '}· Angebot{' '}
+                <Link className="mono" href={`/verkauf/${repair.sales_order_id}`}>{repair.sales_order_number}</Link>
               </>
             )}
           </>
@@ -106,7 +108,11 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
         actions={
           <>
             <Badge state={repair.state} kind="repair" />
-            {repair.under_warranty && <span className="badge success">Garantie</span>}
+            {/* Abrechnung immer zeigen — vorher war „kostenpflichtig“ unsichtbar. */}
+            <span className="nowrap">
+              <span className={`led ${repair.under_warranty ? 'ok' : 'off'}`} />{' '}
+              {repair.under_warranty ? 'Garantie' : 'kostenpflichtig'}
+            </span>
             {repair.state === 'new' && (
               <ActionButton className="primary" action={confirmRepair.bind(null, id)}>
                 Bestätigen
@@ -136,7 +142,18 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
         <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
       </div>
 
-      {repair.note && <div className="notice info">Fehlerbeschreibung: {repair.note}</div>}
+      {/* Der Rohtext des Kunden — am Arbeitsplatz gelesen, darum als Geräteanzeige. */}
+      {repair.note && (
+        <div className="display-panel" style={{ marginBottom: 16 }}>
+          <div className="display-head">
+            <span>Fehlerbild</span>
+            <span>{repair.number}</span>
+          </div>
+          <div style={{ padding: '0 6px 2px', color: 'var(--display-bright)', whiteSpace: 'pre-wrap' }}>
+            {repair.note}
+          </div>
+        </div>
+      )}
 
       <Card title="Teile" tight>
         {parts.length === 0 ? (
@@ -156,31 +173,42 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
                   </tr>
                 </thead>
                 <tbody>
-                  {parts.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <span className={`badge ${p.part_type === 'add' ? 'info' : p.part_type === 'recycle' ? 'success' : 'warn'}`}>
-                          {PART_TYPES[p.part_type].label}
-                        </span>
-                      </td>
-                      <td>{p.product}</td>
-                      <td className="num">{qty(p.qty)}</td>
-                      <td className="num muted">
-                        {p.part_type === 'add' ? qty(p.available) : '—'}
-                      </td>
-                      <td>
-                        <input type="number" name={`done_${p.id}`} step="0.001" min="0" defaultValue={p.qty} required />
-                      </td>
-                      <td>{p.uom}</td>
-                    </tr>
-                  ))}
+                  {parts.map((p) => {
+                    const covered = Number(p.available) >= Number(p.qty)
+                    return (
+                      <tr key={p.id}>
+                        {/* Die Art ist eine Einteilung, kein Zustand: neutral. */}
+                        <td>
+                          <span className="badge neutral">{PART_TYPES[p.part_type].label}</span>
+                        </td>
+                        <td>{p.product}</td>
+                        <td className="num">{qty(p.qty)}</td>
+                        {/* Deckt der Bestand den geplanten Bedarf? Das war bisher nicht ablesbar. */}
+                        <td className="num">
+                          {p.part_type === 'add' ? (
+                            <>
+                              <span className={`led ${covered ? 'ok' : 'warn'}`} />{' '}
+                              <span className="muted small">{covered ? 'gedeckt' : 'zu wenig'}</span>{' '}
+                              {qty(p.available)}
+                            </>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <input type="number" name={`done_${p.id}`} step="0.001" min="0" defaultValue={p.qty} required />
+                        </td>
+                        <td>{p.uom}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </TableWrap>
             <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
               <button className="primary" type="submit">Reparatur abschließen</button>
               <span className="muted small" style={{ marginLeft: 12 }}>
-                Bucht alle Teilebewegungen und setzt den Auftrag auf „Repariert".
+                Bucht alle Teilebewegungen und setzt den Auftrag auf „Repariert“.
               </span>
             </div>
           </ActionForm>
@@ -201,10 +229,9 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
               <tbody>
                 {parts.map((p) => (
                   <tr key={p.id}>
+                    {/* Die Art ist eine Einteilung, kein Zustand: neutral. */}
                     <td>
-                      <span className={`badge ${p.part_type === 'add' ? 'info' : p.part_type === 'recycle' ? 'success' : 'warn'}`}>
-                        {PART_TYPES[p.part_type].label}
-                      </span>
+                      <span className="badge neutral">{PART_TYPES[p.part_type].label}</span>
                     </td>
                     <td>{p.product}</td>
                     <td className="num">{qty(p.qty)}</td>

@@ -27,6 +27,29 @@ function formatJson(value: unknown): string {
   }
 }
 
+/** Roh-JSON als dunkle Datenfläche mit Kopfzeile statt als nackter Block. */
+function Json({
+  titel,
+  wert,
+  zusatz,
+}: {
+  titel: string
+  wert: unknown
+  zusatz?: string | number
+}) {
+  return (
+    <div className="display-panel" style={{ margin: '6px 0' }}>
+      <div className="display-head">
+        <span>{titel}</span>
+        <span>{zusatz || ''}</span>
+      </div>
+      <pre className="tx-json" style={{ background: 'transparent', border: 0, padding: 0, margin: 0 }}>
+        {formatJson(wert)}
+      </pre>
+    </div>
+  )
+}
+
 export default async function TransaktionenPage({
   searchParams,
 }: {
@@ -80,19 +103,25 @@ export default async function TransaktionenPage({
       />
 
       <Card tight>
-        <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {SYSTEME.map((s) => (
-            <Link
-              key={s.label}
-              href={linkFor({ system: s.key })}
-              className={`btn small${(system ?? undefined) === s.key ? ' primary' : ''}`}
-            >
-              {s.label}
-            </Link>
-          ))}
+        <div className="actions" style={{ padding: 12 }}>
+          {SYSTEME.map((s) => {
+            const aktiv = (system ?? undefined) === s.key
+            return (
+              <Link
+                key={s.label}
+                href={linkFor({ system: s.key })}
+                aria-current={aktiv ? 'true' : undefined}
+                className={`btn small${aktiv ? ' primary' : ''}`}
+              >
+                {s.label}
+              </Link>
+            )
+          })}
+          {/* Ein gesetzter Filter ist aktive Navigation, kein zerstörender Vorgang. */}
           <Link
             href={linkFor({ nur: nurFehler ? undefined : 'fehler' })}
-            className={`btn small${nurFehler ? ' danger' : ''}`}
+            aria-current={nurFehler ? 'true' : undefined}
+            className={`btn small${nurFehler ? ' primary' : ''}`}
           >
             Nur Fehler
           </Link>
@@ -131,7 +160,7 @@ export default async function TransaktionenPage({
               <tbody>
                 {rows.map((t) => (
                   <tr key={t.id}>
-                    <td className="nowrap small">{dateTime(t.created_at)}</td>
+                    <td className="nowrap small mono">{dateTime(t.created_at)}</td>
                     <td><span className="badge neutral">{t.system}</span></td>
                     <td className="mono small">{t.kind}</td>
                     <td className="mono small">{t.reference ?? '—'}</td>
@@ -141,17 +170,27 @@ export default async function TransaktionenPage({
                         {t.status_code ? ` · ${t.status_code}` : ''}
                       </span>
                     </td>
-                    <td className="num small">{t.duration_ms != null ? `${t.duration_ms} ms` : '—'}</td>
+                    <td className="num small mono">
+                      {t.duration_ms != null ? `${t.duration_ms} ms` : '—'}
+                    </td>
                     <td style={{ maxWidth: 480 }}>
                       {t.error && <div className="small" style={{ color: 'var(--danger)' }}>{t.error}</div>}
                       <details>
-                        <summary className="small muted" style={{ cursor: 'pointer' }}>
+                        <summary className="mono-label" style={{ cursor: 'pointer', marginTop: 6 }}>
                           Request / Antwort
                         </summary>
-                        <div className="small muted" style={{ marginTop: 6 }}>Request</div>
-                        <pre className="tx-json">{formatJson(t.request)}</pre>
-                        <div className="small muted">Antwort</div>
-                        <pre className="tx-json">{formatJson(t.response)}</pre>
+                        {/* Roh-JSON ist eine Datenfläche: Display mit Typenschild-Kopf. */}
+                        <Json titel="Request" wert={t.request} zusatz={t.system} />
+                        <Json
+                          titel="Antwort"
+                          wert={t.response}
+                          zusatz={[
+                            t.status_code != null ? String(t.status_code) : null,
+                            t.duration_ms != null ? `${t.duration_ms} ms` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        />
                       </details>
                     </td>
                   </tr>

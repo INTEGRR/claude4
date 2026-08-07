@@ -97,7 +97,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <PageHeader
-        title={picking.number}
+        title={<span className="mono">{picking.number}</span>}
         subtitle={
           <>
             {picking.type_name}
@@ -105,18 +105,22 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
             {picking.origin_label && (
               <>
                 {' '}· Quellbeleg{' '}
-                {originHref ? <Link href={originHref}>{picking.origin_label}</Link> : picking.origin_label}
+                {originHref ? (
+                  <Link className="mono" href={originHref}>{picking.origin_label}</Link>
+                ) : (
+                  <span className="mono">{picking.origin_label}</span>
+                )}
               </>
             )}
-            {picking.backorder_of && <> · Rückstand zu {picking.backorder_of}</>}
-            {picking.return_of && <> · Retoure zu {picking.return_of}</>}
+            {picking.backorder_of && <> · Rückstand zu <span className="mono">{picking.backorder_of}</span></>}
+            {picking.return_of && <> · Retoure zu <span className="mono">{picking.return_of}</span></>}
           </>
         }
         actions={
           <>
             <Badge state={picking.state} kind="picking" />
             {picking.state === 'draft' && (
-              <ActionButton className="primary" action={confirmPicking.bind(null, id)}>
+              <ActionButton action={confirmPicking.bind(null, id)}>
                 Bestätigen
               </ActionButton>
             )}
@@ -145,6 +149,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
 
       {picking.state === 'done' && (
         <div className="notice success">
+          <span className="led ok" />{' '}
           Validiert am {date(picking.date_done)}. Erledigte Transfers sind unveränderlich — Korrekturen
           laufen über eine Retoure.
         </div>
@@ -170,16 +175,16 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                     <tr key={m.id}>
                       <td>
                         {m.product}
-                        {m.sku && <span className="muted small"> · {m.sku}</span>}
+                        {m.sku && <span className="muted small mono"> · {m.sku}</span>}
                       </td>
-                      <td className="small muted nowrap">{m.src} → {m.dest}</td>
+                      <td className="small muted nowrap mono">{m.src} → {m.dest}</td>
                       <td className="num">{qty(m.qty)}</td>
                       <td className="num">
-                        {Number(m.reserved_qty) >= Number(m.qty) ? (
-                          <span className="badge success">{qty(m.reserved_qty)}</span>
-                        ) : (
-                          <span className="badge warn">{qty(m.reserved_qty)}</span>
-                        )}
+                        {qty(m.reserved_qty)}
+                        <div className="small muted nowrap">
+                          <span className={Number(m.reserved_qty) >= Number(m.qty) ? 'led ok' : 'led warn'} />{' '}
+                          {Number(m.reserved_qty) >= Number(m.qty) ? 'reserviert' : 'Teilmenge'}
+                        </div>
                       </td>
                       <td>
                         <input
@@ -194,6 +199,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                         {m.tracking !== 'none' && (
                           <input
                             name={`lots_${m.id}`}
+                            className="mono"
                             style={{ marginTop: 4 }}
                             placeholder={
                               m.tracking === 'serial'
@@ -203,7 +209,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                           />
                         )}
                       </td>
-                      <td>{m.uom}</td>
+                      <td className="mono small">{m.uom}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -242,10 +248,10 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                 {moves.map((m) => (
                   <tr key={m.id}>
                     <td>{m.product}</td>
-                    <td className="small muted nowrap">{m.src} → {m.dest}</td>
+                    <td className="small muted nowrap mono">{m.src} → {m.dest}</td>
                     <td className="num">{qty(m.qty)}</td>
                     <td className="num">{qty(m.qty_done)}</td>
-                    <td>{m.uom}</td>
+                    <td className="mono small">{m.uom}</td>
                     <td><Badge state={m.state} kind="picking" /></td>
                   </tr>
                 ))}

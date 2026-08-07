@@ -56,14 +56,14 @@ export default async function BillsPage() {
                 {bills.map((b) => (
                   <tr key={b.id}>
                     <td className="mono">
-                      <Link href={`/einkauf/rechnungen/${b.id}`}>{b.number}</Link>
-                      {b.is_credit_note && (
-                        <span className="badge info" style={{ marginLeft: 6 }}>Gutschrift</span>
-                      )}
+                      <span className="actions" style={{ gap: 6 }}>
+                        <Link href={`/einkauf/rechnungen/${b.id}`}>{b.number}</Link>
+                        {b.is_credit_note && <span className="badge info">Gutschrift</span>}
+                      </span>
                     </td>
                     <td>{b.vendor}</td>
                     <td className="mono small">{b.po_number ?? '—'}</td>
-                    <td className="nowrap">{date(b.bill_date)}</td>
+                    <td className="mono nowrap">{date(b.bill_date)}</td>
                     <td><Badge state={b.state} kind="bill" /></td>
                     <td className="num nowrap">
                       {b.is_credit_note ? `− ${money(b.gross)}` : money(b.gross)}

@@ -75,14 +75,14 @@ export default async function ReparaturPage() {
             </label>
             <div className="shrink field">
               <label className="shrink" style={{ display: 'block', marginBottom: 8 }}>
-                <input type="checkbox" name="under_warranty" /> Garantie
+                <input type="checkbox" name="under_warranty" /> <span className="mono-label">Garantie</span>
               </label>
               <button className="primary" type="submit">Anlegen</button>
             </div>
           </div>
           <label className="field">
             <span>Fehlerbeschreibung</span>
-            <input name="note" placeholder="z. B. Taste klemmt, Switch defekt" />
+            <textarea name="note" rows={2} placeholder="z. B. Taste klemmt, Switch defekt" />
           </label>
         </ActionForm>
       </Card>
@@ -119,7 +119,7 @@ export default async function ReparaturPage() {
                         <span className="badge neutral">kostenpflichtig</span>
                       )}
                     </td>
-                    <td className="nowrap">{date(r.scheduled_date)}</td>
+                    <td className="mono nowrap">{date(r.scheduled_date)}</td>
                   </tr>
                 ))}
               </tbody>

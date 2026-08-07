@@ -89,7 +89,9 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             {partner.is_customer && partner.is_vendor && ' · '}
             {partner.is_vendor && 'Lieferant'}
             {partner.is_company ? ' · Firma' : ''}
-            {partner.ref && ` · Ref. ${partner.ref}`}
+            {partner.ref && (
+              <> · Ref. <span className="mono">{partner.ref}</span></>
+            )}
           </>
         }
       />
@@ -107,7 +109,7 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field">
               <span>Interne Referenz</span>
-              <input name="ref" defaultValue={partner.ref ?? ''} />
+              <input className="mono" name="ref" defaultValue={partner.ref ?? ''} />
             </label>
             <label className="field">
               <span>Funktion</span>
@@ -147,7 +149,7 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field">
               <span>PLZ</span>
-              <input name="zip" defaultValue={partner.zip ?? ''} />
+              <input className="mono" name="zip" defaultValue={partner.zip ?? ''} />
             </label>
             <label className="field">
               <span>Ort</span>
@@ -155,17 +157,17 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field">
               <span>Land</span>
-              <input name="country_code" defaultValue={partner.country_code} maxLength={2} />
+              <input className="mono" name="country_code" defaultValue={partner.country_code} maxLength={2} />
             </label>
           </div>
           <div className="row">
             <label className="field">
               <span>USt-ID</span>
-              <input name="vat" defaultValue={partner.vat ?? ''} />
+              <input className="mono" name="vat" defaultValue={partner.vat ?? ''} />
             </label>
             <label className="field">
               <span>Handelsregister</span>
-              <input name="company_registry" defaultValue={partner.company_registry ?? ''} placeholder="HRB …" />
+              <input className="mono" name="company_registry" defaultValue={partner.company_registry ?? ''} placeholder="HRB …" />
             </label>
             <label className="field">
               <span>Verkäufer</span>
@@ -196,9 +198,9 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             </label>
           </div>
           <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
-            <label className="shrink"><input type="checkbox" name="is_company" defaultChecked={partner.is_company} /> Firma</label>
-            <label className="shrink"><input type="checkbox" name="is_customer" defaultChecked={partner.is_customer} /> Kunde</label>
-            <label className="shrink"><input type="checkbox" name="is_vendor" defaultChecked={partner.is_vendor} /> Lieferant</label>
+            <label className="shrink field"><input type="checkbox" name="is_company" defaultChecked={partner.is_company} /> Firma</label>
+            <label className="shrink field"><input type="checkbox" name="is_customer" defaultChecked={partner.is_customer} /> Kunde</label>
+            <label className="shrink field"><input type="checkbox" name="is_vendor" defaultChecked={partner.is_vendor} /> Lieferant</label>
           </div>
           <button className="primary" type="submit">Speichern</button>
         </ActionForm>
@@ -228,19 +230,40 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
         <div style={{ padding: 12 }}>
           <ActionForm action={createChildContact.bind(null, id)}>
             <div className="row">
-              <input name="name" placeholder="Name" required style={{ flex: 2 }} />
-              <select name="partner_type" defaultValue="contact">
-                <option value="contact">Ansprechpartner</option>
-                <option value="invoice">Rechnungsadresse</option>
-                <option value="delivery">Lieferadresse</option>
-                <option value="other">Sonstige</option>
-              </select>
-              <input name="email" placeholder="E-Mail" />
-              <input name="street" placeholder="Straße (leer = wie Hauptkontakt)" />
-              <input name="house_number" placeholder="Nr." style={{ maxWidth: 70 }} />
-              <input name="zip" placeholder="PLZ" style={{ maxWidth: 90 }} />
-              <input name="city" placeholder="Ort" />
-              <div className="shrink">
+              <label className="field" style={{ flex: 2 }}>
+                <span>Name</span>
+                <input name="name" required />
+              </label>
+              <label className="field">
+                <span>Typ</span>
+                <select name="partner_type" defaultValue="contact">
+                  <option value="contact">Ansprechpartner</option>
+                  <option value="invoice">Rechnungsadresse</option>
+                  <option value="delivery">Lieferadresse</option>
+                  <option value="other">Sonstige</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>E-Mail</span>
+                <input name="email" />
+              </label>
+              <label className="field">
+                <span>Straße</span>
+                <input name="street" placeholder="leer = wie Hauptkontakt" />
+              </label>
+              <label className="field" style={{ maxWidth: 70 }}>
+                <span>Nr.</span>
+                <input name="house_number" />
+              </label>
+              <label className="field" style={{ maxWidth: 90 }}>
+                <span>PLZ</span>
+                <input className="mono" name="zip" />
+              </label>
+              <label className="field">
+                <span>Ort</span>
+                <input name="city" />
+              </label>
+              <div className="shrink field">
                 <button type="submit">Anlegen</button>
               </div>
             </div>
@@ -260,7 +283,7 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
                     <tr key={o.id}>
                       <td className="mono"><Link href={`/verkauf/${o.id}`}>{o.number}</Link></td>
                       <td><Badge state={o.state} kind="sale" /></td>
-                      <td className="nowrap small muted">{date(o.order_date)}</td>
+                      <td className="mono nowrap small muted">{date(o.order_date)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -280,7 +303,7 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
                     <tr key={p.id}>
                       <td className="mono"><Link href={`/einkauf/${p.id}`}>{p.number}</Link></td>
                       <td><Badge state={p.state} kind="purchase" /></td>
-                      <td className="nowrap small muted">{date(p.order_date)}</td>
+                      <td className="mono nowrap small muted">{date(p.order_date)}</td>
                     </tr>
                   ))}
                 </tbody>

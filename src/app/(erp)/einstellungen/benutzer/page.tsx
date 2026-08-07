@@ -54,10 +54,19 @@ export default async function BenutzerPage() {
                       {u.name}
                       {u.id === admin.id && <span className="muted small"> (Sie)</span>}
                     </td>
-                    <td>{u.email}</td>
+                    <td className="mono small">{u.email}</td>
                     <td>
                       {lastAdmin ? (
-                        <span title="Letzter aktiver Administrator">{ROLE_LABELS[u.role]}</span>
+                        // Gesperrter Zustand sichtbar machen, nicht nur im title-Attribut.
+                        <>
+                          <div>{ROLE_LABELS[u.role]}</div>
+                          <div
+                            className="mono-label"
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}
+                          >
+                            <span className="led warn" /> gesperrt · letzter Administrator
+                          </div>
+                        </>
                       ) : (
                         <ActionForm action={setRole.bind(null, u.id)}>
                           <div className="row">
@@ -74,13 +83,15 @@ export default async function BenutzerPage() {
                       )}
                     </td>
                     <td>
-                      {u.active ? (
-                        <span className="badge success">aktiv</span>
-                      ) : (
-                        <span className="badge neutral">deaktiviert</span>
-                      )}
+                      <span
+                        className="mono-label"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <span className={u.active ? 'led ok' : 'led off'} />
+                        {u.active ? 'aktiv' : 'deaktiviert'}
+                      </span>
                     </td>
-                    <td className="nowrap small muted">{dateTime(u.created_at)}</td>
+                    <td className="nowrap small muted mono">{dateTime(u.created_at)}</td>
                     <td className="num">
                       <div className="actions">
                         {u.active && !lastAdmin && u.id !== admin.id && (

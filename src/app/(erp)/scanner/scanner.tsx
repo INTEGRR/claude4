@@ -1,7 +1,8 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { validatePicking } from '../lager/actions'
 import { produceMo } from '../fertigung/actions'
+import { Badge } from '@/components/ui'
 import type { ScannerDoc } from '@/app/api/scanner/lookup/route'
 
 /**
@@ -15,8 +16,25 @@ import type { ScannerDoc } from '@/app/api/scanner/lookup/route'
 type Phase = 'idle' | 'work' | 'confirm' | 'booking' | 'done'
 
 interface Feedback {
-  text: string
+  text: ReactNode
   tone: 'ok' | 'warn' | 'error' | 'info'
+}
+
+/** Zustand wird nie allein über Farbe gezeigt: zur Leuchte gehört das Wort. */
+const TON_WORT: Record<Feedback['tone'], string> = {
+  ok: 'OK',
+  warn: 'Achtung',
+  error: 'Fehler',
+  info: 'Info',
+}
+
+/** Phase des Geräts als Leuchte + Wort (laufend = Akzent, wie in der Fertigung). */
+const PHASE_ANZEIGE: Record<Phase, { led: string; wort: string }> = {
+  idle: { led: 'on', wort: 'Bereit' },
+  work: { led: 'on', wort: 'Erfassung' },
+  confirm: { led: 'warn', wort: 'Bestätigen' },
+  booking: { led: 'warn', wort: 'Bucht' },
+  done: { led: 'ok', wort: 'Gebucht' },
 }
 
 function playBeep(kind: 'ok' | 'warn' | 'error') {
@@ -66,7 +84,7 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
     refocus()
   }, [refocus, phase])
 
-  const say = useCallback((text: string, tone: Feedback['tone']) => {
+  const say = useCallback((text: ReactNode, tone: Feedback['tone']) => {
     setFeedback({ text, tone })
     if (tone === 'ok') playBeep('ok')
     if (tone === 'warn') playBeep('warn')
@@ -87,6 +105,10 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
 
   const complete = doc ? doc.lines.every((l) => (counts[l.moveId] ?? 0) >= Number(l.qty)) : false
   const anyScanned = Object.values(counts).some((c) => c > 0)
+  // Fortschritt als Kennzahl im Kopf: vollständige Positionen von allen.
+  const fertigeZeilen = doc
+    ? doc.lines.filter((l) => (counts[l.moveId] ?? 0) >= Number(l.qty)).length
+    : 0
 
   async function loadDoc(code: string) {
     const res = await fetch(`/api/scanner/lookup?code=${encodeURIComponent(code)}`)
@@ -100,7 +122,13 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
     setCounts(Object.fromEntries(loaded.lines.map((l) => [l.moveId, 0])))
     setProduceQty(loaded.remaining ?? 0)
     setPhase('work')
-    say(`${loaded.number} geladen — Positionen scannen oder Beleg erneut scannen`, 'ok')
+    say(
+      <>
+        <span className="mono">{loaded.number}</span> geladen — Positionen scannen oder Beleg erneut
+        scannen
+      </>,
+      'ok',
+    )
   }
 
   function scanProduct(code: string) {
@@ -110,16 +138,34 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
       (l) => l.barcode?.toLowerCase() === norm || l.sku?.toLowerCase() === norm,
     )
     if (!line) {
-      say(`"${code}" gehört nicht zu diesem Beleg`, 'error')
+      say(
+        <>
+          &quot;<span className="mono">{code}</span>&quot; gehört nicht zu diesem Beleg
+        </>,
+        'error',
+      )
       return
     }
     const current = counts[line.moveId] ?? 0
     if (current >= Number(line.qty)) {
-      say(`${line.product}: Sollmenge (${line.qty}) bereits erreicht`, 'warn')
+      say(
+        <>
+          {line.product}: Sollmenge (<span className="mono">{line.qty}</span>) bereits erreicht
+        </>,
+        'warn',
+      )
       return
     }
     setCounts((c) => ({ ...c, [line.moveId]: current + 1 }))
-    say(`${line.product}: ${current + 1} / ${line.qty}`, 'ok')
+    say(
+      <>
+        {line.product}:{' '}
+        <span className="mono">
+          {current + 1} / {line.qty}
+        </span>
+      </>,
+      'ok',
+    )
   }
 
   async function book() {
@@ -146,7 +192,12 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
       if (doc.type === 'picking') await validatePicking(doc.id, fd)
       else await produceMo(doc.id, fd)
       setPhase('done')
-      say(`${doc.number} gebucht`, 'ok')
+      say(
+        <>
+          <span className="mono">{doc.number}</span> gebucht
+        </>,
+        'ok',
+      )
       setTimeout(reset, 4000)
     } catch (err) {
       setPhase('confirm')
@@ -210,18 +261,50 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
         onBlur={refocus}
       />
 
-      {feedback && <div className={`scanner-feedback ${feedback.tone}`}>{feedback.text}</div>}
+      {feedback && (
+        // Der Punkt vor der Zeile ist die Leuchte, das Wort davor benennt den Ton.
+        <div className={`scanner-feedback ${feedback.tone}`}>
+          {/* `color: inherit` schlägt das --text-muted von .mono-label: das
+              Tonwort muss die Farbe der Rückmeldung tragen, sonst steht ein
+              graues Wort auf getönter Fläche (im dunklen Modus am schwächsten). */}
+          <span className="mono-label" style={{ color: 'inherit' }}>
+            {TON_WORT[feedback.tone]}
+          </span>
+          <span>{feedback.text}</span>
+        </div>
+      )}
 
       {phase === 'idle' && (
         <div className="scanner-idle">
-          <div className="scanner-icon" aria-hidden>▮▯▮▮▯</div>
+          {/* Ruhezustand als Geräteanzeige: dunkle Fläche, Leuchte, Wort. */}
+          <div className="display-panel">
+            <div className="display-head">
+              <span>Scanner-Eingang</span>
+              <span>
+                <span className="led on" /> {PHASE_ANZEIGE.idle.wort}
+              </span>
+            </div>
+            <div className="scanner-icon" aria-hidden style={{ color: 'var(--display-text)' }}>
+              ▮▯▮▮▯
+            </div>
+            <div className="mono-label">Warte auf Scan</div>
+          </div>
           <h2>Beleg scannen</h2>
           <p className="muted">
-            {canPickings && canMos
-              ? 'Transfer (WH/…) oder Fertigungsauftrag (MO/…) scannen, um zu starten.'
-              : canPickings
-                ? 'Transfer (WH/…) scannen, um zu starten.'
-                : 'Fertigungsauftrag (MO/…) scannen, um zu starten.'}
+            {canPickings && canMos ? (
+              <>
+                Transfer (<span className="mono">WH/…</span>) oder Fertigungsauftrag (
+                <span className="mono">MO/…</span>) scannen, um zu starten.
+              </>
+            ) : canPickings ? (
+              <>
+                Transfer (<span className="mono">WH/…</span>) scannen, um zu starten.
+              </>
+            ) : (
+              <>
+                Fertigungsauftrag (<span className="mono">MO/…</span>) scannen, um zu starten.
+              </>
+            )}
           </p>
           <p className="muted small">
             Ohne Scanner: Belegnummer eintippen und Enter drücken.
@@ -232,34 +315,68 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
       {doc && phase !== 'idle' && (
         <>
           <header className="scanner-head">
-            <div>
-              <span className="mono scanner-number">{doc.number}</span>
-              <span className="muted"> · {doc.label}</span>
-              {doc.sub && <span className="muted"> · {doc.sub}</span>}
-              {doc.type === 'mo' && doc.remaining !== undefined && (
-                <span className="muted"> · noch {doc.remaining} zu fertigen</span>
-              )}
+            {/* Belegkopf als Geräteanzeige: Nummer groß, Phase als Leuchte + Wort. */}
+            <div className="display-panel" style={{ flex: 1 }}>
+              <div className="display-head">
+                <span>Beleg</span>
+                <span>
+                  <span className={`led ${PHASE_ANZEIGE[phase].led}`} /> {PHASE_ANZEIGE[phase].wort}
+                </span>
+              </div>
+              <div className="mono scanner-number" style={{ color: 'var(--display-bright)' }}>
+                {doc.number}
+              </div>
+              <div className="muted small">
+                {doc.label}
+                {doc.sub ? ` · ${doc.sub}` : ''}
+              </div>
             </div>
-            <button className="small" type="button" onClick={reset}>
-              Abbrechen (Esc)
-            </button>
+            <div className="actions" style={{ gap: 16 }}>
+              <div>
+                <div className="mono-label">Positionen</div>
+                <div className="mono">
+                  {fertigeZeilen} / {doc.lines.length}
+                </div>
+              </div>
+              {doc.type === 'mo' && doc.remaining !== undefined && (
+                <div>
+                  <div className="mono-label">Rest zu fertigen</div>
+                  <div className="mono">{doc.remaining}</div>
+                </div>
+              )}
+              <Badge state={doc.state} kind={doc.type} />
+              <button className="small" type="button" onClick={reset}>
+                Abbrechen (Esc)
+              </button>
+            </div>
           </header>
 
           <div className="scanner-lines">
             {doc.lines.length === 0 && (
-              <div className="muted" style={{ padding: 24 }}>
-                Keine offenen Positionen — direkt bestätigen.
-              </div>
+              <div className="empty">Keine offenen Positionen — direkt bestätigen.</div>
             )}
             {doc.lines.map((l) => {
               const count = counts[l.moveId] ?? 0
               const full = count >= Number(l.qty)
+              // Vollständigkeit nie nur über die grüne Fläche: Leuchte + Wort.
+              const zeilenLed = full ? 'ok' : count > 0 ? 'warn' : 'off'
+              const zeilenWort = full ? 'vollständig' : count > 0 ? 'Teilmenge' : 'offen'
               return (
                 <div key={l.moveId} className={`scanner-line${full ? ' complete' : ''}`}>
                   <div className="scanner-line-info">
                     <div className="scanner-line-name">{l.product}</div>
                     <div className="muted small mono">
-                      {l.barcode ?? '—'} {l.sku ? `· ${l.sku}` : ''}
+                      <span className="mono-label">BC</span> {l.barcode ?? '—'}
+                      {l.sku ? (
+                        <>
+                          {' · '}
+                          <span className="mono-label">SKU</span> {l.sku}
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="actions">
+                      <span className={`led ${zeilenLed}`} />
+                      <span className="mono-label">{zeilenWort}</span>
                     </div>
                   </div>
                   <div className="scanner-line-qty">
@@ -274,7 +391,8 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
                     </button>
                     <span className={`scanner-count${full ? ' ok' : ''}`}>
                       {count}
-                      <span className="muted"> / {l.qty}</span>
+                      <span className="muted"> / {l.qty} </span>
+                      <span className="mono-label">{l.uom}</span>
                     </span>
                     <button
                       type="button"
@@ -301,7 +419,8 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
                       ? 'Weiter scannen — oder Beleg scannen, um mit Teilmengen abzuschließen.'
                       : 'Positionen scannen — oder Beleg erneut scannen, um alles wie geplant zu buchen.'}
                 </div>
-                <button type="button" className="primary big" onClick={() => onScan(doc.number)}>
+                {/* Diese Taste bucht nicht, sie wechselt nur in die Bestätigung: neutral. */}
+                <button type="button" className="big" onClick={() => onScan(doc.number)}>
                   Abschließen
                 </button>
               </>
@@ -323,8 +442,9 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
                     </label>
                   )}
                   {doc.type === 'mo' && anyScanned && !complete && (
-                    <div style={{ marginBottom: 8 }}>
-                      <label style={{ display: 'block' }}>
+                    <div>
+                      <div className="mono-label">Verbrauchsmodus</div>
+                      <label className="field">
                         <input
                           type="radio"
                           name="mo-modus"
@@ -333,7 +453,7 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
                         />{' '}
                         Sollmengen verbrauchen (Scans waren nur Kontrolle)
                       </label>
-                      <label style={{ display: 'block' }}>
+                      <label className="field">
                         <input
                           type="radio"
                           name="mo-modus"
@@ -361,14 +481,24 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
                   onClick={() => void book()}
                   disabled={phase === 'booking'}
                 >
-                  {phase === 'booking' ? 'Bucht…' : `${doc.number} jetzt buchen`}
+                  {phase === 'booking' ? (
+                    'Bucht…'
+                  ) : (
+                    <>
+                      <span className="mono">{doc.number}</span> jetzt buchen
+                    </>
+                  )}
                 </button>
               </>
             )}
 
             {phase === 'done' && (
               <>
-                <div className="scanner-done">✓ {doc.number} gebucht</div>
+                <div className="scanner-done actions">
+                  <span className="led ok" />
+                  <span className="mono-label">Gebucht</span>
+                  <span className="mono">{doc.number}</span>
+                </div>
                 <button type="button" className="big" onClick={reset}>
                   Nächster Beleg
                 </button>
