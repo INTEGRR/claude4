@@ -89,6 +89,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },
+            { href: '/einkauf/kurse', label: 'Wechselkurse' },
           ]
         : [],
     },
@@ -98,6 +99,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ? [
             { href: '/lager', label: 'Transfers', count: counts.offene_eingaenge },
             { href: '/lager/bestand', label: 'Bestand' },
+            { href: '/lager/bewertung', label: 'Bewertung' },
             { href: '/lager/beschaffung', label: 'Beschaffung', count: counts.beschaffung },
             { href: '/lager/lose', label: 'Lose & Serien' },
             { href: '/lager/inventur', label: 'Inventur' },

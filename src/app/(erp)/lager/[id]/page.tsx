@@ -5,6 +5,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { ResponsibleForm } from '@/components/responsible-form'
+import { LandedCosts } from '@/components/landed-costs'
 import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
 import { cancelPicking, checkAvailability, confirmPicking, returnPicking, updatePickingDetails, validatePicking } from '../actions'
@@ -278,6 +279,11 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
             </table>
           </TableWrap>
         </Card>
+      )}
+
+      {/* Nebenkosten nur beim Wareneingang: dort entsteht der Einstand. */}
+      {picking.kind === 'receipt' && picking.state === 'done' && (
+        <LandedCosts pickingId={id} />
       )}
 
       <RecordComments model="stock_picking" recordId={id} path={`/lager/${id}`} />

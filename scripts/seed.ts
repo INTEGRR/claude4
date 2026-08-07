@@ -232,12 +232,16 @@ async function main() {
       phone: '+49 911 1234567',
     })} where key = 'company'`
 
+    // Anfangsbestand bewerten, damit Bestandswert und Marge von Beginn an stimmen.
+    await sql`select valuation_initialize(null, 'seed')`
+
     console.log(`Beispieldaten angelegt:
   - 20 Komponenten mit Anfangsbestand, Barcodes und Lieferantenpreisen
   - Tastatur mit 3 Farbvarianten
   - Stückliste mit 20 Positionen, davon 6 farbabhängig gefiltert
   - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
-  - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)`)
+  - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)
+  - Anfangsbestand zum Einstandspreis bewertet`)
   } finally {
     await sql.end()
   }

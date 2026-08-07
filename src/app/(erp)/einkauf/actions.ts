@@ -229,3 +229,69 @@ export async function cancelBill(billId: string) {
   if (creditId) redirect(`/einkauf/rechnungen/${creditId}`)
   revalidatePath(`/einkauf/rechnungen/${billId}`)
 }
+
+// --- Einstandsnebenkosten (Landed Costs) -----------------------------------
+
+export async function createLandedCost(pickingId: string, formData: FormData) {
+  await requireWrite('einkauf')
+  const amount = Number(formData.get('amount') ?? 0)
+  if (!(amount > 0)) throw new Error('Bitte einen Betrag größer als 0 angeben')
+
+  const currency = String(formData.get('currency') ?? 'EUR')
+  try {
+    await sql`
+      insert into landed_costs
+        (number, picking_id, cost_type, basis, amount, currency, exchange_rate,
+         is_estimate, vendor_id, note)
+      values (
+        next_sequence('landed'), ${pickingId},
+        ${String(formData.get('cost_type') ?? 'freight')}::landed_cost_type,
+        ${String(formData.get('basis') ?? 'weight')}::landed_cost_basis,
+        ${amount}, ${currency},
+        exchange_rate_at(${currency}, current_date),
+        ${formData.get('is_estimate') === 'on'},
+        ${String(formData.get('vendor_id') ?? '') || null},
+        ${String(formData.get('note') ?? '').trim() || null})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath(`/lager/${pickingId}`)
+}
+
+export async function postLandedCost(costId: string, pickingId: string) {
+  const user = await requireWrite('einkauf')
+  try {
+    await sql`select landed_cost_post(${costId}, ${user.name})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath(`/lager/${pickingId}`)
+  revalidatePath('/lager/bewertung')
+}
+
+export async function cancelLandedCost(costId: string, pickingId: string) {
+  const user = await requireWrite('einkauf')
+  try {
+    await sql`select landed_cost_cancel(${costId}, ${user.name})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath(`/lager/${pickingId}`)
+  revalidatePath('/lager/bewertung')
+}
+
+/** Wechselkurs erfassen (1 Fremdwährung = rate Hauswährung). */
+export async function setExchangeRate(formData: FormData) {
+  await requireWrite('einkauf')
+  const currency = String(formData.get('currency') ?? '')
+  const rate = Number(formData.get('rate') ?? 0)
+  const validFrom = String(formData.get('valid_from') ?? '')
+  if (!currency || !(rate > 0)) throw new Error('Bitte Währung und Kurs angeben')
+
+  await sql`
+    insert into exchange_rates (currency, rate, valid_from, source)
+    values (${currency}, ${rate}, ${validFrom || null}::date, 'manuell')
+    on conflict (currency, valid_from) do update
+      set rate = excluded.rate, source = 'manuell'`
+  revalidatePath('/einkauf/kurse')
+}

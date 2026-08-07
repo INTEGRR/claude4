@@ -208,3 +208,14 @@ export async function executeOrderpoint(orderpointId: string) {
   revalidatePath('/einkauf')
   revalidatePath('/fertigung')
 }
+
+/**
+ * Eröffnungsbewertung: bewertet Altbestand, der vor Einführung der
+ * Wertschicht entstanden ist, zum hinterlegten Einstandspreis.
+ */
+export async function initializeValuation() {
+  const user = await requireWrite('lager')
+  await sql`select valuation_initialize(null, ${user.name})`
+  revalidatePath('/lager/bewertung')
+  revalidatePath('/auswertungen')
+}
