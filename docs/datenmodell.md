@@ -484,3 +484,24 @@ create table shopify_unmatched_lines (                       -- Zeilen ohne SKU-
 | `unbuild(id)` | Fertigprodukt −, Komponenten + (mit Negativbestands-Warnung) |
 | `apply_inventory_count(id)` | Korrektur-Move gegen Inventurdifferenz-Ort |
 | `repair_transition(id, action)` | Reparatur-Statusmaschine inkl. Teile-Buchungen |
+
+## 9. Erweiterungen aus dem zweiten Ausbau (Migrationen 0011–0017)
+
+Dieses Dokument beschreibt den Kernstand. Später ergänzt (Details in
+[module/odoo-vervollstaendigung.md](module/odoo-vervollstaendigung.md) und
+den Migrationen selbst — die Migrationen sind die verbindliche Quelle):
+
+- **0011** Rollen `lager`/`fertigung` (user_role)
+- **0012** `product_categories`, `taxes`, `payment_terms`, `incoterms`,
+  `tags` (+ vier Link-Tabellen), `bom_byproducts`; Zusatzfelder an
+  `partners` (Hierarchie/Typ, Verkäufer, Zahlungsbedingungen, …),
+  `product_templates` (Kategorie, Steuern, sale_delay, HS-Code, …),
+  `vendor_prices` (Rabatt, Gültigkeit)
+- **0013/0014** Statuswerte `started`/`upselling`/`by_date`; Belegfelder
+  auf Verkauf/Einkauf/Rechnung/Transfer/MO/Reparatur inkl. Kit-Explosion,
+  Steuer-Schnappschuss, 3-Way-Matching, Fälligkeit aus Zahlungsbedingung
+- **0015** `stock_orderpoints` + `orderpoint_suggestions()/execute()`
+- **0016** `api_transactions` (Ereignis-Monitor), Queue-Härtung
+  (`last_result`, `started_at`, `reap_stuck_jobs()`), Webhook-Backoff
+- **0017** `stock_lots`, `move_lot_assignments`, `stock_lot_quants`,
+  `tracking` am Produkt; `move_done`/`mo_produce` um die Los-Dimension
