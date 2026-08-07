@@ -76,7 +76,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **mv_supplier_otd**: Liefertreue je Lieferant und Monat (vendor_id, vendor, lines, delivered, on_time, overdue, avg_delay_days, qty_ordered, qty_received).
 - **mv_rma_analysis**: RMA je Monat und Variante (rma_count, repaired, cancelled, parts_used, qty_delivered, rma_rate in Prozent).
 - **mv_labor_hours**: Minuten und Lohnkosten je Monat, Mitarbeiter, Art und Arbeitsplatz.
-- Stand der Berechnung: `select value ->> 'refreshed_at' from settings where key = 'analytics'`.
+- Stand der Berechnung: settings.value ->> 'refreshed_at' für key = 'analytics'.
 
 ### Sonstiges
 - **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at).
