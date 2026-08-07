@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { ResponsibleForm } from '@/components/responsible-form'
 import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
-import { cancelMo, checkAvailability, confirmMo, produceMo, startMo } from '../actions'
+import { cancelMo, checkAvailability, confirmMo, produceMo, startMo, updateMoDetails } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,10 +31,14 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       backorder_of_number: string | null
       uom: string
       consumption: string
+      user_id: string | null
+      priority: string
+      origin: string | null
     }[]
   >`
     select mo.id, mo.number, variant_display_name(mo.variant_id) as product, mo.variant_id,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date, mo.date_done,
+           mo.user_id, mo.priority, mo.origin,
            mo.sales_order_id, so.number as sales_order_number,
            bo.number as backorder_of_number, u.name as uom, b.consumption
     from manufacturing_orders mo
@@ -111,6 +116,9 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
           </>
         }
       />
+      <div style={{ marginBottom: 12 }}>
+        <ResponsibleForm action={updateMoDetails.bind(null, id)} userId={mo.user_id} priority={mo.priority} />
+      </div>
 
       {mo.state === 'done' && (
         <div className="notice success">

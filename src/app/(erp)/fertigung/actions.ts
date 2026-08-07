@@ -171,3 +171,14 @@ export async function setBomConsumption(bomId: string, formData: FormData) {
   await sql`update boms set consumption = ${value}::consumption_rule where id = ${bomId}`
   revalidatePath(`/fertigung/stuecklisten/${bomId}`)
 }
+
+/** Verantwortlichen und Priorität des Fertigungsauftrags setzen. */
+export async function updateMoDetails(moId: string, formData: FormData) {
+  await requireWrite('fertigung')
+  await sql`
+    update manufacturing_orders set
+      user_id = ${String(formData.get('user_id') ?? '') || null},
+      priority = ${formData.get('priority') === 'on' ? '1' : '0'}
+    where id = ${moId}`
+  revalidatePath(`/fertigung/${moId}`)
+}

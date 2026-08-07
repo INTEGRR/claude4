@@ -38,6 +38,24 @@ export async function cancelOrder(orderId: string) {
   revalidatePath('/verkauf')
 }
 
+/** Kopffelder: Verkäufer, Kundenreferenz, Termine, Zahlungsbedingung, Incoterm. */
+export async function updateOrderHeader(orderId: string, formData: FormData) {
+  await requireWrite('verkauf')
+  const commitment = String(formData.get('commitment_date') ?? '')
+  const validity = String(formData.get('validity_date') ?? '')
+  await sql`
+    update sales_orders set
+      user_id = ${String(formData.get('user_id') ?? '') || null},
+      client_order_ref = ${String(formData.get('client_order_ref') ?? '').trim() || null},
+      commitment_date = ${commitment ? new Date(commitment).toISOString() : null},
+      validity_date = ${validity || null},
+      payment_term_id = ${String(formData.get('payment_term_id') ?? '') || null},
+      incoterm_code = ${String(formData.get('incoterm_code') ?? '') || null},
+      incoterm_location = ${String(formData.get('incoterm_location') ?? '').trim() || null}
+    where id = ${orderId} and state <> 'cancel' and not locked`
+  revalidatePath(`/verkauf/${orderId}`)
+}
+
 export async function setLocked(orderId: string, locked: boolean) {
   const user = await requireWrite('verkauf')
   await sql`update sales_orders set locked = ${locked} where id = ${orderId} and state = 'sale'`

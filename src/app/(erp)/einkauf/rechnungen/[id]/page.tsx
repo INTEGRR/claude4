@@ -6,7 +6,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { money, qty } from '@/modules/shared/format'
-import { cancelBill, payBill, postBill, setBillDate } from '../../actions'
+import { cancelBill, payBill, postBill, setBillChecked, setBillDate } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,10 +30,15 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
       tax: number
       gross: number
       reversed_number: string | null
+      due_date: string | null
+      payment_term_id: string | null
+      payment_reference: string | null
+      checked: boolean
+      match_state: string
     }[]
   >`
     select b.*, p.name as vendor, po.number as po_number, t.net, t.tax, t.gross,
-           rb.number as reversed_number
+           rb.number as reversed_number, vendor_bill_match_state(b.id) as match_state
     from vendor_bills b
     join partners p on p.id = b.vendor_id
     left join purchase_orders po on po.id = b.purchase_order_id
@@ -46,6 +51,17 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
   const lines = await sql<{ id: string; name: string; qty: number; price_unit: number; tax_rate: number }[]>`
     select id, name, qty, price_unit, tax_rate from vendor_bill_lines
     where bill_id = ${id} order by created_at`
+
+  const terms = await sql<{ id: string; name: string }[]>`
+    select id, name from payment_terms where active order by sequence, nb_days`
+
+  // 3-Way-Matching-Ampel: Bestellung <-> Wareneingang <-> Rechnung
+  const MATCH = {
+    yes: { label: 'Zahlung freigegeben', tone: 'success' },
+    no: { label: 'Wareneingang fehlt', tone: 'warn' },
+    exception: { label: 'Mehr berechnet als erhalten', tone: 'danger' },
+  } as Record<string, { label: string; tone: string }>
+  const match = MATCH[bill.match_state] ?? MATCH.yes
 
 
   return (
@@ -64,11 +80,19 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
               <> · Bestellung <Link href={`/einkauf/${bill.purchase_order_id}`}>{bill.po_number}</Link></>
             )}
             {bill.reversed_number && <> · storniert {bill.reversed_number}</>}
+            {bill.due_date && <> · fällig {bill.due_date}</>}
+            {bill.payment_reference && <> · Verwendungszweck {bill.payment_reference}</>}
           </>
         }
         actions={
           <>
             <Badge state={bill.state} kind="bill" />
+            {bill.po_number && <span className={`badge ${match.tone}`}>{match.label}</span>}
+            {bill.checked ? (
+              <ActionButton action={setBillChecked.bind(null, id, false)}>✓ Geprüft</ActionButton>
+            ) : (
+              <ActionButton action={setBillChecked.bind(null, id, true)}>Als geprüft markieren</ActionButton>
+            )}
             {bill.state === 'draft' && (
               <ActionButton className="primary" action={postBill.bind(null, id)}>Buchen</ActionButton>
             )}
@@ -103,6 +127,19 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
               <label className="field" style={{ flex: 2 }}>
                 <span>Rechnungsnummer des Lieferanten</span>
                 <input name="vendor_bill_reference" defaultValue={bill.vendor_bill_reference ?? ''} />
+              </label>
+              <label className="field">
+                <span>Zahlungsbedingung</span>
+                <select name="payment_term_id" defaultValue={bill.payment_term_id ?? ''}>
+                  <option value="">—</option>
+                  {terms.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Verwendungszweck</span>
+                <input name="payment_reference" defaultValue={bill.payment_reference ?? ''} />
               </label>
               <div className="shrink field">
                 <button type="submit">Speichern</button>

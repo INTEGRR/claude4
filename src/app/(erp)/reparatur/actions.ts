@@ -112,3 +112,14 @@ export async function createQuotation(repairId: string) {
   }
   redirect(`/verkauf/${orderId}`)
 }
+
+/** Verantwortlichen und Priorität setzen (repair.order.user_id/priority). */
+export async function updateRepairDetails(repairId: string, formData: FormData) {
+  await requireWrite('reparatur')
+  await sql`
+    update repair_orders set
+      user_id = ${String(formData.get('user_id') ?? '') || null},
+      priority = ${formData.get('priority') === 'on' ? '1' : '0'}
+    where id = ${repairId}`
+  revalidatePath(`/reparatur/${repairId}`)
+}

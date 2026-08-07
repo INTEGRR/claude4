@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { ResponsibleForm } from '@/components/responsible-form'
 import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
-import { cancelPicking, checkAvailability, confirmPicking, returnPicking, validatePicking } from '../actions'
+import { cancelPicking, checkAvailability, confirmPicking, returnPicking, updatePickingDetails, validatePicking } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,11 +31,14 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       backorder_of: string | null
       return_of: string | null
       note: string | null
+      user_id: string | null
+      priority: string
     }[]
   >`
     select p.id, p.number, ot.kind, ot.name as type_name, p.state, part.name as partner,
            p.origin_model, p.origin_id, p.origin_label, p.scheduled_date, p.date_done,
-           bo.number as backorder_of, ro.number as return_of, p.note
+           bo.number as backorder_of, ro.number as return_of, p.note,
+           p.user_id, p.priority
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
     left join partners part on part.id = p.partner_id
@@ -128,6 +132,9 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
           </>
         }
       />
+      <div style={{ marginBottom: 12 }}>
+        <ResponsibleForm action={updatePickingDetails.bind(null, id)} userId={picking.user_id} priority={picking.priority} />
+      </div>
 
       {picking.state === 'done' && (
         <div className="notice success">

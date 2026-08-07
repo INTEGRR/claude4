@@ -132,3 +132,14 @@ export async function scrapProduct(formData: FormData) {
   }
   revalidatePath('/lager/bestand')
 }
+
+/** Verantwortlichen und Priorität des Transfers setzen (stock.picking). */
+export async function updatePickingDetails(pickingId: string, formData: FormData) {
+  await requireWrite('lager')
+  await sql`
+    update stock_pickings set
+      user_id = ${String(formData.get('user_id') ?? '') || null},
+      priority = ${formData.get('priority') === 'on' ? '1' : '0'}
+    where id = ${pickingId}`
+  revalidatePath(`/lager/${pickingId}`)
+}

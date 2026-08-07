@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { ResponsibleForm } from '@/components/responsible-form'
+import { TagEditor } from '@/components/tag-editor'
 import { RecordComments } from '@/components/record-comments'
 import { date, qty } from '@/modules/shared/format'
 import {
@@ -14,6 +16,7 @@ import {
   endRepair,
   removePart,
   startRepair,
+  updateRepairDetails,
 } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -42,11 +45,14 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
       note: string | null
       sales_order_id: string | null
       sales_order_number: string | null
+      user_id: string | null
+      priority: string
     }[]
   >`
     select r.id, r.number, p.name as customer, r.partner_id,
            variant_display_name(r.variant_id) as product, r.qty, r.under_warranty, r.state,
-           r.scheduled_date, r.note, r.sales_order_id, so.number as sales_order_number
+           r.scheduled_date, r.note, r.sales_order_id, so.number as sales_order_number,
+           r.user_id, r.priority
     from repair_orders r
     join partners p on p.id = r.partner_id
     left join sales_orders so on so.id = r.sales_order_id
@@ -124,6 +130,11 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
           </>
         }
       />
+
+      <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <ResponsibleForm action={updateRepairDetails.bind(null, id)} userId={repair.user_id} priority={repair.priority} />
+        <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
+      </div>
 
       {repair.note && <div className="notice info">Fehlerbeschreibung: {repair.note}</div>}
 

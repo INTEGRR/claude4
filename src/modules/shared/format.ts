@@ -57,6 +57,7 @@ export const LABELS = {
   },
   delivery: {
     pending: 'Nicht geliefert',
+    started: 'Lieferung begonnen',
     partial: 'Teilweise geliefert',
     full: 'Vollständig geliefert',
   },
@@ -64,6 +65,7 @@ export const LABELS = {
     no: 'Nichts abzurechnen',
     to_invoice: 'Abzurechnen',
     invoiced: 'Vollständig abgerechnet',
+    upselling: 'Mehr geliefert als bestellt',
   },
   purchase: {
     draft: 'Angebotsanfrage',
@@ -141,6 +143,8 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'failure':
       return 'danger'
     case 'waiting':
+    case 'started':
+    case 'upselling':
     case 'to_invoice':
     case 'partial':
     case 'to_close':

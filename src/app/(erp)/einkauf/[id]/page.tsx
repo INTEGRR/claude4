@@ -14,6 +14,7 @@ import {
   lockPo,
   removePoLine,
   sendPoEmail,
+  updatePoHeader,
 } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -54,14 +55,32 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       qty: number
       uom: string
       price_unit: number
+      discount: number
       qty_received: number
       qty_billed: number
       tax_rate: number
+      subtotal: number
     }[]
   >`
-    select l.id, l.name, l.qty, u.name as uom, l.price_unit, l.qty_received, l.qty_billed, l.tax_rate
+    select l.id, l.name, l.qty, u.name as uom, l.price_unit, l.discount,
+           l.qty_received, l.qty_billed, l.tax_rate, purchase_line_subtotal(l) as subtotal
     from purchase_order_lines l join uoms u on u.id = l.uom_id
     where l.order_id = ${id} order by l.sequence`
+
+  const kopf = (order as unknown) as {
+    user_id: string | null
+    payment_term_id: string | null
+    incoterm_code: string | null
+    priority: string
+    receipt_reminder_email: boolean
+    reminder_date_before_receipt: number
+  }
+  const benutzer = await sql<{ id: string; name: string }[]>`
+    select id, name from users where active order by name`
+  const terms = await sql<{ id: string; name: string }[]>`
+    select id, name from payment_terms where active order by sequence, nb_days`
+  const incoterms = await sql<{ code: string; name: string }[]>`
+    select code, name from incoterms order by code`
 
   const receipts = await sql<{ id: string; number: string; state: string; date_done: string | null }[]>`
     select id, number, state, date_done from stock_pickings
@@ -126,6 +145,63 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         <div className="notice info">Die Bestellung ist gesperrt. Zum Bearbeiten bitte entsperren.</div>
       )}
 
+      <Card title="Details">
+        <ActionForm action={updatePoHeader.bind(null, id)}>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field">
+              <span>Einkäufer</span>
+              <select name="user_id" defaultValue={kopf.user_id ?? ''}>
+                <option value="">—</option>
+                {benutzer.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Zahlungsbedingung</span>
+              <select name="payment_term_id" defaultValue={kopf.payment_term_id ?? ''}>
+                <option value="">— vom Lieferanten —</option>
+                {terms.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Incoterm</span>
+              <select name="incoterm_code" defaultValue={kopf.incoterm_code ?? ''}>
+                <option value="">—</option>
+                {incoterms.map((i) => (
+                  <option key={i.code} value={i.code}>{i.code} — {i.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="shrink field">
+              <input type="checkbox" name="priority" defaultChecked={kopf.priority === '1'} /> Dringend
+            </label>
+            <label className="shrink field">
+              <input
+                type="checkbox"
+                name="receipt_reminder_email"
+                defaultChecked={kopf.receipt_reminder_email}
+              />{' '}
+              Empfangserinnerung
+            </label>
+            <label className="field" style={{ maxWidth: 130 }}>
+              <span>Tage vorher</span>
+              <input
+                type="number"
+                name="reminder_date_before_receipt"
+                min="0"
+                defaultValue={kopf.reminder_date_before_receipt}
+              />
+            </label>
+            <div className="shrink field">
+              <button type="submit">Speichern</button>
+            </div>
+          </div>
+        </ActionForm>
+      </Card>
+
       <Card title="Positionen" tight>
         {lines.length === 0 ? (
           <Empty>Noch keine Positionen.</Empty>
@@ -140,6 +216,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   <th className="num">Erhalten</th>
                   <th className="num">Abgerechnet</th>
                   <th className="num">Preis</th>
+                  <th className="num">Rabatt</th>
                   <th className="num">Netto</th>
                   {editable && <th />}
                 </tr>
@@ -167,7 +244,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                       )}
                     </td>
                     <td className="num">{money(l.price_unit, order.currency)}</td>
-                    <td className="num">{money(Number(l.qty) * Number(l.price_unit), order.currency)}</td>
+                    <td className="num">{Number(l.discount) > 0 ? `${qty(l.discount)} %` : '—'}</td>
+                    <td className="num">{money(l.subtotal, order.currency)}</td>
                     {editable && (
                       <td className="num">
                         <ActionButton className="small danger" action={removePoLine.bind(null, id, l.id)}>
@@ -180,12 +258,12 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={6} className="num muted">Netto</td>
+                  <td colSpan={7} className="num muted">Netto</td>
                   <td className="num">{money(order.net, order.currency)}</td>
                   {editable && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={6} className="num" style={{ fontWeight: 650 }}>Gesamt (brutto)</td>
+                  <td colSpan={7} className="num" style={{ fontWeight: 650 }}>Gesamt (brutto)</td>
                   <td className="num" style={{ fontWeight: 650 }}>{money(order.gross, order.currency)}</td>
                   {editable && <td />}
                 </tr>
@@ -214,6 +292,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 <label className="field">
                   <span>Preis (optional)</span>
                   <input type="number" name="price_unit" step="0.01" placeholder="aus Preisliste" />
+                </label>
+                <label className="field">
+                  <span>Rabatt % (optional)</span>
+                  <input type="number" name="discount" step="0.1" min="0" max="100" placeholder="aus Preisliste" />
                 </label>
                 <div className="shrink field">
                   <button className="primary" type="submit">Hinzufügen</button>

@@ -39,22 +39,48 @@ export async function addPoLine(orderId: string, formData: FormData) {
     where pv.id = ${variantId}`
   if (!info) throw new Error('Produkt nicht gefunden')
 
-  // Preis aus der Lieferantenpreisliste, sonst Standardkosten.
-  const [vendorPrice] = await sql<{ price: number | null }[]>`
-    select (best_vendor_price(${variantId}, ${order.vendor_id}, ${quantity})).price as price`
+  // Preis + Rabatt aus der Lieferantenpreisliste, sonst Standardkosten.
+  const [vendorPrice] = await sql<{ price: number | null; discount: number | null }[]>`
+    select (best_vendor_price(${variantId}, ${order.vendor_id}, ${quantity})).price as price,
+           (best_vendor_price(${variantId}, ${order.vendor_id}, ${quantity})).discount as discount`
 
   const priceInput = formData.get('price_unit')
   const price =
     priceInput !== null && priceInput !== ''
       ? Number(priceInput)
       : Number(vendorPrice?.price ?? info.cost ?? 0)
+  const discountInput = formData.get('discount')
+  const discount =
+    discountInput !== null && discountInput !== ''
+      ? Number(discountInput)
+      : Number(vendorPrice?.discount ?? 0)
 
   await sql`
-    insert into purchase_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit)
-    values (${orderId},
-            coalesce((select max(sequence) + 10 from purchase_order_lines where order_id = ${orderId}), 10),
-            ${variantId}, ${info.name}, ${quantity}, ${info.purchase_uom}, ${price})`
+    insert into purchase_order_lines
+      (order_id, sequence, variant_id, name, qty, uom_id, price_unit, discount, tax_id, tax_rate)
+    select ${orderId},
+           coalesce((select max(sequence) + 10 from purchase_order_lines where order_id = ${orderId}), 10),
+           ${variantId}, ${info.name}, ${quantity}, ${info.purchase_uom}, ${price}, ${discount},
+           pt.purchase_tax_id,
+           coalesce((select amount from taxes where id = pt.purchase_tax_id), 19)
+    from product_variants pv join product_templates pt on pt.id = pv.template_id
+    where pv.id = ${variantId}`
 
+  revalidatePath(`/einkauf/${orderId}`)
+}
+
+/** Kopffelder: Einkäufer, Zahlungsbedingung, Incoterm, Priorität, Erinnerung. */
+export async function updatePoHeader(orderId: string, formData: FormData) {
+  await requireWrite('einkauf')
+  await sql`
+    update purchase_orders set
+      user_id = ${String(formData.get('user_id') ?? '') || null},
+      payment_term_id = ${String(formData.get('payment_term_id') ?? '') || null},
+      incoterm_code = ${String(formData.get('incoterm_code') ?? '') || null},
+      priority = ${formData.get('priority') === 'on' ? '1' : '0'},
+      receipt_reminder_email = ${formData.get('receipt_reminder_email') === 'on'},
+      reminder_date_before_receipt = ${Number(formData.get('reminder_date_before_receipt') ?? 1)}
+    where id = ${orderId} and state <> 'cancel'`
   revalidatePath(`/einkauf/${orderId}`)
 }
 
@@ -158,8 +184,19 @@ export async function setBillDate(billId: string, formData: FormData) {
   await sql`
     update vendor_bills set
       bill_date = ${billDate || null}::date,
-      vendor_bill_reference = ${reference || null}
+      vendor_bill_reference = ${reference || null},
+      payment_term_id = ${String(formData.get('payment_term_id') ?? '') || null},
+      payment_reference = ${String(formData.get('payment_reference') ?? '').trim() || null}
     where id = ${billId} and state = 'draft'`
+  revalidatePath(`/einkauf/rechnungen/${billId}`)
+}
+
+/** Prüf-Flag der Rechnung (Odoo: account.move.checked). */
+export async function setBillChecked(billId: string, checked: boolean) {
+  const user = await requireWrite('einkauf')
+  await sql`update vendor_bills set checked = ${checked} where id = ${billId}`
+  await sql`select log_event('vendor_bill', ${billId}, 'note',
+    ${checked ? 'Als geprüft markiert' : 'Prüfmarkierung entfernt'}, ${user.name})`
   revalidatePath(`/einkauf/rechnungen/${billId}`)
 }
 

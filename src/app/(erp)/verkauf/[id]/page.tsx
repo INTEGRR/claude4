@@ -6,6 +6,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { date, money, qty } from '@/modules/shared/format'
+import { TagEditor } from '@/components/tag-editor'
 import {
   addLine,
   cancelOrder,
@@ -13,6 +14,7 @@ import {
   removeLine,
   resetToDraft,
   setLocked,
+  updateOrderHeader,
 } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -56,6 +58,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     where so.id = ${id}`
 
   if (!order) notFound()
+
+  const kopf = (order as unknown) as {
+    user_id: string | null
+    client_order_ref: string | null
+    commitment_date: string | null
+    validity_date: string | null
+    payment_term_id: string | null
+    incoterm_code: string | null
+    incoterm_location: string | null
+  }
+  const benutzer = await sql<{ id: string; name: string }[]>`
+    select id, name from users where active order by name`
+  const terms = await sql<{ id: string; name: string }[]>`
+    select id, name from payment_terms where active order by sequence, nb_days`
+  const incoterms = await sql<{ code: string; name: string }[]>`
+    select code, name from incoterms order by code`
 
   const lines = await sql<
     {
@@ -160,6 +178,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
+      <div style={{ marginBottom: 12 }}>
+        <TagEditor model="sales_order" recordId={id} path={`/verkauf/${id}`} />
+      </div>
+
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Card title="Lieferstatus">
           <Badge state={order.delivery_status} kind="delivery" />
@@ -177,6 +199,71 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </div>
         </Card>
       </div>
+
+      <Card title="Details">
+        <ActionForm action={updateOrderHeader.bind(null, id)}>
+          <div className="row">
+            <label className="field">
+              <span>Verkäufer</span>
+              <select name="user_id" defaultValue={kopf.user_id ?? ''} disabled={!editable}>
+                <option value="">—</option>
+                {benutzer.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Kundenreferenz</span>
+              <input name="client_order_ref" defaultValue={kopf.client_order_ref ?? ''} disabled={!editable} />
+            </label>
+            <label className="field">
+              <span>Zugesagter Liefertermin</span>
+              <input
+                type="date"
+                name="commitment_date"
+                defaultValue={kopf.commitment_date?.slice(0, 10) ?? ''}
+                disabled={!editable}
+              />
+            </label>
+            <label className="field">
+              <span>Angebot gültig bis</span>
+              <input
+                type="date"
+                name="validity_date"
+                defaultValue={kopf.validity_date?.slice(0, 10) ?? ''}
+                disabled={!editable}
+              />
+            </label>
+            <label className="field">
+              <span>Zahlungsbedingung</span>
+              <select name="payment_term_id" defaultValue={kopf.payment_term_id ?? ''} disabled={!editable}>
+                <option value="">—</option>
+                {terms.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Incoterm</span>
+              <select name="incoterm_code" defaultValue={kopf.incoterm_code ?? ''} disabled={!editable}>
+                <option value="">—</option>
+                {incoterms.map((i) => (
+                  <option key={i.code} value={i.code}>{i.code} — {i.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Incoterm-Ort</span>
+              <input name="incoterm_location" defaultValue={kopf.incoterm_location ?? ''} disabled={!editable} />
+            </label>
+            {editable && (
+              <div className="shrink field">
+                <button type="submit">Speichern</button>
+              </div>
+            )}
+          </div>
+        </ActionForm>
+      </Card>
 
       <Card title="Positionen" tight>
         {lines.length === 0 ? (
