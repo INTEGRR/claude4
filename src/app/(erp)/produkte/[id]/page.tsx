@@ -195,6 +195,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 ))}
               </select>
             </label>
+            <label className="field">
+              <span>Rückverfolgung</span>
+              <select name="tracking" defaultValue={(tpl as { tracking?: string }).tracking ?? 'none'}>
+                <option value="none">keine</option>
+                <option value="lot">Losnummern (Chargen)</option>
+                <option value="serial">Seriennummern</option>
+              </select>
+            </label>
           </div>
           <div className="row">
             <label className="field">

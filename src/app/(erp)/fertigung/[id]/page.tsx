@@ -34,11 +34,13 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       user_id: string | null
       priority: string
       origin: string | null
+      tracking: string
     }[]
   >`
     select mo.id, mo.number, variant_display_name(mo.variant_id) as product, mo.variant_id,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date, mo.date_done,
            mo.user_id, mo.priority, mo.origin,
+           product_tracking(mo.variant_id) as tracking,
            mo.sales_order_id, so.number as sales_order_number,
            bo.number as backorder_of_number, u.name as uom, b.consumption
     from manufacturing_orders mo
@@ -193,6 +195,12 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                   required
                 />
               </label>
+              {mo.tracking !== 'none' && (
+                <label className="field" style={{ maxWidth: 260 }}>
+                  <span>{mo.tracking === 'serial' ? 'Seriennummer (leer = automatisch)' : 'Losnummer (leer = automatisch)'}</span>
+                  <input name="lot" placeholder={mo.tracking === 'serial' ? 'nur bei Menge 1' : 'z. B. CHARGE-2026-01'} />
+                </label>
+              )}
               <label className="field">
                 <span>Bei Teilmenge</span>
                 <select name="backorder" defaultValue="yes">

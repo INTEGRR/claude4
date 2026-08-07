@@ -57,9 +57,10 @@ export async function produceMo(moId: string, formData: FormData) {
   const backorder = formData.get('backorder') !== 'no'
 
   const consumed = parseQtyMap(formData, 'consumed_')
+  const lot = String(formData.get('lot') ?? '').trim() || null
 
   try {
-    await sql`select mo_produce(${moId}, ${qty}, ${sql.json(consumed)}, ${backorder}, ${user.name})`
+    await sql`select mo_produce(${moId}, ${qty}, ${sql.json(consumed)}, ${backorder}, ${user.name}, ${lot})`
   } catch (err) {
     fail(err)
   }

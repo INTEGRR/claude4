@@ -67,7 +67,8 @@ export async function updateProduct(templateId: string, formData: FormData) {
         description_sale = ${String(formData.get('description_sale') ?? '').trim() || null},
         description_purchase = ${String(formData.get('description_purchase') ?? '').trim() || null},
         description_picking = ${String(formData.get('description_picking') ?? '').trim() || null},
-        responsible_id = ${String(formData.get('responsible_id') ?? '') || null}
+        responsible_id = ${String(formData.get('responsible_id') ?? '') || null},
+        tracking = ${String(formData.get('tracking') ?? 'none')}
       where id = ${templateId}`
   } catch (err) {
     fail(err)

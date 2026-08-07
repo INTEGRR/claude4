@@ -94,6 +94,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             { href: '/lager', label: 'Transfers', count: counts.offene_eingaenge },
             { href: '/lager/bestand', label: 'Bestand' },
             { href: '/lager/beschaffung', label: 'Beschaffung', count: counts.beschaffung },
+            { href: '/lager/lose', label: 'Lose & Serien' },
             { href: '/lager/inventur', label: 'Inventur' },
           ]
         : [],

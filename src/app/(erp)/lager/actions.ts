@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
-import { parseQtyMap } from '@/modules/shared/form'
+import { parseLotSpec, parseQtyMap } from '@/modules/shared/form'
 import { queueFulfillmentForPicking } from '@/modules/versand/service'
 
 function fail(err: unknown): never {
@@ -17,6 +17,20 @@ export async function validatePicking(pickingId: string, formData: FormData) {
   const backorder = formData.get('backorder') !== 'no'
 
   try {
+    // Explizit erfasste Lose/Seriennummern vor der Buchung zuordnen
+    // (leere Felder überlassen die Zuteilung der Automatik in move_done).
+    for (const [key, value] of formData.entries()) {
+      if (!key.startsWith('lots_') || typeof value !== 'string' || !value.trim()) continue
+      const moveId = key.slice('lots_'.length)
+      const [row] = await sql<{ tracking: 'lot' | 'serial' | 'none' }[]>`
+        select product_tracking(variant_id) as tracking from stock_moves where id = ${moveId}`
+      if (!row || row.tracking === 'none') continue
+      const lots = parseLotSpec(value, row.tracking)
+      await sql`select set_move_lots(${moveId}, ${sql.json(lots as never)})`
+      // Erfasste Lose bestimmen die Ist-Menge, wenn keine explizit angegeben ist.
+      if (!(moveId in done)) done[moveId] = lots.reduce((sum, l) => sum + l.qty, 0)
+    }
+
     await sql`select picking_validate(${pickingId}, ${sql.json(done)}, ${backorder})`
   } catch (err) {
     fail(err)

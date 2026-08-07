@@ -24,3 +24,45 @@ export function parseQtyMap(formData: FormData, prefix: string): Record<string, 
 
   return result
 }
+
+export interface LotEntry {
+  name: string
+  qty: number
+}
+
+/**
+ * Los-/Serieneingabe aus einem Textfeld:
+ *  - Serie:  "SN-001, SN-002, SN-003"          (je Menge 1)
+ *  - Los:    "CHARGE-A:10, CHARGE-B:2,5"       (NAME:MENGE, Komma dezimal ok)
+ * Leere Eingabe => leere Liste (dann greift die automatische Zuteilung).
+ */
+export function parseLotSpec(value: string, tracking: 'lot' | 'serial'): LotEntry[] {
+  const teile = value.split(',').map((t) => t.trim()).filter(Boolean)
+
+  if (tracking === 'serial') {
+    return teile.map((name) => ({ name, qty: 1 }))
+  }
+
+  // Los: NAME:MENGE — Vorsicht mit Dezimalkomma: erst an ":" trennen,
+  // dann gehört ein rein numerischer Folgeteil ("5") zur Menge davor.
+  const entries: LotEntry[] = []
+  for (const teil of teile) {
+    const doppelpunkt = teil.lastIndexOf(':')
+    if (doppelpunkt === -1) {
+      if (/^\d+$/.test(teil) && entries.length > 0) {
+        // Nachkommateil eines Dezimalkommas: "CHARGE:2,5"
+        const prev = entries[entries.length - 1]
+        prev.qty = Number(`${prev.qty}.${teil}`)
+        continue
+      }
+      throw new Error(`Losangabe "${teil}" braucht das Format NAME:MENGE`)
+    }
+    const name = teil.slice(0, doppelpunkt).trim()
+    const qty = Number(teil.slice(doppelpunkt + 1).replace(',', '.'))
+    if (!name || !Number.isFinite(qty) || qty <= 0) {
+      throw new Error(`Losangabe "${teil}" braucht das Format NAME:MENGE`)
+    }
+    entries.push({ name, qty })
+  }
+  return entries
+}

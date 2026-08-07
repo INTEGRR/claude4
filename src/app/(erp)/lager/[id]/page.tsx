@@ -60,12 +60,19 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       state: string
       src: string
       dest: string
+      tracking: string
+      lots: string | null
     }[]
   >`
     select m.id, variant_display_name(m.variant_id) as product, pv.sku, m.qty, m.qty_done,
-           m.reserved_qty, u.name as uom, m.state, src.full_path as src, dst.full_path as dest
+           m.reserved_qty, u.name as uom, m.state, src.full_path as src, dst.full_path as dest,
+           pt.tracking,
+           (select string_agg(sl.name || ' × ' || round(a.qty, 2), ', ' order by sl.name)
+            from move_lot_assignments a join stock_lots sl on sl.id = a.lot_id
+            where a.move_id = m.id) as lots
     from stock_moves m
     join product_variants pv on pv.id = m.variant_id
+    join product_templates pt on pt.id = pv.template_id
     join uoms u on u.id = m.uom_id
     join stock_locations src on src.id = m.src_location_id
     join stock_locations dst on dst.id = m.dest_location_id
@@ -184,6 +191,17 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                           defaultValue={m.qty}
                           required
                         />
+                        {m.tracking !== 'none' && (
+                          <input
+                            name={`lots_${m.id}`}
+                            style={{ marginTop: 4 }}
+                            placeholder={
+                              m.tracking === 'serial'
+                                ? 'Seriennummern: SN1, SN2, … (leer = automatisch)'
+                                : 'Lose: NAME:MENGE, … (leer = automatisch)'
+                            }
+                          />
+                        )}
                       </td>
                       <td>{m.uom}</td>
                     </tr>
