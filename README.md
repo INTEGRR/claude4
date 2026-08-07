@@ -38,6 +38,23 @@ Zum Ausprobieren der Rollen liegen zwei weitere Demo-Konten bei:
 
 Ist Port 3000 belegt: `ERP_PORT=3001 docker compose up --build`
 (Windows PowerShell: `$env:ERP_PORT=3001; docker compose up --build`).
+Dauerhaft geht auch eine Zeile `ERP_PORT=3001` in der Datei `.env`.
+
+### Zugangsdaten für Shopify, DHL, E-Mail und KI
+
+Die Anmeldedaten der externen Dienste liest Compose aus der Datei `.env` — die
+Vorlage `.env.example` wird **nicht** gelesen, sie muss einmal kopiert werden:
+
+```bash
+cp .env.example .env      # dann Schlüssel eintragen
+docker compose up -d --build
+```
+
+Ohne `.env` läuft das ERP vollständig, nur die externen Anbindungen sind
+deaktiviert (die Seite „KI-Analyse" sagt das ausdrücklich, wenn
+`ANTHROPIC_API_KEY` fehlt). `DATABASE_URL`, `PORT` und `NODE_ENV` aus der
+`.env` werden für den Container bewusst überschrieben: dort gilt die Datenbank
+aus dem Compose-Netz und Port 3000.
 
 ```bash
 docker compose down       # anhalten (Daten bleiben erhalten)

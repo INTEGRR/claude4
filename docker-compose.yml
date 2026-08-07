@@ -31,8 +31,25 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Alles aus der Datei .env landet im Container: ANTHROPIC_API_KEY für die
+    # KI-Analyse, dazu Shopify, DHL und Resend. Die Datei ist optional — ohne
+    # sie läuft das ERP genauso, nur ohne die externen Anbindungen.
+    #
+    # Wichtig: .env.example ist nur eine Vorlage und wird von niemandem
+    # gelesen. Zum Eintragen:  cp .env.example .env
+    env_file:
+      - path: .env
+        required: false
+    # Diese Werte gewinnen gegen .env — sie beschreiben den Container, nicht
+    # den Entwicklungsrechner. Sonst würde z. B. ein DATABASE_URL mit
+    # "localhost:5433" oder ein PORT aus der .env den Start zerlegen.
     environment:
       DATABASE_URL: postgres://erp:erp@db:5432/erp
+      # Innen immer 3000; nach außen ist der Port über ERP_PORT umstellbar.
+      PORT: '3000'
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      STORAGE_DIR: /app/storage
       # Beispieldaten beim ersten Start (Tastatur mit Farbvarianten,
       # 20-Positionen-Stückliste, Komponenten mit Bestand)
       SEED_DEMO: 'true'

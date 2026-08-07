@@ -78,6 +78,34 @@ Dauerhaft: eine Zeile `ERP_PORT=3001` in die Datei `.env` im Projektordner
 schreiben (anlegen, falls nicht vorhanden) — dann reicht wieder
 `docker compose up`.
 
+### Zugangsdaten eintragen (Shopify, DHL, E-Mail, KI)
+
+Die Schlüssel gehören in die Datei `.env`. Die mitgelieferte `.env.example`
+ist nur eine **Vorlage** und wird von niemandem gelesen — sie muss einmal
+kopiert werden:
+
+```bash
+cp .env.example .env
+```
+
+```powershell
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+Danach den jeweiligen Schlüssel eintragen, zum Beispiel für die KI-Analyse:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+und neu starten: `docker compose up -d --build`.
+
+Drei Werte aus der `.env` setzt Compose für den Container bewusst selbst —
+`DATABASE_URL` (die Datenbank läuft im Compose-Netz, nicht auf deinem
+Rechner), `PORT` (innen immer 3000) und `NODE_ENV`. Ein abweichender Eintrag
+in der `.env` stört den Container-Start also nicht.
+
 Was jetzt passiert (alles automatisch):
 
 1. Ein Node-Image wird gebaut und die Anwendung kompiliert — **beim ersten Mal
