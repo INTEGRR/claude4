@@ -4,8 +4,13 @@
  * nutzen können.
  *
  * Zuschnitt: Lager- und Fertigungsmitarbeiter sehen nur ihre eigenen
- * Bereiche plus den Scanner; Produkte nur lesend (keine Einkaufspreise,
- * keine Anlage). 'mitarbeiter' ist die Büro-Rolle: alles außer Verwaltung.
+ * Bereiche plus Scanner und Zeiterfassung; Produkte nur lesend (keine
+ * Einkaufspreise, keine Anlage). 'mitarbeiter' ist die Büro-Rolle: alles
+ * außer Verwaltung.
+ *
+ * 'personal' und 'zeiterfassung' sind bewusst getrennt: an der Stempeluhr
+ * darf jeder stehen, an den Personalstammdaten (Kostensätze, Urlaubstage,
+ * Genehmigungen) nur das Büro.
  */
 
 export type Role = 'admin' | 'mitarbeiter' | 'lager' | 'fertigung'
@@ -22,21 +27,23 @@ export type Area =
   | 'auswertungen'
   | 'ki'
   | 'scanner'
+  | 'personal'
+  | 'zeiterfassung'
   | 'integrationen'
   | 'einstellungen'
 
 const ALL_AREAS: Area[] = [
   'verkauf', 'einkauf', 'fertigung', 'lager', 'versand', 'reparatur',
   'produkte', 'kontakte', 'auswertungen', 'ki', 'scanner',
-  'integrationen', 'einstellungen',
+  'personal', 'zeiterfassung', 'integrationen', 'einstellungen',
 ]
 
 /** Bereiche, in denen die Rolle arbeiten (schreiben) darf. */
 const WRITE_AREAS: Record<Role, Area[]> = {
   admin: ALL_AREAS,
   mitarbeiter: ALL_AREAS.filter((a) => a !== 'integrationen' && a !== 'einstellungen'),
-  lager: ['lager', 'versand', 'reparatur', 'scanner'],
-  fertigung: ['fertigung', 'reparatur', 'scanner'],
+  lager: ['lager', 'versand', 'reparatur', 'scanner', 'zeiterfassung'],
+  fertigung: ['fertigung', 'reparatur', 'scanner', 'zeiterfassung'],
 }
 
 /** Bereiche, die die Rolle zusätzlich nur lesend sieht. */

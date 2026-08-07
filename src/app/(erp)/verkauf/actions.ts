@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
+import { actionError, actionFail } from '@/modules/shared/action'
 
 /**
  * Server Actions des Verkaufsmoduls. Die Fachlogik liegt in den
@@ -10,18 +11,12 @@ import { requireWrite } from '@/modules/auth'
  * und Fehleraufbereitung.
  */
 
-function fail(err: unknown): never {
-  const message = err instanceof Error ? err.message : String(err)
-  // Postgres stellt eigenen Meldungen technische Präfixe voran.
-  throw new Error(message.replace(/^error: /, ''))
-}
-
 export async function confirmOrder(orderId: string) {
   const user = await requireWrite('verkauf')
   try {
     await sql`select confirm_sales_order(${orderId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/verkauf/${orderId}`)
   revalidatePath('/verkauf')
@@ -32,7 +27,7 @@ export async function cancelOrder(orderId: string) {
   try {
     await sql`select cancel_sales_order(${orderId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/verkauf/${orderId}`)
   revalidatePath('/verkauf')
@@ -75,7 +70,7 @@ export async function resetToDraft(orderId: string) {
 export async function createOrder(formData: FormData) {
   await requireWrite('verkauf')
   const partnerId = String(formData.get('partner_id') ?? '')
-  if (!partnerId) throw new Error('Bitte einen Kunden auswählen')
+  if (!partnerId) return actionError('Bitte einen Kunden auswählen')
 
   const [order] = await sql<{ id: string }[]>`
     insert into sales_orders (number, partner_id)
@@ -99,15 +94,15 @@ export async function addLine(orderId: string, formData: FormData) {
 
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
-  if (!variantId) throw new Error('Bitte ein Produkt auswählen')
-  if (!(qty > 0)) throw new Error('Die Menge muss größer als 0 sein')
+  if (!variantId) return actionError('Bitte ein Produkt auswählen')
+  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
 
   const [info] = await sql<{ uom_id: string; name: string; price: number }[]>`
     select pt.uom_id, variant_display_name(pv.id) as name,
            pt.list_price + pv.price_extra as price
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.id = ${variantId}`
-  if (!info) throw new Error('Produkt nicht gefunden')
+  if (!info) return actionError('Produkt nicht gefunden')
 
   const priceInput = formData.get('price_unit')
   const price = priceInput !== null && priceInput !== '' ? Number(priceInput) : Number(info.price)

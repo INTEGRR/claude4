@@ -4,6 +4,7 @@ import { requireArea, requireWrite } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
+import { actionError } from '@/modules/shared/action'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ async function createCategory(formData: FormData) {
   'use server'
   await requireWrite('produkte')
   const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
   await sql`insert into product_categories (name, parent_id, full_path)
             values (${name}, ${String(formData.get('parent_id') ?? '') || null}, '')`
   revalidatePath('/produkte/konfiguration')
@@ -28,7 +29,7 @@ async function createTax(formData: FormData) {
   await requireWrite('produkte')
   const name = String(formData.get('name') ?? '').trim()
   const amount = Number(formData.get('amount') ?? 0)
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
   await sql`insert into taxes (name, amount, type_tax_use, price_include, description)
             values (${name}, ${amount}, ${String(formData.get('type_tax_use') ?? 'sale')},
                     ${formData.get('price_include') === 'on'},
@@ -40,7 +41,7 @@ async function createPaymentTerm(formData: FormData) {
   'use server'
   await requireWrite('produkte')
   const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
   const early = formData.get('early_discount') === 'on'
   await sql`insert into payment_terms
               (name, nb_days, delay_type, early_discount, discount_percentage, discount_days)

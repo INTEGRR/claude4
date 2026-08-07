@@ -1,5 +1,6 @@
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
+import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
 import { createOrder } from '../actions'
 
@@ -14,7 +15,7 @@ export default async function NewOrderPage() {
     <>
       <PageHeader title="Neuer Verkaufsauftrag" subtitle="Kunde wählen, Positionen folgen im nächsten Schritt" />
       <Card>
-        <form action={createOrder} style={{ maxWidth: 460 }}>
+        <ActionForm action={createOrder} style={{ maxWidth: 460 }}>
           <label className="field">
             <span>Kunde</span>
             <select name="partner_id" required defaultValue="">
@@ -28,7 +29,7 @@ export default async function NewOrderPage() {
             </select>
           </label>
           <button className="primary" type="submit">Auftrag anlegen</button>
-        </form>
+        </ActionForm>
         {partners.length === 0 && (
           <div className="notice warn" style={{ marginTop: 12 }}>
             Es sind noch keine Kunden angelegt. Lege zuerst unter <strong>Kontakte</strong> einen an.

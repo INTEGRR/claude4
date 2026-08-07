@@ -102,16 +102,36 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       date_start: string | null
       date_done: string | null
       worker: string | null
+      labor_cost: number
+      booked_minutes: number
     }[]
   >`
     select o.id, o.sequence, o.name, w.name as work_center, w.code, o.cost_per_hour,
            o.duration_expected, o.duration_real, o.state::text, o.date_start, o.date_done,
-           us.name as worker
+           us.name as worker,
+           mo_operation_cost(o.id) as labor_cost,
+           coalesce((select sum(t.minutes) from time_entries t
+                     where t.mo_operation_id = o.id and t.ended_at is not null), 0) as booked_minutes
     from mo_operations o
     join work_centers w on w.id = o.work_center_id
     left join users us on us.id = o.user_id
     where o.mo_id = ${id}
     order by o.sequence, o.id`
+
+  // Wer kann Zeit buchen, und läuft schon eine Uhr am Arbeitsgang?
+  const mitarbeiter = await sql<{ id: string; name: string }[]>`
+    select e.id, e.name from employees e
+    where e.active
+      and not exists (select 1 from time_entries t
+                      where t.employee_id = e.id and t.kind = 'production' and t.ended_at is null)
+    order by e.name`
+
+  const laufend = await sql<{ mo_operation_id: string; name: string; started_at: string }[]>`
+    select t.mo_operation_id, e.name, t.started_at
+    from time_entries t
+    join employees e on e.id = t.employee_id
+    join mo_operations o on o.id = t.mo_operation_id
+    where o.mo_id = ${id} and t.ended_at is null`
 
 
   const open = mo.state !== 'done' && mo.state !== 'cancel'
@@ -333,12 +353,24 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                       <td className="num mono muted">{qty(o.duration_expected)} Min.</td>
                       <td className="num mono">
                         {Number(o.duration_real) > 0 ? `${qty(o.duration_real)} Min.` : '—'}
-                        {o.date_start && o.state === 'progress' && (
+                        {laufend
+                          .filter((l) => l.mo_operation_id === o.id)
+                          .map((l) => (
+                            <div key={l.name} className="small muted nowrap">
+                              <span className="led on" /> {l.name} seit {dateTime(l.started_at)}
+                            </div>
+                          ))}
+                        {o.date_start && o.state === 'progress' && laufend.every((l) => l.mo_operation_id !== o.id) && (
                           <div className="small muted nowrap">seit {dateTime(o.date_start)}</div>
                         )}
                       </td>
                       <td className="num mono">
-                        {money((Number(o.duration_real) / 60) * Number(o.cost_per_hour))}
+                        {money(o.labor_cost)}
+                        {Number(o.booked_minutes) > 0 && (
+                          <div className="small muted nowrap">
+                            {qty(o.booked_minutes)} Min. zum Personalsatz
+                          </div>
+                        )}
                       </td>
                       <td className="nowrap">
                         <span className={`led ${led}`} /> <span className="small muted">{label}</span>
@@ -347,9 +379,24 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                         {open && o.state !== 'done' && o.state !== 'cancel' && (
                           <span className="actions" style={{ justifyContent: 'flex-end' }}>
                             {o.state === 'pending' && (
-                              <ActionButton className="small" action={startOperation.bind(null, id, o.id)}>
-                                Starten
-                              </ActionButton>
+                              <ActionForm action={startOperation.bind(null, id, o.id)}>
+                                <span className="actions">
+                                  {mitarbeiter.length > 0 && (
+                                    <select
+                                      name="employee_id"
+                                      defaultValue=""
+                                      style={{ width: 150 }}
+                                      title="Mit Mitarbeiter läuft die Zeiterfassung mit — dann zählt der Personalkostensatz"
+                                    >
+                                      <option value="">ohne Zeiterfassung</option>
+                                      {mitarbeiter.map((m) => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <button className="small" type="submit">Starten</button>
+                                </span>
+                              </ActionForm>
                             )}
                             <ActionForm action={finishOperation.bind(null, id, o.id)}>
                               <span className="actions">

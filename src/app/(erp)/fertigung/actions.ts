@@ -4,17 +4,14 @@ import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
 import { parseQtyMap } from '@/modules/shared/form'
-
-function fail(err: unknown): never {
-  throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
-}
+import { actionError, actionFail } from '@/modules/shared/action'
 
 export async function createMo(formData: FormData) {
   const user = await requireWrite('fertigung')
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
-  if (!variantId) throw new Error('Bitte ein Produkt auswählen')
-  if (!(qty > 0)) throw new Error('Die Menge muss größer als 0 sein')
+  if (!variantId) return actionError('Bitte ein Produkt auswählen')
+  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
 
   let id: string
   try {
@@ -22,7 +19,7 @@ export async function createMo(formData: FormData) {
       select create_manufacturing_order(${variantId}, ${qty}, null, null, ${user.name})`
     id = row.create_manufacturing_order
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   redirect(`/fertigung/${id}`)
 }
@@ -32,7 +29,7 @@ export async function confirmMo(moId: string) {
   try {
     await sql`select mo_confirm(${moId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/fertigung/${moId}`)
 }
@@ -62,7 +59,7 @@ export async function produceMo(moId: string, formData: FormData) {
   try {
     await sql`select mo_produce(${moId}, ${qty}, ${sql.json(consumed)}, ${backorder}, ${user.name}, ${lot})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/fertigung/${moId}`)
   revalidatePath('/fertigung')
@@ -74,7 +71,7 @@ export async function cancelMo(moId: string) {
   try {
     await sql`select mo_cancel(${moId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/fertigung/${moId}`)
 }
@@ -85,11 +82,11 @@ export async function createUnbuild(formData: FormData) {
   const user = await requireWrite('fertigung')
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
-  if (!variantId) throw new Error('Bitte ein Produkt auswählen')
-  if (!(qty > 0)) throw new Error('Die Menge muss größer als 0 sein')
+  if (!variantId) return actionError('Bitte ein Produkt auswählen')
+  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
 
   const [bom] = await sql<{ resolve_bom: string | null }[]>`select resolve_bom(${variantId})`
-  if (!bom.resolve_bom) throw new Error('Für dieses Produkt existiert keine Stückliste')
+  if (!bom.resolve_bom) return actionError('Für dieses Produkt existiert keine Stückliste')
 
   const [stock] = await sql<{ id: string }[]>`
     select id from stock_locations where full_path = 'WH/Stock'`
@@ -109,7 +106,7 @@ export async function applyUnbuild(unbuildId: string, force: boolean) {
   try {
     await sql`select unbuild_apply(${unbuildId}, ${force}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath('/fertigung/demontage')
 }
@@ -120,11 +117,11 @@ export async function createBom(formData: FormData) {
   await requireWrite('fertigung')
   const templateId = String(formData.get('template_id') ?? '')
   const qty = Number(formData.get('qty') ?? 1)
-  if (!templateId) throw new Error('Bitte ein Produkt auswählen')
+  if (!templateId) return actionError('Bitte ein Produkt auswählen')
 
   const [tpl] = await sql<{ uom_id: string }[]>`
     select uom_id from product_templates where id = ${templateId}`
-  if (!tpl) throw new Error('Produkt nicht gefunden')
+  if (!tpl) return actionError('Produkt nicht gefunden')
 
   const [bom] = await sql<{ id: string }[]>`
     insert into boms (template_id, qty, uom_id) values (${templateId}, ${qty}, ${tpl.uom_id})
@@ -137,8 +134,8 @@ export async function addBomLine(bomId: string, formData: FormData) {
   const variantId = String(formData.get('component_variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   const issueMethod = formData.get('issue_method') === 'manual' ? 'manual' : 'backflush'
-  if (!variantId) throw new Error('Bitte eine Komponente auswählen')
-  if (!(qty > 0)) throw new Error('Die Menge muss größer als 0 sein')
+  if (!variantId) return actionError('Bitte eine Komponente auswählen')
+  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
 
   const [info] = await sql<{ uom_id: string }[]>`
     select pt.uom_id from product_variants pv
@@ -203,8 +200,8 @@ export async function createWorkCenter(formData: FormData) {
   await requireWrite('fertigung')
   const code = String(formData.get('code') ?? '').trim().toUpperCase()
   const name = String(formData.get('name') ?? '').trim()
-  if (!code) throw new Error('Bitte ein Kürzel vergeben')
-  if (!name) throw new Error('Bitte einen Namen vergeben')
+  if (!code) return actionError('Bitte ein Kürzel vergeben')
+  if (!name) return actionError('Bitte einen Namen vergeben')
 
   try {
     await sql`
@@ -215,7 +212,7 @@ export async function createWorkCenter(formData: FormData) {
               ${Number(formData.get('time_efficiency') ?? 100) || 100},
               ${String(formData.get('note') ?? '').trim() || null})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath('/fertigung/arbeitsplaetze')
 }
@@ -233,7 +230,7 @@ export async function updateWorkCenter(workCenterId: string, formData: FormData)
         note = ${String(formData.get('note') ?? '').trim() || null}
       where id = ${workCenterId}`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath('/fertigung/arbeitsplaetze')
 }
@@ -244,8 +241,8 @@ export async function addBomOperation(bomId: string, formData: FormData) {
   await requireWrite('fertigung')
   const name = String(formData.get('name') ?? '').trim()
   const workCenter = String(formData.get('work_center_id') ?? '')
-  if (!name) throw new Error('Bitte den Arbeitsgang benennen')
-  if (!workCenter) throw new Error('Bitte einen Arbeitsplatz auswählen')
+  if (!name) return actionError('Bitte den Arbeitsgang benennen')
+  if (!workCenter) return actionError('Bitte einen Arbeitsplatz auswählen')
 
   try {
     await sql`
@@ -257,7 +254,7 @@ export async function addBomOperation(bomId: string, formData: FormData) {
               ${Number(formData.get('duration_minutes') ?? 0) || 0},
               ${Number(formData.get('setup_minutes') ?? 0) || 0})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/fertigung/stuecklisten/${bomId}`)
 }
@@ -270,16 +267,23 @@ export async function removeBomOperation(bomId: string, operationId: string) {
 
 // --- Arbeitsgänge am Auftrag ----------------------------------------------
 
-export async function startOperation(moId: string, operationId: string) {
+export async function startOperation(moId: string, operationId: string, formData?: FormData) {
   const user = await requireWrite('fertigung')
+  const employeeId = String(formData?.get('employee_id') ?? '').trim() || null
   try {
     await sql`select mo_operation_start(${operationId}, ${user.name})`
     await sql`update mo_operations set user_id = ${user.id} where id = ${operationId}`
     await sql`select mo_start(${moId}, ${user.name})`
+    // Mit Mitarbeiter läuft zusätzlich die Zeiterfassung — dann zählt beim
+    // Abschluss der Personalkostensatz statt des Arbeitsplatzsatzes.
+    if (employeeId) {
+      await sql`select time_entry_start(${employeeId}, 'production', ${operationId}, ${user.name})`
+    }
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/fertigung/${moId}`)
+  revalidatePath('/zeiterfassung')
 }
 
 /** Arbeitsgang beenden — ohne Minutenangabe zählt die Zeit seit dem Start. */
@@ -288,12 +292,13 @@ export async function finishOperation(moId: string, operationId: string, formDat
   const raw = String(formData.get('minutes') ?? '').trim()
   const minutes = raw === '' ? null : Number(raw)
   if (minutes !== null && (!Number.isFinite(minutes) || minutes < 0)) {
-    throw new Error('Bitte eine gültige Dauer in Minuten erfassen')
+    return actionError('Bitte eine gültige Dauer in Minuten erfassen')
   }
   try {
     await sql`select mo_operation_finish(${operationId}, ${minutes}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/fertigung/${moId}`)
+  revalidatePath('/zeiterfassung')
 }

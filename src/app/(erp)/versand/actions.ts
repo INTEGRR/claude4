@@ -2,16 +2,13 @@
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
+import { actionError, actionFail } from '@/modules/shared/action'
 import {
   cancelShipmentById,
   createLabelForPicking,
   createReturnLabelForPartner,
   syncTracking,
 } from '@/modules/versand/service'
-
-function fail(err: unknown): never {
-  throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
-}
 
 export async function createLabel(pickingId: string, formData: FormData) {
   await requireWrite('versand')
@@ -32,7 +29,7 @@ export async function createLabel(pickingId: string, formData: FormData) {
     const message = err instanceof Error ? err.message : String(err)
     await sql`select log_event('stock_picking', ${pickingId}, 'error',
       ${`DHL-Label fehlgeschlagen: ${message.slice(0, 300)}`}, 'system')`
-    fail(err)
+    return actionFail(err)
   }
 
   revalidatePath('/versand')
@@ -44,7 +41,7 @@ export async function cancelLabel(shipmentId: string) {
   try {
     await cancelShipmentById(shipmentId)
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath('/versand')
 }
@@ -54,7 +51,7 @@ export async function refreshTracking() {
   try {
     await syncTracking(10)
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath('/versand')
 }
@@ -62,14 +59,14 @@ export async function refreshTracking() {
 export async function createReturnLabel(formData: FormData) {
   await requireWrite('versand')
   const partnerId = String(formData.get('partner_id') ?? '')
-  if (!partnerId) throw new Error('Bitte einen Kunden auswählen')
+  if (!partnerId) return actionError('Bitte einen Kunden auswählen')
 
   try {
     await createReturnLabelForPartner(partnerId, {
       reference: String(formData.get('reference') ?? '') || undefined,
     })
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath('/versand/retouren')
 }

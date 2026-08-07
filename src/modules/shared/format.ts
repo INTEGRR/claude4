@@ -37,6 +37,14 @@ export function money(value: number | string | null | undefined, currency = 'EUR
   return moneyFormat.format(Number(value))
 }
 
+/** Minuten als Stundenangabe, wie sie auf einem Stundenzettel steht: "7:45 h". */
+export function hours(minutes: number | string | null | undefined): string {
+  const total = Math.round(Number(minutes ?? 0))
+  const sign = total < 0 ? '-' : ''
+  const abs = Math.abs(total)
+  return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, '0')} h`
+}
+
 export function date(value: string | Date | null | undefined): string {
   if (!value) return '—'
   return dateFormat.format(new Date(value))
@@ -108,6 +116,12 @@ export const LABELS = {
     repaired: 'Repariert',
     cancel: 'Abgebrochen',
   },
+  absence: {
+    requested: 'Beantragt',
+    approved: 'Genehmigt',
+    rejected: 'Abgelehnt',
+    cancel: 'Zurückgezogen',
+  },
   shipment: {
     created: 'Label erstellt',
     manifested: 'Übergeben',
@@ -129,6 +143,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'repaired':
     case 'fully_billed':
     case 'paid':
+    case 'approved':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -141,6 +156,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'cancel':
     case 'cancelled':
     case 'failure':
+    case 'rejected':
       return 'danger'
     case 'waiting':
     case 'started':
@@ -149,6 +165,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'partial':
     case 'to_close':
     case 'created':
+    case 'requested':
       return 'warn'
     default:
       return 'neutral'

@@ -4,17 +4,14 @@ import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
 import { parseQtyMap } from '@/modules/shared/form'
-
-function fail(err: unknown): never {
-  throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
-}
+import { actionError, actionFail } from '@/modules/shared/action'
 
 export async function createRepair(formData: FormData) {
   await requireWrite('reparatur')
   const partnerId = String(formData.get('partner_id') ?? '')
   const variantId = String(formData.get('variant_id') ?? '')
-  if (!partnerId) throw new Error('Bitte einen Kunden auswählen')
-  if (!variantId) throw new Error('Bitte das zu reparierende Produkt auswählen')
+  if (!partnerId) return actionError('Bitte einen Kunden auswählen')
+  if (!variantId) return actionError('Bitte das zu reparierende Produkt auswählen')
 
   const [repair] = await sql<{ id: string }[]>`
     insert into repair_orders (number, partner_id, variant_id, qty, under_warranty, note)
@@ -32,8 +29,8 @@ export async function addPart(repairId: string, formData: FormData) {
   const variantId = String(formData.get('variant_id') ?? '')
   const qty = Number(formData.get('qty') ?? 0)
   const partType = String(formData.get('part_type') ?? 'add')
-  if (!variantId) throw new Error('Bitte ein Teil auswählen')
-  if (!(qty > 0)) throw new Error('Die Menge muss größer als 0 sein')
+  if (!variantId) return actionError('Bitte ein Teil auswählen')
+  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
 
   const [info] = await sql<{ uom_id: string; price: number }[]>`
     select pt.uom_id, pt.list_price as price
@@ -65,7 +62,7 @@ export async function confirmRepair(repairId: string) {
   try {
     await sql`select repair_confirm(${repairId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/reparatur/${repairId}`)
 }
@@ -84,7 +81,7 @@ export async function endRepair(repairId: string, formData: FormData) {
   try {
     await sql`select repair_end(${repairId}, ${sql.json(done)}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/reparatur/${repairId}`)
   revalidatePath('/lager/bestand')
@@ -95,7 +92,7 @@ export async function cancelRepair(repairId: string) {
   try {
     await sql`select repair_cancel(${repairId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/reparatur/${repairId}`)
 }
@@ -108,7 +105,7 @@ export async function createQuotation(repairId: string) {
       select repair_create_quotation(${repairId}, ${user.name})`
     orderId = row.repair_create_quotation
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   redirect(`/verkauf/${orderId}`)
 }

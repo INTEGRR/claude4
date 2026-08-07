@@ -264,6 +264,23 @@ async function main() {
         values (${bom.id}, ${o.seq}, ${o.name}, ${wcIds.get(o.wc) ?? ''}, ${o.minutes}, ${o.setup})`
     }
 
+    // --- Personal -----------------------------------------------------------
+    const team = [
+      { name: 'Fred Fertigung', job: 'Montage', dept: 'Fertigung', cost: 38.5, badge: 'MA-001', login: 'fertigung@example.com' },
+      { name: 'Lena Lager', job: 'Wareneingang', dept: 'Lager', cost: 35.0, badge: 'MA-002', login: 'lager@example.com' },
+      { name: 'Tom Löter', job: 'Löten und Prüfen', dept: 'Fertigung', cost: 41.0, badge: 'MA-003', login: null },
+    ]
+    for (const m of team) {
+      const [u] = m.login
+        ? await sql<{ id: string }[]>`select id from users where email = ${m.login}`
+        : [undefined]
+      await sql`
+        insert into employees (number, name, user_id, barcode, job_title, department,
+                               hourly_cost, weekly_hours, hire_date)
+        values (next_sequence('employee'), ${m.name}, ${u?.id ?? null}, ${m.badge},
+                ${m.job}, ${m.dept}, ${m.cost}, 40, current_date - 400)`
+    }
+
     // --- Beispielauftrag ----------------------------------------------------
     const weiss = variants.find((v) => v.display_name.includes('Weiß'))!
     const [order] = await sql<{ id: string }[]>`
@@ -297,6 +314,7 @@ async function main() {
   - Stückliste mit 19 Positionen, davon 6 farbabhängig gefiltert
   - Phantom-Baugruppe "Verpackungsset" (Karton + Handbuch), die beim Fertigen aufgelöst wird
   - 3 Arbeitsplätze mit Stundensatz und 3 Arbeitsgänge (52 Min. je Tastatur)
+  - 3 Mitarbeiter mit Ausweis-Barcode (MA-001 bis MA-003) und Personalkostensatz
   - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
   - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)
   - Anfangsbestand zum Einstandspreis bewertet`)

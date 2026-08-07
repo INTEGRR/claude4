@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { requireUser } from '@/modules/auth'
 import { type Area, canAccess } from '@/modules/auth/permissions'
+import { actionError } from '@/modules/shared/action'
 
 /**
  * Gemeinsame Kommentar-Action für alle Belege und Stammdaten. Kommentare
@@ -33,18 +34,18 @@ export async function addComment(
 ) {
   const user = await requireUser()
   const target = MODELS[model]
-  if (!target) throw new Error(`Kommentare sind für "${model}" nicht vorgesehen`)
+  if (!target) return actionError(`Kommentare sind für "${model}" nicht vorgesehen`)
   // Kommentieren darf, wer den Bereich sehen kann (auch die Lese-Rollen).
   if (!canAccess(user.role, target.area)) {
-    throw new Error('Dafür fehlt Ihrer Rolle die Berechtigung')
+    return actionError('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
 
   const note = String(formData.get('note') ?? '').trim()
   if (!note) return
-  if (note.length > 2000) throw new Error('Der Kommentar ist zu lang (max. 2000 Zeichen)')
+  if (note.length > 2000) return actionError('Der Kommentar ist zu lang (max. 2000 Zeichen)')
 
   const [exists] = await sql`select 1 from ${sql(target.table)} where id = ${recordId}`
-  if (!exists) throw new Error('Der Datensatz existiert nicht (mehr)')
+  if (!exists) return actionError('Der Datensatz existiert nicht (mehr)')
 
   await sql`select log_event(${model}, ${recordId}, 'note', ${note}, ${user.name})`
   revalidatePath(path)

@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { requireUser } from '@/modules/auth'
 import { type Area, canWrite } from '@/modules/auth/permissions'
+import { actionError } from '@/modules/shared/action'
 
 /**
  * Gemeinsame Tag-Verwaltung für Kontakte, Produkte, Verkaufsaufträge und
@@ -23,9 +24,9 @@ const MODELS: Record<
 export async function setTags(model: string, recordId: string, path: string, formData: FormData) {
   const user = await requireUser()
   const target = MODELS[model]
-  if (!target) throw new Error(`Tags sind für "${model}" nicht vorgesehen`)
+  if (!target) return actionError(`Tags sind für "${model}" nicht vorgesehen`)
   if (!canWrite(user.role, target.area)) {
-    throw new Error('Dafür fehlt Ihrer Rolle die Berechtigung')
+    return actionError('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
 
   const selected = formData.getAll('tag_ids').map(String).filter(Boolean)

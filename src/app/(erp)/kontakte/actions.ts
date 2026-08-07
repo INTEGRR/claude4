@@ -2,11 +2,12 @@
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
+import { actionError } from '@/modules/shared/action'
 
 export async function updatePartner(partnerId: string, formData: FormData) {
   await requireWrite('kontakte')
   const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
 
   await sql`
     update partners set
@@ -41,7 +42,7 @@ export async function updatePartner(partnerId: string, formData: FormData) {
 export async function createChildContact(parentId: string, formData: FormData) {
   await requireWrite('kontakte')
   const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
 
   await sql`
     insert into partners (

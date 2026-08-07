@@ -3,15 +3,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
-
-function fail(err: unknown): never {
-  throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
-}
+import { actionError, actionFail } from '@/modules/shared/action'
 
 export async function createProduct(formData: FormData) {
   await requireWrite('produkte')
   const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
 
   const uomId = String(formData.get('uom_id') ?? '')
   const [tpl] = await sql<{ id: string }[]>`
@@ -71,7 +68,7 @@ export async function updateProduct(templateId: string, formData: FormData) {
         tracking = ${String(formData.get('tracking') ?? 'none')}
       where id = ${templateId}`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/produkte/${templateId}`)
 }
@@ -81,8 +78,8 @@ export async function addAttribute(templateId: string, formData: FormData) {
   await requireWrite('produkte')
   const attributeId = String(formData.get('attribute_id') ?? '')
   const valueIds = formData.getAll('value_ids').map(String).filter(Boolean)
-  if (!attributeId) throw new Error('Bitte ein Attribut auswählen')
-  if (valueIds.length === 0) throw new Error('Bitte mindestens einen Wert auswählen')
+  if (!attributeId) return actionError('Bitte ein Attribut auswählen')
+  if (valueIds.length === 0) return actionError('Bitte mindestens einen Wert auswählen')
 
   const [line] = await sql<{ id: string }[]>`
     insert into product_template_attribute_lines (template_id, attribute_id)
@@ -113,9 +110,9 @@ export async function setVariantCodes(variantId: string, formData: FormData) {
   } catch (err) {
     // Eindeutigkeitsverletzungen verständlich melden.
     const message = err instanceof Error ? err.message : String(err)
-    if (message.includes('product_variants_sku_key')) throw new Error('Diese Artikelnummer ist bereits vergeben')
-    if (message.includes('product_variants_barcode_key')) throw new Error('Dieser Barcode ist bereits vergeben')
-    fail(err)
+    if (message.includes('product_variants_sku_key')) return actionError('Diese Artikelnummer ist bereits vergeben')
+    if (message.includes('product_variants_barcode_key')) return actionError('Dieser Barcode ist bereits vergeben')
+    return actionFail(err)
   }
 
   const [variant] = await sql<{ template_id: string }[]>`
@@ -133,8 +130,8 @@ export async function createAttribute(formData: FormData) {
     .split(/[,\n]/)
     .map((v) => v.trim())
     .filter(Boolean)
-  if (!name) throw new Error('Bitte einen Namen angeben')
-  if (values.length === 0) throw new Error('Bitte mindestens einen Wert angeben (kommagetrennt)')
+  if (!name) return actionError('Bitte einen Namen angeben')
+  if (values.length === 0) return actionError('Bitte mindestens einen Wert angeben (kommagetrennt)')
 
   const [attr] = await sql<{ id: string }[]>`
     insert into product_attributes (name) values (${name})

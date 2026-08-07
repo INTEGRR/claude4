@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { validatePicking } from '../lager/actions'
 import { produceMo } from '../fertigung/actions'
+import { isActionError } from '@/modules/shared/action'
 import { Badge } from '@/components/ui'
 import type { ScannerDoc } from '@/app/api/scanner/lookup/route'
 
@@ -189,8 +190,14 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
       fd.set('backorder', 'yes')
     }
     try {
-      if (doc.type === 'picking') await validatePicking(doc.id, fd)
-      else await produceMo(doc.id, fd)
+      // Fachliche Fehler kommen als Rückgabewert zurück, nicht als Ausnahme.
+      const result =
+        doc.type === 'picking' ? await validatePicking(doc.id, fd) : await produceMo(doc.id, fd)
+      if (isActionError(result)) {
+        setPhase('confirm')
+        say(result.error, 'error')
+        return
+      }
       setPhase('done')
       say(
         <>

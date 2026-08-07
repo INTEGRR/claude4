@@ -24,6 +24,8 @@ async function badges() {
       versandbereit: number
       offene_reparaturen: number
       beschaffung: number
+      anwesend: number
+      abwesenheiten: number
       fehler: number
     }[]
   >`
@@ -39,6 +41,8 @@ async function badges() {
       (select count(*) from repair_orders
         where state not in ('repaired','cancel'))::int as offene_reparaturen,
       (select count(*) from orderpoint_suggestions())::int as beschaffung,
+      (select count(*) from employees_present)::int as anwesend,
+      (select count(*) from absences where state = 'requested')::int as abwesenheiten,
       ((select count(*) from integration_jobs where status = 'failed')
        + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler`
   return row
@@ -112,6 +116,21 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items: sees('reparatur')
         ? [{ href: '/reparatur', label: 'Reparaturen', count: counts.offene_reparaturen }]
         : [],
+    },
+    {
+      label: 'Personal',
+      items: [
+        ...(sees('zeiterfassung')
+          ? [{ href: '/zeiterfassung', label: 'Zeiterfassung', count: counts.anwesend }]
+          : []),
+        ...(sees('personal')
+          ? [
+              { href: '/personal', label: 'Mitarbeiter' },
+              { href: '/personal/schichtplan', label: 'Schichtplan' },
+              { href: '/personal/abwesenheiten', label: 'Abwesenheiten', count: counts.abwesenheiten },
+            ]
+          : []),
+      ],
     },
     {
       label: 'Auswertungen',

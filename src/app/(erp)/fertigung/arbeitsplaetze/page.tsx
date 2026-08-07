@@ -40,7 +40,7 @@ export default async function WorkCentersPage() {
              as minutes_open,
            coalesce((select sum(o.duration_real) from mo_operations o
                      where o.work_center_id = w.id and o.state = 'done'), 0) as minutes_done,
-           coalesce((select sum(o.duration_real / 60.0 * o.cost_per_hour) from mo_operations o
+           coalesce((select sum(mo_operation_cost(o.id)) from mo_operations o
                      where o.work_center_id = w.id and o.state = 'done'), 0) as cost_done
     from work_centers w
     order by w.active desc, w.code`

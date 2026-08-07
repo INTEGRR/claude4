@@ -1,5 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
+import { type ActionResult, isActionError } from '@/modules/shared/action'
 
 /**
  * Fehlerzeile: Leuchte plus Wort, dann die Meldung im Klartext. Bewusst
@@ -32,7 +33,7 @@ export function ActionButton({
   disabled,
   title,
 }: {
-  action: () => Promise<void>
+  action: () => Promise<ActionResult>
   children: React.ReactNode
   confirm?: string
   className?: string
@@ -47,7 +48,10 @@ export function ActionButton({
     setError(null)
     startTransition(async () => {
       try {
-        await action()
+        // Fachliche Fehler kommen als Rückgabewert (Next.js schwärzt geworfene
+        // Fehler im Produktionsbau), technische weiterhin als Ausnahme.
+        const result = await action()
+        if (isActionError(result)) setError(result.error)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')
       }
@@ -78,7 +82,7 @@ export function ActionForm({
   className,
   style,
 }: {
-  action: (formData: FormData) => Promise<void>
+  action: (formData: FormData) => Promise<ActionResult>
   children: React.ReactNode
   className?: string
   style?: React.CSSProperties
@@ -93,7 +97,11 @@ export function ActionForm({
     setError(null)
     startTransition(async () => {
       try {
-        await action(data)
+        const result = await action(data)
+        if (isActionError(result)) {
+          setError(result.error)
+          return                    // Eingaben stehen lassen, damit nichts verloren geht
+        }
         form.reset()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')

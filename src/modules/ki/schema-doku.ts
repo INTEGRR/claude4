@@ -57,6 +57,12 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **vendor_bills**: Lieferantenrechnungen (number 'BILL/…', vendor_id, purchase_order_id, state 'draft'|'posted'|'paid'|'cancel', total).
 - **vendor_bill_lines**: Positionen.
 
+### Personal
+- **employees**: Mitarbeiter (number 'MA0001', name, barcode = Ausweis, job_title, department, employment_type 'full_time'|'part_time'|'mini_job'|'temp'|'apprentice', hourly_cost = Personalkostensatz je Stunde, weekly_hours, vacation_days, hire_date, exit_date, active, user_id → users).
+- **time_entries**: Zeiterfassung (employee_id, kind 'attendance'|'production', mo_operation_id, started_at, ended_at, break_minutes, minutes = Nettodauer, hourly_cost als Schnappschuss). Helfer: employee_minutes(employee_id, von, bis). View **employees_present** (wer ist gerade angemeldet), View **time_sheet** (Minuten und Kosten je Mitarbeiter, Tag und Art).
+- **shift_templates** (code, name, start_time, end_time, break_minutes) und **shift_assignments** (employee_id, template_id, work_center_id, starts_at, ends_at, state 'draft'|'published'|'cancel'). Überschneidungen sind per Ausschluss-Constraint unmöglich.
+- **absences**: Abwesenheiten (kind 'vacation'|'sick'|'training'|'unpaid'|'other', starts_on, ends_on, half_day, state 'requested'|'approved'|'rejected'|'cancel', reason, decided_by, decided_at). Arbeitstage: absence_days(id).
+
 ### Reparatur & Versand
 - **repair_orders**: number ('RMA/…'), partner_id, variant_id, state ('new','confirmed','under_repair','repaired','cancel').
 - **repair_parts**: Teile (kind 'add'|'remove'|'recycle', variant_id, qty).

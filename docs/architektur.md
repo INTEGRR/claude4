@@ -57,6 +57,12 @@ vollständig in `db/migrations` (Logik) und `app/(erp)/<modul>` (Seiten +
 Server Actions) — sie brauchen keine eigene Zwischenschicht, weil die Actions
 direkt die Postgres-Funktionen aufrufen.
 
+### 1b. Fachliche Fehler werden zurückgegeben, nicht geworfen
+
+Next.js schwärzt in Produktionsbauten jeden Fehler, der aus einer Server Action geworfen wird — beim Benutzer kommt nur eine React-Fehlernummer an. Genau diese Meldungen („Erledigte Transfers können nicht storniert werden", „Bestand reicht nicht") sind aber der Kern der Bedienung: Sie stammen aus `raise exception` in den Postgres-Funktionen und sagen dem Lager, was zu tun ist.
+
+Deshalb gilt im ganzen Haus: Server Actions **geben** fachliche Fehler zurück (`actionError(...)`, `actionFail(err)` aus `src/modules/shared/action.ts`); `ActionButton` und `ActionForm` zeigen sie an. Geworfen wird nur, was wirklich ein Programmfehler ist. `tests/actions.test.ts` wacht darüber, dass niemand wieder wirft.
+
 ### 2. Lagerbewegungen als einzige Wahrheit (Ledger-Prinzip)
 
 Wie in Odoo ist **jede** Bestandsänderung eine `stock_moves`-Zeile „von Ort A nach Ort B" — auch Fertigung (→ virtueller Produktionsort), Inventur (→ Inventurdifferenz-Ort) und Ausschuss. Bestände werden **nie direkt geschrieben**, sondern aus erledigten Bewegungen abgeleitet (materialisiert in `stock_quants`, gepflegt per Trigger in derselben Transaktion). Damit sind Bestände jederzeit nachvollziehbar und ein Audit-Trail existiert gratis.

@@ -4,6 +4,7 @@ import { sql } from '@/db/client'
 import { requireArea, requireWrite } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { actionError } from '@/modules/shared/action'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ async function createPartner(formData: FormData) {
   'use server'
   await requireWrite('kontakte')
   const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('Bitte einen Namen angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
 
   await sql`
     insert into partners (

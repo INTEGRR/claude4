@@ -4,15 +4,12 @@ import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
 import { money, qty } from '@/modules/shared/format'
-
-function fail(err: unknown): never {
-  throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
-}
+import { actionError, actionFail } from '@/modules/shared/action'
 
 export async function createPurchaseOrder(formData: FormData) {
   await requireWrite('einkauf')
   const vendorId = String(formData.get('vendor_id') ?? '')
-  if (!vendorId) throw new Error('Bitte einen Lieferanten auswählen')
+  if (!vendorId) return actionError('Bitte einen Lieferanten auswählen')
 
   const [order] = await sql<{ id: string }[]>`
     insert into purchase_orders (number, vendor_id)
@@ -26,8 +23,8 @@ export async function addPoLine(orderId: string, formData: FormData) {
 
   const variantId = String(formData.get('variant_id') ?? '')
   const quantity = Number(formData.get('qty') ?? 0)
-  if (!variantId) throw new Error('Bitte ein Produkt auswählen')
-  if (!(quantity > 0)) throw new Error('Die Menge muss größer als 0 sein')
+  if (!variantId) return actionError('Bitte ein Produkt auswählen')
+  if (!(quantity > 0)) return actionError('Die Menge muss größer als 0 sein')
 
   const [order] = await sql<{ vendor_id: string }[]>`
     select vendor_id from purchase_orders where id = ${orderId}`
@@ -37,7 +34,7 @@ export async function addPoLine(orderId: string, formData: FormData) {
            variant_display_name(pv.id) as name, pt.standard_cost as cost
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.id = ${variantId}`
-  if (!info) throw new Error('Produkt nicht gefunden')
+  if (!info) return actionError('Produkt nicht gefunden')
 
   // Preis + Rabatt aus der Lieferantenpreisliste, sonst Standardkosten.
   const [vendorPrice] = await sql<{ price: number | null; discount: number | null }[]>`
@@ -96,7 +93,7 @@ export async function confirmPo(orderId: string) {
   try {
     await sql`select confirm_purchase_order(${orderId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/einkauf/${orderId}`)
   revalidatePath('/einkauf')
@@ -108,7 +105,7 @@ export async function cancelPo(orderId: string) {
   try {
     await sql`select cancel_purchase_order(${orderId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/einkauf/${orderId}`)
 }
@@ -128,8 +125,8 @@ export async function sendPoEmail(orderId: string) {
   >`
     select po.number, p.name as vendor, p.email, po.expected_arrival
     from purchase_orders po join partners p on p.id = po.vendor_id where po.id = ${orderId}`
-  if (!order) throw new Error('Bestellung nicht gefunden')
-  if (!order.email) throw new Error(`Für ${order.vendor} ist keine E-Mail-Adresse hinterlegt`)
+  if (!order) return actionError('Bestellung nicht gefunden')
+  if (!order.email) return actionError(`Für ${order.vendor} ist keine E-Mail-Adresse hinterlegt`)
 
   const lines = await sql<{ name: string; qty: number; uom: string; price_unit: number }[]>`
     select l.name, l.qty, u.name as uom, l.price_unit
@@ -172,7 +169,7 @@ export async function createBill(orderId: string) {
       select create_vendor_bill(${orderId}, ${user.name})`
     billId = row.create_vendor_bill
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   redirect(`/einkauf/rechnungen/${billId}`)
 }
@@ -205,7 +202,7 @@ export async function postBill(billId: string) {
   try {
     await sql`select post_vendor_bill(${billId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/einkauf/rechnungen/${billId}`)
 }
@@ -224,7 +221,7 @@ export async function cancelBill(billId: string) {
       select cancel_vendor_bill(${billId}, ${user.name})`
     creditId = row.cancel_vendor_bill
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   if (creditId) redirect(`/einkauf/rechnungen/${creditId}`)
   revalidatePath(`/einkauf/rechnungen/${billId}`)
@@ -235,7 +232,7 @@ export async function cancelBill(billId: string) {
 export async function createLandedCost(pickingId: string, formData: FormData) {
   await requireWrite('einkauf')
   const amount = Number(formData.get('amount') ?? 0)
-  if (!(amount > 0)) throw new Error('Bitte einen Betrag größer als 0 angeben')
+  if (!(amount > 0)) return actionError('Bitte einen Betrag größer als 0 angeben')
 
   const currency = String(formData.get('currency') ?? 'EUR')
   try {
@@ -253,7 +250,7 @@ export async function createLandedCost(pickingId: string, formData: FormData) {
         ${String(formData.get('vendor_id') ?? '') || null},
         ${String(formData.get('note') ?? '').trim() || null})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/lager/${pickingId}`)
 }
@@ -263,7 +260,7 @@ export async function postLandedCost(costId: string, pickingId: string) {
   try {
     await sql`select landed_cost_post(${costId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/lager/${pickingId}`)
   revalidatePath('/lager/bewertung')
@@ -274,7 +271,7 @@ export async function cancelLandedCost(costId: string, pickingId: string) {
   try {
     await sql`select landed_cost_cancel(${costId}, ${user.name})`
   } catch (err) {
-    fail(err)
+    return actionFail(err)
   }
   revalidatePath(`/lager/${pickingId}`)
   revalidatePath('/lager/bewertung')
@@ -286,7 +283,7 @@ export async function setExchangeRate(formData: FormData) {
   const currency = String(formData.get('currency') ?? '')
   const rate = Number(formData.get('rate') ?? 0)
   const validFrom = String(formData.get('valid_from') ?? '')
-  if (!currency || !(rate > 0)) throw new Error('Bitte Währung und Kurs angeben')
+  if (!currency || !(rate > 0)) return actionError('Bitte Währung und Kurs angeben')
 
   await sql`
     insert into exchange_rates (currency, rate, valid_from, source)

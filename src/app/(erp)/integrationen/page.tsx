@@ -9,6 +9,7 @@ import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
+import { actionError } from '@/modules/shared/action'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +33,7 @@ async function runReconcile() {
   try {
     await reconcileOrders()
   } catch (err) {
-    throw new Error((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
+    return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
   }
   revalidatePath('/integrationen')
 }
@@ -63,7 +64,7 @@ async function resolveUnmatched(lineId: string, formData: FormData) {
   'use server'
   await requireAdmin()
   const variantId = String(formData.get('variant_id') ?? '')
-  if (!variantId) throw new Error('Bitte eine Variante auswählen')
+  if (!variantId) return actionError('Bitte eine Variante auswählen')
 
   const [line] = await sql<{ sku: string | null; variant_gid: string | null }[]>`
     select sku, variant_gid from shopify_unmatched_lines where id = ${lineId}`

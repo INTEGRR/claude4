@@ -50,7 +50,16 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
+  // Genau ein Eintrag ist aktiv: der mit dem längsten passenden Pfad. Sonst
+  // leuchtete auf /personal/schichtplan auch „Mitarbeiter" (/personal) mit.
+  const passt = (href: string) =>
+    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
+  const aktiv = groups
+    .flatMap((g) => g.items.map((i) => i.href))
+    .filter(passt)
+    .sort((a, b) => b.length - a.length)[0]
+
+  const isActive = (href: string) => href === aktiv
 
   const toggle = (label: string) => {
     setClosed((c) => {

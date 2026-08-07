@@ -3,20 +3,20 @@ import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { hashPassword, requireAdmin } from '@/modules/auth'
 import { ALL_ROLES, type Role } from '@/modules/auth/permissions'
+import { actionError } from '@/modules/shared/action'
 
-function parseRole(value: unknown): Role {
+function parseRole(value: unknown): Role | null {
   const role = String(value ?? '')
-  if (!(ALL_ROLES as string[]).includes(role)) throw new Error('Unbekannte Rolle')
-  return role as Role
+  return (ALL_ROLES as string[]).includes(role) ? (role as Role) : null
 }
 
-/** Wirft, wenn nach der Änderung kein aktiver Administrator übrig bliebe. */
+/** Liefert eine Meldung, wenn nach der Änderung kein Administrator übrig bliebe. */
 async function guardLastAdmin(userId: string) {
   const [row] = await sql<{ count: number }[]>`
     select count(*)::int as count from users
     where role = 'admin' and active and id <> ${userId}`
   if (row.count === 0) {
-    throw new Error('Der letzte aktive Administrator kann nicht entfernt werden')
+    return actionError('Der letzte aktive Administrator kann nicht entfernt werden')
   }
 }
 
@@ -27,16 +27,17 @@ export async function createUser(formData: FormData) {
   const password = String(formData.get('password') ?? '')
   const role = parseRole(formData.get('role'))
 
-  if (!email.includes('@')) throw new Error('Bitte eine gültige E-Mail-Adresse angeben')
-  if (!name) throw new Error('Bitte einen Namen angeben')
-  if (password.length < 8) throw new Error('Das Passwort braucht mindestens 8 Zeichen')
+  if (!role) return actionError('Unbekannte Rolle')
+  if (!email.includes('@')) return actionError('Bitte eine gültige E-Mail-Adresse angeben')
+  if (!name) return actionError('Bitte einen Namen angeben')
+  if (password.length < 8) return actionError('Das Passwort braucht mindestens 8 Zeichen')
 
   const [row] = await sql<{ id: string }[]>`
     insert into users (email, name, password_hash, role)
     values (${email}, ${name}, ${await hashPassword(password)}, ${role})
     on conflict (email) do nothing
     returning id`
-  if (!row) throw new Error('Diese E-Mail-Adresse ist bereits vergeben')
+  if (!row) return actionError('Diese E-Mail-Adresse ist bereits vergeben')
 
   await sql`select log_event('user', ${row.id}, 'state', ${'Benutzer angelegt (' + role + ')'}, ${admin.name})`
   revalidatePath('/einstellungen/benutzer')
@@ -45,7 +46,11 @@ export async function createUser(formData: FormData) {
 export async function setRole(userId: string, formData: FormData) {
   const admin = await requireAdmin()
   const role = parseRole(formData.get('role'))
-  if (role !== 'admin') await guardLastAdmin(userId)
+  if (!role) return actionError('Unbekannte Rolle')
+  if (role !== 'admin') {
+    const problem = await guardLastAdmin(userId)
+    if (problem) return problem
+  }
 
   await sql`update users set role = ${role} where id = ${userId}`
   await sql`select log_event('user', ${userId}, 'state', ${'Rolle geändert auf ' + role}, ${admin.name})`
@@ -55,7 +60,8 @@ export async function setRole(userId: string, formData: FormData) {
 export async function setActive(userId: string, active: boolean) {
   const admin = await requireAdmin()
   if (!active) {
-    await guardLastAdmin(userId)
+    const problem = await guardLastAdmin(userId)
+    if (problem) return problem
     // Laufende Sitzungen des deaktivierten Kontos sofort beenden.
     await sql`delete from sessions where user_id = ${userId}`
   }
@@ -68,7 +74,7 @@ export async function setActive(userId: string, active: boolean) {
 export async function resetPassword(userId: string, formData: FormData) {
   const admin = await requireAdmin()
   const password = String(formData.get('password') ?? '')
-  if (password.length < 8) throw new Error('Das Passwort braucht mindestens 8 Zeichen')
+  if (password.length < 8) return actionError('Das Passwort braucht mindestens 8 Zeichen')
 
   await sql`update users set password_hash = ${await hashPassword(password)} where id = ${userId}`
   await sql`delete from sessions where user_id = ${userId}`
