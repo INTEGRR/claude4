@@ -22,6 +22,7 @@ async function badges() {
       offene_eingaenge: number
       versandbereit: number
       offene_reparaturen: number
+      beschaffung: number
       fehler: number
     }[]
   >`
@@ -36,6 +37,7 @@ async function badges() {
       (select count(*) from shipping_ready)::int as versandbereit,
       (select count(*) from repair_orders
         where state not in ('repaired','cancel'))::int as offene_reparaturen,
+      (select count(*) from orderpoint_suggestions())::int as beschaffung,
       ((select count(*) from integration_jobs where status = 'failed')
        + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler`
   return row
@@ -91,6 +93,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ? [
             { href: '/lager', label: 'Transfers', count: counts.offene_eingaenge },
             { href: '/lager/bestand', label: 'Bestand' },
+            { href: '/lager/beschaffung', label: 'Beschaffung', count: counts.beschaffung },
             { href: '/lager/inventur', label: 'Inventur' },
           ]
         : [],

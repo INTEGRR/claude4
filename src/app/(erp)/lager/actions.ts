@@ -143,3 +143,54 @@ export async function updatePickingDetails(pickingId: string, formData: FormData
     where id = ${pickingId}`
   revalidatePath(`/lager/${pickingId}`)
 }
+
+// --- Meldebestände (Reordering Rules) --------------------------------------
+
+export async function createOrderpoint(formData: FormData) {
+  await requireWrite('lager')
+  const variantId = String(formData.get('variant_id') ?? '')
+  if (!variantId) throw new Error('Bitte ein Produkt auswählen')
+  const min = Number(formData.get('min_qty') ?? 0)
+  const max = Number(formData.get('max_qty') ?? 0)
+  if (max < min) throw new Error('Der Maximalbestand darf den Mindestbestand nicht unterschreiten')
+
+  const [loc] = await sql<{ id: string }[]>`
+    select id from stock_locations where full_path = 'WH/Stock'`
+  try {
+    await sql`
+      insert into stock_orderpoints (variant_id, location_id, min_qty, max_qty, qty_multiple, route)
+      values (${variantId}, ${loc.id}, ${min}, ${max},
+              ${Number(formData.get('qty_multiple') ?? 1) || 1},
+              ${String(formData.get('route') ?? '') || null})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath('/lager/beschaffung')
+}
+
+export async function deleteOrderpoint(orderpointId: string) {
+  await requireWrite('lager')
+  await sql`delete from stock_orderpoints where id = ${orderpointId}`
+  revalidatePath('/lager/beschaffung')
+}
+
+/** Vorschlag für einige Tage stummschalten (Odoo: snoozed_until). */
+export async function snoozeOrderpoint(orderpointId: string, days: number) {
+  await requireWrite('lager')
+  await sql`update stock_orderpoints
+            set snoozed_until = current_date + ${days}::int
+            where id = ${orderpointId}`
+  revalidatePath('/lager/beschaffung')
+}
+
+export async function executeOrderpoint(orderpointId: string) {
+  const user = await requireWrite('lager')
+  try {
+    await sql`select orderpoint_execute(${orderpointId}, ${user.name})`
+  } catch (err) {
+    fail(err)
+  }
+  revalidatePath('/lager/beschaffung')
+  revalidatePath('/einkauf')
+  revalidatePath('/fertigung')
+}
