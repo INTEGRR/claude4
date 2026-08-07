@@ -7,6 +7,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { addAttribute, updateProduct } from '../actions'
 import { RecordComments } from '@/components/record-comments'
+import { TagEditor } from '@/components/tag-editor'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,12 +32,29 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       route_manufacture: boolean
       route_mto: boolean
       uom: string
+      category_id: string
+      sale_delay: number
+      hs_code: string | null
+      country_of_origin: string | null
+      sale_tax_id: string | null
+      purchase_tax_id: string | null
+      description_sale: string | null
+      description_purchase: string | null
+      description_picking: string | null
+      responsible_id: string | null
     }[]
   >`
     select pt.*, u.name as uom from product_templates pt
     join uoms u on u.id = pt.uom_id where pt.id = ${id}`
 
   if (!tpl) notFound()
+
+  const categories = await sql<{ id: string; full_path: string }[]>`
+    select id, full_path from product_categories order by full_path`
+  const taxes = await sql<{ id: string; name: string; type_tax_use: string }[]>`
+    select id, name, type_tax_use from taxes where active order by type_tax_use, sequence`
+  const benutzer = await sql<{ id: string; name: string }[]>`
+    select id, name from users where active order by name`
 
   const variants = await sql<
     { id: string; display_name: string | null; sku: string | null; barcode: string | null; on_hand: number }[]
@@ -88,6 +106,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         }
       />
 
+      <div style={{ marginBottom: 12 }}>
+        <TagEditor model="product_template" recordId={id} path={`/produkte/${id}`} />
+      </div>
+
       <Card title="Eigenschaften">
         <ActionForm action={updateProduct.bind(null, id)}>
           <div className="row">
@@ -133,6 +155,81 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </select>
             </label>
           </div>
+          <div className="row">
+            <label className="field">
+              <span>Kategorie</span>
+              <select name="category_id" defaultValue={tpl.category_id}>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.full_path}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Steuer Verkauf</span>
+              <select name="sale_tax_id" defaultValue={tpl.sale_tax_id ?? ''}>
+                <option value="">keine</option>
+                {taxes.filter((t) => t.type_tax_use === 'sale').map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Steuer Einkauf</span>
+              <select name="purchase_tax_id" defaultValue={tpl.purchase_tax_id ?? ''}>
+                <option value="">keine</option>
+                {taxes.filter((t) => t.type_tax_use === 'purchase').map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Lieferzeit an Kunden (Tage)</span>
+              <input type="number" name="sale_delay" step="1" min="0" defaultValue={tpl.sale_delay} />
+            </label>
+            <label className="field">
+              <span>Verantwortlich</span>
+              <select name="responsible_id" defaultValue={tpl.responsible_id ?? ''}>
+                <option value="">—</option>
+                {benutzer.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="row">
+            <label className="field">
+              <span>Zolltarifnummer (HS-Code)</span>
+              <input name="hs_code" defaultValue={tpl.hs_code ?? ''} placeholder="für DHL-Auslandsversand" />
+            </label>
+            <label className="field">
+              <span>Ursprungsland</span>
+              <input
+                name="country_of_origin"
+                defaultValue={tpl.country_of_origin ?? ''}
+                maxLength={2}
+                placeholder="z. B. DE"
+              />
+            </label>
+            <label className="field" style={{ flex: 2 }}>
+              <span>Belegtext Verkauf</span>
+              <input name="description_sale" defaultValue={tpl.description_sale ?? ''} />
+            </label>
+          </div>
+          <details style={{ marginBottom: 12 }}>
+            <summary className="small muted" style={{ cursor: 'pointer' }}>
+              Weitere Belegtexte (Einkauf, Lieferschein)
+            </summary>
+            <div className="row" style={{ marginTop: 8 }}>
+              <label className="field">
+                <span>Belegtext Einkauf</span>
+                <input name="description_purchase" defaultValue={tpl.description_purchase ?? ''} />
+              </label>
+              <label className="field">
+                <span>Belegtext Lieferschein</span>
+                <input name="description_picking" defaultValue={tpl.description_picking ?? ''} />
+              </label>
+            </div>
+          </details>
           <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
             <label className="shrink">
               <input type="checkbox" name="can_be_sold" defaultChecked={tpl.can_be_sold} /> Verkaufbar

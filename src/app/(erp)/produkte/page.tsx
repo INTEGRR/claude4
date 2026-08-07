@@ -51,7 +51,12 @@ export default async function ProduktePage({
       <PageHeader
         title="Produkte"
         subtitle="Produktvorlagen mit Attributen und Varianten"
-        actions={<Link className="btn" href="/produkte/attribute">Attribute</Link>}
+        actions={
+          <>
+            <Link className="btn" href="/produkte/attribute">Attribute</Link>
+            <Link className="btn" href="/produkte/konfiguration">Konfiguration</Link>
+          </>
+        }
       />
 
       <Card title="Neues Produkt">

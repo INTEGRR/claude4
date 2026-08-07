@@ -57,7 +57,17 @@ export async function updateProduct(templateId: string, formData: FormData) {
         can_be_purchased = ${formData.get('can_be_purchased') === 'on'},
         route_buy = ${formData.get('route_buy') === 'on'},
         route_manufacture = ${formData.get('route_manufacture') === 'on'},
-        route_mto = ${formData.get('route_mto') === 'on'}
+        route_mto = ${formData.get('route_mto') === 'on'},
+        category_id = coalesce(${String(formData.get('category_id') ?? '') || null}::uuid, category_id),
+        sale_delay = ${Number(formData.get('sale_delay') ?? 0)},
+        hs_code = ${String(formData.get('hs_code') ?? '').trim() || null},
+        country_of_origin = ${String(formData.get('country_of_origin') ?? '').trim().toUpperCase() || null},
+        sale_tax_id = ${String(formData.get('sale_tax_id') ?? '') || null},
+        purchase_tax_id = ${String(formData.get('purchase_tax_id') ?? '') || null},
+        description_sale = ${String(formData.get('description_sale') ?? '').trim() || null},
+        description_purchase = ${String(formData.get('description_purchase') ?? '').trim() || null},
+        description_picking = ${String(formData.get('description_picking') ?? '').trim() || null},
+        responsible_id = ${String(formData.get('responsible_id') ?? '') || null}
       where id = ${templateId}`
   } catch (err) {
     fail(err)
