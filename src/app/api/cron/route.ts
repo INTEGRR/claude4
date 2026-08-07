@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen/import'
 import { runDueJobs } from '@/modules/integrationen/jobs'
+import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
 import { pruneSessions } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
           task,
           sessions: await pruneSessions(),
           tracking: await pruneTrackingData(),
+          monitor: await pruneMonitorData(),
         })
       default:
         return NextResponse.json({ error: `Unbekannte Aufgabe: ${task}` }, { status: 400 })

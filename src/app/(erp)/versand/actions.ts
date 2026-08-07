@@ -28,6 +28,10 @@ export async function createLabel(pickingId: string, formData: FormData) {
         ${`DHL-Hinweise zur Adresse: ${result.warnings.join(' | ')}`}, 'system')`
     }
   } catch (err) {
+    // Fehler dauerhaft am Beleg festhalten — nicht nur flüchtig in der UI.
+    const message = err instanceof Error ? err.message : String(err)
+    await sql`select log_event('stock_picking', ${pickingId}, 'error',
+      ${`DHL-Label fehlgeschlagen: ${message.slice(0, 300)}`}, 'system')`
     fail(err)
   }
 

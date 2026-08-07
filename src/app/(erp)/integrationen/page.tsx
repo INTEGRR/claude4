@@ -7,8 +7,8 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
-import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen/import'
-import { retryJob, runDueJobs } from '@/modules/integrationen/jobs'
+import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
+import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +44,20 @@ async function retry(jobId: string) {
   revalidatePath('/integrationen')
 }
 
+async function resetRunning(jobId: string) {
+  'use server'
+  await requireAdmin()
+  await resetRunningJob(jobId)
+  revalidatePath('/integrationen')
+}
+
+async function retryWebhook(eventId: string) {
+  'use server'
+  await requireAdmin()
+  await retryWebhookEvent(eventId)
+  revalidatePath('/integrationen')
+}
+
 /** Ordnet eine unbekannte Shopify-SKU einer Variante zu. */
 async function resolveUnmatched(lineId: string, formData: FormData) {
   'use server'
@@ -72,14 +86,29 @@ async function resolveUnmatched(lineId: string, formData: FormData) {
 export default async function IntegrationenPage() {
   await requireArea('integrationen')
   const [stats] = await sql<
-    { pending_events: number; failed_events: number; pending_jobs: number; failed_jobs: number; unmatched: number }[]
+    {
+      pending_events: number
+      failed_events: number
+      pending_jobs: number
+      failed_jobs: number
+      running_stuck: number
+      unmatched: number
+      tx_failed_24h: number
+      tx_24h: number
+    }[]
   >`
     select
       (select count(*) from shopify_webhook_events where status = 'pending')::int as pending_events,
       (select count(*) from shopify_webhook_events where status = 'failed')::int as failed_events,
       (select count(*) from integration_jobs where status = 'pending')::int as pending_jobs,
       (select count(*) from integration_jobs where status = 'failed')::int as failed_jobs,
-      (select count(*) from shopify_unmatched_lines where resolved_at is null)::int as unmatched`
+      (select count(*) from integration_jobs
+        where status = 'running' and started_at < now() - interval '10 minutes')::int as running_stuck,
+      (select count(*) from shopify_unmatched_lines where resolved_at is null)::int as unmatched,
+      (select count(*) from api_transactions
+        where not ok and created_at > now() - interval '24 hours')::int as tx_failed_24h,
+      (select count(*) from api_transactions
+        where created_at > now() - interval '24 hours')::int as tx_24h`
 
   const [syncState] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`
@@ -91,9 +120,18 @@ export default async function IntegrationenPage() {
     from shopify_webhook_events order by received_at desc limit 20`
 
   const jobs = await sql<
-    { id: string; kind: string; status: string; attempts: number; last_error: string | null; next_run_at: string }[]
+    {
+      id: string
+      kind: string
+      status: string
+      attempts: number
+      last_error: string | null
+      last_result: string | null
+      next_run_at: string
+      started_at: string | null
+    }[]
   >`
-    select id, kind, status, attempts, last_error, next_run_at
+    select id, kind, status, attempts, last_error, last_result, next_run_at, started_at
     from integration_jobs order by created_at desc limit 25`
 
   const unmatched = await sql<
@@ -110,10 +148,11 @@ export default async function IntegrationenPage() {
   return (
     <>
       <PageHeader
-        title="Integrationen"
-        subtitle="Shopify-Import, ausgehende Aufträge und Zustand der Anbindungen"
+        title="Ereignis-Monitor"
+        subtitle="Shopify-Import, ausgehende Aufträge, API-Transaktionen und Zustand der Anbindungen"
         actions={
           <>
+            <Link className="btn" href="/integrationen/transaktionen">Transaktionsprotokoll</Link>
             <ActionButton action={processWebhooks}>Webhooks verarbeiten</ActionButton>
             <ActionButton action={runJobs}>Jobs ausführen</ActionButton>
             <ActionButton action={runReconcile}>Mit Shopify abgleichen</ActionButton>
@@ -133,11 +172,33 @@ export default async function IntegrationenPage() {
           hint="Parcel DE Shipping API v2"
         />
         <Stat
-          label="Offene Vorgänge"
+          label="Warteschlange"
           value={qty(stats.pending_events + stats.pending_jobs)}
-          hint={`${stats.failed_events + stats.failed_jobs} fehlgeschlagen`}
+          hint={`${stats.failed_events + stats.failed_jobs} fehlgeschlagen${
+            stats.running_stuck > 0 ? ` · ${stats.running_stuck} hängend` : ''
+          }`}
+        />
+        <Stat
+          label="API-Transaktionen (24 h)"
+          value={qty(stats.tx_24h)}
+          hint={`${stats.tx_failed_24h} fehlgeschlagen`}
+          href="/integrationen/transaktionen"
         />
       </div>
+
+      {(stats.failed_events + stats.failed_jobs > 0 || stats.tx_failed_24h > 0 || stats.running_stuck > 0) && (
+        <div className="notice danger">
+          {stats.failed_jobs > 0 && <>{stats.failed_jobs} Job(s) endgültig fehlgeschlagen. </>}
+          {stats.failed_events > 0 && <>{stats.failed_events} Webhook(s) fehlgeschlagen. </>}
+          {stats.running_stuck > 0 && <>{stats.running_stuck} Job(s) hängen in „running". </>}
+          {stats.tx_failed_24h > 0 && (
+            <>
+              {stats.tx_failed_24h} API-Fehler in 24 h —{' '}
+              <Link href="/integrationen/transaktionen?nur=fehler">zum Protokoll</Link>.
+            </>
+          )}
+        </div>
+      )}
 
       {!shopifyConfigured() && (
         <div className="notice warn">
@@ -223,14 +284,32 @@ export default async function IntegrationenPage() {
                       >
                         {j.status}
                       </span>
+                      {j.status === 'running' && j.started_at && (
+                        <span className="muted small"> seit {dateTime(j.started_at)}</span>
+                      )}
                     </td>
                     <td className="num">{j.attempts}</td>
-                    <td className="small" style={{ maxWidth: 380 }}>{j.last_error ?? '—'}</td>
+                    <td className="small" style={{ maxWidth: 380 }}>
+                      {j.last_error ? (
+                        <span className="badge danger">{j.last_error}</span>
+                      ) : (
+                        j.last_result ?? '—'
+                      )}
+                    </td>
                     <td className="nowrap small">{dateTime(j.next_run_at)}</td>
                     <td className="num">
                       {j.status === 'failed' && (
                         <ActionButton className="small" action={retry.bind(null, j.id)}>
                           Erneut
+                        </ActionButton>
+                      )}
+                      {j.status === 'running' && (
+                        <ActionButton
+                          className="small"
+                          action={resetRunning.bind(null, j.id)}
+                          confirm="Diesen Lauf als abgebrochen behandeln und den Job zurück in die Queue stellen?"
+                        >
+                          Zurücksetzen
                         </ActionButton>
                       )}
                     </td>
@@ -252,8 +331,10 @@ export default async function IntegrationenPage() {
                 <tr>
                   <th>Empfangen</th>
                   <th>Ereignis</th>
+                  <th>Shopify-Order</th>
                   <th>Status</th>
                   <th>Meldung</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -261,6 +342,7 @@ export default async function IntegrationenPage() {
                   <tr key={e.id}>
                     <td className="nowrap small">{dateTime(e.received_at)}</td>
                     <td className="mono small">{e.topic}</td>
+                    <td className="mono small">{e.order_id?.split('/').pop() ?? '—'}</td>
                     <td>
                       <span
                         className={`badge ${
@@ -271,6 +353,13 @@ export default async function IntegrationenPage() {
                       </span>
                     </td>
                     <td className="small" style={{ maxWidth: 420 }}>{e.error ?? '—'}</td>
+                    <td className="num">
+                      {(e.status === 'failed' || e.status === 'skipped') && (
+                        <ActionButton className="small" action={retryWebhook.bind(null, e.id)}>
+                          Erneut
+                        </ActionButton>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

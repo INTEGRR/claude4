@@ -43,6 +43,11 @@ interface GraphQLResponse<T> {
   errors?: { message: string; extensions?: { code?: string } }[]
 }
 
+/** Operationsname fürs Transaktionslog: erstes Feld hinter der öffnenden Klammer. */
+function operationName(query: string): string {
+  return /(?:query|mutation)[^{]*\{\s*(\w+)/.exec(query)?.[1] ?? 'anonym'
+}
+
 export async function shopifyGraphQL<T>(
   query: string,
   variables: Record<string, unknown> = {},
@@ -50,29 +55,55 @@ export async function shopifyGraphQL<T>(
   const c = shopifyConfig()
   if (!c.shop || !c.token) throw new ShopifyError('Shopify ist nicht konfiguriert', false)
 
-  const res = await fetch(`https://${c.shop}/admin/api/${c.apiVersion}/graphql.json`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': c.token,
-    },
-    body: JSON.stringify({ query, variables }),
-  })
+  const start = Date.now()
+  const kind = `graphql:${operationName(query)}`
+  const protokoll = async (ok: boolean, statusCode: number | null, response: unknown, error?: string) => {
+    const { logTransaction } = await import('./transaktionen')
+    await logTransaction({
+      system: 'shopify', kind, request: { variables }, response,
+      ok, statusCode, error, durationMs: Date.now() - start,
+    })
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`https://${c.shop}/admin/api/${c.apiVersion}/graphql.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': c.token,
+      },
+      body: JSON.stringify({ query, variables }),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await protokoll(false, null, null, `Netzwerkfehler: ${message}`)
+    throw new ShopifyError(`Shopify nicht erreichbar: ${message}`, true)
+  }
 
   // 429/5xx sind vorübergehend - der Job-Runner versucht es später erneut.
   if (res.status === 429 || res.status >= 500) {
+    await protokoll(false, res.status, null, `Shopify antwortete mit ${res.status}`)
     throw new ShopifyError(`Shopify antwortete mit ${res.status}`, true)
   }
   if (!res.ok) {
-    throw new ShopifyError(`Shopify antwortete mit ${res.status}: ${await res.text()}`, false)
+    const text = await res.text()
+    await protokoll(false, res.status, null, text.slice(0, 500))
+    throw new ShopifyError(`Shopify antwortete mit ${res.status}: ${text}`, false)
   }
 
   const body = (await res.json()) as GraphQLResponse<T>
   if (body.errors?.length) {
     const throttled = body.errors.some((e) => e.extensions?.code === 'THROTTLED')
-    throw new ShopifyError(body.errors.map((e) => e.message).join('; '), throttled)
+    const message = body.errors.map((e) => e.message).join('; ')
+    await protokoll(false, res.status, body.errors, message)
+    throw new ShopifyError(message, throttled)
   }
-  if (!body.data) throw new ShopifyError('Shopify lieferte keine Daten', true)
+  if (!body.data) {
+    await protokoll(false, res.status, null, 'Shopify lieferte keine Daten')
+    throw new ShopifyError('Shopify lieferte keine Daten', true)
+  }
+  await protokoll(true, res.status, body.data)
   return body.data
 }
 

@@ -25,12 +25,19 @@ export function mailConfigured(): boolean {
 export async function sendMail(mail: MailInput): Promise<void> {
   const key = process.env.RESEND_API_KEY
   const from = process.env.MAIL_FROM ?? 'ERP <noreply@example.com>'
+  const { logTransaction } = await import('./transaktionen')
 
   if (!key) {
     console.info(`[mail] Kein RESEND_API_KEY gesetzt — E-Mail an ${mail.to} nicht versendet: ${mail.subject}`)
+    await logTransaction({
+      system: 'mail', kind: 'send', reference: mail.to, ok: true,
+      request: { subject: mail.subject },
+      error: 'nicht versendet (RESEND_API_KEY fehlt)',
+    })
     return
   }
 
+  const start = Date.now()
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -47,6 +54,17 @@ export async function sendMail(mail: MailInput): Promise<void> {
   })
 
   if (!res.ok) {
-    throw new Error(`E-Mail-Versand fehlgeschlagen (${res.status}): ${await res.text()}`)
+    const text = await res.text()
+    await logTransaction({
+      system: 'mail', kind: 'send', reference: mail.to, ok: false,
+      statusCode: res.status, request: { subject: mail.subject },
+      error: text.slice(0, 500), durationMs: Date.now() - start,
+    })
+    throw new Error(`E-Mail-Versand fehlgeschlagen (${res.status}): ${text}`)
   }
+  await logTransaction({
+    system: 'mail', kind: 'send', reference: mail.to, ok: true,
+    statusCode: res.status, request: { subject: mail.subject },
+    durationMs: Date.now() - start,
+  })
 }

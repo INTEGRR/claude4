@@ -181,14 +181,39 @@ export interface RunResult {
   failed: number
 }
 
+/**
+ * Beleg, an dessen Verlauf ein Job-Fehler gehört. So sieht man am
+ * Verkaufsauftrag bzw. an der Lieferung, dass die Rückmeldung hakt.
+ */
+async function originForJob(
+  kind: string,
+  payload: Record<string, unknown>,
+): Promise<{ model: string; id: string } | null> {
+  if (kind === 'shopify_tag_add' && payload.sales_order_id) {
+    return { model: 'sales_order', id: String(payload.sales_order_id) }
+  }
+  if (kind === 'send_po_email' && payload.purchase_order_id) {
+    return { model: 'purchase_order', id: String(payload.purchase_order_id) }
+  }
+  if (kind === 'shopify_fulfillment_create' && payload.shipment_id) {
+    const [row] = await sql<{ picking_id: string }[]>`
+      select picking_id from shipments where id = ${String(payload.shipment_id)}`
+    if (row) return { model: 'stock_picking', id: row.picking_id }
+  }
+  return null
+}
+
 /** Arbeitet fällige Jobs ab. Wird vom Cron-Endpunkt aufgerufen. */
 export async function runDueJobs(limit = 20): Promise<RunResult> {
+  // Hängengebliebene Läufe (Prozessabbruch mitten im Handler) zurückholen.
+  await sql`select reap_stuck_jobs()`
+
   // Jobs einzeln sperren, damit parallele Runner sich nicht in die Quere kommen.
   const jobs = await sql<
     { id: string; kind: string; payload: Record<string, unknown>; attempts: number; max_attempts: number }[]
   >`
     update integration_jobs
-    set status = 'running', attempts = attempts + 1
+    set status = 'running', attempts = attempts + 1, started_at = now()
     where id in (
       select id from integration_jobs
       where status = 'pending' and next_run_at <= now()
@@ -214,7 +239,8 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
     try {
       const message = await handler(job.payload)
       await sql`update integration_jobs
-                set status = 'done', last_error = ${message} where id = ${job.id}`
+                set status = 'done', last_result = ${message}, last_error = null
+                where id = ${job.id}`
       succeeded++
     } catch (err) {
       failed++
@@ -229,6 +255,13 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
           last_error = ${message},
           next_run_at = now() + make_interval(mins => ${delay})
         where id = ${job.id}`
+
+      // Fehler auch am betroffenen Beleg sichtbar machen.
+      const origin = await originForJob(job.kind, job.payload)
+      if (origin) {
+        await sql`select log_event(${origin.model}, ${origin.id}, 'error',
+          ${`${job.kind} fehlgeschlagen (Versuch ${job.attempts}/${job.max_attempts}): ${message.slice(0, 300)}`})`
+      }
     }
   }
 
@@ -241,4 +274,12 @@ export async function retryJob(jobId: string): Promise<void> {
     update integration_jobs
     set status = 'pending', attempts = 0, next_run_at = now(), last_error = null
     where id = ${jobId} and status = 'failed'`
+}
+
+/** Holt einen hängengebliebenen 'running'-Job von Hand zurück in die Queue. */
+export async function resetRunningJob(jobId: string): Promise<void> {
+  await sql`
+    update integration_jobs
+    set status = 'pending', next_run_at = now(), last_error = 'Manuell zurückgesetzt'
+    where id = ${jobId} and status = 'running'`
 }

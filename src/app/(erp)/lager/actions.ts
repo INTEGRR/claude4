@@ -25,8 +25,12 @@ export async function validatePicking(pickingId: string, formData: FormData) {
   // Nach dem Warenausgang die Sendung an Shopify melden (läuft über die Outbox).
   try {
     await queueFulfillmentForPicking(pickingId)
-  } catch {
-    // Die Rückmeldung darf den Warenausgang nie blockieren.
+  } catch (err) {
+    // Die Rückmeldung darf den Warenausgang nie blockieren — aber sie
+    // muss eine Spur hinterlassen.
+    await sql`select log_event('stock_picking', ${pickingId}, 'error',
+      ${`Shopify-Rückmeldung konnte nicht eingereiht werden: ${err instanceof Error ? err.message : String(err)}`})`
+      .catch(() => undefined)
   }
 
   revalidatePath(`/lager/${pickingId}`)

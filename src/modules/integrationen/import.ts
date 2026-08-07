@@ -209,7 +209,7 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
   >`
     select id, topic, shopify_order_id, payload
     from shopify_webhook_events
-    where status = 'pending' and attempts < 5
+    where status = 'pending' and attempts < 5 and next_attempt_at <= now()
     order by received_at
     limit ${limit}`
 
@@ -246,17 +246,28 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
       processed++
     } catch (err) {
       failed++
+      // Gleiche Backoff-Staffel wie die Job-Queue statt Sofort-Wiederholung.
       await sql`
         update shopify_webhook_events
         set attempts = attempts + 1,
             error = ${err instanceof Error ? err.message : String(err)},
             status = case when attempts + 1 >= 5 then 'failed'::webhook_status
-                          else 'pending'::webhook_status end
+                          else 'pending'::webhook_status end,
+            next_attempt_at = now() + make_interval(
+              mins => (array[1, 5, 15, 60, 180])[least(attempts + 1, 5)])
         where id = ${event.id}`
     }
   }
 
   return { processed, failed }
+}
+
+/** Stellt ein fehlgeschlagenes Webhook-Event zur erneuten Verarbeitung ein. */
+export async function retryWebhookEvent(eventId: string): Promise<void> {
+  await sql`
+    update shopify_webhook_events
+    set status = 'pending', attempts = 0, error = null, next_attempt_at = now()
+    where id = ${eventId} and status in ('failed', 'skipped')`
 }
 
 /**

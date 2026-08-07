@@ -49,6 +49,21 @@ export class DhlError extends Error {
   }
 }
 
+/** Transaktionslog-Anbindung (fire-and-forget, nie mit Zugangsdaten). */
+async function protokoll(t: {
+  kind: string
+  reference?: string | null
+  request?: unknown
+  response?: unknown
+  ok: boolean
+  statusCode?: number | null
+  error?: string | null
+  durationMs?: number
+}) {
+  const { logTransaction } = await import('../integrationen/transaktionen')
+  await logTransaction({ system: 'dhl', ...t })
+}
+
 // --- Token-Verwaltung ------------------------------------------------------
 
 let cachedToken: { value: string; expiresAt: number } | undefined
@@ -57,6 +72,7 @@ async function accessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return cachedToken.value
 
   const c = dhlConfig()
+  const start = Date.now()
   const res = await fetch(`${c.base}/parcel/de/account/auth/ropc/v1/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -70,12 +86,17 @@ async function accessToken(): Promise<string> {
   })
 
   if (!res.ok) {
+    await protokoll({
+      kind: 'oauth_token', ok: false, statusCode: res.status,
+      error: `Anmeldung fehlgeschlagen (${res.status})`, durationMs: Date.now() - start,
+    })
     throw new DhlError(
       `DHL-Anmeldung fehlgeschlagen (${res.status}). Bitte Zugangsdaten prüfen — ` +
         `das Passwort des GKP-Systembenutzers läuft nach 365 Tagen ab.`,
       res.status,
     )
   }
+  await protokoll({ kind: 'oauth_token', ok: true, statusCode: res.status, durationMs: Date.now() - start })
 
   const body = (await res.json()) as { access_token: string; expires_in: number }
   cachedToken = {
@@ -169,6 +190,7 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
     ],
   }
 
+  const start = Date.now()
   const res = await dhlFetch(
     `/parcel/de/shipping/v2/orders?includeDocs=include&printFormat=${encodeURIComponent(printFormat)}&docFormat=PDF`,
     {
@@ -188,23 +210,30 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
     }[]
   } | null
 
+  // Fürs Protokoll ohne das Label-PDF (Base64 wäre nur Ballast).
+  const responseOhneLabel = json
+    ? { ...json, items: json.items?.map((i) => ({ ...i, label: i.label?.url ? { url: i.label.url } : undefined })) }
+    : null
+  const logCreate = (ok: boolean, error?: string) =>
+    protokoll({
+      kind: 'label_create', reference: input.reference, request: body,
+      response: responseOhneLabel, ok, statusCode: res.status, error, durationMs: Date.now() - start,
+    })
+
   if (!res.ok || !json) {
-    throw new DhlError(
-      `DHL lehnte die Sendung ab (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? 'unbekannter Fehler'}`,
-      res.status,
-      json,
-    )
+    const message = `DHL lehnte die Sendung ab (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? 'unbekannter Fehler'}`
+    await logCreate(false, message)
+    throw new DhlError(message, res.status, json)
   }
 
   const item = json.items?.[0]
   if (!item?.shipmentNo) {
     const messages = item?.validationMessages?.map((m) => m.validationMessage ?? '').filter(Boolean)
-    throw new DhlError(
-      `DHL hat keine Sendungsnummer geliefert: ${messages?.join('; ') || item?.sstatus?.detail || 'unbekannter Fehler'}`,
-      res.status,
-      json,
-    )
+    const message = `DHL hat keine Sendungsnummer geliefert: ${messages?.join('; ') || item?.sstatus?.detail || 'unbekannter Fehler'}`
+    await logCreate(false, message)
+    throw new DhlError(message, res.status, json)
   }
+  await logCreate(true)
 
   return {
     shipmentNumber: item.shipmentNo,
@@ -221,16 +250,23 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
 
 /** Storniert eine Sendung. Möglich nur bis zum Tagesabschluss (Manifest). */
 export async function cancelShipment(shipmentNumber: string): Promise<void> {
+  const start = Date.now()
   const res = await dhlFetch(
     `/parcel/de/shipping/v2/orders?shipment=${encodeURIComponent(shipmentNumber)}`,
     { method: 'DELETE' },
   )
   if (!res.ok) {
-    throw new DhlError(
-      `Storno abgelehnt (${res.status}). Nach dem Tagesabschluss lässt sich ein Label nicht mehr stornieren.`,
-      res.status,
-    )
+    const message = `Storno abgelehnt (${res.status}). Nach dem Tagesabschluss lässt sich ein Label nicht mehr stornieren.`
+    await protokoll({
+      kind: 'label_cancel', reference: shipmentNumber, ok: false,
+      statusCode: res.status, error: message, durationMs: Date.now() - start,
+    })
+    throw new DhlError(message, res.status)
   }
+  await protokoll({
+    kind: 'label_cancel', reference: shipmentNumber, ok: true,
+    statusCode: res.status, durationMs: Date.now() - start,
+  })
 }
 
 // --- Tracking --------------------------------------------------------------
@@ -249,17 +285,31 @@ export interface TrackingResult {
  */
 export async function trackShipment(shipmentNumber: string): Promise<TrackingResult | null> {
   const c = dhlConfig()
+  const start = Date.now()
   const res = await fetch(
     `${c.base}/track/shipments?trackingNumber=${encodeURIComponent(shipmentNumber)}` +
       `&service=parcel-de&requesterCountryCode=DE&language=de`,
     { headers: { 'DHL-API-Key': c.apiKey, Accept: 'application/json' } },
   )
+  const logTrack = (ok: boolean, error?: string) =>
+    protokoll({
+      kind: 'tracking', reference: shipmentNumber, ok,
+      statusCode: res.status, error, durationMs: Date.now() - start,
+    })
 
-  if (res.status === 404) return null
+  if (res.status === 404) {
+    await logTrack(true, 'Sendung (noch) nicht im Tracking')
+    return null
+  }
   if (res.status === 429) {
+    await logTrack(false, 'Tracking-Limit erreicht')
     throw new DhlError('DHL-Tracking-Limit erreicht (250 Abfragen/Tag, 1 alle 5 s)', 429)
   }
-  if (!res.ok) throw new DhlError(`Tracking fehlgeschlagen (${res.status})`, res.status)
+  if (!res.ok) {
+    await logTrack(false, `Tracking fehlgeschlagen (${res.status})`)
+    throw new DhlError(`Tracking fehlgeschlagen (${res.status})`, res.status)
+  }
+  await logTrack(true)
 
   const json = (await res.json()) as {
     shipments?: {
@@ -291,6 +341,7 @@ export async function createReturnLabel(
   reference: string,
 ): Promise<ReturnLabelResult> {
   const c = dhlConfig()
+  const start = Date.now()
   const res = await dhlFetch(`/parcel/de/shipping/returns/v1/orders?labelType=BOTH`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -318,13 +369,20 @@ export async function createReturnLabel(
   } | null
 
   if (!res.ok || !json?.shipmentNo) {
-    throw new DhlError(
+    const message =
       `Retourenlabel abgelehnt (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? 'unbekannter Fehler'}. ` +
-        `Voraussetzung ist ein Retouren-Vertrag mit im GKP angelegtem Retourenempfänger.`,
-      res.status,
-      json,
-    )
+      `Voraussetzung ist ein Retouren-Vertrag mit im GKP angelegtem Retourenempfänger.`
+    await protokoll({
+      kind: 'return_label', reference, ok: false, statusCode: res.status,
+      error: message, response: json?.status, durationMs: Date.now() - start,
+    })
+    throw new DhlError(message, res.status, json)
   }
+  await protokoll({
+    kind: 'return_label', reference, ok: true, statusCode: res.status,
+    response: { shipmentNo: json.shipmentNo, qrLink: json.qrLink },
+    durationMs: Date.now() - start,
+  })
 
   return {
     shipmentNumber: json.shipmentNo,
