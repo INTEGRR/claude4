@@ -4,7 +4,7 @@ import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
 import { parseLotSpec, parseQtyMap } from '@/modules/shared/form'
 import { queueFulfillmentForPicking } from '@/modules/versand/service'
-import { actionError, actionFail } from '@/modules/shared/action'
+import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
 
 /** Validiert einen Transfer inkl. abweichender Ist-Mengen und Rückstand. */
 export async function validatePicking(pickingId: string, formData: FormData) {
@@ -186,6 +186,12 @@ export async function deleteOrderpoint(orderpointId: string) {
 }
 
 /** Vorschlag für einige Tage stummschalten (Odoo: snoozed_until). */
+/*
+ * Keine Rückmeldung am Knopf: Mit dem Schlummern verschwindet die Zeile aus
+ * den Vorschlägen und nimmt die Meldung mit. Stattdessen steht oben auf der
+ * Seite dauerhaft, wie viele Regeln schlummern — das überlebt den Neuaufbau
+ * und ist auch morgen noch zu sehen.
+ */
 export async function snoozeOrderpoint(orderpointId: string, days: number) {
   await requireWrite('lager')
   await sql`update stock_orderpoints
@@ -194,16 +200,44 @@ export async function snoozeOrderpoint(orderpointId: string, days: number) {
   revalidatePath('/lager/beschaffung')
 }
 
+/*
+ * Legt Bestellung oder Fertigungsauftrag an. Beides entsteht als Entwurf und
+ * verändert die Prognose noch nicht — der Vorschlag bleibt also stehen.
+ * Deshalb muss die Rückmeldung sagen, welcher Beleg entstanden ist; sonst
+ * sieht es aus, als hätte der Knopf nichts getan.
+ */
 export async function executeOrderpoint(orderpointId: string) {
   const user = await requireWrite('lager')
+  let beleg: string
   try {
-    await sql`select orderpoint_execute(${orderpointId}, ${user.name})`
+    const [row] = await sql<{ orderpoint_execute: string }[]>`
+      select orderpoint_execute(${orderpointId}, ${user.name})`
+    beleg = row.orderpoint_execute
   } catch (err) {
     return actionFail(err)
   }
   revalidatePath('/lager/beschaffung')
   revalidatePath('/einkauf')
   revalidatePath('/fertigung')
+
+  const istFertigung = beleg.startsWith('MO/')
+  const [ziel] = istFertigung
+    ? await sql<{ id: string }[]>`select id from manufacturing_orders where number = ${beleg}`
+    : await sql<{ id: string }[]>`select id from purchase_orders where number = ${beleg}`
+
+  return actionInfo(
+    istFertigung
+      ? `Fertigungsauftrag ${beleg} angelegt und bestätigt.`
+      : `Position in Bestellung ${beleg} aufgenommen (Entwurf).`,
+    ziel ? (istFertigung ? `/fertigung/${ziel.id}` : `/einkauf/${ziel.id}`) : undefined,
+  )
+}
+
+/** Schlummern beenden — sonst bliebe die Regel unauffindbar stumm. */
+export async function wakeOrderpoint(orderpointId: string) {
+  await requireWrite('lager')
+  await sql`update stock_orderpoints set snoozed_until = null where id = ${orderpointId}`
+  revalidatePath('/lager/beschaffung')
 }
 
 /**

@@ -3,11 +3,13 @@ import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, qty, money } from '@/modules/shared/format'
+import Link from 'next/link'
 import {
   createOrderpoint,
   deleteOrderpoint,
   executeOrderpoint,
   snoozeOrderpoint,
+  wakeOrderpoint,
 } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +38,23 @@ export default async function BeschaffungPage() {
       unit_price: number | null
     }[]
   >`select * from orderpoint_suggestions()`
+
+  // Was aus früheren Klicks schon offen ist. Entwurfs-Bestellungen verändern
+  // die Prognose nicht, deshalb steht der Vorschlag weiter da — ohne diesen
+  // Hinweis würde man ihn ein zweites Mal ausführen.
+  const offen = await sql<
+    { orderpoint_id: string; beleg: string; art: string; ziel: string; menge: number }[]
+  >`
+    select op.id as orderpoint_id, po.number as beleg, 'Bestellung' as art,
+           po.id::text as ziel, sum(pol.qty) as menge
+    from stock_orderpoints op
+    join purchase_order_lines pol on pol.variant_id = op.variant_id
+    join purchase_orders po on po.id = pol.order_id and po.state = 'draft'
+    group by 1, 2, 3, 4
+    union all
+    select mo.orderpoint_id, mo.number, 'Fertigungsauftrag', mo.id::text, mo.qty_to_produce
+    from manufacturing_orders mo
+    where mo.orderpoint_id is not null and mo.state not in ('done', 'cancel')`
 
   const regeln = await sql<
     {
@@ -70,6 +89,14 @@ export default async function BeschaffungPage() {
         subtitle="Meldebestände: Vorschläge entstehen, sobald die Prognose unter den Mindestbestand fällt"
       />
 
+      {regeln.some((r) => r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10)) && (
+        <div className="notice info">
+          {regeln.filter((r) => r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10)).length}{' '}
+          Regel(n) schlummern und erscheinen deshalb nicht in den Vorschlägen. Sie stehen unten
+          in der Regelliste und lassen sich dort wieder aufwecken.
+        </div>
+      )}
+
       <Card title={`Beschaffungsvorschläge (${vorschlaege.length})`} tight>
         {vorschlaege.length === 0 ? (
           <Empty>Kein Bedarf — alle Prognosen liegen über dem Mindestbestand.</Empty>
@@ -85,6 +112,7 @@ export default async function BeschaffungPage() {
                   <th className="num">Vorschlag</th>
                   <th>Weg</th>
                   <th>Lieferant</th>
+                  <th>Bereits veranlasst</th>
                   <th />
                 </tr>
               </thead>
@@ -112,6 +140,25 @@ export default async function BeschaffungPage() {
                       {v.vendor_name ?? '—'}
                       {v.unit_price != null && (
                         <> · <span className="mono nowrap">{money(v.unit_price)}</span></>
+                      )}
+                    </td>
+                    <td className="small">
+                      {offen
+                        .filter((o) => o.orderpoint_id === v.orderpoint_id)
+                        .map((o) => (
+                          <div key={o.beleg} className="nowrap">
+                            <span className="led ok" />{' '}
+                            <Link
+                              className="mono"
+                              href={o.art === 'Bestellung' ? `/einkauf/${o.ziel}` : `/fertigung/${o.ziel}`}
+                            >
+                              {o.beleg}
+                            </Link>{' '}
+                            <span className="muted">· {qty(o.menge)}</span>
+                          </div>
+                        ))}
+                      {offen.every((o) => o.orderpoint_id !== v.orderpoint_id) && (
+                        <span className="muted">—</span>
                       )}
                     </td>
                     <td className="num">
@@ -165,15 +212,31 @@ export default async function BeschaffungPage() {
                     <td className="small">
                       {r.route === 'manufacture' ? 'Fertigen' : r.route === 'buy' ? 'Einkaufen' : 'aus Produktrouten'}
                     </td>
-                    <td className="small muted mono nowrap">{r.snoozed_until ? date(r.snoozed_until) : '—'}</td>
+                    <td className="small nowrap">
+                      {r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10) ? (
+                        <>
+                          <span className="led off" />{' '}
+                          <span className="mono muted">schlummert bis {date(r.snoozed_until)}</span>
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
                     <td className="num">
-                      <ActionButton
-                        className="small danger"
-                        action={deleteOrderpoint.bind(null, r.id)}
-                        confirm="Meldebestand-Regel löschen?"
-                      >
-                        Löschen
-                      </ActionButton>
+                      <div className="actions" style={{ justifyContent: 'flex-end' }}>
+                        {r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10) && (
+                          <ActionButton className="small" action={wakeOrderpoint.bind(null, r.id)}>
+                            Aufwecken
+                          </ActionButton>
+                        )}
+                        <ActionButton
+                          className="small danger"
+                          action={deleteOrderpoint.bind(null, r.id)}
+                          confirm="Meldebestand-Regel löschen?"
+                        >
+                          Löschen
+                        </ActionButton>
+                      </div>
                     </td>
                   </tr>
                 ))}

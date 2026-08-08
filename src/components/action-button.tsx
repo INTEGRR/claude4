@@ -1,6 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { type ActionResult, isActionError } from '@/modules/shared/action'
+import { type ActionResult, isActionError, isActionInfo } from '@/modules/shared/action'
 
 /**
  * Fehlerzeile: Leuchte plus Wort, dann die Meldung im Klartext. Bewusst
@@ -15,6 +15,22 @@ function ErrorNotice({ message, style }: { message: string; style?: React.CSSPro
         Fehler
       </span>
       {message}
+    </div>
+  )
+}
+
+/** Gegenstück zur Fehlerzeile: bestätigt, was die Aktion angelegt hat. */
+function InfoNotice({ text, link, style }: { text: string; link?: string; style?: React.CSSProperties }) {
+  return (
+    <div className="notice success" role="status" style={{ marginBottom: 0, maxWidth: 460, ...style }}>
+      <span className="led ok" style={{ marginRight: 6 }} />
+      {text}
+      {link && (
+        <>
+          {' '}
+          <a href={link}>Öffnen</a>
+        </>
+      )}
     </div>
   )
 }
@@ -42,16 +58,19 @@ export function ActionButton({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<{ text: string; link?: string } | null>(null)
 
   function run() {
     if (confirm && !window.confirm(confirm)) return
     setError(null)
+    setInfo(null)
     startTransition(async () => {
       try {
         // Fachliche Fehler kommen als Rückgabewert (Next.js schwärzt geworfene
         // Fehler im Produktionsbau), technische weiterhin als Ausnahme.
         const result = await action()
         if (isActionError(result)) setError(result.error)
+        else if (isActionInfo(result)) setInfo({ text: result.info, link: result.link })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')
       }
@@ -71,6 +90,7 @@ export function ActionButton({
         {children}
       </button>
       {error && <ErrorNotice message={error} />}
+      {info && <InfoNotice text={info.text} link={info.link} />}
     </>
   )
 }
@@ -89,12 +109,14 @@ export function ActionForm({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<{ text: string; link?: string } | null>(null)
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
     const data = new FormData(form)
     setError(null)
+    setInfo(null)
     startTransition(async () => {
       try {
         const result = await action(data)
@@ -102,6 +124,7 @@ export function ActionForm({
           setError(result.error)
           return                    // Eingaben stehen lassen, damit nichts verloren geht
         }
+        if (isActionInfo(result)) setInfo({ text: result.info, link: result.link })
         form.reset()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')
@@ -115,6 +138,7 @@ export function ActionForm({
         {children}
       </fieldset>
       {error && <ErrorNotice message={error} style={{ marginTop: 8 }} />}
+      {info && <InfoNotice text={info.text} link={info.link} style={{ marginTop: 8 }} />}
     </form>
   )
 }

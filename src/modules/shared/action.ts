@@ -10,7 +10,7 @@
  * nicht geworfen. `ActionButton` und `ActionForm` zeigen sie an. Geworfen
  * wird nur noch, was wirklich ein Programmfehler ist.
  */
-export type ActionResult = void | { error: string }
+export type ActionResult = void | { error: string } | { info: string; link?: string }
 
 /** Fachlicher Fehler mit fester Meldung. */
 export function actionError(message: string): { error: string } {
@@ -27,7 +27,20 @@ export function actionFail(err: unknown): { error: string } {
   return { error: raw.replace(/^error: /, '') }
 }
 
+/**
+ * Erfolgsmeldung. Nötig, wo eine Aktion etwas anlegt, das nicht auf derselben
+ * Seite auftaucht — ein Knopf, nach dem sichtbar nichts passiert, wirkt kaputt,
+ * auch wenn er seine Arbeit getan hat.
+ */
+export function actionInfo(text: string, link?: string): { info: string; link?: string } {
+  return { info: text, ...(link ? { link } : {}) }
+}
+
 /** Typwächter für die Oberfläche. */
 export function isActionError(result: unknown): result is { error: string } {
   return typeof result === 'object' && result !== null && 'error' in result
+}
+
+export function isActionInfo(result: unknown): result is { info: string; link?: string } {
+  return typeof result === 'object' && result !== null && 'info' in result
 }
