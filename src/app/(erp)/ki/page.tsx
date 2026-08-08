@@ -13,7 +13,7 @@ export default async function KiPage() {
     <>
       <PageHeader
         title="KI-Analyse"
-        subtitle="Ad-hoc-Auswertungen, Listen und Übersichten auf Zuruf — mit Lesezugriff auf alle ERP-Daten"
+        subtitle="Auswertungen, Listen und Diagramme auf Zuruf — lesend auf allen ERP-Daten; Anlegen nur nach Bestätigung"
       />
       {aktiv ? (
         <KiChat />

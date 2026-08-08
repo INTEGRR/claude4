@@ -83,17 +83,53 @@ Buchungsregeln:
 Chat-Agent (Claude, `@anthropic-ai/sdk`) für Ad-hoc-Auswertungen, Listen
 und Übersichten „auf Zuruf" — ergänzend zu den festen Auswertungen.
 
-- Ein einziges Werkzeug: `sql_abfrage` — läuft in einer
-  **Read-only-Transaktion** (Schreiben auf Datenbankebene ausgeschlossen)
-  mit 10-Sekunden-Timeout und Kappung bei 500 Zeilen
-  (`src/modules/ki/sql-tool.ts`).
+Drei Werkzeuge:
+
+**1. `sql_abfrage` — lesen.** Läuft in einer **Read-only-Transaktion**
+  (Schreiben auf Datenbankebene ausgeschlossen) mit 10-Sekunden-Timeout und
+  Kappung bei 500 Zeilen (`src/modules/ki/sql-tool.ts`).
+
+**2. `diagramm` — zeigen.** Der Agent liefert eine schmale Beschreibung
+  (`src/modules/ki/diagramm.ts`): Art (`saeulen`, `balken`, `anteile`), Titel,
+  Einheit und die Werte. Gezeichnet wird mit denselben Komponenten wie die
+  festen Auswertungen — der Agent bestimmt *was* gezeigt wird, nicht *wie*.
+  Die Beschreibung wird serverseitig geprüft: passen die Werte nicht zu den
+  Kategorien, bekommt das Modell die Meldung zurück und kann korrigieren.
+
+**3. `aktion_vorschlagen` — anlegen, aber nur mit Bestätigung.** Der Agent
+  schreibt **kein** SQL. Er wählt eine Aktion aus einem festen Katalog
+  (`src/modules/ki/aktionen.ts`) und füllt deren Felder; der Vorschlag
+  erscheint im Chat als Karte mit Zusammenfassung, Begründung und allen
+  Feldern im Klartext. Erst der Klick auf „Ausführen" schickt ihn an
+  `/api/ki/aktion`, wo **erneut** geprüft wird:
+
+  - Ist die Aktion im Katalog? (sonst 400 mit der Liste der erlaubten)
+  - Sind die Felder gültig? (Zod-Schema, Meldung im Klartext)
+  - Darf die Rolle im Zielbereich schreiben? (sonst 403)
+
+  Ausgeführt wird über dieselben Wege wie in der Oberfläche — Nummernkreise
+  über `next_sequence`, Fertigungsaufträge über `create_manufacturing_order`.
+  Kein Sonderweg für die KI, sonst gälten für ihre Datensätze andere Regeln.
+
+  Der Katalog ist bewusst abschließend und legt nur an, nie ändern oder
+  löschen: Kontakt, Verkaufsauftrag (Entwurf), Bestellung (Entwurf),
+  Fertigungsauftrag, Meldebestand, Arbeitsplatz, Mitarbeiter, Notiz.
+  Belege entstehen im Entwurf — das Bestätigen bleibt ein bewusster Schritt
+  in der Oberfläche.
+
+  Katalog und Ausführung liegen in getrennten Dateien: der Agent lädt nur den
+  Katalog, die Datenbankseite hängt allein an der bestätigten Route.
+
 - Sperrliste hält Geheimnisse fern: `users`, `sessions`, `settings`,
   `integration_jobs`, `password_hash` sind tabu.
-- Jede Frage und jede ausgeführte SQL-Abfrage landet im `audit_log`
-  (Modell `ki`).
+- Jede Frage, jede SQL-Abfrage, jeder Vorschlag und jede ausgeführte Aktion
+  landet im `audit_log` (Modell `ki`); angelegte Belege tragen zusätzlich eine
+  Notiz „Über die KI-Analyse angelegt" in ihrem eigenen Verlauf.
 - Antworten streamen; Markdown-Tabellen werden gerendert und lassen sich
   als CSV herunterladen.
 - Konfiguration: `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, Standard
   `claude-opus-5`). Ohne Schlüssel zeigt die Seite einen Hinweis — alle
   anderen Module laufen unabhängig davon.
-- Zugriff: nur `admin` und `mitarbeiter`.
+- Zugriff auf die Seite: nur `admin` und `mitarbeiter`. Für schreibende
+  Aktionen zählt zusätzlich der Zielbereich — ein Fertigungsmitarbeiter kann
+  sich auch über die KI keinen Kunden anlegen.

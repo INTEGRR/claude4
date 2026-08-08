@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { sql } from '@/db/client'
 import { SCHEMA_DOKU } from './schema-doku'
 import { MAX_ROWS, runReadOnlyQuery } from './sql-tool'
+import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
+import { aktionPruefen, aktionenTool } from './aktionen'
 
 /**
  * KI-Agent für Ad-hoc-Auswertungen: Claude mit genau einem Werkzeug —
@@ -26,8 +28,20 @@ const SYSTEM = `Du bist der Datenanalyst im selbstgebauten ERP eines Tastaturher
 Du beantwortest Fragen zu Verkauf, Einkauf, Fertigung, Lager, Reparatur und Versand,
 indem du SQL-Abfragen (PostgreSQL, nur lesend) über das Werkzeug sql_abfrage ausführst.
 
+Du hast drei Werkzeuge: sql_abfrage (lesen), diagramm (anzeigen) und
+aktion_vorschlagen (anlegen — nur nach Bestätigung durch den Benutzer).
+
 Regeln:
 - Antworte auf Deutsch, knapp und mit Zahlen. Ergebnislisten als Markdown-Tabellen.
+- Zeig ein Diagramm, wenn es die Aussage trägt: Verläufe über Monate, Ranglisten, Anteile
+  an einem Ganzen. Bei zwei, drei Zahlen bleibt es beim Satz. Die Zahlen gehören immer
+  zusätzlich in den Text — ein Diagramm ersetzt keine Tabelle, es fasst zusammen.
+- Anlegen darfst du nur, was ausdrücklich gewünscht ist, und nur über aktion_vorschlagen.
+  Der Vorschlag geht an den Benutzer; erst sein Klick führt ihn aus. Sag danach also nicht,
+  etwas sei angelegt — sag, dass der Vorschlag zur Bestätigung bereitliegt. Schlage nie
+  ungefragt etwas vor, und immer nur eine Aktion je Antwort.
+- Namen und Kennungen (SKU, Kunde, IDs) vor einem Vorschlag mit sql_abfrage nachschlagen,
+  statt sie zu raten.
 - Führe lieber mehrere kleine Abfragen aus als eine riesige. Ergebnisse werden bei ${MAX_ROWS} Zeilen gekappt — nutze aggregierende Abfragen und LIMIT.
 - Nutze die dokumentierten Hilfsfunktionen (on_hand_qty, variant_display_name, sales_order_total, …) statt Bestände selbst zusammenzurechnen.
 - Runde Geldwerte auf 2 Nachkommastellen; nenne die Kostenbasis, wenn du Werte bewertest.
@@ -35,6 +49,8 @@ Regeln:
 ${SCHEMA_DOKU}`
 
 const TOOLS: Anthropic.Messages.Tool[] = [
+  DIAGRAMM_TOOL,
+  aktionenTool(),
   {
     name: 'sql_abfrage',
     description:
@@ -55,6 +71,17 @@ export type KiEvent =
   | { type: 'text'; text: string }
   | { type: 'status'; text: string }
   | { type: 'sql'; query: string }
+  | { type: 'chart'; chart: Diagramm }
+  | {
+      type: 'aktion'
+      id: string
+      aktion: string
+      label: string
+      bereich: string
+      zusammenfassung: string
+      begruendung?: string
+      parameter: Record<string, unknown>
+    }
   | { type: 'error'; text: string }
   | { type: 'done' }
 
@@ -113,6 +140,71 @@ export async function runAgent(
     const results: Anthropic.Messages.ToolResultBlockParam[] = []
     for (const block of response.content) {
       if (block.type !== 'tool_use') continue
+
+      // --- Diagramm ---------------------------------------------------------
+      if (block.name === 'diagramm') {
+        const geprueft = diagrammSchema.safeParse(block.input)
+        if (!geprueft.success) {
+          results.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content:
+              'Diagramm abgelehnt — ' +
+              geprueft.error.issues.map((i) => i.message).join('; '),
+            is_error: true,
+          })
+          continue
+        }
+        await onEvent({ type: 'chart', chart: geprueft.data })
+        results.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: 'Diagramm wird angezeigt. Nenne die wichtigsten Zahlen zusätzlich im Text.',
+        })
+        continue
+      }
+
+      // --- Schreibende Aktion (nur Vorschlag) -------------------------------
+      if (block.name === 'aktion_vorschlagen') {
+        const eingabe = block.input as {
+          aktion?: string
+          parameter?: unknown
+          begruendung?: string
+        }
+        try {
+          const { aktion, werte } = aktionPruefen(String(eingabe.aktion ?? ''), eingabe.parameter)
+          const id = randomUUID()
+          await onEvent({
+            type: 'aktion',
+            id,
+            aktion: String(eingabe.aktion),
+            label: aktion.label,
+            bereich: aktion.bereich,
+            zusammenfassung: aktion.zusammenfassung(werte),
+            begruendung: eingabe.begruendung,
+            parameter: werte as Record<string, unknown>,
+          })
+          await sql`select log_event('ki', ${requestId}, 'note',
+            ${'Aktion vorgeschlagen: ' + String(eingabe.aktion)}, ${actor})`
+          results.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content:
+              'Der Vorschlag liegt dem Benutzer zur Bestätigung vor. Führe nichts weiter aus ' +
+              'und behaupte nicht, es sei bereits angelegt — sage kurz, was er bestätigen soll.',
+          })
+        } catch (err) {
+          results.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content: err instanceof Error ? err.message : 'Aktion abgelehnt',
+            is_error: true,
+          })
+        }
+        continue
+      }
+
+      // --- SQL --------------------------------------------------------------
       const query = String((block.input as { query?: string }).query ?? '')
       await onEvent({ type: 'sql', query })
       await onEvent({ type: 'status', text: 'Abfrage läuft …' })
