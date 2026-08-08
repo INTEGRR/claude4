@@ -13,7 +13,7 @@
     "db:reset": "node --experimental-strip-types scripts/reset.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "check": "npm run typecheck && npm run test",
-    "vercel-build": "node --experimental-strip-types scripts/migrate.ts && node --experimental-strip-types scripts/seed.ts --demo && next build"
+    "vercel-build": "node --experimental-strip-types scripts/vorbereiten.ts && next build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
