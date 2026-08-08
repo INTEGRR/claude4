@@ -131,11 +131,21 @@ verbrauch as (
   join stock_locations dst on dst.id = m.dest_location_id and dst.type <> 'internal'
   where m.state = 'done' and m.date_done >= current_date - 90
   group by 1
+),
+bestand as (
+  -- Bewusst als Verbund statt über on_hand_qty(): PostgreSQL 17 legt
+  -- materialisierte Sichten mit eingeschränktem search_path an, dabei findet
+  -- eine eingebettete SQL-Funktion ihre eigenen Tabellen nicht mehr. Der
+  -- Verbund ist zudem billiger als ein Funktionsaufruf je Zeile.
+  select q.variant_id, sum(q.on_hand) as on_hand
+  from stock_quants q
+  join stock_locations l on l.id = q.location_id and l.type = 'internal'
+  group by 1
 )
 select pv.id as variant_id,
        coalesce(pv.display_name, pt.name) as product,
        pv.sku,
-       on_hand_qty(pv.id) as on_hand,
+       coalesce(b.on_hand, 0) as on_hand,
        pv.valuation_total as value_now,
        coalesce(mw.avg_value, 0) as avg_value_12m,
        coalesce(e.cogs, 0) as cogs_12m,
@@ -145,12 +155,13 @@ select pv.id as variant_id,
             then round(coalesce(e.cogs, 0) / mw.avg_value, 2) end as turnover,
        coalesce(v.qty_90d, 0) / 90.0 as daily_use,
        case when coalesce(v.qty_90d, 0) > 0
-            then round(on_hand_qty(pv.id) / (v.qty_90d / 90.0), 1) end as days_of_supply
+            then round(coalesce(b.on_hand, 0) / (v.qty_90d / 90.0), 1) end as days_of_supply
 from product_variants pv
 join product_templates pt on pt.id = pv.template_id
 left join einsatz e on e.variant_id = pv.id
 left join mittelwert mw on mw.variant_id = pv.id
 left join verbrauch v on v.variant_id = pv.id
+left join bestand b on b.variant_id = pv.id
 where pv.active and pt.type = 'goods';
 
 create unique index mv_inventory_turnover_idx on mv_inventory_turnover (variant_id);

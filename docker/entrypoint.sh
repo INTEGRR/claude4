@@ -8,6 +8,15 @@ i=0
 
 echo "→ Warte auf die Datenbank …"
 until node --experimental-strip-types scripts/migrate.ts 2>/tmp/migrate.err; do
+  # Nur auf eine noch nicht erreichbare Datenbank wird gewartet. Ein echter
+  # Migrationsfehler bricht sofort ab — sonst sähe er zwei Minuten lang wie
+  # "Datenbank nicht bereit" aus und die eigentliche Meldung ginge unter.
+  if ! grep -qE 'ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|starting up|Connection terminated' /tmp/migrate.err; then
+    echo "✗ Migration fehlgeschlagen:"
+    cat /tmp/migrate.err
+    exit 1
+  fi
+
   i=$((i + 1))
   if [ "$i" -ge "$ATTEMPTS" ]; then
     echo "✗ Datenbank nach $((ATTEMPTS * 2)) Sekunden nicht erreichbar:"

@@ -63,6 +63,12 @@ Next.js schwärzt in Produktionsbauten jeden Fehler, der aus einer Server Action
 
 Deshalb gilt im ganzen Haus: Server Actions **geben** fachliche Fehler zurück (`actionError(...)`, `actionFail(err)` aus `src/modules/shared/action.ts`); `ActionButton` und `ActionForm` zeigen sie an. Geworfen wird nur, was wirklich ein Programmfehler ist. `tests/actions.test.ts` wacht darüber, dass niemand wieder wirft.
 
+### 1c. Materialisierte Sichten rufen keine SQL-Funktionen auf
+
+PostgreSQL 17 legt materialisierte Sichten mit eingeschränktem `search_path` an und aktualisiert sie ebenso. Eine eingebettete SQL-Funktion — etwa `on_hand_qty()` — findet dabei ihre eigenen Tabellen nicht mehr, und `CREATE MATERIALIZED VIEW` scheitert mit „relation … does not exist". Auf PostgreSQL 16 fällt das nicht auf; der Docker-Stack fährt aber 17.
+
+Deshalb: In den `mv_*`-Sichten stehen Verbunde statt Funktionsaufrufe. Das ist ohnehin schneller, weil die Funktion sonst je Zeile liefe. Die Testsuite läuft gegen dieselbe Version wie der Container (siehe `docker-compose.yml`), damit solche Unterschiede auffallen.
+
 ### 2. Lagerbewegungen als einzige Wahrheit (Ledger-Prinzip)
 
 Wie in Odoo ist **jede** Bestandsänderung eine `stock_moves`-Zeile „von Ort A nach Ort B" — auch Fertigung (→ virtueller Produktionsort), Inventur (→ Inventurdifferenz-Ort) und Ausschuss. Bestände werden **nie direkt geschrieben**, sondern aus erledigten Bewegungen abgeleitet (materialisiert in `stock_quants`, gepflegt per Trigger in derselben Transaktion). Damit sind Bestände jederzeit nachvollziehbar und ein Audit-Trail existiert gratis.
