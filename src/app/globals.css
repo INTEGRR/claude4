@@ -265,6 +265,22 @@ a:hover { text-decoration: underline; }
   background: var(--surface);
 }
 
+/* Scanfeld in der Kopfzeile. Es darf schrumpfen, aber nie umbrechen —
+   Zustandsleuchte, Feld und Tastenhinweis gehören optisch zusammen. */
+.systemzeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.systemzeile .systemtext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.scan-form { flex-wrap: nowrap; min-width: 0; }
+.scan-zustand { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.scan-form input { width: 280px; min-width: 90px; }
+.scan-fehler {
+  color: var(--danger);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .content { padding: 22px 24px 60px; }
 
 /* --- Karten und Tabellen -------------------------------------------------- */
@@ -402,6 +418,22 @@ label.field > span {
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Seitenkopf: Titel links, Schaltflächen rechts — auf schmalen Geräten
+   untereinander (siehe Medienabfrage weiter unten). */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.page-head-titel { min-width: 0; }
+.page-head h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+.page-head h1.mono { font-size: 19px; letter-spacing: 0.01em; }
+.page-head .mono-label { margin-bottom: 3px; }
+.page-head .muted.small { margin-top: 2px; }
 
 /* --- Kennzahlen ------------------------------------------------------------ */
 .stat { padding: 14px 16px; }
@@ -773,3 +805,132 @@ label.field > span {
 }
 .share-bar { display: flex; height: 18px; gap: 2px; border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
 .share-bar span { height: 100%; }
+
+/* --- Schmale Geräte ---------------------------------------------------------
+   Bis 900 px steht die Navigation nicht mehr fest neben dem Inhalt, sondern
+   fährt darüber. Der Schalter dafür sitzt in der Kopfzeile; er ist auf großen
+   Bildschirmen ausgeblendet, weil die Navigation dort ohnehin sichtbar ist.
+
+   Alles Übrige ist bereits fließend gebaut (Raster mit auto-fit, Tabellen in
+   .table-wrap mit eigenem Querlauf) — hier bleibt nur, die Ränder zu
+   verkleinern und die wenigen festen Breiten aufzulösen. */
+
+.nav-schalter { display: none; }
+.nav-schatten { display: none; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+
+  .sidebar {
+    position: fixed;
+    z-index: 40;
+    inset: 0 auto 0 0;
+    width: 264px;
+    max-width: 84vw;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+    overflow-y: auto;
+    box-shadow: none;
+  }
+  .app.nav-offen .sidebar {
+    transform: translateX(0);
+    box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.02), 12px 0 32px rgb(0 0 0 / 0.18);
+  }
+
+  /* Fläche zum Schließen: liegt unter der Navigation, über allem anderen. */
+  .app.nav-offen .nav-schatten {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    border: 0;
+    padding: 0;
+    background: rgb(0 0 0 / 0.45);
+  }
+
+  .nav-schalter {
+    display: inline-flex;
+    flex: 0 0 auto;
+    order: -1;
+  }
+
+  .topbar {
+    padding: 10px 14px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  /* Der Satz zum Systemzustand ist das Erste, was weichen darf. */
+  .systemzeile { order: 3; width: 100%; }
+  .topbar .actions { flex: 1 1 auto; justify-content: flex-end; }
+
+  .content { padding: 16px 14px 48px; }
+
+  /* Seitenkopf: Titel über den Schaltflächen statt daneben. */
+  .page-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .page-head .actions { justify-content: flex-start; }
+
+  /* Formularzeilen stapeln statt zu quetschen. */
+  .row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .row > * { min-width: 0; }
+  .row > .shrink { width: 100%; }
+  .row > .shrink button { width: 100%; justify-content: center; }
+
+  .stat .value { font-size: 24px; }
+  .card > header { padding: 10px 12px; flex-wrap: wrap; gap: 6px; }
+  .card > .body { padding: 12px; }
+
+  th, td { padding: 8px 10px; }
+
+  /* Der Chat darf die volle Breite nutzen — 85 % lassen auf dem Telefon
+     kaum Platz für eine Tabelle. */
+  .ki-msg { max-width: 100%; }
+  .ki-messages { padding: 14px; }
+
+  /* Waagerechte Balken: das Etikett darf schmaler werden, der Balken bleibt. */
+  .hbar-row { grid-template-columns: minmax(88px, 140px) 1fr 72px; gap: 8px; }
+}
+
+@media (max-width: 560px) {
+  .content { padding: 12px 10px 40px; }
+  .stat { padding: 12px; }
+  .stat .value { font-size: 21px; }
+  .page-head h1, .page-head h1.mono { font-size: 18px; }
+
+  /* Kopfzeile auf zwei feste Zeilen statt auf Umbruchglück: oben Menü,
+     Zustandsleuchte und Erscheinungsbild, darunter das Scanfeld über die
+     ganze Breite. `display: contents` hebt die Gruppierung von .actions auf,
+     damit deren Kinder direkt im Raster liegen. */
+  .topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'schalter zustand thema'
+      'scan     scan    scan';
+    align-items: center;
+    gap: 10px;
+  }
+  .topbar > .actions { display: contents; }
+  .nav-schalter { grid-area: schalter; }
+  .systemzeile { grid-area: zustand; width: auto; }
+  .theme-toggle { grid-area: thema; }
+  .scan-form { grid-area: scan; }
+  .scan-form input { flex: 1; width: auto; }
+  /* Ohne Tastatur ist der F2-Hinweis nur Ballast. */
+  .scan-taste { display: none; }
+
+  /* Der Satz zum Systemzustand weicht der Leuchte. Er steht weiterhin im
+     title und bleibt für Vorlesehilfen lesbar — nur unsichtbar. */
+  .systemtext {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Der Chat füllt den sichtbaren Rest, statt eine feste Höhe zu erzwingen. */
+  .ki-chat { min-height: 60vh; }
+  .ki-messages { padding: 12px; }
+  .ki-beispiele { justify-content: stretch; flex-direction: column; }
+}

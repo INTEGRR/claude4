@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { currentUser, logout } from '@/modules/auth'
 import { type Area, ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
+import { AppShell } from '@/components/app-shell'
 import { type NavGroup, SidebarNav } from '@/components/sidebar-nav'
 import { ScanBox } from '@/components/scan-box'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -57,6 +58,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const [company] = await sql<{ name: string }[]>`
     select value ->> 'name' as name from settings where key = 'company'`
   const firma = company?.name ?? 'ERP'
+
+  const systemzustand =
+    counts.fehler > 0
+      ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
+      : 'Alle Systeme im Normalbetrieb'
 
   // Navigation als Datenstruktur: rollengefiltert hier, Aufklapp-Logik im Client.
   const groups: NavGroup[] = [
@@ -163,43 +169,45 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   ].filter((g) => g.items.length > 0)
 
   return (
-    <div className="app">
-      <nav className="sidebar">
-        <div className="brand">
-          erp<span className="dot">.system</span>
-        </div>
-        <div className="brand-sub">{firma}</div>
-        <SidebarNav groups={groups} />
-
-        <div className="spacer" />
-        <form action={signOut} style={{ padding: '10px 8px 4px' }}>
-          <div className="small muted" style={{ marginBottom: 8, lineHeight: 1.4 }}>
-            {user.name}
-            <br />
-            <span className="mono-label">{ROLE_LABELS[user.role]}</span>
+    <AppShell
+      sidebar={
+        <>
+          <div className="brand">
+            erp<span className="dot">.system</span>
           </div>
-          <button className="small" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
-            Abmelden
-          </button>
-        </form>
-      </nav>
+          <div className="brand-sub">{firma}</div>
+          <SidebarNav groups={groups} />
 
-      <div className="main">
-        <div className="topbar">
-          {/* Zustandszeile wie auf einem Typenschild: was gerade anliegt. */}
-          <div className="mono-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="spacer" />
+          <form action={signOut} style={{ padding: '10px 8px 4px' }}>
+            <div className="small muted" style={{ marginBottom: 8, lineHeight: 1.4 }}>
+              {user.name}
+              <br />
+              <span className="mono-label">{ROLE_LABELS[user.role]}</span>
+            </div>
+            <button className="small" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
+              Abmelden
+            </button>
+          </form>
+        </>
+      }
+      topbar={
+        <>
+          {/* Zustandszeile wie auf einem Typenschild: was gerade anliegt.
+              Auf dem Telefon bleibt nur die Leuchte stehen — der Satz steht
+              dann im title und wird von Vorlesehilfen weiterhin gelesen. */}
+          <div className="mono-label systemzeile" title={systemzustand}>
             <span className={`led ${counts.fehler > 0 ? 'on' : 'ok'}`} />
-            {counts.fehler > 0
-              ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
-              : 'Alle Systeme im Normalbetrieb'}
+            <span className="systemtext">{systemzustand}</span>
           </div>
           <div className="actions">
             <ScanBox />
             <ThemeToggle />
           </div>
-        </div>
-        <div className="content">{children}</div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {children}
+    </AppShell>
   )
 }

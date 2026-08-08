@@ -56,8 +56,8 @@ export function ScanBox() {
       : { led: 'led ok', wort: 'Bereit' }
 
   return (
-    <form onSubmit={submit} className="no-print actions" style={{ flexWrap: 'nowrap' }}>
-      <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+    <form onSubmit={submit} className="no-print actions scan-form">
+      <span className="mono-label scan-zustand">
         <span className={zustand.led} />
         {zustand.wort}
       </span>
@@ -68,25 +68,14 @@ export function ScanBox() {
         className="mono"
         placeholder="Barcode scannen oder suchen"
         aria-label="Barcode scannen"
-        style={{ width: 280 }}
         disabled={busy}
       />
-      <span className="mono-label">F2</span>
+      {/* Der Tastaturhinweis ist auf dem Telefon sinnlos — CSS blendet ihn aus. */}
+      <span className="mono-label scan-taste">F2</span>
       {/* Meldung rechts vom Feld: die Eingabe bleibt stehen, wenn ein Scan
           fehlschlägt. Breite gedeckelt, der volle Text steht im Titel. */}
       {error && (
-        <span
-          className="small"
-          role="alert"
-          title={error}
-          style={{
-            color: 'var(--danger)',
-            maxWidth: 200,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <span className="small scan-fehler" role="alert" title={error}>
           {error}
         </span>
       )}

@@ -78,35 +78,15 @@ export function PageHeader({
   kicker?: React.ReactNode
   mono?: boolean
 }) {
+  // Die Maße stehen bewusst im Stylesheet (.page-head) und nicht hier inline:
+  // sonst könnten die Medienabfragen den Kopf auf schmalen Geräten nicht mehr
+  // umbauen — Inline-Stil schlägt jede Regel.
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 16,
-        marginBottom: 16,
-        flexWrap: 'wrap',
-      }}
-    >
-      <div>
-        {kicker && <div className="mono-label" style={{ marginBottom: 3 }}>{kicker}</div>}
-        <h1
-          className={mono ? 'mono' : undefined}
-          style={{
-            margin: 0,
-            fontSize: mono ? 19 : 20,
-            fontWeight: 650,
-            letterSpacing: mono ? '0.01em' : '-0.01em',
-          }}
-        >
-          {title}
-        </h1>
-        {subtitle && (
-          <div className="muted small" style={{ marginTop: 2 }}>
-            {subtitle}
-          </div>
-        )}
+    <div className="page-head">
+      <div className="page-head-titel">
+        {kicker && <div className="mono-label">{kicker}</div>}
+        <h1 className={mono ? 'mono' : undefined}>{title}</h1>
+        {subtitle && <div className="muted small">{subtitle}</div>}
       </div>
       {actions && <div className="actions">{actions}</div>}
     </div>
