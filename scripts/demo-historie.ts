@@ -144,6 +144,20 @@ export async function baueHistorie(sql: Sql): Promise<string[]> {
     select id from partners where is_customer and active and id <> all(${kunden}) limit 1`
   if (altkunde) kunden.push(altkunde.id)
 
+  // Anfangsbestand an Fertigware, bewertet zu den Plankosten. Ohne ihn
+  // verkauft der erste Monat aus dünnem Bestand: der gleitende Durchschnitt
+  // hat dann kaum Substanz und die Marge springt zwischen Traum und Verlust,
+  // obwohl an Preis und Kosten nichts Ungewöhnliches ist.
+  const [lager] = await sql<{ id: string }[]>`
+    select id from stock_locations where full_path = 'WH/Stock'`
+  for (const v of varianten) {
+    const [zaehlung] = await sql<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty)
+      values (${lager.id}, ${v.id}, 45, 0) returning id`
+    await sql`select inventory_apply(${zaehlung.id}, 'demo')`
+  }
+  await sql`select valuation_initialize(null, 'demo')`
+
   let auftraege = 0
   let bestellungen = 0
   let fertigungen = 0

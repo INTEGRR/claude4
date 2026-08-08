@@ -11,6 +11,7 @@ import './env.ts'
 import { randomBytes, scrypt as scryptCb } from 'node:crypto'
 import { promisify } from 'node:util'
 import postgres from 'postgres'
+import { baueHistorie } from './demo-historie.ts'
 
 const scrypt = promisify(scryptCb) as (p: string, s: Buffer, k: number) => Promise<Buffer>
 
@@ -163,7 +164,10 @@ async function main() {
       insert into product_templates (
         name, uom_id, list_price, standard_cost, weight_g, can_be_sold,
         route_manufacture, route_mto, invoice_policy)
-      values ('Tastatur Modell One', ${stueck.id}, 189.0, 0, 1200, true, true, true, 'order')
+      -- Verkaufspreis mit Abstand zu den Herstellkosten, und die Plankosten
+      -- gepflegt: ohne sie startet der gleitende Durchschnitt bei 0 und die
+      -- ersten Monate zeigen erst eine Traummarge und dann einen Verlust.
+      values ('Tastatur Modell One', ${stueck.id}, 329.0, 190.0, 1200, true, true, true, 'order')
       returning id`
 
     const [line] = await sql<{ id: string }[]>`
@@ -308,6 +312,10 @@ async function main() {
     // Anfangsbestand bewerten, damit Bestandswert und Marge von Beginn an stimmen.
     await sql`select valuation_initialize(null, 'seed')`
 
+    // Betriebshistorie: ohne sie zeigen alle Verlaufsauswertungen einen
+    // einzigen Balken. Läuft über die echten Buchungsfunktionen.
+    const historie = await baueHistorie(sql)
+
     console.log(`Beispieldaten angelegt:
   - 20 Komponenten mit Anfangsbestand, Barcodes und Lieferantenpreisen
   - Tastatur mit 3 Farbvarianten
@@ -317,7 +325,8 @@ async function main() {
   - 3 Mitarbeiter mit Ausweis-Barcode (MA-001 bis MA-003) und Personalkostensatz
   - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
   - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)
-  - Anfangsbestand zum Einstandspreis bewertet`)
+  - Anfangsbestand zum Einstandspreis bewertet
+  - ${historie.join('\n  - ')}`)
   } finally {
     await sql.end()
   }
