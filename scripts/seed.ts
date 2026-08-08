@@ -8,6 +8,7 @@
  * Ohne --demo werden nur der Administrator und die Firmendaten angelegt.
  */
 import './env.ts'
+import { wartungsUrl } from './db-url.ts'
 import { randomBytes, scrypt as scryptCb } from 'node:crypto'
 import { promisify } from 'node:util'
 import postgres from 'postgres'
@@ -25,8 +26,7 @@ const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com'
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'erp-admin'
 
 async function main() {
-  const url = process.env.DATABASE_URL
-  if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
+  const url = wartungsUrl()
   const sql = postgres(url, { max: 1 })
   const demo = process.argv.includes('--demo')
 

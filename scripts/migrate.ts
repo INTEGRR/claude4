@@ -6,6 +6,7 @@
  *   node --experimental-strip-types scripts/migrate.ts
  */
 import './env.ts'
+import { wartungsUrl } from './db-url.ts'
 import { readdir, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
@@ -14,8 +15,7 @@ import postgres from 'postgres'
 const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'src', 'db', 'migrations')
 
 async function main() {
-  const url = process.env.DATABASE_URL
-  if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
+  const url = wartungsUrl()
   const sql = postgres(url, { max: 1 })
 
   try {

@@ -17,17 +17,29 @@ import {
 
 /**
  * Labels werden bei uns gespeichert, weil DHL sie nur rund drei Tage vorhält.
- * Lokal im Dateisystem; in der Cloud zeigt STORAGE_DIR auf ein gemountetes
- * Verzeichnis bzw. wird durch einen Objektspeicher ersetzt.
+ *
+ * Die verlässliche Ablage ist die Datenbank (Spalte label_pdf) — sie
+ * überlebt auch eine zustandslose Umgebung wie Vercel, wo nur /tmp
+ * beschreibbar ist und beim nächsten Aufruf leer sein kann. Zusätzlich legen
+ * wir die Datei ab, wenn ein dauerhaftes Verzeichnis konfiguriert ist; das
+ * ist der Docker-Betrieb mit gemountetem Volume.
  */
-const STORAGE_DIR = process.env.STORAGE_DIR ?? path.join(process.cwd(), 'storage')
+const STORAGE_DIR = process.env.STORAGE_DIR
+const DATEIABLAGE = Boolean(STORAGE_DIR) || !process.env.VERCEL
 
-async function storeLabel(name: string, base64: string): Promise<string> {
-  const dir = path.join(STORAGE_DIR, 'labels')
-  await mkdir(dir, { recursive: true })
-  const file = path.join(dir, name)
-  await writeFile(file, Buffer.from(base64, 'base64'))
-  return path.relative(process.cwd(), file)
+async function storeLabel(name: string, base64: string): Promise<string | null> {
+  if (!DATEIABLAGE) return null
+  const dir = path.join(STORAGE_DIR ?? path.join(process.cwd(), 'storage'), 'labels')
+  try {
+    await mkdir(dir, { recursive: true })
+    const file = path.join(dir, name)
+    await writeFile(file, Buffer.from(base64, 'base64'))
+    return path.relative(process.cwd(), file)
+  } catch {
+    // Kein Schreibrecht: das PDF liegt ohnehin in der Datenbank, der Versand
+    // darf daran nicht scheitern.
+    return null
+  }
 }
 
 interface CompanySettings {
@@ -180,10 +192,11 @@ export async function createLabelForPicking(
   const [shipment] = await sql<{ id: string }[]>`
     insert into shipments (
       picking_id, sales_order_id, dhl_product, billing_number, weight_g,
-      shipment_number, tracking_url, label_path, label_format, dhl_warnings)
+      shipment_number, tracking_url, label_path, label_pdf, label_format, dhl_warnings)
     values (
       ${pickingId}, ${picking.sales_order_id}, ${product}, ${dhlConfig().billingNumber},
       ${weightG}, ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
+      ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},
       ${settings?.print_format ?? '910-300-700'},
       ${result.warnings.length ? sql.json(result.warnings) : null})
     returning id`
@@ -339,9 +352,13 @@ export async function createReturnLabelForPartner(
 
   const [row] = await sql<{ id: string }[]>`
     insert into return_labels (
-      repair_order_id, sales_order_id, partner_id, shipment_number, label_path, qr_link)
+      repair_order_id, sales_order_id, partner_id, shipment_number,
+      label_path, label_pdf, qr_link)
     values (${opts.repairOrderId ?? null}, ${opts.salesOrderId ?? null}, ${partnerId},
-            ${result.shipmentNumber}, ${labelPath}, ${result.qrLink ?? null})
+            ${result.shipmentNumber},
+            ${labelPath},
+            ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},
+            ${result.qrLink ?? null})
     returning id`
 
   await sql`select enqueue_job('send_return_label_email',

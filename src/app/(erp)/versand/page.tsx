@@ -39,7 +39,7 @@ export default async function VersandPage() {
       shipment_number: string
       state: string
       tracking_url: string
-      label_path: string | null
+      hat_label: boolean
       dhl_product: string
       created_at: string
       picking_number: string
@@ -49,7 +49,8 @@ export default async function VersandPage() {
       last_event: { description?: string } | null
     }[]
   >`
-    select s.id, s.shipment_number, s.state, s.tracking_url, s.label_path, s.dhl_product,
+    select s.id, s.shipment_number, s.state, s.tracking_url, s.dhl_product,
+           (s.label_pdf is not null or s.label_path is not null) as hat_label,
            s.created_at, p.number as picking_number, p.id as picking_id,
            part.name as customer, s.shopify_fulfillment_id,
            s.last_tracking_event as last_event
@@ -225,7 +226,7 @@ export default async function VersandPage() {
                     <td className="mono nowrap small">{dateTime(s.created_at)}</td>
                     <td className="num">
                       <div className="actions" style={{ justifyContent: 'flex-end' }}>
-                        {s.label_path && (
+                        {s.hat_label && (
                           <a className="btn small" href={`/api/label/${s.id}`} target="_blank">
                             Label
                           </a>

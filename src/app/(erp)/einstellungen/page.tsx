@@ -83,8 +83,10 @@ export default async function EinstellungenPage() {
   const sales = get<{ lock_confirmed?: boolean }>('sales')
   const purchase = get<{ lock_confirmed?: boolean }>('purchase')
 
+  // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
+  // mehr in der Tabellenspalte.
   const sequences = await sql<{ code: string; prefix: string; next_number: number }[]>`
-    select code, prefix, next_number from sequences order by code`
+    select code, prefix, next_number from sequence_state()`
 
   return (
     <>

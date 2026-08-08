@@ -12,7 +12,8 @@
     "db:seed": "node --experimental-strip-types scripts/seed.ts",
     "db:reset": "node --experimental-strip-types scripts/reset.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "vercel-build": "node --experimental-strip-types scripts/migrate.ts && node --experimental-strip-types scripts/seed.ts --demo && next build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -29,5 +30,8 @@
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=22.6"
   }
 }
