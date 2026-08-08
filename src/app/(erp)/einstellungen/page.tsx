@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
+import { actionFail, actionInfo } from '@/modules/shared/action'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
@@ -32,8 +33,13 @@ async function saveCompany(formData: FormData) {
     email: String(formData.get('email') ?? ''),
     phone: String(formData.get('phone') ?? ''),
   }
-  await sql`update settings set value = ${sql.json(value)} where key = 'company'`
+  try {
+    await sql`update settings set value = ${sql.json(value)} where key = 'company'`
+  } catch (err) {
+    return actionFail(err)
+  }
   revalidatePath('/einstellungen')
+  return actionInfo('Firmendaten gespeichert.')
 }
 
 async function saveDhl(formData: FormData) {
@@ -43,20 +49,30 @@ async function saveDhl(formData: FormData) {
     default_product: String(formData.get('default_product') ?? 'V01PAK'),
     print_format: String(formData.get('print_format') ?? '910-300-700'),
   }
-  await sql`update settings set value = ${sql.json(value)} where key = 'dhl'`
+  try {
+    await sql`update settings set value = ${sql.json(value)} where key = 'dhl'`
+  } catch (err) {
+    return actionFail(err)
+  }
   revalidatePath('/einstellungen')
+  return actionInfo('Versandvorgaben gespeichert.')
 }
 
 async function savePolicies(formData: FormData) {
   'use server'
   await requireAdmin()
-  await sql`update settings set value = ${sql.json({
-    lock_confirmed: formData.get('sales_lock') === 'on',
-  })} where key = 'sales'`
-  await sql`update settings set value = ${sql.json({
-    lock_confirmed: formData.get('purchase_lock') === 'on',
-  })} where key = 'purchase'`
+  try {
+    await sql`update settings set value = ${sql.json({
+      lock_confirmed: formData.get('sales_lock') === 'on',
+    })} where key = 'sales'`
+    await sql`update settings set value = ${sql.json({
+      lock_confirmed: formData.get('purchase_lock') === 'on',
+    })} where key = 'purchase'`
+  } catch (err) {
+    return actionFail(err)
+  }
   revalidatePath('/einstellungen')
+  return actionInfo('Belegverhalten gespeichert.')
 }
 
 /**
