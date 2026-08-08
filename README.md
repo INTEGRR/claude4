@@ -104,6 +104,7 @@ fertig melden → Lieferung wird versandbereit.
 | [docs/architektur.md](docs/architektur.md) | Tech-Stack, Prinzipien, Projektstruktur, Erweiterbarkeit |
 | [docs/datenmodell.md](docs/datenmodell.md) | Datenbankschema |
 | [docs/betrieb.md](docs/betrieb.md) | Deployment (auch hinter VPN), Cron-Aufgaben, Betriebspflichten |
+| [docs/vercel-supabase.md](docs/vercel-supabase.md) | **Auf Vercel bereitstellen** — Supabase anlegen, Variablen, Cron-Grenzen, Zugangsschutz |
 | [docs/module/](docs/module/) | Fachliche Spezifikation je Modul |
 | [docs/odoo-referenz/](docs/odoo-referenz/) | Recherche aus der offiziellen Odoo-18-Dokumentation |
 | [docs/api-referenz/](docs/api-referenz/) | Shopify- und DHL-APIs, Sendcloud-Funktionsumfang als Nachbau-Vorlage |

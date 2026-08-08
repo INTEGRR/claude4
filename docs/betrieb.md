@@ -67,6 +67,8 @@ Wenn der Komfort einer verwalteten Plattform (Vercel) gewünscht ist:
 **Konsequenz:** Bestellungen kommen in Sekunden an. Dafür existieren zwei
 öffentlich erreichbare Endpunkte, die man im Blick behalten muss.
 
+Schritt für Schritt durchgespielt: [vercel-supabase.md](vercel-supabase.md).
+
 ---
 
 ## Empfehlung
