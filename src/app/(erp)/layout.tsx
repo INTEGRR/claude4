@@ -5,6 +5,7 @@ import { sql } from '@/db/client'
 import { AppShell } from '@/components/app-shell'
 import { type NavGroup, SidebarNav } from '@/components/sidebar-nav'
 import { ScanBox } from '@/components/scan-box'
+import { AbmeldenKnopf } from '@/components/abmelden'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 export const dynamic = 'force-dynamic'
@@ -179,16 +180,17 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           <SidebarNav groups={groups} />
 
           <div className="spacer" />
-          <form action={signOut} style={{ padding: '10px 8px 4px' }}>
+          {/* Kein <form action={…}>: dessen Server-Fallback-Attribute lösten
+              je nach Hydrations-Timing React-Fehler #418 auf jeder Seite aus
+              (Baumvergleich Server-HTML vs. Client, siehe AbmeldenKnopf). */}
+          <div style={{ padding: '10px 8px 4px' }}>
             <div className="small muted" style={{ marginBottom: 8, lineHeight: 1.4 }}>
               {user.name}
               <br />
               <span className="mono-label">{ROLE_LABELS[user.role]}</span>
             </div>
-            <button className="small" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
-              Abmelden
-            </button>
-          </form>
+            <AbmeldenKnopf action={signOut} />
+          </div>
         </>
       }
       topbar={
