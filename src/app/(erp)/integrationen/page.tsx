@@ -16,15 +16,25 @@ export const dynamic = 'force-dynamic'
 async function runJobs() {
   'use server'
   await requireAdmin()
-  await runDueJobs()
+  const r = await runDueJobs()
   revalidatePath('/integrationen')
+  return actionInfo(
+    r.ran === 0
+      ? 'Nichts zu tun — die Outbox ist leer.'
+      : `${r.ran} Job(s) ausgeführt: ${r.succeeded} erfolgreich, ${r.failed} fehlgeschlagen.`,
+  )
 }
 
 async function processWebhooks() {
   'use server'
   await requireAdmin()
-  await processPendingWebhooks()
+  const r = await processPendingWebhooks()
   revalidatePath('/integrationen')
+  return actionInfo(
+    r.processed + r.failed === 0
+      ? 'Keine offenen Webhooks.'
+      : `${r.processed} Webhook(s) verarbeitet, ${r.failed} fehlgeschlagen.`,
+  )
 }
 
 async function runReconcile() {
