@@ -175,6 +175,22 @@ const handlers: Record<string, Handler> = {
     return `${r.imported} Kunde(n) neu übernommen — Übernahme abgeschlossen`
   },
 
+  /** Produkte aus Shopify verknüpfen/übernehmen, ein Häppchen je Lauf. */
+  async shopify_product_import(payload) {
+    const { importProdukteChunk } = await import('./produkt-import')
+    const cursor = payload.cursor ? String(payload.cursor) : null
+    const r = await importProdukteChunk(cursor)
+    if (r.nextCursor) {
+      await sql`select enqueue_job('shopify_product_import',
+        ${sql.json({ cursor: r.nextCursor })}, ${`produkt-import:${r.nextCursor}`})`
+    }
+    const problem = r.probleme.length ? ` — Probleme: ${r.probleme.join(' | ')}` : ''
+    return (
+      `${r.verknuepft} verknüpft, ${r.angelegt} im ERP angelegt, ${r.uebersprungen} unverändert` +
+      (r.nextCursor ? ' — nächste Seite eingereiht' : ' — Übernahme abgeschlossen') + problem
+    )
+  },
+
   /** Erstübernahme der Bestellungen (Suchanfrage), ein Häppchen je Lauf. */
   async shopify_order_backfill(payload) {
     const { backfillOrdersChunk } = await import('./import')

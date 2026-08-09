@@ -65,6 +65,22 @@ async function pushInventarJetzt() {
   }
 }
 
+async function starteProduktUebernahme() {
+  'use server'
+  await requireAdmin()
+  try {
+    await sql`insert into shopify_sync_state (key, value)
+              values ('backfill_products', ${sql.json({ verknuepft: 0, angelegt: 0, fertig: false })})
+              on conflict (key) do update set value = excluded.value, updated_at = now()`
+    await sql`select enqueue_job('shopify_product_import', '{}'::jsonb, 'produkt-import:start')`
+    await runDueJobs()
+  } catch (err) {
+    return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
+  }
+  revalidatePath('/integrationen')
+  return actionInfo('Produktübernahme läuft — Ergebnis auf dieser Karte und in der Outbox.')
+}
+
 /** Erstübernahme anstoßen: Kunden und/oder Bestellungen ab Zeitraum. */
 async function starteUebernahme(formData: FormData) {
   'use server'
@@ -310,9 +326,9 @@ export default async function IntegrationenPage() {
     (
       await sql<{ key: string; value: { importiert: number; fertig: boolean } }[]>`
         select key, value from shopify_sync_state
-        where key in ('backfill_customers', 'backfill_orders')`
+        where key in ('backfill_customers', 'backfill_orders', 'backfill_products')`
     ).map((r) => [r.key, r.value]),
-  ) as Record<string, { importiert: number; fertig: boolean } | undefined>
+  ) as Record<string, { importiert?: number; verknuepft?: number; angelegt?: number; fertig: boolean } | undefined>
 
   return (
     <>
@@ -454,6 +470,19 @@ export default async function IntegrationenPage() {
             übersprungen; die Übernahme darf mehrfach laufen. Im ERP gepflegte Kontaktdaten werden
             nicht überschrieben, nur Lücken gefüllt.
           </p>
+          <div style={{ marginBottom: 10 }}>
+            <ActionButton action={starteProduktUebernahme}>
+              Produkte aus Shopify verknüpfen/übernehmen
+            </ActionButton>
+            {uebernahme.backfill_products && (
+              <span className="small" style={{ marginLeft: 12 }}>
+                <span className={`led ${uebernahme.backfill_products.fertig ? 'ok' : 'on'}`} style={{ marginRight: 6 }} />
+                {qty(uebernahme.backfill_products.verknuepft ?? 0)} verknüpft,{' '}
+                {qty(uebernahme.backfill_products.angelegt ?? 0)} angelegt
+                {uebernahme.backfill_products.fertig ? ' — abgeschlossen' : ' — läuft'}
+              </span>
+            )}
+          </div>
           <ActionForm action={starteUebernahme}>
             <div className="row">
               <label className="field">
