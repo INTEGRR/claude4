@@ -464,7 +464,7 @@ Zum Aktivieren die Werte in `.env` eintragen (bzw. bei Docker in
 2026 der einzige Weg; die früheren Custom Apps im Shop-Admin gibt es für neue
 Apps nicht mehr):
 
-1. Dev Dashboard → App erstellen, Scopes geben: `read_orders`,
+1. Dev Dashboard → App erstellen, Scopes geben: `read_orders`, `read_all_orders` (sonst nur die letzten 60 Tage!),
    `write_orders`, `read_customers`, `read_products`,
    `write_merchant_managed_fulfillment_orders`, `read_inventory`,
    `write_inventory`, `read_locations`.

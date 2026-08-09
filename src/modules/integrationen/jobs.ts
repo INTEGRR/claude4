@@ -175,15 +175,16 @@ const handlers: Record<string, Handler> = {
     return `${r.imported} Kunde(n) neu übernommen — Übernahme abgeschlossen`
   },
 
-  /** Erstübernahme der Bestellungen ab Startdatum, ein Häppchen je Lauf. */
+  /** Erstübernahme der Bestellungen (Suchanfrage), ein Häppchen je Lauf. */
   async shopify_order_backfill(payload) {
     const { backfillOrdersChunk } = await import('./import')
-    const seit = String(payload.seit)
+    // Alte Jobs tragen noch ein Startdatum (seit); neue eine fertige Anfrage.
+    const q = payload.q ? String(payload.q) : `created_at:>'${String(payload.seit)}'`
     const cursor = payload.cursor ? String(payload.cursor) : null
-    const r = await backfillOrdersChunk(seit, cursor)
+    const r = await backfillOrdersChunk(q, cursor)
     if (r.nextCursor) {
       await sql`select enqueue_job('shopify_order_backfill',
-        ${sql.json({ seit, cursor: r.nextCursor })}, ${`bestell-import:${r.nextCursor}`})`
+        ${sql.json({ q, cursor: r.nextCursor })}, ${`bestell-import:${r.nextCursor}`})`
       return `${r.imported} Bestellung(en) übernommen — nächste Seite eingereiht`
     }
     return `${r.imported} Bestellung(en) übernommen — Übernahme abgeschlossen`

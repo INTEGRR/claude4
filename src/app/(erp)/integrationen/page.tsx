@@ -280,6 +280,7 @@ export default async function IntegrationenPage() {
         subtitle="Shopify-Import, ausgehende Aufträge, API-Transaktionen und Zustand der Anbindungen"
         actions={
           <>
+            <Link className="btn" href="/integrationen/import">Shopify-Import</Link>
             <Link className="btn" href="/integrationen/transaktionen">Transaktionsprotokoll</Link>
             <ActionButton action={processWebhooks}>Webhooks verarbeiten</ActionButton>
             <ActionButton action={runJobs}>Jobs ausführen</ActionButton>
@@ -338,7 +339,8 @@ export default async function IntegrationenPage() {
         <div className="notice warn">
           Shopify ist nicht konfiguriert. App im{' '}
           <a href="https://dev.shopify.com" target="_blank" rel="noreferrer">Dev Dashboard</a>{' '}
-          anlegen, Scopes geben (<code className="mono">read_orders</code>,{' '}
+          anlegen, Scopes geben (<code className="mono">read_orders</code>, <code className="mono">read_all_orders</code>{' '}
+          (sonst liefert Shopify nur die letzten 60 Tage!),{' '}
           <code className="mono">write_orders</code>, <code className="mono">read_customers</code>,{' '}
           <code className="mono">read_products</code>,{' '}
           <code className="mono">write_merchant_managed_fulfillment_orders</code>,{' '}
@@ -404,7 +406,8 @@ export default async function IntegrationenPage() {
       {shopifyConfigured() && (
         <Card title="Erstübernahme aus Shopify">
           <p className="small muted" style={{ marginTop: 0 }}>
-            Holt Kunden und vergangene Bestellungen in Häppchen über die Outbox. In Shopify bereits
+            Gezielt einzelne Bestellungen ansehen und übernehmen: <Link href="/integrationen/import">Shopify-Import</Link>.
+            Diese Karte holt dagegen alles auf einmal — Kunden und vergangene Bestellungen in Häppchen über die Outbox. In Shopify bereits
             versandte Bestellungen werden als historische Belege übernommen — <strong>ohne</strong>{' '}
             Lieferungen oder Fertigungsaufträge anzustoßen. Bereits Importiertes wird erkannt und
             übersprungen; die Übernahme darf mehrfach laufen. Im ERP gepflegte Kontaktdaten werden

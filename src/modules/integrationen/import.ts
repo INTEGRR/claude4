@@ -281,16 +281,17 @@ export async function importCustomersChunk(
 }
 
 /**
- * Ein Häppchen Bestellübernahme (50 Stück) ab einem Startdatum. Bereits
- * importierte Orders werden erkannt und übersprungen — die Übernahme darf
- * beliebig oft und überlappend laufen.
+ * Ein Häppchen Bestellübernahme (50 Stück) für eine beliebige
+ * Shopify-Suchanfrage (z. B. "status:open" oder "created_at:>'2024-01-01'").
+ * Bereits importierte Orders werden erkannt und übersprungen — die Übernahme
+ * darf beliebig oft und überlappend laufen.
  */
 export async function backfillOrdersChunk(
-  seitIso: string,
+  q: string,
   cursor: string | null,
 ): Promise<{ imported: number; nextCursor: string | null }> {
   const { fetchOrdersPage } = await import('./shopify')
-  const { orders, endCursor } = await fetchOrdersPage(`created_at:>'${seitIso}'`, cursor)
+  const { orders, endCursor } = await fetchOrdersPage(q, cursor)
 
   let imported = 0
   for (const order of orders) {
@@ -417,4 +418,15 @@ export async function reconcileOrders(): Promise<{ checked: number; imported: nu
     where key = 'last_reconciliation_at'`
 
   return { checked: orders.length, imported }
+}
+
+/** Holt genau eine Bestellung frisch von Shopify und importiert sie. */
+export async function importOrderByGid(gid: string): Promise<ImportResult> {
+  const { fetchOrder } = await import('./shopify')
+  const order = await fetchOrder(gid)
+  if (!order) {
+    return { salesOrderId: null, created: false, unmatched: 0,
+      message: 'Bestellung in Shopify nicht gefunden' }
+  }
+  return importShopifyOrder(order)
 }
