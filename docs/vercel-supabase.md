@@ -82,8 +82,9 @@ keine Daten heraus, aber ohne Not sollte das niemand so lassen.
 ```
 ANTHROPIC_API_KEY        schaltet die Seite /ki frei
 SHOPIFY_SHOP_DOMAIN      meinshop.myshopify.com
-SHOPIFY_ADMIN_TOKEN      shpat_…
-SHOPIFY_WEBHOOK_SECRET   Client Secret der Custom App
+SHOPIFY_CLIENT_ID        Dev-Dashboard-App, Settings → Credentials
+SHOPIFY_CLIENT_SECRET    dito — Token holt und erneuert das ERP selbst
+SHOPIFY_ADMIN_TOKEN      nur Alt-Apps von vor 2026 (statisches shpat_…)
 DHL_API_KEY              …und die übrigen DHL_-Variablen aus .env.example
 RESEND_API_KEY           Mailversand an Lieferanten
 MAIL_FROM                "Einkauf <einkauf@example.com>"

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
-import { verifyWebhookHmac } from '@/modules/integrationen/shopify'
+import { shopifyConfig, verifyWebhookHmac } from '@/modules/integrationen/shopify'
 
 /**
  * Shopify-Webhook-Endpunkt.
@@ -14,7 +14,10 @@ export async function POST(request: Request) {
   const raw = await request.text()
   const hmac = request.headers.get('x-shopify-hmac-sha256')
 
-  if (!verifyWebhookHmac(raw, hmac)) {
+  // Webhooks der eigenen App signiert Shopify mit dem Client Secret; ein
+  // eigenes SHOPIFY_WEBHOOK_SECRET braucht es nur für Admin-Seiten-Webhooks.
+  // shopifyConfig() kennt diese Rangfolge.
+  if (!verifyWebhookHmac(raw, hmac, shopifyConfig().webhookSecret || undefined)) {
     return NextResponse.json({ error: 'Ungültige Signatur' }, { status: 401 })
   }
 

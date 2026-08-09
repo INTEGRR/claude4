@@ -45,9 +45,10 @@ aktives Abholen statt über Webhooks herein.
 statt in Sekunden. Für den Ablauf (Fertigung, Versand) ist das ohne Bedeutung.
 Mehr API-Aufrufe bei Shopify, aber weit innerhalb der Grenzen.
 
-**Was dafür anzupassen ist:** nichts am Code. Nur die Cron-Frequenz erhöhen und
-`SHOPIFY_WEBHOOK_SECRET` weglassen — der Webhook-Endpunkt weist ohne Secret
-ohnehin alles ab.
+**Was dafür anzupassen ist:** nichts am Code. Nur die Cron-Frequenz erhöhen;
+Webhooks werden schlicht nicht registriert. Der Webhook-Endpunkt weist alles
+ab, was nicht von Shopify signiert ist — und hinter dem VPN erreicht ihn
+ohnehin niemand.
 
 ---
 

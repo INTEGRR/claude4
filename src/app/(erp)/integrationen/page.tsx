@@ -292,20 +292,21 @@ export default async function IntegrationenPage() {
 
       {!shopifyConfigured() && (
         <div className="notice warn">
-          Shopify ist nicht konfiguriert. Die App muss <strong>im Shop-Admin</strong> angelegt werden
-          (Einstellungen → Apps und Vertriebskanäle → Apps entwickeln) — nur dort gibt es den
-          statischen Admin-Token. Das neue Dev Dashboard erzeugt OAuth-Apps mit Client ID/Secret;
-          die passen hier nicht. Scopes: <code className="mono">read_orders</code>,{' '}
+          Shopify ist nicht konfiguriert. App im{' '}
+          <a href="https://dev.shopify.com" target="_blank" rel="noreferrer">Dev Dashboard</a>{' '}
+          anlegen, Scopes geben (<code className="mono">read_orders</code>,{' '}
           <code className="mono">write_orders</code>, <code className="mono">read_customers</code>,{' '}
           <code className="mono">read_products</code>,{' '}
           <code className="mono">write_merchant_managed_fulfillment_orders</code>,{' '}
           <code className="mono">read_inventory</code>, <code className="mono">write_inventory</code>,{' '}
-          <code className="mono">read_locations</code>. Nach dem Installieren den Admin-API-Token
-          (shpat_…) als <code className="mono">SHOPIFY_ADMIN_TOKEN</code> eintragen. Webhooks
-          (<code className="mono">orders/*</code>, <code className="mono">inventory_levels/update</code>{' '}
-          auf <code className="mono">/api/webhooks/shopify</code>) brauchen eine öffentlich
-          erreichbare URL — lokal übernimmt der viertelstündliche Abgleich; das Secret ist der
-          Signatur-Schlüssel unten auf der Webhooks-Seite des Shop-Admins.
+          <code className="mono">read_locations</code>) und im eigenen Shop installieren. Dann{' '}
+          <code className="mono">SHOPIFY_SHOP_DOMAIN</code>, <code className="mono">SHOPIFY_CLIENT_ID</code>{' '}
+          und <code className="mono">SHOPIFY_CLIENT_SECRET</code> (Settings → Credentials) als
+          Umgebungsvariablen setzen — das Access Token holt sich das ERP selbst und erneuert es
+          automatisch. Webhooks (<code className="mono">orders/*</code>,{' '}
+          <code className="mono">inventory_levels/update</code> auf{' '}
+          <code className="mono">/api/webhooks/shopify</code>) brauchen eine öffentlich erreichbare
+          URL — lokal übernimmt der viertelstündliche Abgleich.
         </div>
       )}
 

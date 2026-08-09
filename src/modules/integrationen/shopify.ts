@@ -9,7 +9,11 @@ export { verifyWebhookHmac } from './shopify-hmac'
 
 export interface ShopifyConfig {
   shop: string
+  /** Statisches Admin-Token (shpat_…) — nur noch bei Alt-Apps von vor 2026. */
   token: string
+  /** Dev-Dashboard-App: Client ID + Secret, Token kommt per OAuth-Grant. */
+  clientId: string
+  clientSecret: string
   apiVersion: string
   webhookSecret: string
 }
@@ -18,14 +22,84 @@ export function shopifyConfig(): ShopifyConfig {
   return {
     shop: process.env.SHOPIFY_SHOP_DOMAIN ?? '',
     token: process.env.SHOPIFY_ADMIN_TOKEN ?? '',
+    clientId: process.env.SHOPIFY_CLIENT_ID ?? '',
+    clientSecret: process.env.SHOPIFY_CLIENT_SECRET ?? '',
     apiVersion: process.env.SHOPIFY_API_VERSION ?? '2026-07',
-    webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET ?? '',
+    // Webhooks der eigenen App signiert Shopify mit dem Client Secret —
+    // ein eigenes Secret ist nur noch für Admin-Seiten-Webhooks nötig.
+    webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET || (process.env.SHOPIFY_CLIENT_SECRET ?? ''),
   }
 }
 
 export function shopifyConfigured(): boolean {
   const c = shopifyConfig()
-  return Boolean(c.shop && c.token)
+  return Boolean(c.shop && (c.token || (c.clientId && c.clientSecret)))
+}
+
+// --- Access Token ------------------------------------------------------------
+//
+// Seit 2026 zeigt Shopify für neue Apps kein statisches Admin-Token mehr an.
+// Stattdessen wird die Client ID samt Secret über den Client-Credentials-Grant
+// gegen ein Token getauscht, das 24 Stunden gilt. Voraussetzung: App und Shop
+// gehören derselben Organisation — für eine Eigen-App auf dem eigenen Shop
+// (unser Fall) ist das immer erfüllt.
+
+let tokenCache: { token: string; gueltigBis: number } | null = null
+
+async function accessToken(): Promise<string> {
+  const c = shopifyConfig()
+  if (c.token) return c.token // Alt-App mit statischem Token
+
+  if (tokenCache && Date.now() < tokenCache.gueltigBis) return tokenCache.token
+
+  const start = Date.now()
+  let res: Response
+  try {
+    res = await fetch(`https://${c.shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: c.clientId,
+        client_secret: c.clientSecret,
+        grant_type: 'client_credentials',
+      }),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await protokollToken(false, null, `Netzwerkfehler: ${message}`, start)
+    throw new ShopifyError(`Shopify-Token nicht erreichbar: ${message}`, true)
+  }
+
+  if (!res.ok) {
+    const text = (await res.text()).slice(0, 300)
+    await protokollToken(false, res.status, text, start)
+    throw new ShopifyError(
+      `Shopify-Token abgelehnt (${res.status}): ${text} — stimmen Client ID/Secret, und ist die App im Shop installiert?`,
+      res.status >= 500,
+    )
+  }
+
+  const body = (await res.json()) as { access_token?: string; expires_in?: number | string }
+  if (!body.access_token) {
+    await protokollToken(false, res.status, 'Antwort ohne access_token', start)
+    throw new ShopifyError('Shopify-Token: Antwort ohne access_token', true)
+  }
+
+  // Fünf Minuten Sicherheitsabstand: lieber einmal zu früh erneuern als mit
+  // einem gerade abgelaufenen Token in einen 401 laufen.
+  const sekunden = Number(body.expires_in ?? 86399)
+  tokenCache = { token: body.access_token, gueltigBis: Date.now() + (sekunden - 300) * 1000 }
+  await protokollToken(true, res.status, undefined, start)
+  return body.access_token
+}
+
+/** Tokenholung protokollieren — ohne Request-Body: da stünde das Secret drin. */
+async function protokollToken(ok: boolean, statusCode: number | null, error: string | undefined, start: number) {
+  const { logTransaction } = await import('./transaktionen')
+  await logTransaction({
+    system: 'shopify', kind: 'oauth_token', request: null,
+    response: null, ok, statusCode, error, durationMs: Date.now() - start,
+  })
 }
 
 export class ShopifyError extends Error {
@@ -53,7 +127,7 @@ export async function shopifyGraphQL<T>(
   variables: Record<string, unknown> = {},
 ): Promise<T> {
   const c = shopifyConfig()
-  if (!c.shop || !c.token) throw new ShopifyError('Shopify ist nicht konfiguriert', false)
+  if (!shopifyConfigured()) throw new ShopifyError('Shopify ist nicht konfiguriert', false)
 
   const start = Date.now()
   const kind = `graphql:${operationName(query)}`
@@ -65,16 +139,25 @@ export async function shopifyGraphQL<T>(
     })
   }
 
-  let res: Response
-  try {
-    res = await fetch(`https://${c.shop}/admin/api/${c.apiVersion}/graphql.json`, {
+  const anfrage = async () =>
+    fetch(`https://${c.shop}/admin/api/${c.apiVersion}/graphql.json`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': c.token,
+        'X-Shopify-Access-Token': await accessToken(),
       },
       body: JSON.stringify({ query, variables }),
     })
+
+  let res: Response
+  try {
+    res = await anfrage()
+    // 401 mit Grant-Token: Token kann widerrufen oder gerade abgelaufen sein —
+    // einmal frisch holen und wiederholen, erst dann ist es ein echter Fehler.
+    if (res.status === 401 && !c.token) {
+      tokenCache = null
+      res = await anfrage()
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     await protokoll(false, null, null, `Netzwerkfehler: ${message}`)

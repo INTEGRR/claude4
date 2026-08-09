@@ -49,10 +49,10 @@ melde() {
 
 echo "→ Konfiguration:"
 melde "KI-Analyse (ANTHROPIC_API_KEY)" "${ANTHROPIC_API_KEY}" "Seite /ki bleibt deaktiviert"
-melde "Shopify (SHOPIFY_ADMIN_TOKEN)"  "${SHOPIFY_ADMIN_TOKEN}"  "kein Bestellimport, kein Fulfillment"
+melde "Shopify (Client ID/Secret oder Admin-Token)" "${SHOPIFY_CLIENT_ID}${SHOPIFY_ADMIN_TOKEN}" "kein Bestellimport, kein Fulfillment"
 melde "DHL (DHL_API_KEY)"              "${DHL_API_KEY}"          "keine Labels, kein Tracking"
 melde "E-Mail (RESEND_API_KEY)"        "${RESEND_API_KEY}"       "keine Bestell-Mails"
-if [ -z "${ANTHROPIC_API_KEY}${SHOPIFY_ADMIN_TOKEN}${DHL_API_KEY}${RESEND_API_KEY}" ]; then
+if [ -z "${ANTHROPIC_API_KEY}${SHOPIFY_CLIENT_ID}${SHOPIFY_ADMIN_TOKEN}${DHL_API_KEY}${RESEND_API_KEY}" ]; then
   echo "   Hinweis: keine einzige Zugangsdatei erkannt. Liegt im Projektordner"
   echo "   wirklich eine Datei namens .env? Unter Windows blendet der Explorer"
   echo "   Endungen aus — aus .env.example wird beim Umbenennen leicht .env.txt."

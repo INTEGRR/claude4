@@ -460,34 +460,38 @@ Labelerstellung sind deaktiviert, mit sichtbarem Hinweis in der Oberfläche.
 Zum Aktivieren die Werte in `.env` eintragen (bzw. bei Docker in
 `docker-compose.yml` unter `environment`) und neu starten.
 
-**Shopify** — die App muss **im Shop-Admin** angelegt werden, nicht im neuen
-Dev Dashboard: das Dashboard erzeugt OAuth-Apps mit Client ID/Secret, das ERP
-braucht aber den statischen Admin-Token, und den gibt es nur hier:
+**Shopify** — App im [Dev Dashboard](https://dev.shopify.com) anlegen (seit
+2026 der einzige Weg; die früheren Custom Apps im Shop-Admin gibt es für neue
+Apps nicht mehr):
 
-1. `admin.shopify.com/store/<shop>` → **Einstellungen → Apps und
-   Vertriebskanäle → Apps entwickeln** → App erstellen.
-2. Konfiguration → Admin-API-Integration → Scopes: `read_orders`,
+1. Dev Dashboard → App erstellen, Scopes geben: `read_orders`,
    `write_orders`, `read_customers`, `read_products`,
    `write_merchant_managed_fulfillment_orders`, `read_inventory`,
    `write_inventory`, `read_locations`.
-3. Installieren → Reiter **API-Anmeldedaten** zeigt den Admin-API-Token
-   (`shpat_…`) — **einmalig**, sofort kopieren.
+2. App im eigenen Shop **installieren**.
+3. **Settings → Credentials**: Client ID und Secret kopieren.
 
 ```
 SHOPIFY_SHOP_DOMAIN=deinshop.myshopify.com   # die .myshopify.com-Adresse
-SHOPIFY_ADMIN_TOKEN=shpat_…
-SHOPIFY_WEBHOOK_SECRET=                      # lokal leer lassen, siehe unten
+SHOPIFY_CLIENT_ID=…
+SHOPIFY_CLIENT_SECRET=…
 ```
+
+Ein Token muss nirgends kopiert werden: das ERP tauscht Client ID und Secret
+selbst gegen ein Access Token (Client-Credentials-Grant, 24 Stunden gültig)
+und erneuert es automatisch. Das funktioniert, weil App und Shop derselben
+Organisation gehören. Alt-Apps von vor 2026 mit statischem `shpat_…`-Token
+laufen weiter über `SHOPIFY_ADMIN_TOKEN`.
 
 Webhooks brauchen eine öffentlich erreichbare URL — `localhost` kann Shopify
 nicht anrufen. Lokal ist das einkalkuliert: der viertelstündliche Abgleich
 holt Bestellungen aktiv ab, es geht nur die Sekunden-Aktualität verloren.
-Läuft das ERP öffentlich (z. B. Vercel): im Shop-Admin unter
-**Einstellungen → Benachrichtigungen → Webhooks** die Ereignisse
-`orders/create`, `orders/updated`, `orders/cancelled` und
-`inventory_levels/update` auf `https://<erp>/api/webhooks/shopify`
-registrieren; `SHOPIFY_WEBHOOK_SECRET` ist der Signatur-Schlüssel, der unten
-auf genau dieser Webhooks-Seite steht.
+Läuft das ERP öffentlich (z. B. Vercel), die Webhooks `orders/create`,
+`orders/updated`, `orders/cancelled` und `inventory_levels/update` auf
+`https://<erp>/api/webhooks/shopify` registrieren (im Dev Dashboard in der
+App-Konfiguration). Shopify signiert sie mit dem Client Secret — 
+`SHOPIFY_WEBHOOK_SECRET` bleibt dann leer und ist nur für Webhooks nötig, die
+über die Admin-Seite (Einstellungen → Benachrichtigungen) registriert wurden.
 
 **DHL** — Geschäftskundenvertrag mit Zugang zum Geschäftskundenportal, dort
 einen Systembenutzer anlegen, App im
