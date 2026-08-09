@@ -258,6 +258,73 @@ export async function fetchOrder(gid: string): Promise<ShopifyOrder | null> {
  * Holt Orders, die seit `since` geändert wurden - das Sicherheitsnetz gegen
  * verlorene Webhooks (Shopify garantiert keine Zustellung).
  */
+/**
+ * Eine einzelne Bestellungs-Seite — für die Erstübernahme, die als Job in
+ * Häppchen arbeitet und den Cursor zwischen den Läufen mitnimmt.
+ */
+export async function fetchOrdersPage(
+  q: string,
+  after: string | null,
+): Promise<{ orders: ShopifyOrder[]; endCursor: string | null }> {
+  const data: {
+    orders: { nodes: ShopifyOrder[]; pageInfo: { hasNextPage: boolean; endCursor: string } }
+  } = await shopifyGraphQL(
+    `query($q: String!, $after: String) {
+       orders(first: 50, query: $q, after: $after, sortKey: CREATED_AT) {
+         nodes { ${ORDER_FIELDS} }
+         pageInfo { hasNextPage endCursor }
+       }
+     }`,
+    { q, after },
+  )
+  return {
+    orders: data.orders.nodes,
+    endCursor: data.orders.pageInfo.hasNextPage ? data.orders.pageInfo.endCursor : null,
+  }
+}
+
+export interface ShopifyCustomer {
+  id: string
+  displayName: string | null
+  firstName: string | null
+  lastName: string | null
+  email: string | null
+  phone: string | null
+  defaultAddress: {
+    company: string | null
+    address1: string | null
+    address2: string | null
+    zip: string | null
+    city: string | null
+    countryCodeV2: string | null
+    phone: string | null
+  } | null
+}
+
+/** Eine Kunden-Seite für die Erstübernahme. */
+export async function fetchCustomersPage(
+  after: string | null,
+): Promise<{ customers: ShopifyCustomer[]; endCursor: string | null }> {
+  const data: {
+    customers: { nodes: ShopifyCustomer[]; pageInfo: { hasNextPage: boolean; endCursor: string } }
+  } = await shopifyGraphQL(
+    `query($after: String) {
+       customers(first: 100, after: $after, sortKey: CREATED_AT) {
+         nodes {
+           id displayName firstName lastName email phone
+           defaultAddress { company address1 address2 zip city countryCodeV2 phone }
+         }
+         pageInfo { hasNextPage endCursor }
+       }
+     }`,
+    { after },
+  )
+  return {
+    customers: data.customers.nodes,
+    endCursor: data.customers.pageInfo.hasNextPage ? data.customers.pageInfo.endCursor : null,
+  }
+}
+
 export async function fetchOrdersUpdatedSince(
   since: Date,
   limit = 50,

@@ -5,16 +5,40 @@ import { closeDb, expectError, withRollback } from './helpers.ts'
 after(closeDb)
 
 describe('Ereignis-Monitor', () => {
+  test('Dedupe-Schlüssel sperrt nur offene Jobs, nicht erledigte', async () => {
+    await withRollback(async (t) => {
+      const [erster] = await t<{ enqueue_job: string | null }[]>`
+        select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'probe-abgleich')`
+      assert.ok(erster.enqueue_job, 'erster Job wird eingereiht')
+
+      const [doppelt] = await t<{ enqueue_job: string | null }[]>`
+        select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'probe-abgleich')`
+      assert.equal(doppelt.enqueue_job, null, 'gleicher Schlüssel offen → kein zweiter Job')
+
+      // Abschluss gibt den Schlüssel frei (so bucht der Runner seit 0028).
+      await t`update integration_jobs
+              set status = 'done', dedupe_key = null where id = ${erster.enqueue_job}`
+
+      const [erneut] = await t<{ enqueue_job: string | null }[]>`
+        select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'probe-abgleich')`
+      assert.ok(erneut.enqueue_job, 'nach Abschluss ist derselbe Schlüssel wieder frei')
+    })
+  })
+
   test('api_transactions nimmt Erfolge und Fehler auf', async () => {
     await withRollback(async (t) => {
+      // Nur die Differenz zählen: die Tabelle kann echte Protokolle enthalten.
+      const [vorher] = await t<{ count: number }[]>`
+        select count(*)::int as count from api_transactions where not ok`
+
       await t`insert into api_transactions (system, kind, reference, ok, status_code, duration_ms)
               values ('dhl', 'label_create', 'WH/OUT/00001', true, 200, 412)`
       await t`insert into api_transactions (system, kind, ok, error)
               values ('shopify', 'graphql:order', false, 'THROTTLED')`
 
-      const [fehler] = await t<{ count: number }[]>`
+      const [nachher] = await t<{ count: number }[]>`
         select count(*)::int as count from api_transactions where not ok`
-      assert.equal(fehler.count, 1)
+      assert.equal(nachher.count - vorher.count, 1)
     })
   })
 

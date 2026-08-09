@@ -177,6 +177,25 @@ export async function importShopifyOrder(
         'shopify')`
     }
 
+    // In Shopify bereits vollständig versandte Orders sind Historie: als
+    // Beleg übernehmen, aber KEINE Lieferung und keine Fertigung anstoßen —
+    // sonst erzeugte eine Erstübernahme hunderte offene Vorgänge für Ware,
+    // die längst beim Kunden ist.
+    if (order.displayFulfillmentStatus === 'FULFILLED') {
+      await t`update sales_orders
+              set state = 'sale', delivery_status = 'full'
+              where id = ${created.id}`
+      await t`select log_event('sales_order', ${created.id}, 'note',
+        'Historisch übernommen — in Shopify bereits versandt, keine Lieferung erzeugt.',
+        'shopify')`
+      return {
+        salesOrderId: created.id,
+        created: true,
+        unmatched,
+        message: `${order.name} historisch übernommen (bereits versandt)`,
+      }
+    }
+
     // Bezahlte Orders sofort bestätigen: erzeugt Lieferung + Fertigungsaufträge.
     const paid = order.displayFinancialStatus === 'PAID'
     if (paid && unmatched === 0) {
@@ -193,6 +212,98 @@ export async function importShopifyOrder(
         (unmatched > 0 ? ` (${unmatched} Position(en) offen)` : ''),
     }
   })
+}
+
+// --- Erstübernahme -----------------------------------------------------------
+
+export interface UebernahmeStand {
+  importiert: number
+  fertig: boolean
+}
+
+async function schreibeStand(key: string, stand: UebernahmeStand): Promise<void> {
+  await sql`
+    insert into shopify_sync_state (key, value)
+    values (${key}, ${sql.json({ ...stand })})
+    on conflict (key) do update set value = excluded.value, updated_at = now()`
+}
+
+async function leseStand(key: string): Promise<UebernahmeStand> {
+  const [row] = await sql<{ value: UebernahmeStand }[]>`
+    select value from shopify_sync_state where key = ${key}`
+  return row?.value ?? { importiert: 0, fertig: false }
+}
+
+/**
+ * Ein Häppchen Kundenübernahme (100 Stück). Gibt den Cursor für die nächste
+ * Seite zurück; null heißt fertig. Bestehende Kontakte werden ergänzt, nie
+ * überschrieben — im ERP gepflegte Daten schlagen den Shop-Stand.
+ */
+export async function importCustomersChunk(
+  cursor: string | null,
+): Promise<{ imported: number; nextCursor: string | null }> {
+  const { fetchCustomersPage } = await import('./shopify')
+  const { customers, endCursor } = await fetchCustomersPage(cursor)
+
+  let imported = 0
+  for (const k of customers) {
+    const name =
+      k.displayName || [k.firstName, k.lastName].filter(Boolean).join(' ') || k.email || 'Unbekannt'
+    const a = k.defaultAddress
+    const { street, houseNumber } = splitStreet(a?.address1)
+    const ergebnis = await sql`
+      insert into partners (
+        name, is_company, is_customer, email, phone, street, house_number,
+        street2, zip, city, country_code, shopify_customer_id)
+      values (
+        ${name}, ${Boolean(a?.company)}, true, ${k.email}, ${k.phone ?? a?.phone ?? null},
+        ${street}, ${houseNumber}, ${a?.address2 ?? null}, ${a?.zip ?? null},
+        ${a?.city ?? null}, ${a?.countryCodeV2 ?? 'DE'}, ${k.id})
+      on conflict (shopify_customer_id) do update set
+        -- nur Lücken füllen: was im ERP steht, bleibt
+        email = coalesce(partners.email, excluded.email),
+        phone = coalesce(partners.phone, excluded.phone),
+        street = coalesce(partners.street, excluded.street),
+        house_number = coalesce(partners.house_number, excluded.house_number),
+        zip = coalesce(partners.zip, excluded.zip),
+        city = coalesce(partners.city, excluded.city),
+        is_customer = true
+      returning (xmax = 0) as neu`
+    if ((ergebnis[0] as { neu?: boolean } | undefined)?.neu) imported++
+  }
+
+  const stand = await leseStand('backfill_customers')
+  await schreibeStand('backfill_customers', {
+    importiert: stand.importiert + imported,
+    fertig: endCursor === null,
+  })
+  return { imported, nextCursor: endCursor }
+}
+
+/**
+ * Ein Häppchen Bestellübernahme (50 Stück) ab einem Startdatum. Bereits
+ * importierte Orders werden erkannt und übersprungen — die Übernahme darf
+ * beliebig oft und überlappend laufen.
+ */
+export async function backfillOrdersChunk(
+  seitIso: string,
+  cursor: string | null,
+): Promise<{ imported: number; nextCursor: string | null }> {
+  const { fetchOrdersPage } = await import('./shopify')
+  const { orders, endCursor } = await fetchOrdersPage(`created_at:>'${seitIso}'`, cursor)
+
+  let imported = 0
+  for (const order of orders) {
+    const result = await importShopifyOrder(order)
+    if (result.created) imported++
+  }
+
+  const stand = await leseStand('backfill_orders')
+  await schreibeStand('backfill_orders', {
+    importiert: stand.importiert + imported,
+    fertig: endCursor === null,
+  })
+  return { imported, nextCursor: endCursor }
 }
 
 // --- Webhook-Verarbeitung --------------------------------------------------

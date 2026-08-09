@@ -157,6 +157,38 @@ const handlers: Record<string, Handler> = {
     return `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert${zusatz}`
   },
 
+  /**
+   * Erstübernahme der Kunden, ein Häppchen je Lauf (100 Stück). Solange es
+   * weitere Seiten gibt, reiht sich der Job mit dem nächsten Cursor selbst
+   * wieder ein — der Schlüssel trägt den Cursor, damit der noch laufende
+   * Job den Nachfolger nicht wegdedupliziert.
+   */
+  async shopify_customer_import(payload) {
+    const { importCustomersChunk } = await import('./import')
+    const cursor = payload.cursor ? String(payload.cursor) : null
+    const r = await importCustomersChunk(cursor)
+    if (r.nextCursor) {
+      await sql`select enqueue_job('shopify_customer_import',
+        ${sql.json({ cursor: r.nextCursor })}, ${`kunden-import:${r.nextCursor}`})`
+      return `${r.imported} Kunde(n) neu übernommen — nächste Seite eingereiht`
+    }
+    return `${r.imported} Kunde(n) neu übernommen — Übernahme abgeschlossen`
+  },
+
+  /** Erstübernahme der Bestellungen ab Startdatum, ein Häppchen je Lauf. */
+  async shopify_order_backfill(payload) {
+    const { backfillOrdersChunk } = await import('./import')
+    const seit = String(payload.seit)
+    const cursor = payload.cursor ? String(payload.cursor) : null
+    const r = await backfillOrdersChunk(seit, cursor)
+    if (r.nextCursor) {
+      await sql`select enqueue_job('shopify_order_backfill',
+        ${sql.json({ seit, cursor: r.nextCursor })}, ${`bestell-import:${r.nextCursor}`})`
+      return `${r.imported} Bestellung(en) übernommen — nächste Seite eingereiht`
+    }
+    return `${r.imported} Bestellung(en) übernommen — Übernahme abgeschlossen`
+  },
+
   /** Retourenlabel an den Kunden. */
   async send_return_label_email(payload) {
     const labelId = String(payload.return_label_id)
@@ -251,8 +283,11 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
 
     try {
       const message = await handler(job.payload)
+      // Schlüssel freigeben: „dedupe" heißt kein zweiter OFFENER Job — ein
+      // erledigter darf einen wiederkehrenden Schlüssel nicht ewig blockieren.
       await sql`update integration_jobs
-                set status = 'done', last_result = ${message}, last_error = null
+                set status = 'done', last_result = ${message}, last_error = null,
+                    dedupe_key = null
                 where id = ${job.id}`
       succeeded++
     } catch (err) {
@@ -266,7 +301,8 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
         update integration_jobs set
           status = ${permanent ? 'failed' : 'pending'},
           last_error = ${message},
-          next_run_at = now() + make_interval(mins => ${delay})
+          next_run_at = now() + make_interval(mins => ${delay}),
+          dedupe_key = case when ${permanent} then null else dedupe_key end
         where id = ${job.id}`
 
       // Fehler auch am betroffenen Beleg sichtbar machen.

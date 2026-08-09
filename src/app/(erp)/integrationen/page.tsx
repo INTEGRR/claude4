@@ -55,6 +55,41 @@ async function pushInventarJetzt() {
   }
 }
 
+/** Erstübernahme anstoßen: Kunden und/oder Bestellungen ab Zeitraum. */
+async function starteUebernahme(formData: FormData) {
+  'use server'
+  await requireAdmin()
+  const was = String(formData.get('was') ?? 'beides')
+  const tage = Number(formData.get('tage') ?? 365)
+  const seit = new Date(Date.now() - tage * 24 * 60 * 60 * 1000).toISOString()
+
+  try {
+    if (was === 'kunden' || was === 'beides') {
+      await sql`update shopify_sync_state set value = ${sql.json({ importiert: 0, fertig: false })}
+                where key = 'backfill_customers'`
+      await sql`insert into shopify_sync_state (key, value)
+                values ('backfill_customers', ${sql.json({ importiert: 0, fertig: false })})
+                on conflict (key) do nothing`
+      await sql`select enqueue_job('shopify_customer_import', '{}'::jsonb, 'kunden-import:start')`
+    }
+    if (was === 'bestellungen' || was === 'beides') {
+      await sql`update shopify_sync_state set value = ${sql.json({ importiert: 0, fertig: false })}
+                where key = 'backfill_orders'`
+      await sql`insert into shopify_sync_state (key, value)
+                values ('backfill_orders', ${sql.json({ importiert: 0, fertig: false })})
+                on conflict (key) do nothing`
+      await sql`select enqueue_job('shopify_order_backfill',
+        ${sql.json({ seit })}, 'bestell-import:start')`
+    }
+    // Sofort loslegen statt auf die nächste Cron-Minute zu warten.
+    await runDueJobs()
+  } catch (err) {
+    return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
+  }
+  revalidatePath('/integrationen')
+  return actionInfo('Übernahme läuft — Fortschritt unten in der Outbox und hier auf der Karte.')
+}
+
 async function retry(jobId: string) {
   'use server'
   await requireAdmin()
@@ -229,6 +264,15 @@ export default async function IntegrationenPage() {
     select variant_id, sku, erp_menge, shop_menge, shop_seen_at
     from shopify_inventory_drift order by sku limit 50`
 
+  // Stand der Erstübernahme (Kunden/Bestellungen) für die Karte.
+  const uebernahme = Object.fromEntries(
+    (
+      await sql<{ key: string; value: { importiert: number; fertig: boolean } }[]>`
+        select key, value from shopify_sync_state
+        where key in ('backfill_customers', 'backfill_orders')`
+    ).map((r) => [r.key, r.value]),
+  ) as Record<string, { importiert: number; fertig: boolean } | undefined>
+
   return (
     <>
       <PageHeader
@@ -354,6 +398,60 @@ export default async function IntegrationenPage() {
               </tbody>
             </table>
           </TableWrap>
+        </Card>
+      )}
+
+      {shopifyConfigured() && (
+        <Card title="Erstübernahme aus Shopify">
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Holt Kunden und vergangene Bestellungen in Häppchen über die Outbox. In Shopify bereits
+            versandte Bestellungen werden als historische Belege übernommen — <strong>ohne</strong>{' '}
+            Lieferungen oder Fertigungsaufträge anzustoßen. Bereits Importiertes wird erkannt und
+            übersprungen; die Übernahme darf mehrfach laufen. Im ERP gepflegte Kontaktdaten werden
+            nicht überschrieben, nur Lücken gefüllt.
+          </p>
+          <ActionForm action={starteUebernahme}>
+            <div className="row">
+              <label className="field">
+                <span>Was</span>
+                <select name="was" defaultValue="beides">
+                  <option value="beides">Kunden und Bestellungen</option>
+                  <option value="kunden">Nur Kunden</option>
+                  <option value="bestellungen">Nur Bestellungen</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Bestellungen ab</span>
+                <select name="tage" defaultValue="365">
+                  <option value="90">letzte 90 Tage</option>
+                  <option value="365">letzte 12 Monate</option>
+                  <option value="1095">letzte 3 Jahre</option>
+                  <option value="3650">alles (10 Jahre)</option>
+                </select>
+              </label>
+              <div className="shrink field">
+                <button className="primary" type="submit">Übernahme starten</button>
+              </div>
+            </div>
+          </ActionForm>
+          {(uebernahme.backfill_customers || uebernahme.backfill_orders) && (
+            <div className="small" style={{ marginTop: 10, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+              {uebernahme.backfill_customers && (
+                <span>
+                  <span className={`led ${uebernahme.backfill_customers.fertig ? 'ok' : 'on'}`} style={{ marginRight: 6 }} />
+                  Kunden: {qty(uebernahme.backfill_customers.importiert)} neu
+                  {uebernahme.backfill_customers.fertig ? ' — abgeschlossen' : ' — läuft'}
+                </span>
+              )}
+              {uebernahme.backfill_orders && (
+                <span>
+                  <span className={`led ${uebernahme.backfill_orders.fertig ? 'ok' : 'on'}`} style={{ marginRight: 6 }} />
+                  Bestellungen: {qty(uebernahme.backfill_orders.importiert)} übernommen
+                  {uebernahme.backfill_orders.fertig ? ' — abgeschlossen' : ' — läuft'}
+                </span>
+              )}
+            </div>
+          )}
         </Card>
       )}
 
