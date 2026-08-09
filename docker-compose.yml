@@ -66,6 +66,23 @@ services:
     volumes:
       - label-storage:/app/storage
 
+  # Zeitsteuerung. Auf Vercel macht das die Plattform (vercel.json); lokal
+  # gäbe es sonst gar keine — die Outbox liefe nie an, Fulfillment und
+  # Bestell-Mails blieben liegen, die Kennzahlen wären eingefroren.
+  cron:
+    image: alpine:3
+    depends_on:
+      - app
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ERP_URL: http://app:3000
+    volumes:
+      - ./docker/cron.sh:/cron.sh:ro
+    command: ['sh', '/cron.sh']
+    restart: unless-stopped
+
 volumes:
   db-data:
   label-storage:

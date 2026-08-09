@@ -289,6 +289,84 @@ psql postgres://erp:erp@localhost:5433/erp
 
 ---
 
+# Für den echten Betrieb: vier Dinge beachten
+
+Zum Ausprobieren läuft alles ohne Zutun. Wer damit wirklich arbeitet, sollte
+diese vier Punkte kennen.
+
+## 1. Die Daten liegen in Docker-Volumes, nicht im Projektordner
+
+`docker compose down -v` löscht **alles** — Aufträge, Bestände, Bewegungen.
+Das `-v` ist der Unterschied zwischen „anhalten" und „wegwerfen".
+
+Sicherung, am besten regelmäßig:
+
+```bash
+docker compose exec -T db pg_dump -U erp -Fc erp > sicherung-$(date +%F).dump
+```
+
+Zurückspielen in eine leere Datenbank:
+
+```bash
+docker compose exec -T db pg_restore -U erp -d erp --clean < sicherung-2026-08-09.dump
+```
+
+## 2. Vom Telefon oder Tablet erreichbar machen
+
+Die Oberfläche ist für schmale Geräte gebaut — am Packtisch oder an der
+Werkbank ist das Telefon oft die bequemste Bedienung. Standardmäßig lauscht
+das ERP aber **nur auf dem eigenen Rechner**:
+
+```yaml
+ports:
+  - '127.0.0.1:${ERP_PORT:-3000}:3000'
+```
+
+Für den Zugriff aus dem Werkstatt-WLAN die Bindung auf alle Schnittstellen
+umstellen:
+
+```yaml
+ports:
+  - '${ERP_PORT:-3000}:3000'
+```
+
+Danach ist das ERP unter `http://<IP-des-Rechners>:3000` erreichbar — und
+zwar **für jeden im selben Netz, ohne weitere Hürde**. Das ist die bewusste
+Entscheidung, die dahintersteht: im eigenen, vertrauenswürdigen Netz in
+Ordnung, in einem Gast- oder Büro-WLAN mit Fremdgeräten nicht. Wer das
+weiterdenken will, findet die Varianten in [betrieb.md](betrieb.md).
+
+## 3. Die Zeitsteuerung läuft mit — aber nur, wenn der Dienst `cron` läuft
+
+Ohne sie bliebe die Warteschlange stehen: Fulfillment würde nicht an Shopify
+gemeldet, Bestell-Mails blieben liegen, die Sendungsverfolgung stünde still
+und die Kennzahlen zeigten Zahlen von vorgestern. Der Dienst `cron` in
+`docker-compose.yml` erledigt das und startet automatisch mit.
+
+Prüfen, ob er arbeitet:
+
+```bash
+docker compose logs -f cron       # → "Zeitsteuerung aktiv"
+```
+
+Die Staffelung (minütlich Outbox und Webhooks, viertelstündlich Abgleich,
+stündlich Sendungsverfolgung, alle sechs Stunden Kennzahlen, täglich
+Aufräumen) steht in `docker/cron.sh` und entspricht der auf Vercel.
+
+## 4. Nach einem `git pull` neu bauen
+
+Neue Migrationen spielt der Container beim Start selbst ein — aber nur, wenn
+er auch neu gebaut wurde:
+
+```bash
+git pull && docker compose up --build
+```
+
+Migrationen sind unveränderlich und laufen genau einmal; ein zweiter Start
+ändert nichts. Das Startprotokoll zeigt, was eingespielt wurde.
+
+---
+
 # Weg 2: Ohne Docker
 
 Sinnvoll, wenn du am Code arbeitest: Änderungen sind sofort im Browser
