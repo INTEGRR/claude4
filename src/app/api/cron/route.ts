@@ -42,7 +42,11 @@ export async function GET(request: Request) {
 
       case 'reconcile': {
         if (!shopifyConfigured()) return NextResponse.json({ skipped: 'Shopify nicht konfiguriert' })
-        return NextResponse.json({ task, ...(await reconcileOrders()) })
+        const orders = await reconcileOrders()
+        // Bestandsmeldung über die Outbox statt direkt: der Job hat Retry und
+        // Backoff, und der Dedupe-Schlüssel verhindert Stapelbildung.
+        await sql`select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'inventar-abgleich')`
+        return NextResponse.json({ task, ...orders, inventar: 'eingereiht' })
       }
       case 'tracking': {
         if (!dhlConfigured()) return NextResponse.json({ skipped: 'DHL nicht konfiguriert' })

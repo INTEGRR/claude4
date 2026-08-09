@@ -218,6 +218,18 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
 
   for (const event of events) {
     try {
+      // Bestandsmeldungen tragen keine Order-ID — eigener Zweig vor der
+      // Order-Verarbeitung, sonst würden sie als "ohne Order-ID" übersprungen.
+      if (event.topic.startsWith('inventory_levels/')) {
+        const { verarbeiteInventarWebhook } = await import('./inventar')
+        const meldung = await verarbeiteInventarWebhook(event.payload)
+        await sql`update shopify_webhook_events
+                  set status = 'done', processed_at = now(), error = ${meldung}
+                  where id = ${event.id}`
+        processed++
+        continue
+      }
+
       const gid = event.shopify_order_id
       if (!gid) {
         await sql`update shopify_webhook_events

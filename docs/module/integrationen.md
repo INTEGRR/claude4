@@ -33,6 +33,31 @@ Die Rückmeldung, die bei Sendcloud die Integration übernommen hätte, machen w
 - Fehlerbilder (Out-of-Stock `nonFulfillableQuantity`, fehlende Location, Rate-Limits) ⇒ Retry mit Backoff, nach 10 Versuchen Fehler-Aktivität am Auftrag.
 - Der frühere `ready-to-ship`-Tag entfällt als Trigger (war nur für Sendcloud nötig); optional konfigurierbarer Info-Tag, Default aus.
 
+## Shopify — Bestandsabgleich (Inventar-Push)
+
+Das ERP ist die Quelle der Wahrheit für Bestände; der Shop bekommt die frei
+verfügbare Menge (`free_to_use`: Bestand minus Reservierungen an internen
+Orten, abgerundet auf ganze Stücke) gemeldet.
+
+- **Push**: Outbox-Job `shopify_inventory_push`, angestoßen viertelstündlich
+  vom Reconcile-Cron, von Hand über die Monitor-Karte, und automatisch bei
+  erkannter Abweichung. Der Dedupe-Schlüssel `inventar-abgleich` bündelt
+  beliebig viele Auslöser zu einem Durchlauf. Übertragen wird nur, was sich
+  seit der letzten Meldung geändert hat (`shopify_inventory_state.pushed_qty`)
+  — ein leerer Durchlauf kostet keinen API-Aufruf.
+- **Mechanik**: `inventorySetQuantities` (name `available`, reason
+  `correction`, `ignoreCompareQuantity: true` — das ERP hat recht), höchstens
+  200 Mengen je Aufruf. Adressiert wird das InventoryItem der Variante; die
+  Zuordnung wird einmal über `nodes(ids:…)` erfragt und an der Variante
+  gespeichert (`shopify_inventory_item_gid`). Der Standort ist der erste
+  aktive des Shops und wird in `shopify_sync_state` festgehalten.
+- **Abweichungserkennung**: Webhook `inventory_levels/update` schreibt den
+  Shop-Stand nach `shopify_inventory_state.shop_qty`. Weicht er vom ERP ab
+  (Handkorrektur im Shopify-Admin), zeigt die Sicht
+  `shopify_inventory_drift` die Differenz auf der Monitor-Seite, und ein
+  korrigierender Push wird eingereiht.
+- **Scopes**: zusätzlich `write_inventory` und `read_locations`.
+
 ## E-Mail (Einkauf)
 
 Resend + React-Email-Vorlage „Bestellung": Betreff `Bestellung {number} — {Firmenname}`, Bestell-PDF als Anhang, Empfänger = Lieferanten-E-Mail, Reply-To = Einkaufs-Postfach. Versand als Outbox-Job (Retry bei Fehlern), Protokoll am Beleg. Ebenfalls über diesen Kanal: DHL-Retourenlabel-Mail an Kunden (siehe Versand-Modul).

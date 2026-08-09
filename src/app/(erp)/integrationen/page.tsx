@@ -9,7 +9,7 @@ import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
-import { actionError } from '@/modules/shared/action'
+import { actionError, actionInfo } from '@/modules/shared/action'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +36,23 @@ async function runReconcile() {
     return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
   }
   revalidatePath('/integrationen')
+}
+
+async function pushInventarJetzt() {
+  'use server'
+  await requireAdmin()
+  try {
+    const { pushInventar } = await import('@/modules/integrationen/inventar')
+    const r = await pushInventar()
+    revalidatePath('/integrationen')
+    return actionInfo(
+      r.uebertragen > 0
+        ? `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert.`
+        : `Alles aktuell — ${r.geprueft} Variante(n) geprüft, nichts zu melden.`,
+    )
+  } catch (err) {
+    return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
+  }
 }
 
 async function retry(jobId: string) {
@@ -193,6 +210,25 @@ export default async function IntegrationenPage() {
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.active order by label limit 500`
 
+  // Bestandsabgleich: was ist gekoppelt, wann wurde zuletzt gemeldet, und wo
+  // glaubt der Shop etwas anderes als das ERP?
+  const [inventar] = await sql<
+    { gekoppelt: number; gemeldet: number; letzter_push: string | null; standort: string | null }[]
+  >`
+    select
+      (select count(*) from product_variants
+        where shopify_variant_id is not null and active)::int as gekoppelt,
+      (select count(*) from shopify_inventory_state where pushed_at is not null)::int as gemeldet,
+      (select max(pushed_at) from shopify_inventory_state)::text as letzter_push,
+      (select value ->> 'name' from shopify_sync_state
+        where key = 'inventory_location') as standort`
+
+  const abweichungen = await sql<
+    { variant_id: string; sku: string | null; erp_menge: number; shop_menge: number; shop_seen_at: string }[]
+  >`
+    select variant_id, sku, erp_menge, shop_menge, shop_seen_at
+    from shopify_inventory_drift order by sku limit 50`
+
   return (
     <>
       <PageHeader
@@ -258,8 +294,10 @@ export default async function IntegrationenPage() {
         <div className="notice warn">
           Shopify ist nicht konfiguriert. Lege im Shopify Dev Dashboard eine Custom App an (Scopes{' '}
           <code className="mono">read_orders</code>, <code className="mono">write_orders</code>,{' '}
-          <code className="mono">write_merchant_managed_fulfillment_orders</code>), trage Token und
-          Webhook-Secret als Umgebungsvariablen ein und registriere den Webhook auf{' '}
+          <code className="mono">write_merchant_managed_fulfillment_orders</code>,{' '}
+          <code className="mono">write_inventory</code>, <code className="mono">read_locations</code>
+          ), trage Token und Webhook-Secret als Umgebungsvariablen ein und registriere die Webhooks{' '}
+          (<code className="mono">orders/*</code>, <code className="mono">inventory_levels/update</code>) auf{' '}
           <code className="mono">/api/webhooks/shopify</code>.
         </div>
       )}
@@ -310,6 +348,72 @@ export default async function IntegrationenPage() {
           </TableWrap>
         </Card>
       )}
+
+      <Card
+        title="Bestandsabgleich mit Shopify"
+        actions={
+          shopifyConfigured() ? (
+            <ActionButton className="small" action={pushInventarJetzt}>
+              Bestand jetzt melden
+            </ActionButton>
+          ) : undefined
+        }
+      >
+        <div className="row" style={{ alignItems: 'flex-start' }}>
+          <div>
+            <div className="mono-label">Gekoppelte Varianten</div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{qty(inventar.gekoppelt)}</div>
+          </div>
+          <div>
+            <div className="mono-label">Zuletzt gemeldet</div>
+            <div className="mono small" style={{ paddingTop: 4 }}>
+              {inventar.letzter_push ? dateTime(inventar.letzter_push) : 'noch nie'}
+            </div>
+          </div>
+          <div>
+            <div className="mono-label">Shopify-Standort</div>
+            <div className="small" style={{ paddingTop: 4 }}>
+              {inventar.standort ?? 'wird beim ersten Abgleich ermittelt'}
+            </div>
+          </div>
+        </div>
+        {abweichungen.length > 0 ? (
+          <>
+            <div className="notice warn" style={{ marginTop: 12 }}>
+              Der Shop meldet für {abweichungen.length} Variante(n) andere Mengen als das ERP —
+              vermutlich Handkorrekturen im Shopify-Admin. Der nächste Abgleich überschreibt sie
+              mit dem ERP-Stand.
+            </div>
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th className="num">ERP</th>
+                    <th className="num">Shop</th>
+                    <th>Gemeldet vom Shop</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {abweichungen.map((a) => (
+                    <tr key={a.variant_id}>
+                      <td className="mono">{a.sku ?? a.variant_id}</td>
+                      <td className="num">{qty(a.erp_menge)}</td>
+                      <td className="num">{qty(a.shop_menge)}</td>
+                      <td className="mono small">{dateTime(a.shop_seen_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </>
+        ) : (
+          <div className="small muted" style={{ marginTop: 10 }}>
+            Keine Abweichungen bekannt. Der Abgleich läuft viertelstündlich mit; der Webhook{' '}
+            <code className="mono">inventory_levels/update</code> meldet Handänderungen im Shop.
+          </div>
+        )}
+      </Card>
 
       <Card title="Ausgehende Aufträge (Outbox)" tight>
         {jobs.length === 0 ? (

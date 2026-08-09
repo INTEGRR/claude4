@@ -144,6 +144,19 @@ const handlers: Record<string, Handler> = {
     return `An ${order.email} gesendet`
   },
 
+  /**
+   * Verfügbare Mengen an Shopify melden. Der Handler überträgt immer alle
+   * gekoppelten Varianten — der Dedupe-Schlüssel „inventar-abgleich" bündelt
+   * beliebig viele Auslöser (Cron, Webhook-Abweichung, Handklick) zu einem
+   * einzigen Durchlauf.
+   */
+  async shopify_inventory_push() {
+    const { pushInventar } = await import('./inventar')
+    const r = await pushInventar()
+    const zusatz = r.ohneZuordnung > 0 ? `, ${r.ohneZuordnung} ohne InventoryItem` : ''
+    return `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert${zusatz}`
+  },
+
   /** Retourenlabel an den Kunden. */
   async send_return_label_email(payload) {
     const labelId = String(payload.return_label_id)
