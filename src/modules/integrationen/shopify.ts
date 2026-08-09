@@ -505,6 +505,8 @@ const WEBHOOK_TOPICS = [
   'ORDERS_UPDATED',
   'ORDERS_CANCELLED',
   'INVENTORY_LEVELS_UPDATE',
+  'PRODUCTS_CREATE',
+  'PRODUCTS_UPDATE',
 ] as const
 
 export interface WebhookEintrag {

@@ -58,6 +58,22 @@ Orten, abgerundet auf ganze Stücke) gemeldet.
   korrigierender Push wird eingereiht.
 - **Scopes**: zusätzlich `write_inventory` und `read_locations`.
 
+## Shopify — Produkt-Sync (beide Richtungen, laufend)
+
+- **ERP → Shop**: „In Shopify anlegen" am Produkt legt Produkt samt Varianten
+  an (Attribute → Optionen, Preis = Listenpreis + Aufpreis, SKU/Barcode,
+  Beschreibung) und verknüpft über die SKU. Danach überträgt jedes Speichern
+  am verknüpften Produkt die Änderungen als Outbox-Job
+  (`shopify_product_push`, Dedupe je Produkt) — Titel, Beschreibung, Preise,
+  SKU, Barcode.
+- **Shop → ERP**: Webhooks `products/create` und `products/update` gleichen
+  sofort ab (`aktualisiereProduktAusShopify`): verknüpfte Produkte folgen dem
+  Shop bei Titel, Preisen und Codes; neue Shop-Varianten werden per
+  SKU/Barcode angekoppelt, Unzuordenbares steht als Klärfall am Produkt;
+  unbekannte Produkte laufen durch Verknüpfen/Anlegen wie die Erstübernahme.
+- **Erstübernahme**: Knopf auf dem Monitor holt den kompletten Shop-Katalog
+  in Häppchen (verknüpfen per SKU/Barcode, sonst anlegen inkl. Attributen).
+
 ## E-Mail (Einkauf)
 
 Resend + React-Email-Vorlage „Bestellung": Betreff `Bestellung {number} — {Firmenname}`, Bestell-PDF als Anhang, Empfänger = Lieferanten-E-Mail, Reply-To = Einkaufs-Postfach. Versand als Outbox-Job (Retry bei Fehlern), Protokoll am Beleg. Ebenfalls über diesen Kanal: DHL-Retourenlabel-Mail an Kunden (siehe Versand-Modul).

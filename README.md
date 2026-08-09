@@ -18,6 +18,7 @@ Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 - **Lose & Seriennummern** — Rückverfolgung je Produkt (Chargen oder Serien), FIFO-Zuteilung, Rückverfolgungsansicht
 - **Ereignis-Monitor** — jede Shopify-/DHL-/Mail-Transaktion protokolliert; Queue mit Backoff, Fehler am Beleg sichtbar
 - **Shopify-Bestandsabgleich** — verfügbare Mengen werden an den Shop gemeldet; Handkorrekturen im Shop fallen als Abweichung auf und werden überschrieben
+- **Shopify-Produkt-Sync** — Produkte in beide Richtungen anlegen und laufend abgleichen (Titel, Preise, SKU/Barcode); Bestellungen, Kunden und Stornos/Erstattungen kommen per Webhook in Sekunden an
 - **Vollständige Stammdaten** — Kategorien, Steuern, Zahlungsbedingungen (inkl. Skonto), Incoterms, Tags, Kontakt-Hierarchie
 
 Die Oberfläche funktioniert auf Monitor, Tablet und Telefon — am Packtisch

@@ -308,6 +308,13 @@ export async function finishOperation(moId: string, operationId: string, formDat
   if (minutes !== null && (!Number.isFinite(minutes) || minutes < 0)) {
     return actionError('Bitte eine gültige Dauer in Minuten erfassen')
   }
+  // Ein zweiter Klick auf einen erledigten Arbeitsgang soll nicht stumm
+  // verpuffen — sagen, dass es nichts zu tun gibt.
+  const [vorher] = await sql<{ state: string }[]>`
+    select state from mo_operations where id = ${operationId}`
+  if (vorher?.state === 'done') {
+    return actionInfo('Dieser Arbeitsgang war bereits abgeschlossen.')
+  }
   try {
     await sql`select mo_operation_finish(${operationId}, ${minutes}, ${user.name})`
   } catch (err) {

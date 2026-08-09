@@ -204,3 +204,78 @@ export async function pushProduktZuShopify(templateId: string): Promise<ProduktP
 
   return { produktGid, varianten: varianten.length }
 }
+
+// --- Laufender Abgleich ERP → Shop -------------------------------------------
+
+/**
+ * Überträgt Änderungen an einem bereits verknüpften Produkt in den Shop:
+ * Titel, Beschreibung, Preise (Listenpreis + Aufpreis), SKU und Barcode.
+ * Aufgerufen als Outbox-Job, den das Speichern am Produkt einreiht.
+ */
+export async function aktualisiereProduktInShopify(templateId: string): Promise<string> {
+  const [tpl] = await sql<
+    { name: string; list_price: number; description_sale: string | null }[]
+  >`select name, list_price, description_sale from product_templates where id = ${templateId}`
+  if (!tpl) return 'Produkt nicht mehr vorhanden'
+
+  const varianten = await sql<
+    { id: string; sku: string | null; barcode: string | null; price_extra: number; shopify_variant_id: string | null }[]
+  >`select id, sku, barcode, price_extra, shopify_variant_id
+    from product_variants where template_id = ${templateId} and active`
+  const verknuepft = varianten.filter((v) => v.shopify_variant_id)
+  if (verknuepft.length === 0) return 'Nicht mit Shopify verknüpft — nichts zu übertragen'
+
+  // Produkt-GID über eine verknüpfte Variante ermitteln.
+  const kopf = await shopifyGraphQL<{
+    node: { product: { id: string } } | null
+  }>(
+    `query($id: ID!) { node(id: $id) { ... on ProductVariant { product { id } } } }`,
+    { id: verknuepft[0].shopify_variant_id },
+  )
+  const produktGid = kopf.node?.product?.id
+  if (!produktGid) return 'Shopify kennt die verknüpfte Variante nicht mehr — Kopplung prüfen'
+
+  const upd = await shopifyGraphQL<{
+    productUpdate: { userErrors: { message: string }[] }
+  }>(
+    `mutation produktAktualisieren($product: ProductUpdateInput!) {
+       productUpdate(product: $product) { userErrors { message } }
+     }`,
+    {
+      product: {
+        id: produktGid,
+        title: tpl.name,
+        ...(tpl.description_sale ? { descriptionHtml: tpl.description_sale } : {}),
+      },
+    },
+  )
+  const kopfFehler = upd.productUpdate.userErrors
+  if (kopfFehler.length) {
+    throw new ShopifyError(`Produkt abgelehnt: ${kopfFehler.map((f) => f.message).join('; ')}`, false)
+  }
+
+  const bulk = await shopifyGraphQL<{
+    productVariantsBulkUpdate: { userErrors: { message: string }[] }
+  }>(
+    `mutation variantenAktualisieren($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+         userErrors { message }
+       }
+     }`,
+    {
+      productId: produktGid,
+      variants: verknuepft.map((v) => ({
+        id: v.shopify_variant_id,
+        price: (Number(tpl.list_price) + Number(v.price_extra)).toFixed(2),
+        ...(v.barcode ? { barcode: v.barcode } : {}),
+        ...(v.sku ? { inventoryItem: { sku: v.sku } } : {}),
+      })),
+    },
+  )
+  const fehler = bulk.productVariantsBulkUpdate.userErrors
+  if (fehler.length) {
+    throw new ShopifyError(`Varianten abgelehnt: ${fehler.map((f) => f.message).join('; ')}`, false)
+  }
+
+  return `„${tpl.name}" im Shop aktualisiert (${verknuepft.length} Variante(n))`
+}

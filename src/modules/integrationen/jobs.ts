@@ -175,6 +175,12 @@ const handlers: Record<string, Handler> = {
     return `${r.imported} Kunde(n) neu übernommen — Übernahme abgeschlossen`
   },
 
+  /** Änderungen an einem verknüpften Produkt in den Shop übertragen. */
+  async shopify_product_push(payload) {
+    const { aktualisiereProduktInShopify } = await import('./produkt-push')
+    return aktualisiereProduktInShopify(String(payload.template_id))
+  },
+
   /** Produkte aus Shopify verknüpfen/übernehmen, ein Häppchen je Lauf. */
   async shopify_product_import(payload) {
     const { importProdukteChunk } = await import('./produkt-import')

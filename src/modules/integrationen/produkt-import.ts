@@ -216,3 +216,97 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<'verknuepft' | 'angele
     return 'angelegt'
   })
 }
+
+// --- Laufender Abgleich Shop → ERP -------------------------------------------
+
+/**
+ * Holt EIN Produkt frisch aus Shopify und gleicht es ab — Einstieg für den
+ * Webhook products/update (und products/create).
+ *
+ * Verknüpfte Produkte werden aktualisiert: Titel, Beschreibung, Preise
+ * (Basis + Aufpreis je Variante), SKU und Barcode folgen dem Shop. Neue
+ * Shop-Varianten werden per SKU/Barcode angekoppelt; bleibt eine ohne
+ * Gegenstück, steht das als Klärfall am Produkt. Unverknüpfte Produkte
+ * laufen durch dieselben zwei Stufen wie die Erstübernahme.
+ */
+export async function aktualisiereProduktAusShopify(gid: string): Promise<string> {
+  const data = await shopifyGraphQL<{ node: ShopProdukt | null }>(
+    `query($id: ID!) {
+       node(id: $id) {
+         ... on Product {
+           id title descriptionHtml
+           options { name values }
+           variants(first: 100) {
+             nodes { id sku barcode price selectedOptions { name value } inventoryItem { id } }
+           }
+         }
+       }
+     }`,
+    { id: gid },
+  )
+  const p = data.node
+  if (!p?.id) return 'Produkt in Shopify nicht gefunden — übersprungen'
+
+  const gids = p.variants.nodes.map((v) => v.id)
+  const verknuepfte = await sql<{ id: string; shopify_variant_id: string; template_id: string }[]>`
+    select id, shopify_variant_id, template_id from product_variants
+    where shopify_variant_id in ${sql(gids)}`
+
+  if (verknuepfte.length === 0) {
+    const ergebnis = await verarbeiteProdukt(p)
+    return `„${p.title}" ${ergebnis === 'angelegt' ? 'im ERP angelegt' : ergebnis === 'verknuepft' ? 'verknüpft' : 'unverändert'}`
+  }
+
+  const templateId = verknuepfte[0].template_id
+  const shopVarianten: ShopVarianteRoh[] = p.variants.nodes.map((v) => ({
+    id: v.id, sku: v.sku, barcode: v.barcode, price: v.price, optionen: v.selectedOptions,
+  }))
+  const { basis, extra } = preisAufteilung(shopVarianten)
+  const erpJeGid = new Map(verknuepfte.map((v) => [v.shopify_variant_id, v.id]))
+
+  await sql`update product_templates
+            set name = ${p.title}, list_price = ${basis},
+                description_sale = coalesce(${p.descriptionHtml}, description_sale)
+            where id = ${templateId}`
+
+  let neuVerknuepft = 0
+  const offen: string[] = []
+  for (const sv of p.variants.nodes) {
+    const erpId = erpJeGid.get(sv.id)
+    if (erpId) {
+      await sql`update product_variants
+                set sku = coalesce(${sv.sku}, sku),
+                    barcode = coalesce(${sv.barcode}, barcode),
+                    price_extra = ${extra.get(sv.id) ?? 0},
+                    shopify_inventory_item_gid = coalesce(shopify_inventory_item_gid, ${sv.inventoryItem.id})
+                where id = ${erpId}`
+      continue
+    }
+    // Neue Shop-Variante: per SKU/Barcode ankoppeln.
+    const [treffer] = await sql<{ id: string }[]>`
+      select id from product_variants
+      where template_id = ${templateId} and shopify_variant_id is null
+        and ((${sv.sku}::text is not null and sku = ${sv.sku})
+          or (${sv.barcode}::text is not null and barcode = ${sv.barcode}))
+      limit 1`
+    if (treffer) {
+      await sql`update product_variants
+                set shopify_variant_id = ${sv.id},
+                    shopify_inventory_item_gid = ${sv.inventoryItem.id},
+                    price_extra = ${extra.get(sv.id) ?? 0}
+                where id = ${treffer.id}`
+      neuVerknuepft++
+    } else {
+      offen.push(sv.sku ?? sv.id)
+    }
+  }
+
+  if (offen.length > 0) {
+    await sql`select log_event('product_template', ${templateId}, 'error',
+      ${`Shopify-Änderung: ${offen.length} Variante(n) ohne ERP-Gegenstück (${offen.join(', ')}) — im ERP anlegen oder SKU angleichen.`},
+      'shopify')`
+  }
+  await sql`select log_event('product_template', ${templateId}, 'note',
+    'Aus Shopify aktualisiert (Titel, Preise, Codes).', 'shopify')`
+  return `„${p.title}" aktualisiert${neuVerknuepft ? `, ${neuVerknuepft} Variante(n) neu verknüpft` : ''}${offen.length ? `, ${offen.length} offen` : ''}`
+}

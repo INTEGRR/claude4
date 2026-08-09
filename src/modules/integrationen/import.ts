@@ -362,6 +362,22 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
 
   for (const event of events) {
     try {
+      // Produktänderungen aus dem Shop: frisch holen und abgleichen.
+      if (event.topic.startsWith('products/')) {
+        const rohId = (event.payload as { admin_graphql_api_id?: string; id?: number | string })
+        const gid = rohId.admin_graphql_api_id ??
+          (rohId.id != null ? `gid://shopify/Product/${String(rohId.id)}` : null)
+        const { aktualisiereProduktAusShopify } = await import('./produkt-import')
+        const meldung = gid
+          ? await aktualisiereProduktAusShopify(gid)
+          : 'Kein Produkt-Identifier im Payload — übersprungen'
+        await sql`update shopify_webhook_events
+                  set status = 'done', processed_at = now(), error = ${meldung}
+                  where id = ${event.id}`
+        processed++
+        continue
+      }
+
       // Bestandsmeldungen tragen keine Order-ID — eigener Zweig vor der
       // Order-Verarbeitung, sonst würden sie als "ohne Order-ID" übersprungen.
       if (event.topic.startsWith('inventory_levels/')) {

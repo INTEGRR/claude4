@@ -3,7 +3,28 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
+import { after } from 'next/server'
 import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
+import { shopifyConfigured } from '@/modules/integrationen/shopify'
+
+/**
+ * Nach dem Speichern: ist das Produkt mit Shopify verknüpft, wandern die
+ * Änderungen als Job in den Shop — nach der Antwort, damit das Speichern
+ * nicht auf Shopify wartet.
+ */
+async function shopifyNachziehen(templateId: string) {
+  if (!shopifyConfigured()) return
+  const [verknuepft] = await sql<{ eins: number }[]>`
+    select 1 as eins from product_variants
+    where template_id = ${templateId} and shopify_variant_id is not null limit 1`
+  if (!verknuepft) return
+  await sql`select enqueue_job('shopify_product_push',
+    ${sql.json({ template_id: templateId })}, ${`produkt-push:${templateId}`})`
+  after(async () => {
+    const { runDueJobs } = await import('@/modules/integrationen/jobs')
+    await runDueJobs().catch(() => {})
+  })
+}
 
 export async function createProduct(formData: FormData) {
   await requireWrite('produkte')
@@ -70,6 +91,7 @@ export async function updateProduct(templateId: string, formData: FormData) {
   } catch (err) {
     return actionFail(err)
   }
+  await shopifyNachziehen(templateId)
   revalidatePath(`/produkte/${templateId}`)
 }
 
@@ -117,6 +139,7 @@ export async function setVariantCodes(variantId: string, formData: FormData) {
 
   const [variant] = await sql<{ template_id: string }[]>`
     select template_id from product_variants where id = ${variantId}`
+  await shopifyNachziehen(variant.template_id)
   revalidatePath(`/produkte/${variant.template_id}`)
   revalidatePath(`/produkte/variante/${variantId}`)
 }

@@ -38,9 +38,12 @@ export async function POST(request: Request) {
   }
 
   // Webhooks liefern numerische IDs, die Admin-API arbeitet mit GIDs.
+  // Nur Order-Themen tragen eine Order-ID — bei Produkt- und Bestandsthemen
+  // wäre die Ableitung eine falsche Order-GID.
   const numericId = payload.admin_graphql_api_id ?? payload.id
-  const orderGid =
-    typeof numericId === 'string' && numericId.startsWith('gid://')
+  const orderGid = !topic.startsWith('orders/')
+    ? null
+    : typeof numericId === 'string' && numericId.startsWith('gid://')
       ? numericId
       : numericId != null
         ? `gid://shopify/Order/${String(numericId)}`
