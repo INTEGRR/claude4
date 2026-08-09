@@ -2,10 +2,11 @@ import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
-import { ActionForm } from '@/components/action-button'
+import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
-import { addAttribute, updateProduct } from '../actions'
+import { addAttribute, produktZuShopify, updateProduct } from '../actions'
+import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { RecordComments } from '@/components/record-comments'
 import { TagEditor } from '@/components/tag-editor'
 
@@ -57,9 +58,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     select id, name from users where active order by name`
 
   const variants = await sql<
-    { id: string; display_name: string | null; sku: string | null; barcode: string | null; on_hand: number }[]
+    {
+      id: string
+      display_name: string | null
+      sku: string | null
+      barcode: string | null
+      on_hand: number
+      shopify_variant_id: string | null
+    }[]
   >`
-    select id, display_name, sku, barcode, on_hand_qty(id) as on_hand
+    select id, display_name, sku, barcode, on_hand_qty(id) as on_hand, shopify_variant_id
     from product_variants where template_id = ${id} and active order by display_name`
 
   const attributes = await sql<{ attribute: string; values: string[] }[]>`
@@ -100,13 +108,29 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </>
         }
         actions={
-          boms.length > 0 ? (
+          <>
+            {shopifyConfigured() &&
+              (variants.some((v) => v.shopify_variant_id) ? (
+                <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="led ok" />
+                  im Shop
+                </span>
+              ) : tpl.can_be_sold ? (
+                <ActionButton
+                  action={produktZuShopify.bind(null, id)}
+                  confirm="Produkt mit allen Varianten in Shopify anlegen? Es erscheint dort sofort als aktives Produkt."
+                >
+                  In Shopify anlegen
+                </ActionButton>
+              ) : null)}
+            {boms.length > 0 ? (
             <Link className="btn" href={`/fertigung/stuecklisten/${boms[0].id}`}>
               Stückliste ({boms[0].lines} Positionen)
             </Link>
-          ) : tpl.route_manufacture ? (
-            <Link className="btn" href="/fertigung/stuecklisten">Stückliste anlegen</Link>
-          ) : null
+            ) : tpl.route_manufacture ? (
+              <Link className="btn" href="/fertigung/stuecklisten">Stückliste anlegen</Link>
+            ) : null}
+          </>
         }
       />
 

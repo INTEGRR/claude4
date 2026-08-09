@@ -126,10 +126,14 @@ export async function pushInventar(): Promise<PushErgebnis> {
          inventorySetQuantities(input: $input) { userErrors { field message } }
        }`,
       {
+        // Ohne compareQuantity je Position prüft Shopify nicht gegen den
+        // letzten Stand — gewollt, das ERP ist die Quelle der Wahrheit.
+        // (ignoreCompareQuantity gab es bis 2026-04; in 2026-07 ist das Feld
+        // weg und das Weglassen von compareQuantity übernimmt seine Rolle.)
         input: {
           name: 'available',
           reason: 'correction',
-          ignoreCompareQuantity: true,
+          referenceDocumentUri: 'erp://bestandsabgleich',
           quantities: block.map((v) => ({
             inventoryItemId: v.inventory_item_gid,
             locationId: location,

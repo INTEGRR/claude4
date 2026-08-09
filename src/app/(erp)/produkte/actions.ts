@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
-import { actionError, actionFail } from '@/modules/shared/action'
+import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
 
 export async function createProduct(formData: FormData) {
   await requireWrite('produkte')
@@ -145,4 +145,22 @@ export async function createAttribute(formData: FormData) {
   }
 
   revalidatePath('/produkte/attribute')
+}
+
+/**
+ * Legt das Produkt samt Varianten in Shopify an und verknüpft beide Seiten.
+ * Danach laufen Bestandsabgleich und Bestellzuordnung automatisch.
+ */
+export async function produktZuShopify(templateId: string) {
+  await requireWrite('produkte')
+  try {
+    const { pushProduktZuShopify } = await import('@/modules/integrationen/produkt-push')
+    const r = await pushProduktZuShopify(templateId)
+    revalidatePath(`/produkte/${templateId}`)
+    return actionInfo(
+      `In Shopify angelegt (${r.varianten} Variante(n)) — der Bestand wird gleich gemeldet.`,
+    )
+  } catch (err) {
+    return actionFail(err)
+  }
 }

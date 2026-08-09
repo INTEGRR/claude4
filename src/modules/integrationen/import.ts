@@ -22,7 +22,7 @@ async function upsertCustomer(t: TransactionSql, order: ShopifyOrder): Promise<s
     'Unbekannter Kunde'
   const { street, houseNumber } = splitStreet(addr?.address1)
   const shopifyCustomerId = order.customer?.id ?? null
-  const email = order.customer?.email ?? order.email
+  const email = order.customer?.defaultEmailAddress?.emailAddress ?? order.email
 
   if (shopifyCustomerId) {
     const [existing] = await t<{ id: string }[]>`
@@ -277,8 +277,10 @@ export async function importCustomersChunk(
 
   let imported = 0
   for (const k of customers) {
+    const email = k.defaultEmailAddress?.emailAddress ?? null
+    const telefon = k.defaultPhoneNumber?.phoneNumber ?? null
     const name =
-      k.displayName || [k.firstName, k.lastName].filter(Boolean).join(' ') || k.email || 'Unbekannt'
+      [k.firstName, k.lastName].filter(Boolean).join(' ') || email || 'Unbekannt'
     const a = k.defaultAddress
     const { street, houseNumber } = splitStreet(a?.address1)
     const ergebnis = await sql`
@@ -286,7 +288,7 @@ export async function importCustomersChunk(
         name, is_company, is_customer, email, phone, street, house_number,
         street2, zip, city, country_code, shopify_customer_id)
       values (
-        ${name}, ${Boolean(a?.company)}, true, ${k.email}, ${k.phone ?? a?.phone ?? null},
+        ${name}, ${Boolean(a?.company)}, true, ${email}, ${telefon ?? a?.phone ?? null},
         ${street}, ${houseNumber}, ${a?.address2 ?? null}, ${a?.zip ?? null},
         ${a?.city ?? null}, ${a?.countryCodeV2 ?? 'DE'}, ${k.id})
       on conflict (shopify_customer_id) do update set

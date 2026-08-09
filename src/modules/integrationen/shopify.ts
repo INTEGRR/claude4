@@ -202,7 +202,12 @@ export interface ShopifyOrder {
   displayFulfillmentStatus: string | null
   cancelledAt: string | null
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } }
-  customer: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null
+  customer: {
+    id: string
+    firstName: string | null
+    lastName: string | null
+    defaultEmailAddress: { emailAddress: string | null } | null
+  } | null
   shippingAddress: {
     name: string | null
     address1: string | null
@@ -235,7 +240,7 @@ const ORDER_FIELDS = `
   displayFulfillmentStatus
   cancelledAt
   totalPriceSet { shopMoney { amount currencyCode } }
-  customer { id firstName lastName email }
+  customer { id firstName lastName defaultEmailAddress { emailAddress } }
   shippingAddress { name address1 address2 zip city countryCodeV2 phone }
   lineItems(first: 100) {
     nodes {
@@ -285,11 +290,11 @@ export async function fetchOrdersPage(
 
 export interface ShopifyCustomer {
   id: string
-  displayName: string | null
   firstName: string | null
   lastName: string | null
-  email: string | null
-  phone: string | null
+  /** 2026-07: E-Mail und Telefon liegen in eigenen Unterobjekten. */
+  defaultEmailAddress: { emailAddress: string | null } | null
+  defaultPhoneNumber: { phoneNumber: string | null } | null
   defaultAddress: {
     company: string | null
     address1: string | null
@@ -311,7 +316,9 @@ export async function fetchCustomersPage(
     `query($after: String) {
        customers(first: 100, after: $after, sortKey: CREATED_AT) {
          nodes {
-           id displayName firstName lastName email phone
+           id firstName lastName
+           defaultEmailAddress { emailAddress }
+           defaultPhoneNumber { phoneNumber }
            defaultAddress { company address1 address2 zip city countryCodeV2 phone }
          }
          pageInfo { hasNextPage endCursor }
@@ -507,19 +514,15 @@ export interface WebhookEintrag {
 }
 
 export async function fetchWebhooks(): Promise<WebhookEintrag[]> {
+  // Seit 2026-07 liegt die Zieladresse direkt als `uri` am Abo; der frühere
+  // Umweg über endpoint { callbackUrl } ist als veraltet markiert.
   const data = await shopifyGraphQL<{
-    webhookSubscriptions: {
-      nodes: { id: string; topic: string; endpoint: { callbackUrl?: string } | null }[]
-    }
-  }>(`query {
-    webhookSubscriptions(first: 50) {
-      nodes { id topic endpoint { ... on WebhookHttpEndpoint { callbackUrl } } }
-    }
-  }`)
+    webhookSubscriptions: { nodes: { id: string; topic: string; uri: string }[] }
+  }>(`query { webhookSubscriptions(first: 50) { nodes { id topic uri } } }`)
   return data.webhookSubscriptions.nodes.map((n) => ({
     id: n.id,
     topic: n.topic,
-    callbackUrl: n.endpoint?.callbackUrl ?? null,
+    callbackUrl: n.uri ?? null,
   }))
 }
 
@@ -552,7 +555,7 @@ export async function registerWebhooks(
              userErrors { message }
            }
          }`,
-        { id: bestehend.id, sub: { callbackUrl: ziel } },
+        { id: bestehend.id, sub: { uri: ziel } },
       )
       const fehler = upd.webhookSubscriptionUpdate.userErrors
       if (fehler.length) throw new ShopifyError(`${topic}: ${fehler.map((f) => f.message).join('; ')}`, false)
@@ -567,7 +570,7 @@ export async function registerWebhooks(
            userErrors { message }
          }
        }`,
-      { topic, sub: { callbackUrl: ziel, format: 'JSON' } },
+      { topic, sub: { uri: ziel } },
     )
     const fehler = neu.webhookSubscriptionCreate.userErrors
     if (fehler.length) throw new ShopifyError(`${topic}: ${fehler.map((f) => f.message).join('; ')}`, false)
