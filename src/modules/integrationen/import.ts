@@ -96,22 +96,37 @@ export async function importShopifyOrder(
   eventId: string | null = null,
 ): Promise<ImportResult> {
   return tx(async (t) => {
-    const [existing] = await t<{ id: string; state: string }[]>`
-      select id, state from sales_orders where shopify_order_id = ${order.id}`
+    const [existing] = await t<{ id: string; state: string; delivery_status: string }[]>`
+      select id, state, delivery_status from sales_orders where shopify_order_id = ${order.id}`
 
-    // Stornierte Orders: vorhandenen Auftrag stornieren, sonst nichts tun.
-    if (order.cancelledAt) {
-      if (existing && existing.state !== 'cancel') {
-        await t`select cancel_sales_order(${existing.id}, 'shopify')`
-        return {
-          salesOrderId: existing.id,
-          created: false,
-          unmatched: 0,
-          message: `Auftrag zu ${order.name} storniert`,
-        }
+    // Storniert ODER voll erstattet: bei uns heißt beides Storno. Der Storno
+    // gibt Reservierungen frei und räumt nicht begonnene Fertigung mit ab
+    // (cancel_sales_order); bereits versandte Ware bleibt Sache der Retoure.
+    const erstattet = order.displayFinancialStatus === 'REFUNDED'
+    const beendet = Boolean(order.cancelledAt) || erstattet
+    const grund = order.cancelledAt ? 'storniert' : 'erstattet'
+
+    if (beendet && existing) {
+      if (existing.state === 'cancel') {
+        return { salesOrderId: existing.id, created: false, unmatched: 0,
+          message: `${order.name} ist ${grund} - war bereits storniert` }
       }
-      return { salesOrderId: existing?.id ?? null, created: false, unmatched: 0,
-        message: `${order.name} ist storniert - nichts zu tun` }
+      await t`select cancel_sales_order(${existing.id}, 'shopify')`
+      if (erstattet) {
+        await t`select log_event('sales_order', ${existing.id}, 'note',
+          'In Shopify erstattet — Auftrag storniert.', 'shopify')`
+      }
+      if (existing.delivery_status !== 'none') {
+        await t`select log_event('sales_order', ${existing.id}, 'error',
+          'Ware war bereits (teilweise) versandt — für die Rückabwicklung eine Retoure bzw. Reparatur/RMA anlegen.',
+          'shopify')`
+      }
+      return {
+        salesOrderId: existing.id,
+        created: false,
+        unmatched: 0,
+        message: `Auftrag zu ${order.name} ${erstattet ? 'wegen Erstattung ' : ''}storniert`,
+      }
     }
 
     if (existing) {
@@ -175,6 +190,21 @@ export async function importShopifyOrder(
       await t`select log_event('sales_order', ${created.id}, 'error',
         ${`${unmatched} Position(en) konnten keinem Produkt zugeordnet werden und fehlen im Auftrag.`},
         'shopify')`
+    }
+
+    // Stornierte/erstattete Orders ohne Beleg: als stornierten Beleg
+    // übernehmen — der Umsatzverlauf bleibt vollständig, aber es entsteht
+    // keinerlei Logistik (der Beleg war nie bestätigt).
+    if (beendet) {
+      await t`select cancel_sales_order(${created.id}, 'shopify')`
+      await t`select log_event('sales_order', ${created.id}, 'note',
+        ${`In Shopify ${grund} — als stornierter Beleg übernommen.`}, 'shopify')`
+      return {
+        salesOrderId: created.id,
+        created: true,
+        unmatched,
+        message: `${order.name} als ${grund}er Beleg übernommen`,
+      }
     }
 
     // In Shopify bereits vollständig versandte Orders sind Historie: als

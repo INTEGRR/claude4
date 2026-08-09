@@ -383,7 +383,7 @@ describe('Verkauf mit Fertigung (MTO)', () => {
     })
   })
 
-  test('Storno bricht die Lieferung ab, warnt aber bei offener Fertigung', async () => {
+  test('Storno bricht Lieferung und nicht begonnene Fertigung ab', async () => {
     await withRollback(async (t) => {
       const s = await keyboardScenario(t)
       const [partner] = await t<{ id: string }[]>`
@@ -403,14 +403,16 @@ describe('Verkauf mit Fertigung (MTO)', () => {
         select state from stock_pickings where origin_model = 'sales_order' and origin_id = ${order.id}`
       assert.equal(pick.state, 'cancel', 'Lieferung storniert')
 
+      // Seit 0029: Storno heißt, die Arbeit entfällt — nicht begonnene
+      // Fertigung wird mitstorniert statt als Leiche stehenzubleiben.
       const [mo] = await t<{ state: string }[]>`
         select state from manufacturing_orders where sales_order_id = ${order.id}`
-      assert.equal(mo.state, 'confirmed', 'Fertigungsauftrag bleibt bestehen (Odoo-Verhalten)')
+      assert.equal(mo.state, 'cancel', 'Fertigungsauftrag ist mitstorniert')
 
       const [warn] = await t<{ message: string }[]>`
         select message from audit_log
         where model = 'sales_order' and record_id = ${order.id} and kind = 'note'`
-      assert.match(warn.message, /offene\(r\) Fertigungsauftrag/)
+      assert.match(warn.message, /storniert, Materialreservierungen freigegeben/)
     })
   })
 
@@ -444,6 +446,73 @@ describe('Verkauf mit Fertigung (MTO)', () => {
       const [so] = await t<{ delivery_status: string }[]>`
         select delivery_status from sales_orders where id = ${order.id}`
       assert.equal(so.delivery_status, 'partial')
+      await assertLedgerConsistent(t)
+    })
+  })
+})
+
+describe('Storno räumt die Fertigung mit auf', () => {
+  /** Auftrag über 2 weiße Tastaturen mit Material auf Lager. */
+  async function auftragMitFertigung(t: TransactionSql) {
+    const s = await keyboardScenario(t)
+    await stockUp(t, s.gehaeuseWeiss, 10)
+    await stockUp(t, s.platine, 10)
+    await stockUp(t, s.switches, 500)
+
+    const [partner] = await t<{ id: string }[]>`
+      insert into partners (name, is_customer) values ('Stornokunde', true) returning id`
+    const [order] = await t<{ id: string }[]>`
+      insert into sales_orders (number, partner_id)
+      values (next_sequence('sale'), ${partner.id}) returning id`
+    await t`insert into sales_order_lines (order_id, variant_id, name, qty, uom_id, price_unit)
+            values (${order.id}, ${s.weiss}, 'Tastatur Weiß', 2, ${s.uom}, 149)`
+    await t`select confirm_sales_order(${order.id}, 'tester')`
+    const [mo] = await t<{ id: string }[]>`
+      select id from manufacturing_orders where sales_order_id = ${order.id}`
+    return { ...s, orderId: order.id, moId: mo.id }
+  }
+
+  test('nicht begonnene Fertigung wird mitstorniert und gibt Material frei', async () => {
+    await withRollback(async (t) => {
+      const s = await auftragMitFertigung(t)
+      await t`select mo_check_availability(${s.moId})`
+      const frei = await freeToUse(t, s.platine)
+
+      await t`select cancel_sales_order(${s.orderId}, 'tester')`
+
+      const [mo] = await t<{ state: string }[]>`
+        select state from manufacturing_orders where id = ${s.moId}`
+      assert.equal(mo.state, 'cancel', 'Fertigungsauftrag ist mitstorniert')
+      assert.ok(
+        (await freeToUse(t, s.platine)) > frei,
+        'Materialreservierung ist freigegeben, Bestand wieder verfügbar',
+      )
+      const [so] = await t<{ state: string }[]>`
+        select state from sales_orders where id = ${s.orderId}`
+      assert.equal(so.state, 'cancel')
+      await assertLedgerConsistent(t)
+    })
+  })
+
+  test('angebrochene Fertigung bleibt mit Hinweis stehen', async () => {
+    await withRollback(async (t) => {
+      const s = await auftragMitFertigung(t)
+      await t`select mo_check_availability(${s.moId})`
+      // Eine Komponente ist bereits entnommen — der Auftrag ist angebrochen.
+      const [move] = await t<{ id: string }[]>`
+        select id from stock_moves
+        where production_id = ${s.moId} and variant_id = ${s.platine}`
+      await t`select move_done(${move.id})`
+
+      await t`select cancel_sales_order(${s.orderId}, 'tester')`
+
+      const [mo] = await t<{ state: string }[]>`
+        select state from manufacturing_orders where id = ${s.moId}`
+      assert.notEqual(mo.state, 'cancel', 'angebrochene Fertigung wird nicht storniert')
+      const hinweise = await t<{ message: string }[]>`
+        select message from audit_log
+        where model = 'sales_order' and record_id = ${s.orderId} and message like '%angebrochen%'`
+      assert.equal(hinweise.length, 1, 'Hinweis am Auftrag')
       await assertLedgerConsistent(t)
     })
   })

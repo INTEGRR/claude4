@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { sql } from '@/db/client'
 import { shopifyConfig, verifyWebhookHmac } from '@/modules/integrationen/shopify'
 
 /**
  * Shopify-Webhook-Endpunkt.
  *
- * Grundsatz: nur prüfen und speichern, dann sofort 200 zurückgeben. Shopify
- * bricht nach 5 Sekunden ab und wiederholt bis zu achtmal; die eigentliche
- * Verarbeitung übernimmt der Cron-Job.
+ * Grundsatz: prüfen, speichern, sofort 200 zurückgeben — Shopify bricht nach
+ * 5 Sekunden ab und wiederholt bis zu achtmal. Die Verarbeitung startet
+ * DIREKT NACH der Antwort (after()): eine neue Bestellung ist damit binnen
+ * Sekunden im ERP und reserviert ihren Bestand — das Fenster für
+ * Überverkäufe schrumpft auf die Laufzeit eines Imports. Der Cron-Job
+ * bleibt als Sicherheitsnetz für alles, was hier schiefgeht.
  */
 export async function POST(request: Request) {
   // Der ROHE Body wird für den HMAC gebraucht - vorher nichts parsen.
@@ -48,6 +51,19 @@ export async function POST(request: Request) {
     insert into shopify_webhook_events (webhook_id, topic, shopify_order_id, payload)
     values (${webhookId}, ${topic}, ${orderGid}, ${raw}::jsonb)
     on conflict (webhook_id) do nothing`
+
+  // Nach der Antwort sofort verarbeiten — Fehler landen am Event und werden
+  // vom Cron mit Backoff wiederholt; hier darf nichts nach außen schlagen.
+  after(async () => {
+    try {
+      const { processPendingWebhooks } = await import('@/modules/integrationen/import')
+      const { runDueJobs } = await import('@/modules/integrationen/jobs')
+      await processPendingWebhooks(5)
+      await runDueJobs()
+    } catch {
+      // bewusst still: der Minuten-Cron holt es nach
+    }
+  })
 
   return NextResponse.json({ ok: true })
 }

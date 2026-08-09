@@ -487,3 +487,92 @@ export async function addOrderTags(orderGid: string, tags: string[]): Promise<vo
     throw new ShopifyError(data.tagsAdd.userErrors.map((e) => e.message).join('; '), true)
   }
 }
+
+// --- Webhook-Verwaltung -------------------------------------------------------
+//
+// Damit Änderungen aus Shopify sofort ankommen, registriert das ERP seine
+// Webhooks selbst — vorausgesetzt, es ist öffentlich erreichbar.
+
+const WEBHOOK_TOPICS = [
+  'ORDERS_CREATE',
+  'ORDERS_UPDATED',
+  'ORDERS_CANCELLED',
+  'INVENTORY_LEVELS_UPDATE',
+] as const
+
+export interface WebhookEintrag {
+  id: string
+  topic: string
+  callbackUrl: string | null
+}
+
+export async function fetchWebhooks(): Promise<WebhookEintrag[]> {
+  const data = await shopifyGraphQL<{
+    webhookSubscriptions: {
+      nodes: { id: string; topic: string; endpoint: { callbackUrl?: string } | null }[]
+    }
+  }>(`query {
+    webhookSubscriptions(first: 50) {
+      nodes { id topic endpoint { ... on WebhookHttpEndpoint { callbackUrl } } }
+    }
+  }`)
+  return data.webhookSubscriptions.nodes.map((n) => ({
+    id: n.id,
+    topic: n.topic,
+    callbackUrl: n.endpoint?.callbackUrl ?? null,
+  }))
+}
+
+/**
+ * Registriert die benötigten Webhooks auf `${baseUrl}/api/webhooks/shopify`.
+ * Vorhandene Einträge mit derselben Adresse bleiben; abweichende Adressen zum
+ * selben Thema werden auf die neue umgezogen.
+ */
+export async function registerWebhooks(
+  baseUrl: string,
+): Promise<{ angelegt: number; aktualisiert: number; unveraendert: number }> {
+  const ziel = `${baseUrl.replace(/\/+$/, '')}/api/webhooks/shopify`
+  const vorhandene = await fetchWebhooks()
+  let angelegt = 0
+  let aktualisiert = 0
+  let unveraendert = 0
+
+  for (const topic of WEBHOOK_TOPICS) {
+    const bestehend = vorhandene.find((w) => w.topic === topic)
+    if (bestehend?.callbackUrl === ziel) {
+      unveraendert++
+      continue
+    }
+    if (bestehend) {
+      const upd = await shopifyGraphQL<{
+        webhookSubscriptionUpdate: { userErrors: { message: string }[] }
+      }>(
+        `mutation aktualisieren($id: ID!, $sub: WebhookSubscriptionInput!) {
+           webhookSubscriptionUpdate(id: $id, webhookSubscription: $sub) {
+             userErrors { message }
+           }
+         }`,
+        { id: bestehend.id, sub: { callbackUrl: ziel } },
+      )
+      const fehler = upd.webhookSubscriptionUpdate.userErrors
+      if (fehler.length) throw new ShopifyError(`${topic}: ${fehler.map((f) => f.message).join('; ')}`, false)
+      aktualisiert++
+      continue
+    }
+    const neu = await shopifyGraphQL<{
+      webhookSubscriptionCreate: { userErrors: { message: string }[] }
+    }>(
+      `mutation anlegen($topic: WebhookSubscriptionTopic!, $sub: WebhookSubscriptionInput!) {
+         webhookSubscriptionCreate(topic: $topic, webhookSubscription: $sub) {
+           userErrors { message }
+         }
+       }`,
+      { topic, sub: { callbackUrl: ziel, format: 'JSON' } },
+    )
+    const fehler = neu.webhookSubscriptionCreate.userErrors
+    if (fehler.length) throw new ShopifyError(`${topic}: ${fehler.map((f) => f.message).join('; ')}`, false)
+    angelegt++
+  }
+
+  return { angelegt, aktualisiert, unveraendert }
+}
