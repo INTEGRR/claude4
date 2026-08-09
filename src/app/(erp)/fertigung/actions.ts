@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
 import { parseQtyMap } from '@/modules/shared/form'
-import { actionError, actionFail } from '@/modules/shared/action'
+import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
 
 export async function createMo(formData: FormData) {
   const user = await requireWrite('fertigung')
@@ -44,6 +44,20 @@ export async function checkAvailability(moId: string) {
   await requireWrite('fertigung')
   await sql`select mo_check_availability(${moId})`
   revalidatePath(`/fertigung/${moId}`)
+
+  // Ohne Rückmeldung wäre das ein Knopf, der scheinbar nichts tut, wenn kein
+  // Bestand zum Reservieren da ist — genau die Sorte Stille, die Misstrauen sät.
+  const [stand] = await sql<{ offen: number; gesamt: number }[]>`
+    select count(*) filter (where state in ('confirmed', 'waiting'))::int as offen,
+           count(*)::int as gesamt
+    from stock_moves
+    where production_id = ${moId} and state not in ('done', 'cancel')`
+  if (!stand || stand.gesamt === 0) return
+  return stand.offen === 0
+    ? actionInfo('Alle Komponenten sind reserviert.')
+    : actionInfo(
+        `${stand.gesamt - stand.offen} von ${stand.gesamt} Positionen reserviert — für den Rest fehlt Bestand.`,
+      )
 }
 
 /** Fertigmeldung inkl. abweichender Ist-Mengen aus dem Formular. */

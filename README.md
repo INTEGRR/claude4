@@ -3,19 +3,26 @@
 Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 
 - **Verkauf** — Verkaufsaufträge (v. a. aus Shopify), Bestätigung erzeugt Lieferung und Fertigungsauftrag
-- **Fertigung** — Produkte mit Varianten, Stücklisten inkl. **„Auf Varianten anwenden"**, Fertigungsaufträge (druckbar, mit Barcode), Demontage
-- **Einkauf** — Lieferanten, Bestellungen (E-Mail-Versand, Sperren, Stornieren), Wareneingang, Lieferantenrechnungen
+- **Fertigung** — Produkte mit Varianten, Stücklisten inkl. **„Auf Varianten anwenden"** und Phantom-Baugruppen, Fertigungsaufträge (druckbar, mit Barcode), Arbeitsplätze mit Arbeitsgängen und Zeiterfassung, Backflush, Demontage
+- **Einkauf** — Lieferanten, Bestellungen (E-Mail-Versand, Sperren, Stornieren), Wareneingang, Lieferantenrechnungen mit 3-Wege-Abgleich, Wechselkurse, Einstandskosten (Fracht/Zoll auf den Warenwert)
 - **Lager** — Bewegungs-Ledger (Eingang, Ausgang, Fertigung, Inventur, Ausschuss, Retoure), Bestände mit Prognose, Barcodes
+- **Bewertung** — laufende Bestandsbewertung nach gleitendem Durchschnitt (AVCO), unveränderliche Wertschichten, Eröffnungsbewertung
+- **Personal** — Mitarbeiter, Kommen/Gehen (auch per Ausweis-Scan), Schichtplan und Abwesenheiten mit Überschneidungsschutz, Arbeitszeit fließt in die Fertigungskosten
 - **Reparatur** — Reparaturaufträge mit Teileverbrauch (einbauen / ausbauen / wiederverwenden)
 - **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren) und Fulfillment-Rückmeldung an Shopify
 - **Scanner-Arbeitsplatz** — Belege per Barcode öffnen, Positionen scannen, Doppelscan bestätigt und bucht
-- **Auswertungen** — Inventarwert, Produktion je Variante, verbaute Komponenten, Abverkaufsquote — mit Diagrammen
-- **KI-Analyse** — Ad-hoc-Auswertungen auf Zuruf: Claude-Agent mit Nur-Lese-Zugriff auf die Datenbank
+- **Auswertungen** — Inventarwert, Produktion, verbaute Komponenten, Abverkaufsquote; Kennzahlen: Deckungsbeitrag, Rohertrag, Lagerumschlag und Reichweite, Liefertreue, RMA-Quote — mit Diagrammen
+- **KI-Analyse** — Ad-hoc-Auswertungen, Tabellen und Diagramme auf Zuruf: Claude-Agent mit Nur-Lese-Zugriff; anlegen darf er nur aus einem festen Katalog und erst nach Bestätigung
 - **Rollen & Kommentare** — Lager-/Fertigungs-/Büro-/Admin-Rollen mit passendem Menü; Verlauf + Kommentare an jedem Beleg
 - **Beschaffung** — Meldebestände (Min/Max) mit Vorschlagsliste; ein Klick erzeugt Bestellung oder Fertigungsauftrag
 - **Lose & Seriennummern** — Rückverfolgung je Produkt (Chargen oder Serien), FIFO-Zuteilung, Rückverfolgungsansicht
 - **Ereignis-Monitor** — jede Shopify-/DHL-/Mail-Transaktion protokolliert; Queue mit Backoff, Fehler am Beleg sichtbar
+- **Shopify-Bestandsabgleich** — verfügbare Mengen werden an den Shop gemeldet; Handkorrekturen im Shop fallen als Abweichung auf und werden überschrieben
 - **Vollständige Stammdaten** — Kategorien, Steuern, Zahlungsbedingungen (inkl. Skonto), Incoterms, Tags, Kontakt-Hierarchie
+
+Die Oberfläche funktioniert auf Monitor, Tablet und Telefon — am Packtisch
+ersetzt das Telefon den Zweitbildschirm. Betrieb wahlweise per Docker,
+hinter VPN oder auf Vercel mit Supabase ([Anleitung](docs/vercel-supabase.md)).
 
 > **Ausführliche Schritt-für-Schritt-Anleitung mit Rundgang durch die
 > Beispieldaten und Fehlerbehebung: [docs/lokal-starten.md](docs/lokal-starten.md)**

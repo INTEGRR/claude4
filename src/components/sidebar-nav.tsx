@@ -54,6 +54,23 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
   // leuchtete auf /personal/schichtplan auch „Mitarbeiter" (/personal) mit.
   const passt = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
+
+  // Beim Ankommen auf einer Seite öffnet sich deren Gruppe — wer über Scanner
+  // oder Suche springt, soll sich verorten können. Danach ist sie normal
+  // zuklappbar: eine dauerhaft erzwungene Gruppe wäre ein Knopf, der klickbar
+  // aussieht und nichts tut (und genau so im Durchklick-Test aufgefallen ist).
+  useEffect(() => {
+    const aktive = groups.find((g) => g.label && g.items.some((i) => passt(i.href)))?.label
+    if (!aktive) return
+    setClosed((c) => {
+      if (!c[aktive]) return c
+      localStorage.setItem(STORAGE_PREFIX + aktive, 'auf')
+      const next = { ...c }
+      delete next[aktive]
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
   const aktiv = groups
     .flatMap((g) => g.items.map((i) => i.href))
     .filter(passt)
@@ -77,9 +94,7 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
             <NavEntry key={item.href} item={item} active={isActive(item.href)} />
           ))
         }
-        // Die Gruppe der aktiven Seite bleibt offen, egal was gespeichert ist.
-        const containsActive = g.items.some((item) => isActive(item.href))
-        const isClosed = closed[g.label] === true && !containsActive
+        const isClosed = closed[g.label] === true
         return (
           <div key={g.label ?? i} className="nav-group">
             <button

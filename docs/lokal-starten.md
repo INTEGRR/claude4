@@ -460,14 +460,34 @@ Labelerstellung sind deaktiviert, mit sichtbarem Hinweis in der Oberfläche.
 Zum Aktivieren die Werte in `.env` eintragen (bzw. bei Docker in
 `docker-compose.yml` unter `environment`) und neu starten.
 
-**Shopify** — Custom App im Shopify Dev Dashboard anlegen, Scopes
-`read_orders`, `write_orders`, `write_merchant_managed_fulfillment_orders`:
+**Shopify** — die App muss **im Shop-Admin** angelegt werden, nicht im neuen
+Dev Dashboard: das Dashboard erzeugt OAuth-Apps mit Client ID/Secret, das ERP
+braucht aber den statischen Admin-Token, und den gibt es nur hier:
+
+1. `admin.shopify.com/store/<shop>` → **Einstellungen → Apps und
+   Vertriebskanäle → Apps entwickeln** → App erstellen.
+2. Konfiguration → Admin-API-Integration → Scopes: `read_orders`,
+   `write_orders`, `read_customers`, `read_products`,
+   `write_merchant_managed_fulfillment_orders`, `read_inventory`,
+   `write_inventory`, `read_locations`.
+3. Installieren → Reiter **API-Anmeldedaten** zeigt den Admin-API-Token
+   (`shpat_…`) — **einmalig**, sofort kopieren.
 
 ```
-SHOPIFY_SHOP_DOMAIN=deinshop.myshopify.com
+SHOPIFY_SHOP_DOMAIN=deinshop.myshopify.com   # die .myshopify.com-Adresse
 SHOPIFY_ADMIN_TOKEN=shpat_…
-SHOPIFY_WEBHOOK_SECRET=…      # Client Secret der App
+SHOPIFY_WEBHOOK_SECRET=                      # lokal leer lassen, siehe unten
 ```
+
+Webhooks brauchen eine öffentlich erreichbare URL — `localhost` kann Shopify
+nicht anrufen. Lokal ist das einkalkuliert: der viertelstündliche Abgleich
+holt Bestellungen aktiv ab, es geht nur die Sekunden-Aktualität verloren.
+Läuft das ERP öffentlich (z. B. Vercel): im Shop-Admin unter
+**Einstellungen → Benachrichtigungen → Webhooks** die Ereignisse
+`orders/create`, `orders/updated`, `orders/cancelled` und
+`inventory_levels/update` auf `https://<erp>/api/webhooks/shopify`
+registrieren; `SHOPIFY_WEBHOOK_SECRET` ist der Signatur-Schlüssel, der unten
+auf genau dieser Webhooks-Seite steht.
 
 **DHL** — Geschäftskundenvertrag mit Zugang zum Geschäftskundenportal, dort
 einen Systembenutzer anlegen, App im
