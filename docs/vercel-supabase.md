@@ -102,12 +102,14 @@ Die Startseite `/integrationen` zeigt später, welche Anbindungen scharf sind.
 → scripts/migrate.ts
   ✓ 0001_fundament.sql
   …
-  ✓ 0026_nummernkreise.sql
-→ scripts/seed.ts --demo
+  ✓ 0031_demodaten.sql
+→ scripts/seed.ts
 ```
 
-Danach ist die Anwendung erreichbar. Anmeldung mit den Zugangsdaten aus dem
-Seed:
+Der Build legt **nur den Administrator** an — Beispieldaten spielt er
+grundsätzlich nicht ein (wer sie zum Ausprobieren will, führt
+`npm run db:seed -- --demo` bewusst von Hand gegen die Datenbank aus).
+Danach ist die Anwendung erreichbar. Anmeldung:
 
 | | |
 |---|---|
@@ -118,16 +120,12 @@ Seed:
 gar nicht erst anlegen will, setzt vor der ersten Bereitstellung
 `SEED_ADMIN_EMAIL` und `SEED_ADMIN_PASSWORD`.
 
-**Vor dem echten Betrieb: Beispieldaten löschen.** Einstellungen →
-„Gefahrenzone: alle Daten löschen (Neustart)" entfernt sämtliche Belege,
-Produkte, Partner, Bestände und Protokolle samt der beiden Demo-Konten;
-Benutzer, Firmendaten, Lagerorte und Konfiguration bleiben, Belegnummern
-starten wieder bei 1. Der gesetzte Merker sorgt dafür, dass auch künftige
-Builds keine Beispieldaten mehr einsäen. Danach holt die Shopify-Erstübernahme
+**Falls mit Beispieldaten getestet wurde:** Einstellungen → „Gefahrenzone:
+alle Daten löschen (Neustart)" entfernt vor dem echten Betrieb sämtliche
+Belege, Produkte, Partner, Bestände und Protokolle samt der beiden
+Demo-Konten; Benutzer, Firmendaten, Lagerorte und Konfiguration bleiben,
+Belegnummern starten wieder bei 1. Danach holt die Shopify-Erstübernahme
 (Seite „Integrationen") Produkte, Kunden und Bestellungen aus dem Shop.
-
-Ohne Beispieldaten von Anfang an: `vercel-build` in der `package.json` auf
-`scripts/seed.ts` ohne `--demo` umstellen.
 
 ---
 

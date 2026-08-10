@@ -57,9 +57,23 @@ git pull
 
 ## 3. Starten
 
-```bash
-docker compose up --build
+Zum Ausprobieren mit Beispieldaten (Tastatur, Stückliste, Bestände — der
+Rundgang weiter unten braucht sie):
+
+```powershell
+# Windows (PowerShell)
+$env:SEED_DEMO='true'; docker compose up --build
 ```
+
+```bash
+# macOS / Linux
+SEED_DEMO=true docker compose up --build
+```
+
+Ohne die Variable startet das System **leer** (nur der Administrator):
+Beispieldaten werden grundsätzlich nie automatisch eingespielt — nur auf
+diesen ausdrücklichen Wunsch. Für den echten Betrieb also einfach
+`docker compose up --build`.
 
 **Ist Port 3000 bei dir schon belegt?** Dann einen anderen wählen — die
 Anwendung ist danach unter genau diesem Port erreichbar:
@@ -111,8 +125,10 @@ Was jetzt passiert (alles automatisch):
 1. Ein Node-Image wird gebaut und die Anwendung kompiliert — **beim ersten Mal
    3–8 Minuten**, danach Sekunden.
 2. PostgreSQL startet.
-3. Das Datenbankschema wird angelegt (10 Migrationen).
-4. Administrator und Beispieldaten werden erzeugt.
+3. Das Datenbankschema wird angelegt (alle Migrationen).
+4. Der Administrator wird erzeugt — und nur mit `SEED_DEMO=true` auch die
+   Beispieldaten. Nachträglich in ein laufendes, leeres System:
+   `docker compose exec app node --experimental-strip-types scripts/seed.ts --demo`
 
 Fertig ist es, wenn im Terminal steht:
 
@@ -145,7 +161,8 @@ den Scanner. Eigene Konten legst du unter **Einstellungen → Benutzer** an.
 Wenn der echte Betrieb beginnt, entfernt **Einstellungen → „Gefahrenzone:
 alle Daten löschen (Neustart)"** die Beispieldaten restlos — samt der beiden
 Demo-Konten und aller Buchungen; Benutzer, Lagerorte und Konfiguration
-bleiben, und der Seed legt sie auch später nicht neu an.
+bleiben. Zurück kommen Beispieldaten nur, wenn du sie ausdrücklich neu
+einspielst (`SEED_DEMO=true` bzw. `--demo`) — nie von selbst.
 
 Das Terminal lässt du offen — dort laufen die Protokolle. Zum Beenden `Strg+C`.
 

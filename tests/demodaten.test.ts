@@ -4,8 +4,9 @@
  * begraben. Deshalb bekommt diese Datei eine eigene Wegwerf-Datenbank:
  * Migrationen rein, kleine Fixture, Funktion ausführen, prüfen, Datenbank weg.
  *
- * Nebeneffekt: hier läuft auch der echte Seed gegen den gesetzten Merker —
- * genau der Pfad, der auf Vercel bei jedem Build durchlaufen wird.
+ * Nebeneffekt: hier läuft auch der echte Seed so, wie ihn jeder Vercel-Build
+ * und jeder Container-Start aufruft (ohne --demo) — und muss dabei die Finger
+ * von den gerade gelöschten Beispieldaten lassen.
  */
 import '../scripts/env.ts'
 import test, { after, before, describe } from 'node:test'
@@ -112,14 +113,15 @@ describe('Neustart: demodaten_loeschen', () => {
     assert.match(nummer, /0*1$/)
   })
 
-  test('der Seed legt danach keine Beispieldaten mehr an', async () => {
+  test('der Build-Seed (ohne --demo) legt keinerlei Beispieldaten an', async () => {
     const [merker] = await sql<{ value: { geloescht?: boolean } }[]>`
       select value from settings where key = 'demo'`
     assert.equal(merker.value.geloescht, true)
 
-    const seed = skript('scripts/seed.ts', '--demo')
+    // Exakt der Aufruf aus scripts/vorbereiten.ts (Vercel) und dem
+    // Docker-Entrypoint ohne SEED_DEMO: nur der Administrator, sonst nichts.
+    const seed = skript('scripts/seed.ts')
     assert.equal(seed.status, 0, `Seed fehlgeschlagen:\n${seed.stderr}`)
-    assert.match(seed.stdout, /nicht neu an/)
 
     const [{ produkte }] = await sql<{ produkte: number }[]>`
       select count(*)::int as produkte from product_templates`
@@ -127,5 +129,16 @@ describe('Neustart: demodaten_loeschen', () => {
     const demoKonten = await sql<{ email: string }[]>`
       select email from users where email like '%@example.com' and email <> 'admin@example.com'`
     assert.equal(demoKonten.length, 0, 'Seed darf die Demo-Konten nicht neu anlegen')
+  })
+
+  test('die Automatik ist wirklich tot: kein Startpfad reicht --demo weiter', async () => {
+    // Absichtlich als Text geprüft: wer --demo je wieder in den Build oder
+    // den Container-Standard schreibt, soll hier auflaufen.
+    const { readFile } = await import('node:fs/promises')
+    const vorbereiten = await readFile('scripts/vorbereiten.ts', 'utf8')
+    assert.ok(!vorbereiten.includes("'--demo'"), 'vercel-build darf --demo nicht setzen')
+    const compose = await readFile('docker-compose.yml', 'utf8')
+    assert.match(compose, /SEED_DEMO: \$\{SEED_DEMO:-false\}/,
+      'Docker-Beispieldaten müssen ein Opt-in bleiben')
   })
 })

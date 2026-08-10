@@ -50,9 +50,12 @@ services:
       HOSTNAME: 0.0.0.0
       NODE_ENV: production
       STORAGE_DIR: /app/storage
-      # Beispieldaten beim ersten Start (Tastatur mit Farbvarianten,
-      # 20-Positionen-Stückliste, Komponenten mit Bestand)
-      SEED_DEMO: 'true'
+      # Beispieldaten (Tastatur mit Farbvarianten, 20-Positionen-Stückliste,
+      # Komponenten mit Bestand) gibt es NUR auf ausdrücklichen Wunsch:
+      #   SEED_DEMO=true docker compose up --build
+      # Niemals stillschweigend einspielen — auf einer Produktionsdatenbank
+      # wäre das ein Datenunfall.
+      SEED_DEMO: ${SEED_DEMO:-false}
       # Zugangsdaten des ersten Benutzers
       SEED_ADMIN_EMAIL: admin@example.com
       SEED_ADMIN_PASSWORD: erp-admin

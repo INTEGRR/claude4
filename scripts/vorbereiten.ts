@@ -1,8 +1,12 @@
 /**
- * Vorbereitung vor dem Build auf Vercel: Schema einspielen, Grunddaten
+ * Vorbereitung vor dem Build auf Vercel: Schema einspielen, Administrator
  * anlegen. Beides ist wiederholbar — angewandte Migrationen stehen in
- * schema_migrations, und der Seed überspringt Beispieldaten, sobald Produkte
- * vorhanden sind.
+ * schema_migrations, ein vorhandener Administrator wird übersprungen.
+ *
+ * Beispieldaten spielt der Build grundsätzlich NICHT ein. Sie kommen nur auf
+ * ausdrücklichen Befehl (`npm run db:seed -- --demo`) — ein Deployment, das
+ * sich ungefragt Beispieldaten in die Produktionsdatenbank legt, ist genau
+ * die Sorte Überraschung, die irgendwann teuer wird.
  *
  * Ohne Datenbankadresse läuft der Build trotzdem durch. Das ist Absicht: die
  * allererste Bereitstellung passiert, bevor jemand die Umgebungsvariablen
@@ -21,11 +25,10 @@ if (!url) {
 }
 
 for (const skript of ['scripts/migrate.ts', 'scripts/seed.ts']) {
-  const argumente = skript.endsWith('seed.ts') ? ['--demo'] : []
-  console.log(`\n→ ${skript} ${argumente.join(' ')}`)
+  console.log(`\n→ ${skript}`)
   const lauf = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', skript, ...argumente],
+    ['--experimental-strip-types', skript],
     { stdio: 'inherit' },
   )
   if (lauf.status !== 0) {

@@ -6,6 +6,9 @@
  *   node --experimental-strip-types scripts/seed.ts [--demo]
  *
  * Ohne --demo werden nur der Administrator und die Firmendaten angelegt.
+ * Beispieldaten kommen ausschließlich über dieses Flag — kein Build und kein
+ * Container-Start darf es automatisch setzen (Vercel: scripts/vorbereiten.ts,
+ * Docker: SEED_DEMO ist bewusst nur ein Opt-in).
  */
 import './env.ts'
 import { wartungsUrl } from './db-url.ts'
@@ -45,15 +48,6 @@ async function main() {
 
     if (!demo) {
       console.log('Fertig. Für Beispieldaten: npm run db:seed -- --demo')
-      return
-    }
-
-    // Wer die Beispieldaten im ERP gelöscht hat („Einstellungen →
-    // Gefahrenzone"), will sie beim nächsten Build nicht zurück.
-    const [demoMerker] = await sql<{ value: { geloescht?: boolean } }[]>`
-      select value from settings where key = 'demo'`
-    if (demoMerker?.value?.geloescht) {
-      console.log('Beispieldaten wurden im ERP bewusst gelöscht — der Seed legt sie nicht neu an.')
       return
     }
 

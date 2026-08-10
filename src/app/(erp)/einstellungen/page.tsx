@@ -89,7 +89,7 @@ async function demodatenLoeschen(formData: FormData) {
   revalidatePath('/', 'layout')
   return actionInfo(
     'Alle Belege, Produkte, Partner und Bestände sind gelöscht; Belegnummern starten wieder bei 1. ' +
-      'Beispieldaten werden auch bei künftigen Deployments nicht neu angelegt.',
+      'Beispieldaten kommen nie automatisch zurück — nur auf ausdrücklichen Befehl.',
   )
 }
 
@@ -242,8 +242,9 @@ export default async function EinstellungenPage() {
         <p>
           Erhalten bleiben: Benutzerkonten (außer den Demo-Konten <span className="mono small">lager@example.com</span>{' '}
           und <span className="mono small">fertigung@example.com</span>), Firmendaten, Lagerorte, Einheiten,
-          Steuern, Zahlungsbedingungen und die Shopify-/DHL-Konfiguration. Belegnummern starten wieder bei 1,
-          und der Seed legt auch bei künftigen Deployments keine Beispieldaten mehr an.
+          Steuern, Zahlungsbedingungen und die Shopify-/DHL-Konfiguration. Belegnummern starten wieder bei 1.
+          Beispieldaten werden grundsätzlich nie automatisch eingespielt — sie kommen nur auf ausdrücklichen
+          Befehl zurück (<span className="mono small">npm run db:seed -- --demo</span>).
         </p>
         {demoMerker?.value?.geloescht ? (
           <div className="notice info" style={{ marginBottom: 12 }}>

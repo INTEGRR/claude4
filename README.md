@@ -33,20 +33,32 @@ hinter VPN oder auf Vercel mit Supabase ([Anleitung](docs/vercel-supabase.md)).
 Voraussetzung ist nur Docker Desktop bzw. Docker Engine mit Compose:
 
 ```bash
-docker compose up --build
+SEED_DEMO=true docker compose up --build
 ```
 
-Beim ersten Start werden Datenbank, Schema, Administrator und Beispieldaten
-angelegt — das dauert ein paar Minuten. Danach:
+Beim ersten Start werden Datenbank, Schema, Administrator und — wegen
+`SEED_DEMO=true` — die Beispieldaten angelegt; das dauert ein paar Minuten.
+Ohne die Variable startet das System bewusst leer (nur Administrator):
+**Beispieldaten kommen nie automatisch**, nur auf diesen ausdrücklichen
+Wunsch. Danach:
 
 **<http://localhost:3000>** · `admin@example.com` / `erp-admin`
 
-Zum Ausprobieren der Rollen liegen zwei weitere Demo-Konten bei:
-`lager@example.com` und `fertigung@example.com` (Passwort jeweils wie beim Administrator).
+Mit Beispieldaten liegen zum Ausprobieren der Rollen zwei weitere Demo-Konten
+bei: `lager@example.com` und `fertigung@example.com` (Passwort jeweils wie beim
+Administrator).
 
 Ist Port 3000 belegt: `ERP_PORT=3001 docker compose up --build`
-(Windows PowerShell: `$env:ERP_PORT=3001; docker compose up --build`).
-Dauerhaft geht auch eine Zeile `ERP_PORT=3001` in der Datei `.env`.
+(Windows PowerShell: `$env:ERP_PORT=3001; docker compose up --build` —
+`SEED_DEMO` entsprechend als `$env:SEED_DEMO='true'`).
+Dauerhaft geht beides auch als Zeile in der Datei `.env`
+(`ERP_PORT=3001`, `SEED_DEMO=true`).
+
+Beispieldaten nachträglich in ein laufendes, leeres System holen:
+
+```bash
+docker compose exec app node --experimental-strip-types scripts/seed.ts --demo
+```
 
 ### Zugangsdaten für Shopify, DHL, E-Mail und KI
 
