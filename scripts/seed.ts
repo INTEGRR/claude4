@@ -48,6 +48,15 @@ async function main() {
       return
     }
 
+    // Wer die Beispieldaten im ERP gelöscht hat („Einstellungen →
+    // Gefahrenzone"), will sie beim nächsten Build nicht zurück.
+    const [demoMerker] = await sql<{ value: { geloescht?: boolean } }[]>`
+      select value from settings where key = 'demo'`
+    if (demoMerker?.value?.geloescht) {
+      console.log('Beispieldaten wurden im ERP bewusst gelöscht — der Seed legt sie nicht neu an.')
+      return
+    }
+
     // --- Demo-Benutzer für die Rollen --------------------------------------
     for (const [email, name, role] of [
       ['lager@example.com', 'Lena Lager', 'lager'],

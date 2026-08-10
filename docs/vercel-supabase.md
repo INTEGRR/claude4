@@ -118,7 +118,15 @@ Seed:
 gar nicht erst anlegen will, setzt vor der ersten Bereitstellung
 `SEED_ADMIN_EMAIL` und `SEED_ADMIN_PASSWORD`.
 
-Ohne Beispieldaten: `vercel-build` in der `package.json` auf
+**Vor dem echten Betrieb: Beispieldaten löschen.** Einstellungen →
+„Gefahrenzone: alle Daten löschen (Neustart)" entfernt sämtliche Belege,
+Produkte, Partner, Bestände und Protokolle samt der beiden Demo-Konten;
+Benutzer, Firmendaten, Lagerorte und Konfiguration bleiben, Belegnummern
+starten wieder bei 1. Der gesetzte Merker sorgt dafür, dass auch künftige
+Builds keine Beispieldaten mehr einsäen. Danach holt die Shopify-Erstübernahme
+(Seite „Integrationen") Produkte, Kunden und Bestellungen aus dem Shop.
+
+Ohne Beispieldaten von Anfang an: `vercel-build` in der `package.json` auf
 `scripts/seed.ts` ohne `--demo` umstellen.
 
 ---

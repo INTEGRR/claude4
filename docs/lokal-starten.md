@@ -142,6 +142,11 @@ Für die Rollen liegen zwei weitere Demo-Konten bei (Passwort jeweils
 und den Scanner; **`fertigung@example.com`** nur Fertigung, Reparatur und
 den Scanner. Eigene Konten legst du unter **Einstellungen → Benutzer** an.
 
+Wenn der echte Betrieb beginnt, entfernt **Einstellungen → „Gefahrenzone:
+alle Daten löschen (Neustart)"** die Beispieldaten restlos — samt der beiden
+Demo-Konten und aller Buchungen; Benutzer, Lagerorte und Konfiguration
+bleiben, und der Seed legt sie auch später nicht neu an.
+
 Das Terminal lässt du offen — dort laufen die Protokolle. Zum Beenden `Strg+C`.
 
 ---

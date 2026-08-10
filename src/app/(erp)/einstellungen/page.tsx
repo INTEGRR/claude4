@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
-import { actionFail, actionInfo } from '@/modules/shared/action'
+import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
@@ -75,6 +75,24 @@ async function savePolicies(formData: FormData) {
   return actionInfo('Belegverhalten gespeichert.')
 }
 
+async function demodatenLoeschen(formData: FormData) {
+  'use server'
+  await requireAdmin()
+  if (String(formData.get('bestaetigung') ?? '').trim() !== 'ALLES LÖSCHEN') {
+    return actionError('Zur Bestätigung muss im Feld exakt „ALLES LÖSCHEN" stehen.')
+  }
+  try {
+    await sql`select demodaten_loeschen()`
+  } catch (err) {
+    return actionFail(err)
+  }
+  revalidatePath('/', 'layout')
+  return actionInfo(
+    'Alle Belege, Produkte, Partner und Bestände sind gelöscht; Belegnummern starten wieder bei 1. ' +
+      'Beispieldaten werden auch bei künftigen Deployments nicht neu angelegt.',
+  )
+}
+
 /**
  * Gespeicherter Zustand einer Belegregel — Leuchte plus Wort, nicht nur der
  * Haken. Zeigt den zuletzt gespeicherten Stand, nicht die Vorwahl im Formular.
@@ -103,6 +121,16 @@ export default async function EinstellungenPage() {
   // mehr in der Tabellenspalte.
   const sequences = await sql<{ code: string; prefix: string; next_number: number }[]>`
     select code, prefix, next_number from sequence_state()`
+
+  const [bestand] = await sql<{ produkte: number; partner: number; belege: number; bewegungen: number }[]>`
+    select (select count(*) from product_templates)::int as produkte,
+           (select count(*) from partners)::int          as partner,
+           (select count(*) from sales_orders)::int
+             + (select count(*) from purchase_orders)::int
+             + (select count(*) from manufacturing_orders)::int as belege,
+           (select count(*) from stock_moves)::int       as bewegungen`
+  const [demoMerker] = await sql<{ value: { geloescht?: boolean } }[]>`
+    select value from settings where key = 'demo'`
 
   return (
     <>
@@ -201,6 +229,41 @@ export default async function EinstellungenPage() {
             </label>
           </div>
           <button className="primary" type="submit">Speichern</button>
+        </ActionForm>
+      </Card>
+
+      <Card title="Gefahrenzone: alle Daten löschen (Neustart)">
+        <p style={{ marginTop: 0 }}>
+          Löscht <strong>alle</strong> Belege, Produkte, Partner, Bestände, Buchungen und Protokolle —
+          gedacht, um die Beispieldaten vor dem echten Betrieb restlos zu entfernen. Zurzeit im System:{' '}
+          <strong>{bestand.produkte}</strong> Produkte, <strong>{bestand.partner}</strong> Partner,{' '}
+          <strong>{bestand.belege}</strong> Belege, <strong>{bestand.bewegungen}</strong> Lagerbewegungen.
+        </p>
+        <p>
+          Erhalten bleiben: Benutzerkonten (außer den Demo-Konten <span className="mono small">lager@example.com</span>{' '}
+          und <span className="mono small">fertigung@example.com</span>), Firmendaten, Lagerorte, Einheiten,
+          Steuern, Zahlungsbedingungen und die Shopify-/DHL-Konfiguration. Belegnummern starten wieder bei 1,
+          und der Seed legt auch bei künftigen Deployments keine Beispieldaten mehr an.
+        </p>
+        {demoMerker?.value?.geloescht ? (
+          <div className="notice info" style={{ marginBottom: 12 }}>
+            Die Beispieldaten wurden bereits gelöscht. Ein erneuter Durchlauf leert das System wieder vollständig.
+          </div>
+        ) : null}
+        <div className="notice danger">
+          Das lässt sich nicht rückgängig machen. Zur Bestätigung unten exakt{' '}
+          <strong>ALLES LÖSCHEN</strong> eintippen.
+        </div>
+        <ActionForm action={demodatenLoeschen}>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field">
+              <span>Bestätigung</span>
+              <input className="mono" name="bestaetigung" placeholder="ALLES LÖSCHEN" autoComplete="off" />
+            </label>
+            <div className="shrink field">
+              <button className="danger" type="submit">Unwiderruflich löschen</button>
+            </div>
+          </div>
         </ActionForm>
       </Card>
 
