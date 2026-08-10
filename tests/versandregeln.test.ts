@@ -38,12 +38,46 @@ const zeile = (sku: string, qty: number, kleinpaket = true, max = 1) => ({
 describe('Versandregeln: Logik', () => {
   test('Kleinpaket-Kapazität zählt anteilig über gemischte Positionen', () => {
     // Ein Keycap-Set (max 2) plus drei Kabel (max 10): 0,5 + 0,3 = 0,8 — passt.
-    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 2), zeile('KAB-1', 3, true, 10)]), true)
+    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 2), zeile('KAB-1', 3, true, 10)], 300), true)
     // Drei Sets à max 2: 1,5 — passt nicht.
-    assert.equal(passtInsKleinpaket([zeile('KC-1', 3, true, 2)]), false)
-    // Eine nicht kleinpaketfähige Position kippt alles.
-    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 2), zeile('TAST-W', 1, false)]), false)
-    assert.equal(passtInsKleinpaket([]), false)
+    assert.equal(passtInsKleinpaket([zeile('KC-1', 3, true, 2)], 300), false)
+    // Zwei verschiedene Produkte, die je allein ein Kleinpaket füllen (max 1):
+    // zusammen 2,0 — passt nicht.
+    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 1), zeile('KAB-1', 1, true, 1)], 300), false)
+    // Dieselben zwei, aber jedes füllt nur ein halbes: 0,5 + 0,5 = 1,0 — passt.
+    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 2), zeile('KAB-1', 1, true, 2)], 300), true)
+    assert.equal(passtInsKleinpaket([], 300), false)
+  })
+
+  test('eine einzige nicht kleinpaketfähige Position kippt die ganze Sendung', () => {
+    // Zubehör (true) zusammen mit einer Tastatur (false): Paket, nicht Kleinpaket.
+    assert.equal(
+      passtInsKleinpaket([zeile('KC-1', 1, true, 2), zeile('TAST-W', 1, false)], 400),
+      false,
+    )
+    // Und die Regel greift dann auch nicht — es bleibt bei der Länder-Automatik.
+    const ergebnis = wendeRegelnAn(
+      [regel({ name: 'Kleinpaket', requireKleinpaketFit: true, dhlProduct: 'V62KP' })],
+      kontext({ weightG: 1400, zeilen: [zeile('KC-1', 1, true, 2), zeile('TAST-W', 1, false)] }),
+    )
+    assert.equal(ergebnis.product, null)
+  })
+
+  test('Gewicht ist ein hartes K.-o., auch ohne Höchstgewicht in der Regel', () => {
+    // Flags und Platz stimmen, aber 1,4 kg sprengen das Kleinpaket (1 kg).
+    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 2)], 1400), false)
+    assert.equal(passtInsKleinpaket([zeile('KC-1', 1, true, 2)], 1000), true)
+
+    // Regel ohne maxWeightG darf trotzdem kein Kleinpaket vorschlagen.
+    const ohneGrenze = regel({ name: 'Kleinpaket', requireKleinpaketFit: true, dhlProduct: 'V62KP' })
+    assert.equal(
+      wendeRegelnAn([ohneGrenze], kontext({ weightG: 1400, zeilen: [zeile('KC-1', 1, true, 2)] })).product,
+      null,
+    )
+    assert.equal(
+      wendeRegelnAn([ohneGrenze], kontext({ weightG: 600, zeilen: [zeile('KC-1', 1, true, 2)] })).product,
+      'V62KP',
+    )
   })
 
   test('SKU-Muster: * als Platzhalter, Groß/Klein egal, sonst exakt', () => {

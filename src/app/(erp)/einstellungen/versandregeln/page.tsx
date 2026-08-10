@@ -192,8 +192,10 @@ function RegelFormular({ regel }: { regel?: Regel }) {
             defaultChecked={regel?.require_kleinpaket_fit ?? false}
           />
           <span>
-            nur wenn die Ware ins Kleinpaket passt (Produkt-Flag; {KLEINPAKET.maxLengthMm / 10} ×{' '}
-            {KLEINPAKET.maxWidthMm / 10} × {KLEINPAKET.maxHeightMm / 10} cm, bis {KLEINPAKET.maxWeightG} g)
+            nur wenn die Ware ins Kleinpaket passt — alle Positionen markiert, Platz reicht
+            (Menge ÷ Stück je Kleinpaket, Summe ≤ 1) und höchstens {KLEINPAKET.maxWeightG} g
+            ({KLEINPAKET.maxLengthMm / 10} × {KLEINPAKET.maxWidthMm / 10} ×{' '}
+            {KLEINPAKET.maxHeightMm / 10} cm)
           </span>
         </label>
       </fieldset>

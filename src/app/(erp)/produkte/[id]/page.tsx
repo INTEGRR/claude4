@@ -7,6 +7,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { addAttribute, produktZuShopify, updateProduct } from '../actions'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
+import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 import { RecordComments } from '@/components/record-comments'
 import { TagEditor } from '@/components/tag-editor'
 
@@ -270,8 +271,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               />
             </label>
             <div className="muted small field" style={{ flex: 2 }}>
-              Grundlage der Versandregel „Kleinpaket": gemischte Lieferungen zählen anteilig
-              (Menge ÷ Stück je Kleinpaket, Summe ≤ 1).
+              Grundlage der Versandregel „Kleinpaket". Es zählt die ganze Lieferung:
+              <strong> eine einzige nicht markierte Position genügt</strong>, und es wird ein Paket.
+              Sind alle markiert, zählt der Platz anteilig (Menge ÷ Stück je Kleinpaket, Summe ≤ 1) —
+              und über {KLEINPAKET.maxWeightG} g Gesamtgewicht ist ohnehin Schluss.
             </div>
           </div>
           <details style={{ marginBottom: 12 }}>

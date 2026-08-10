@@ -37,8 +37,17 @@ Aktionen bei (Stapeln):
 - **Aktionen**: DHL-Produkt, Abrechnungsnummer, Transportversicherung ab
   Warenwert (versichert wird die Auftragssumme).
 - **Kleinpaket-Eignung** steht am Produkt: Flag „passt ins Kleinpaket"
-  (35,5 × 25 × 8 cm, bis 1 kg) plus „Stück je Kleinpaket". Gemischte
-  Lieferungen zählen anteilig: Summe (Menge ÷ Stück je Kleinpaket) ≤ 1.
+  (35,5 × 25 × 8 cm) plus „Stück je Kleinpaket". Geprüft wird die ganze
+  Lieferung, drei K.-o.-Kriterien:
+  1. **Jede** Position muss markiert sein — eine unmarkierte (die Tastatur
+     zum Zubehör) macht die Sendung zum Paket.
+  2. Der Platz reicht: Summe (Menge ÷ Stück je Kleinpaket) ≤ 1. Zwei
+     Produkte, die je allein ein Kleinpaket füllen (max 1), passen zusammen
+     also nicht; zwei mit „max 2" ergeben genau 1,0 und passen.
+  3. Gesamtgewicht ≤ 1 kg, summiert aus den Produktgewichten. Diese Prüfung
+     sitzt in der Eignung selbst, nicht nur im Höchstgewicht der Regel —
+     sonst würde eine entschärfte Regel ein von DHL abgelehntes Label
+     vorschlagen.
 - Die Regeln liefern einen **Vorschlag** am Packtisch (sichtbar mit
   Regelname, Produkt vorausgewählt, überschreibbar) und steuern den
   Massendruck. Ohne Regeltreffer gilt die Länder-Automatik: DE → V01PAK,

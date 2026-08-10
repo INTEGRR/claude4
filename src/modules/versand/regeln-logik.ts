@@ -59,13 +59,24 @@ export interface Regelergebnis {
 /**
  * Passt die Ware der Lieferung in EIN Kleinpaket?
  *
- * Jedes Produkt sagt selbst, wie viele Stück ein Kleinpaket füllen
- * (kleinpaket_max_qty). Gemischte Lieferungen zählen anteilig: zwei
- * Keycap-Sets (max 2) sind voll, ein Set (1/2) plus drei Kabel (3/10)
- * belegen 0,8 — passt. Das ist eine ehrliche Näherung statt 3D-Packerei.
+ * Drei Bedingungen, jede für sich ein K.-o.:
+ *
+ * 1. **Jede** Position muss kleinpaketfähig sein. Eine einzige unmarkierte
+ *    Position (die Tastatur zum Zubehör) kippt die ganze Sendung aufs Paket —
+ *    das ist der häufigste Fall und muss stur sein, nicht klug.
+ * 2. Der Platz reicht: jedes Produkt sagt, wie viele Stück ein Kleinpaket
+ *    füllen (kleinpaket_max_qty), gemischte Lieferungen zählen anteilig.
+ *    Ein Keycap-Set (max 2) plus drei Kabel (max 10) belegen 0,5 + 0,3 = 0,8
+ *    — passt. Zwei Sets à max 1 belegen 2,0 — passt nicht. Ehrliche Näherung
+ *    statt Schein-3D-Packerei.
+ * 3. Das Gesamtgewicht bleibt unter der DHL-Grenze (1 kg). Diese Prüfung
+ *    gehört bewusst HIER hinein und nicht nur in die Regel: nimmt jemand das
+ *    Höchstgewicht aus der Regel heraus, würde sonst eine 3-kg-Sendung als
+ *    Kleinpaket vorgeschlagen und von DHL abgelehnt.
  */
-export function passtInsKleinpaket(zeilen: RegelZeile[]): boolean {
+export function passtInsKleinpaket(zeilen: RegelZeile[], weightG: number): boolean {
   if (zeilen.length === 0) return false
+  if (weightG > KLEINPAKET.maxWeightG) return false
   let belegt = 0
   for (const z of zeilen) {
     if (!z.kleinpaket) return false
@@ -88,7 +99,7 @@ export function regelTrifft(r: Versandregel, k: RegelKontext): boolean {
   if (r.minWeightG != null && k.weightG < r.minWeightG) return false
   if (r.maxWeightG != null && k.weightG > r.maxWeightG) return false
   if (r.zone != null && r.zone !== k.zone) return false
-  if (r.requireKleinpaketFit && !passtInsKleinpaket(k.zeilen)) return false
+  if (r.requireKleinpaketFit && !passtInsKleinpaket(k.zeilen, k.weightG)) return false
   if (r.skus && r.skus.length > 0) {
     const zeilePasst = (z: RegelZeile) => r.skus!.some((m) => skuPasst(m, z.sku ?? ''))
     const treffer = r.skuScope === 'all'
@@ -106,7 +117,7 @@ export function wendeRegelnAn(regeln: Versandregel[], k: RegelKontext): Regelerg
     billingNumber: null,
     insuredValue: null,
     insuranceRegel: null,
-    passtInsKleinpaket: passtInsKleinpaket(k.zeilen),
+    passtInsKleinpaket: passtInsKleinpaket(k.zeilen, k.weightG),
   }
 
   for (const r of regeln) {
