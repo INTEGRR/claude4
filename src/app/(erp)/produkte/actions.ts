@@ -86,7 +86,9 @@ export async function updateProduct(templateId: string, formData: FormData) {
         description_purchase = ${String(formData.get('description_purchase') ?? '').trim() || null},
         description_picking = ${String(formData.get('description_picking') ?? '').trim() || null},
         responsible_id = ${String(formData.get('responsible_id') ?? '') || null},
-        tracking = ${String(formData.get('tracking') ?? 'none')}
+        tracking = ${String(formData.get('tracking') ?? 'none')},
+        kleinpaket = ${formData.get('kleinpaket') === 'on'},
+        kleinpaket_max_qty = ${Math.max(Math.round(Number(formData.get('kleinpaket_max_qty') ?? 1)) || 1, 1)}
       where id = ${templateId}`
   } catch (err) {
     return actionFail(err)

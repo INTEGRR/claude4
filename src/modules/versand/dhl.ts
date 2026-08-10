@@ -135,6 +135,22 @@ export interface DhlAddress {
   phone?: string
 }
 
+export interface ZollPosition {
+  itemDescription: string
+  countryOfOrigin?: string
+  hsCode?: string
+  packagedQuantity: number
+  itemValue: { currency: string; value: number }
+  itemWeight: { uom: string; value: number }
+}
+
+export interface ZollDaten {
+  invoiceNo?: string
+  exportType: 'COMMERCIAL_GOODS' | 'COMMERCIAL_SAMPLE' | 'DOCUMENT' | 'RETURN_OF_GOODS' | 'PRESENT' | 'OTHER'
+  postalCharges: { currency: string; value: number }
+  items: ZollPosition[]
+}
+
 export interface CreateShipmentInput {
   product: string
   billingNumber?: string
@@ -143,6 +159,10 @@ export interface CreateShipmentInput {
   shipper: DhlAddress
   consignee: DhlAddress
   printFormat?: string
+  /** Transportversicherung (Warenwert in EUR). */
+  insuredValue?: number | null
+  /** Zolldaten (CN23) — Pflicht bei Drittland-Versand (V53WPAK/V66WPI). */
+  customs?: ZollDaten | null
 }
 
 export interface CreatedShipment {
@@ -186,6 +206,10 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
           phone: input.consignee.phone,
         },
         details: { weight: { uom: 'g', value: input.weightG } },
+        ...(input.insuredValue
+          ? { services: { additionalInsurance: { currency: 'EUR', value: input.insuredValue } } }
+          : {}),
+        ...(input.customs ? { customs: input.customs } : {}),
       },
     ],
   }

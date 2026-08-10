@@ -137,7 +137,12 @@ export default async function EinstellungenPage() {
       <PageHeader
         title="Einstellungen"
         subtitle="Firmendaten, Versand und Belegverhalten"
-        actions={<Link className="btn" href="/einstellungen/benutzer">Benutzer verwalten</Link>}
+        actions={
+          <>
+            <Link className="btn" href="/einstellungen/versandregeln">Versandregeln</Link>
+            <Link className="btn" href="/einstellungen/benutzer">Benutzer verwalten</Link>
+          </>
+        }
       />
 
       <Card title="Firmendaten (Absender für DHL-Labels und Belege)">

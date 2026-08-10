@@ -24,11 +24,56 @@ Fertigung abgeschlossen (alle MOs des Auftrags done)
 
 Reihenfolge-Entscheidung: Label **vor** Validierung (physisch: Label aufs Paket, dann raus); die Shopify-Rückmeldung hängt an der **Validierung** der Lieferung — das entspricht Sendclouds Verhalten „Rückmeldung bei Label-Erstellung", nur sauberer an unseren Warenausgang gekoppelt.
 
+## Versandregeln (Kleinpaket/Paket-Wahl)
+
+Regelwerk nach Sendcloud-Vorbild („wenn Bedingung, dann Aktion"), gepflegt
+unter Einstellungen → Versandregeln, ausgewertet von oben nach unten — je
+Aktion gewinnt die erste passende Regel, weitere Regeln steuern andere
+Aktionen bei (Stapeln):
+
+- **Bedingungen**: Gewicht (min/max), Zone (DE / EU-Zollunion / Welt),
+  SKU-Muster (`KC-*`, eine Position genügt oder alle), „passt ins
+  Kleinpaket".
+- **Aktionen**: DHL-Produkt, Abrechnungsnummer, Transportversicherung ab
+  Warenwert (versichert wird die Auftragssumme).
+- **Kleinpaket-Eignung** steht am Produkt: Flag „passt ins Kleinpaket"
+  (35,5 × 25 × 8 cm, bis 1 kg) plus „Stück je Kleinpaket". Gemischte
+  Lieferungen zählen anteilig: Summe (Menge ÷ Stück je Kleinpaket) ≤ 1.
+- Die Regeln liefern einen **Vorschlag** am Packtisch (sichtbar mit
+  Regelname, Produkt vorausgewählt, überschreibbar) und steuern den
+  Massendruck. Ohne Regeltreffer gilt die Länder-Automatik: DE → V01PAK,
+  EU → V54EPAK, sonst V53WPAK.
+- Die **Abrechnungsnummer** wird zum Produkt passend gebildet (Verfahren 62
+  für Kleinpaket, 01 für Paket …): Standard-Nummer aus der Umgebung, das
+  Verfahren wird ausgetauscht, die Teilnahme bleibt; eine Regel kann eine
+  abweichende Nummer explizit setzen. Voraussetzung: die Produkte sind im
+  DHL-Geschäftskundenvertrag gebucht.
+
+## Massendruck (Fließband am Packtisch)
+
+Die Versandbereit-Liste ist filterbar (nur Einzelpositions-Aufträge, SKU,
+Zielland, DHL-Produkt laut Regel) — „alle Single-Line mit SKU KC-*" ist ein
+Filter plus ein Klick. Der Massendruck erstellt Labels für die gefilterte
+Liste nach Regelvorschlag (bis 25 je Lauf), liefert ein **Sammel-PDF** über
+`/api/label/sammel?ids=…` und bucht auf Wunsch je Lauf direkt aus
+(Warenausgang + Shopify-Fulfillment); Standard ist „nur Labels", ausgebucht
+wird beim Packen. Fehler einzelner Lieferungen brechen den Lauf nicht ab und
+stehen am jeweiligen Beleg.
+
+## Zolldaten (Drittland)
+
+Sendungen in Nicht-EU-Länder (auch CH, GB, NO) bekommen automatisch einen
+`customs`-Block (CN23): Positionen aus der Lieferung mit HS-Code und
+Ursprungsland vom Produkt, Warenwert aus den Auftragszeilen (sonst
+Listenpreis), `exportType COMMERCIAL_GOODS`, Rechnungsnummer =
+Auftragsnummer. Fehlt ein HS-Code, wird das Label trotzdem erstellt und ein
+Hinweis an der Sendung hinterlegt.
+
 ## Sendungen (`shipments`)
 
 Eine Lieferung kann 1..n Sendungen haben (Multicollo-Erweiterung vorgesehen; erster Ausbau: 1 Paket je Lieferung).
 
-Felder: Lieferung (`picking_id`), Verkaufsauftrag, DHL-Produkt (`V01PAK` national, `V54EPAK` Europaket, `V53WPAK` Kleinpaket), `billing_number`, Gewicht (aus Produktgewichten summiert, editierbar), `shipment_number` (= Trackingnummer), `tracking_url`, Label-Pfad (Storage), Status, `shopify_fulfillment_id`, Fehlerinfo.
+Felder: Lieferung (`picking_id`), Verkaufsauftrag, DHL-Produkt (`V01PAK` national, `V62KP` Kleinpaket, `V54EPAK` Europaket, `V53WPAK` International), `billing_number`, Gewicht (aus Produktgewichten summiert, editierbar), Versicherungswert, Regelname, `shipment_number` (= Trackingnummer), `tracking_url`, Label-Pfad (Storage), Status, `shopify_fulfillment_id`, Fehlerinfo.
 
 **Status-Maschine:**
 

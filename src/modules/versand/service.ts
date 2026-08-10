@@ -4,6 +4,7 @@ import path from 'node:path'
 import { sql } from '@/db/client'
 import {
   DhlError,
+  type ZollDaten,
   cancelShipment,
   createReturnLabel,
   createShipment,
@@ -14,6 +15,9 @@ import {
   trackShipment,
   trackingUrl,
 } from './dhl'
+import { brauchtZoll } from './dhl-codes'
+import { billingNumberForProduct } from './regeln-logik'
+import { vorschlaegeFuerPickings } from './regeln'
 
 /**
  * Labels werden bei uns gespeichert, weil DHL sie nur rund drei Tage vorhält.
@@ -64,11 +68,70 @@ export interface CreateLabelResult {
   shipmentNumber: string
   labelPath: string | null
   warnings: string[]
+  product: string
+  ruleName: string | null
+}
+
+/**
+ * Zolldaten (CN23) für Drittland-Sendungen: Positionen aus den Bewegungen
+ * der Lieferung, Werte aus den Auftragszeilen (sonst Listenpreis).
+ */
+async function zolldatenFuerPicking(
+  pickingId: string,
+  salesOrderId: string | null,
+  invoiceNo: string,
+): Promise<{ customs: ZollDaten; hinweise: string[] }> {
+  const positionen = await sql<
+    {
+      name: string
+      hs_code: string | null
+      country_of_origin: string | null
+      weight_g: number
+      qty: number
+      value: number
+    }[]
+  >`
+    select pt.name, pt.hs_code, pt.country_of_origin, pt.weight_g,
+           sum(m.qty)::float as qty,
+           coalesce(
+             (select sol.price_unit from sales_order_lines sol
+               where sol.order_id = ${salesOrderId} and sol.variant_id = m.variant_id
+               limit 1),
+             pt.list_price, 1)::float as value
+    from stock_moves m
+    join product_variants pv on pv.id = m.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where m.picking_id = ${pickingId} and m.state <> 'cancel'
+    group by pt.name, pt.hs_code, pt.country_of_origin, pt.weight_g`
+
+  const ohneHsCode = positionen.filter((p) => !p.hs_code).map((p) => p.name)
+  return {
+    customs: {
+      invoiceNo: invoiceNo.slice(0, 35),
+      exportType: 'COMMERCIAL_GOODS',
+      // Versandkosten werden nicht je Auftrag geführt; 0 ist zulässig.
+      postalCharges: { currency: 'EUR', value: 0 },
+      items: positionen.map((p) => ({
+        itemDescription: p.name.slice(0, 50),
+        countryOfOrigin: p.country_of_origin ? toAlpha3(p.country_of_origin) : undefined,
+        hsCode: p.hs_code ?? undefined,
+        packagedQuantity: Math.max(Math.round(Number(p.qty)), 1),
+        itemValue: { currency: 'EUR', value: Math.round(Number(p.value) * 100) / 100 },
+        itemWeight: { uom: 'g', value: Math.max(Number(p.weight_g), 1) },
+      })),
+    },
+    hinweise: ohneHsCode.length
+      ? [`Zoll: HS-Code fehlt bei ${ohneHsCode.join(', ')} — am Produkt pflegen, sonst drohen Verzögerungen.`]
+      : [],
+  }
 }
 
 /**
  * Erstellt ein DHL-Label für eine Lieferung. Läuft bewusst synchron (nicht
  * über die Outbox): am Packtisch wird das Label sofort gebraucht.
+ *
+ * Produkt, Abrechnungsnummer und Versicherung kommen aus den Versandregeln
+ * (Vorschlag); explizite opts überschreiben sie.
  */
 export async function createLabelForPicking(
   pickingId: string,
@@ -153,12 +216,27 @@ export async function createLabelForPicking(
            value ->> 'default_product' as default_product
     from settings where key = 'dhl'`
 
+  const vorschlag = (await vorschlaegeFuerPickings([pickingId])).get(pickingId)
   const weightG = Math.max(opts.weightG ?? Number(picking.weight_g) ?? 0, 1)
-  const product = opts.product ?? productForCountry(countryAlpha2)
+  const product = opts.product ?? vorschlag?.product ?? productForCountry(countryAlpha2)
+  // Bei Handwahl zählt die Regel nicht mehr als Urheber.
+  const ruleName = opts.product ? null : (vorschlag?.productRegel ?? null)
+  // Verfahren in der Abrechnungsnummer muss zum Produkt passen (Kleinpaket
+  // bucht auf 62, Paket auf 01) — eine Regel darf sie explizit vorgeben.
+  const billingNumber =
+    vorschlag?.billingNumber ?? billingNumberForProduct(product, dhlConfig().billingNumber)
+  const insuredValue = vorschlag?.insuredValue ?? null
   const reference = picking.sales_order_number ?? picking.number
+
+  const zoll = brauchtZoll(countryAlpha2)
+    ? await zolldatenFuerPicking(pickingId, picking.sales_order_id, reference)
+    : null
 
   const result = await createShipment({
     product,
+    billingNumber,
+    insuredValue,
+    customs: zoll?.customs ?? null,
     reference,
     weightG,
     printFormat: settings?.print_format ?? '910-300-700',
@@ -189,26 +267,33 @@ export async function createLabelForPicking(
     ? await storeLabel(`${result.shipmentNumber}.pdf`, result.labelBase64)
     : null
 
+  const warnings = [...result.warnings, ...(zoll?.hinweise ?? [])]
   const [shipment] = await sql<{ id: string }[]>`
     insert into shipments (
       picking_id, sales_order_id, dhl_product, billing_number, weight_g,
+      insured_value, rule_name,
       shipment_number, tracking_url, label_path, label_pdf, label_format, dhl_warnings)
     values (
-      ${pickingId}, ${picking.sales_order_id}, ${product}, ${dhlConfig().billingNumber},
-      ${weightG}, ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
+      ${pickingId}, ${picking.sales_order_id}, ${product}, ${billingNumber},
+      ${weightG}, ${insuredValue}, ${ruleName},
+      ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
       ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},
       ${settings?.print_format ?? '910-300-700'},
-      ${result.warnings.length ? sql.json(result.warnings) : null})
+      ${warnings.length ? sql.json(warnings) : null})
     returning id`
 
   await sql`select log_event('stock_picking', ${pickingId}, 'note',
-    ${`DHL-Label erstellt: ${result.shipmentNumber}`}, 'system')`
+    ${`DHL-Label erstellt: ${result.shipmentNumber} (${product}` +
+      `${ruleName ? `, Regel „${ruleName}"` : ''}` +
+      `${insuredValue ? `, versichert ${insuredValue.toFixed(2)} €` : ''})`}, 'system')`
 
   return {
     shipmentId: shipment.id,
     shipmentNumber: result.shipmentNumber,
     labelPath,
-    warnings: result.warnings,
+    warnings,
+    product,
+    ruleName,
   }
 }
 

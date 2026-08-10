@@ -43,6 +43,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       description_purchase: string | null
       description_picking: string | null
       responsible_id: string | null
+      kleinpaket: boolean
+      kleinpaket_max_qty: number
     }[]
   >`
     select pt.*, u.name as uom from product_templates pt
@@ -250,6 +252,27 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               <span>Belegtext Verkauf</span>
               <input name="description_sale" defaultValue={tpl.description_sale ?? ''} />
             </label>
+          </div>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field shrink" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" name="kleinpaket" defaultChecked={tpl.kleinpaket} />
+              <span>passt ins DHL Kleinpaket (35,5 × 25 × 8 cm, bis 1 kg)</span>
+            </label>
+            <label className="field shrink">
+              <span>Stück je Kleinpaket</span>
+              <input
+                type="number"
+                name="kleinpaket_max_qty"
+                min={1}
+                step={1}
+                defaultValue={tpl.kleinpaket_max_qty}
+                style={{ width: 90 }}
+              />
+            </label>
+            <div className="muted small field" style={{ flex: 2 }}>
+              Grundlage der Versandregel „Kleinpaket": gemischte Lieferungen zählen anteilig
+              (Menge ÷ Stück je Kleinpaket, Summe ≤ 1).
+            </div>
           </div>
           <details style={{ marginBottom: 12 }}>
             <summary className="mono-label" style={{ cursor: 'pointer' }}>

@@ -9,7 +9,7 @@ Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 - **Bewertung** — laufende Bestandsbewertung nach gleitendem Durchschnitt (AVCO), unveränderliche Wertschichten, Eröffnungsbewertung
 - **Personal** — Mitarbeiter, Kommen/Gehen (auch per Ausweis-Scan), Schichtplan und Abwesenheiten mit Überschneidungsschutz, Arbeitszeit fließt in die Fertigungskosten
 - **Reparatur** — Reparaturaufträge mit Teileverbrauch (einbauen / ausbauen / wiederverwenden)
-- **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren) und Fulfillment-Rückmeldung an Shopify
+- **Versand** — DHL-Direktanbindung (Label, Tracking, Retouren, Zolldaten) und Fulfillment-Rückmeldung an Shopify; **Versandregeln** wählen Kleinpaket/Paket nach Gewicht, SKU und Zone, mit gefiltertem **Massendruck** (Sammel-PDF) am Packtisch
 - **Scanner-Arbeitsplatz** — Belege per Barcode öffnen, Positionen scannen, Doppelscan bestätigt und bucht
 - **Auswertungen** — Inventarwert, Produktion, verbaute Komponenten, Abverkaufsquote; Kennzahlen: Deckungsbeitrag, Rohertrag, Lagerumschlag und Reichweite, Liefertreue, RMA-Quote — mit Diagrammen
 - **KI-Analyse** — Ad-hoc-Auswertungen, Tabellen und Diagramme auf Zuruf: Claude-Agent mit Nur-Lese-Zugriff; anlegen darf er nur aus einem festen Katalog und erst nach Bestätigung

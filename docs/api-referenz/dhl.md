@@ -24,7 +24,7 @@ REST-Nachfolger des alten SOAP-„Geschäftskundenversands" (die Alt-Schnittstel
 
 - **Endpoint:** `POST /orders` (Array `shipments[]`, Bulk möglich; `?validate=true` für reine Validierung)
 - **Wichtigste Request-Felder pro Sendung:**
-  - `product`: **V01PAK** (DHL Paket national), **V53WPAK** (Kleinpaket), **V54EPAK** (Europaket), international „V53INT", **V07PAK** (Retoure)
+  - `product`: **V01PAK** (DHL Paket national), **V62KP** (DHL Kleinpaket — Warenpost-Nachfolger seit 01/2025, max. 35,5 × 25 × 8 cm und 1 kg; der alte Code V62WP wird seit 31.05.2026 nicht mehr umgeschrieben), **V54EPAK** (Europaket, EU), **V53WPAK** (Paket International, mit Zolldaten), **V66WPI** (Kleinpaket international), **V07PAK** (Retoure)
   - `billingNumber` (muss zum Produkt passen), optional `refNo` (Kundenreferenz — z. B. unsere Auftragsnummer)
   - `shipper` (oder `shipperRef` auf im GKP hinterlegte Absenderadresse) und `consignee`: `name1..3`, `addressStreet`, `addressHouse`, `postalCode`, `city`, `country` (**ISO-3166-1 alpha-3**, z. B. `DEU` — Pflicht seit v2.1.13), `email`/`phone`; Packstation über `lockerID` + Postnummer
   - `details.weight` (Pflicht), `details.dim` (optional, dann vollständig)
