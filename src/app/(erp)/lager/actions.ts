@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
 import { requireWrite } from '@/modules/auth'
 import { parseLotSpec, parseQtyMap } from '@/modules/shared/form'
-import { queueFulfillmentForPicking } from '@/modules/versand/service'
+import { consumePackagingForPicking, queueFulfillmentForPicking } from '@/modules/versand/service'
 import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
 
 /** Validiert einen Transfer inkl. abweichender Ist-Mengen und Rückstand. */
@@ -32,6 +32,9 @@ export async function validatePicking(pickingId: string, formData: FormData) {
   } catch (err) {
     return actionFail(err)
   }
+
+  // Die Kartonage verlässt das Haus mit der Ware — jetzt wird sie verbraucht.
+  await consumePackagingForPicking(pickingId).catch(() => undefined)
 
   // Nach dem Warenausgang die Sendung an Shopify melden (läuft über die Outbox).
   try {

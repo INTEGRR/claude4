@@ -88,7 +88,7 @@ export async function updateProduct(templateId: string, formData: FormData) {
         responsible_id = ${String(formData.get('responsible_id') ?? '') || null},
         tracking = ${String(formData.get('tracking') ?? 'none')},
         kleinpaket = ${formData.get('kleinpaket') === 'on'},
-        kleinpaket_max_qty = ${Math.max(Math.round(Number(formData.get('kleinpaket_max_qty') ?? 1)) || 1, 1)}
+        platzbedarf = ${Math.max(Number(formData.get('platzbedarf') ?? 1) || 1, 0.01)}
       where id = ${templateId}`
   } catch (err) {
     return actionFail(err)

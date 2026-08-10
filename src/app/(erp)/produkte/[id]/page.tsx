@@ -45,7 +45,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       description_picking: string | null
       responsible_id: string | null
       kleinpaket: boolean
-      kleinpaket_max_qty: number
+      platzbedarf: number
     }[]
   >`
     select pt.*, u.name as uom from product_templates pt
@@ -260,21 +260,23 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               <span>passt ins DHL Kleinpaket (35,5 × 25 × 8 cm, bis 1 kg)</span>
             </label>
             <label className="field shrink">
-              <span>Stück je Kleinpaket</span>
+              <span>Platzbedarf je Stück</span>
               <input
                 type="number"
-                name="kleinpaket_max_qty"
-                min={1}
-                step={1}
-                defaultValue={tpl.kleinpaket_max_qty}
+                name="platzbedarf"
+                min={0.01}
+                step={0.1}
+                defaultValue={tpl.platzbedarf}
                 style={{ width: 90 }}
               />
             </label>
             <div className="muted small field" style={{ flex: 2 }}>
-              Grundlage der Versandregel „Kleinpaket". Es zählt die ganze Lieferung:
-              <strong> eine einzige nicht markierte Position genügt</strong>, und es wird ein Paket.
-              Sind alle markiert, zählt der Platz anteilig (Menge ÷ Stück je Kleinpaket, Summe ≤ 1) —
-              und über {KLEINPAKET.maxWeightG} g Gesamtgewicht ist ohnehin Schluss.
+              <strong>1 = ein volles Kleinpaket</strong> ({KLEINPAKET.maxLengthMm / 10} ×{' '}
+              {KLEINPAKET.maxWidthMm / 10} × {KLEINPAKET.maxHeightMm / 10} cm) — zwei Stück je
+              Kleinpaket sind also 0,5, eine Tastatur etwa 3. Daraus wählt der Versand die Kartonage.
+              Fürs Kleinpaket zählt die ganze Lieferung:{' '}
+              <strong>eine einzige nicht markierte Position genügt</strong>, und es wird ein Paket;
+              über {KLEINPAKET.maxWeightG} g inklusive Karton ist ohnehin Schluss.
             </div>
           </div>
           <details style={{ marginBottom: 12 }}>

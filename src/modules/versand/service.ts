@@ -217,7 +217,12 @@ export async function createLabelForPicking(
     from settings where key = 'dhl'`
 
   const vorschlag = (await vorschlaegeFuerPickings([pickingId])).get(pickingId)
-  const weightG = Math.max(opts.weightG ?? Number(picking.weight_g) ?? 0, 1)
+  // Gewogen wird das Paket, nicht der Inhalt: ohne Handeingabe zählt das
+  // Warengewicht plus Leergewicht der gewählten Kartonage.
+  const weightG = Math.max(
+    opts.weightG ?? vorschlag?.versandgewichtG ?? Number(picking.weight_g) ?? 0,
+    1,
+  )
   const product = opts.product ?? vorschlag?.product ?? productForCountry(countryAlpha2)
   // Bei Handwahl zählt die Regel nicht mehr als Urheber.
   const ruleName = opts.product ? null : (vorschlag?.productRegel ?? null)
@@ -271,11 +276,11 @@ export async function createLabelForPicking(
   const [shipment] = await sql<{ id: string }[]>`
     insert into shipments (
       picking_id, sales_order_id, dhl_product, billing_number, weight_g,
-      insured_value, rule_name,
+      insured_value, rule_name, packaging_id,
       shipment_number, tracking_url, label_path, label_pdf, label_format, dhl_warnings)
     values (
       ${pickingId}, ${picking.sales_order_id}, ${product}, ${billingNumber},
-      ${weightG}, ${insuredValue}, ${ruleName},
+      ${weightG}, ${insuredValue}, ${ruleName}, ${vorschlag?.kartonage?.id ?? null},
       ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
       ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},
       ${settings?.print_format ?? '910-300-700'},
@@ -285,6 +290,7 @@ export async function createLabelForPicking(
   await sql`select log_event('stock_picking', ${pickingId}, 'note',
     ${`DHL-Label erstellt: ${result.shipmentNumber} (${product}` +
       `${ruleName ? `, Regel „${ruleName}"` : ''}` +
+      `${vorschlag?.kartonage ? `, Kartonage ${vorschlag.kartonage.name}` : ''}` +
       `${insuredValue ? `, versichert ${insuredValue.toFixed(2)} €` : ''})`}, 'system')`
 
   return {
@@ -309,6 +315,37 @@ export async function cancelShipmentById(shipmentId: string): Promise<void> {
   await sql`update shipments set state = 'cancelled' where id = ${shipmentId}`
   await sql`select log_event('stock_picking', ${shipment.picking_id}, 'note',
     ${`DHL-Sendung ${shipment.shipment_number} storniert`}, 'system')`
+}
+
+/**
+ * Verpackungsverbrauch buchen — nach dem Warenausgang, nicht beim
+ * Etikettieren: ein storniertes Label verbraucht keinen Karton, ein
+ * ausgeliefertes Paket schon.
+ *
+ * Der Verbrauch darf den Warenausgang nie blockieren; scheitert er (Karton
+ * nicht auf Bestand), bleibt ein Fehler am Beleg stehen.
+ */
+export async function consumePackagingForPicking(pickingId: string): Promise<number> {
+  const shipments = await sql<{ id: string }[]>`
+    select id from shipments
+    where picking_id = ${pickingId}
+      and packaging_id is not null
+      and packaging_move_id is null
+      and state <> 'cancelled'`
+
+  let gebucht = 0
+  for (const shipment of shipments) {
+    try {
+      await sql`select packaging_consume(${shipment.id})`
+      gebucht++
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      await sql`select log_event('stock_picking', ${pickingId}, 'error',
+        ${`Verpackungsverbrauch nicht gebucht: ${message.slice(0, 300)}`}, 'system')`
+        .catch(() => undefined)
+    }
+  }
+  return gebucht
 }
 
 /**

@@ -140,6 +140,7 @@ export default async function EinstellungenPage() {
         actions={
           <>
             <Link className="btn" href="/einstellungen/versandregeln">Versandregeln</Link>
+            <Link className="btn" href="/einstellungen/kartonagen">Kartonagen</Link>
             <Link className="btn" href="/einstellungen/benutzer">Benutzer verwalten</Link>
           </>
         }

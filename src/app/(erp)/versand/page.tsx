@@ -167,7 +167,14 @@ export default async function VersandPage({
                       <span className="mono">{r.ship_zip}</span> {r.ship_city}{' '}
                       <span className="mono">{r.ship_country_code}</span>
                     </td>
-                    <td className="num nowrap">{qty(Number(r.weight_g) / 1000)} kg</td>
+                    <td className="num nowrap">
+                      {qty((vorschlag?.versandgewichtG ?? Number(r.weight_g)) / 1000)} kg
+                      {vorschlag?.kartonage && (
+                        <div className="muted small">
+                          inkl. {vorschlag.kartonage.name}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       {Number(r.shipment_count) > 0 ? (
                         <span className="badge success">Label vorhanden</span>
@@ -183,7 +190,10 @@ export default async function VersandPage({
                                 type="number"
                                 name="weight_g"
                                 aria-label="Gewicht in Gramm"
-                                defaultValue={Math.max(Number(r.weight_g), 1)}
+                                defaultValue={Math.max(
+                                  vorschlag?.versandgewichtG ?? Number(r.weight_g),
+                                  1,
+                                )}
                                 min={1}
                                 style={{ width: 84 }}
                               />
@@ -210,12 +220,16 @@ export default async function VersandPage({
                               </button>
                             </div>
                           </div>
-                          {(vorschlag?.productRegel || vorschlag?.insuredValue) && (
+                          {(vorschlag?.productRegel || vorschlag?.insuredValue || vorschlag?.kartonage) && (
                             <div className="muted small" style={{ marginTop: 4 }}>
-                              {vorschlag.productRegel && <>Regel: {vorschlag.productRegel}</>}
-                              {vorschlag.insuredValue && (
-                                <>{vorschlag.productRegel ? ' · ' : ''}Versicherung {vorschlag.insuredValue.toFixed(2)} € ({vorschlag.insuranceRegel})</>
-                              )}
+                              {[
+                                vorschlag.productRegel && `Regel: ${vorschlag.productRegel}`,
+                                vorschlag.kartonage && `Kartonage: ${vorschlag.kartonage.name}`,
+                                vorschlag.insuredValue &&
+                                  `Versicherung ${vorschlag.insuredValue.toFixed(2)} € (${vorschlag.insuranceRegel})`,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </div>
                           )}
                         </ActionForm>

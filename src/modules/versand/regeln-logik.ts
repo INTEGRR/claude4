@@ -22,15 +22,31 @@ export interface RegelZeile {
   sku: string | null
   qty: number
   kleinpaket: boolean
-  kleinpaketMaxQty: number
+  /** Platzbedarf eines Stücks; 1 = ein volles Kleinpaket. */
+  platzbedarf: number
+}
+
+/** Eine Verpackung als Bestandsartikel. */
+export interface Kartonage {
+  id: string
+  name: string
+  /** Fassungsvermögen in derselben Skala wie der Platzbedarf. */
+  capacity: number
+  maxContentG: number
+  kleinpaket: boolean
+  /** Leergewicht des Kartons (aus dem Produktgewicht). */
+  tareG: number
 }
 
 export interface RegelKontext {
+  /** Reines Warengewicht; der Karton kommt in wendeRegelnAn dazu. */
   weightG: number
   zone: Zone
   /** Warenwert der Sendung (Auftragssumme). */
   orderValue: number
   zeilen: RegelZeile[]
+  /** Gepflegte Verpackungen; leer = ohne Kartonagen wie bisher. */
+  kartonagen?: Kartonage[]
 }
 
 export interface Versandregel {
@@ -54,6 +70,14 @@ export interface Regelergebnis {
   insuredValue: number | null
   insuranceRegel: string | null
   passtInsKleinpaket: boolean
+  kartonage: Kartonage | null
+  /** Warengewicht plus Leergewicht der Kartonage — das wiegt DHL. */
+  versandgewichtG: number
+}
+
+/** Platzbedarf der ganzen Lieferung, in Kleinpaket-Einheiten. */
+export function platzbedarf(zeilen: RegelZeile[]): number {
+  return zeilen.reduce((summe, z) => summe + z.qty * Math.max(z.platzbedarf, 0), 0)
 }
 
 /**
@@ -64,25 +88,45 @@ export interface Regelergebnis {
  * 1. **Jede** Position muss kleinpaketfähig sein. Eine einzige unmarkierte
  *    Position (die Tastatur zum Zubehör) kippt die ganze Sendung aufs Paket —
  *    das ist der häufigste Fall und muss stur sein, nicht klug.
- * 2. Der Platz reicht: jedes Produkt sagt, wie viele Stück ein Kleinpaket
- *    füllen (kleinpaket_max_qty), gemischte Lieferungen zählen anteilig.
- *    Ein Keycap-Set (max 2) plus drei Kabel (max 10) belegen 0,5 + 0,3 = 0,8
- *    — passt. Zwei Sets à max 1 belegen 2,0 — passt nicht. Ehrliche Näherung
- *    statt Schein-3D-Packerei.
- * 3. Das Gesamtgewicht bleibt unter der DHL-Grenze (1 kg). Diese Prüfung
- *    gehört bewusst HIER hinein und nicht nur in die Regel: nimmt jemand das
+ * 2. Der Platz reicht: Summe aus Menge x Platzbedarf höchstens 1. Ein
+ *    Keycap-Set (0,5) plus drei Kabel (je 0,1) belegen 0,8 — passt. Zwei
+ *    Sets à 1,0 belegen 2,0 — passt nicht. Ehrliche Näherung statt
+ *    Schein-3D-Packerei.
+ * 3. Das Gesamtgewicht bleibt unter der DHL-Grenze (1 kg) — **einschließlich
+ *    Karton**, denn gewogen wird das Paket, nicht der Inhalt. Diese Prüfung
+ *    gehört hierher und nicht nur in die Regel: nimmt jemand das
  *    Höchstgewicht aus der Regel heraus, würde sonst eine 3-kg-Sendung als
  *    Kleinpaket vorgeschlagen und von DHL abgelehnt.
  */
 export function passtInsKleinpaket(zeilen: RegelZeile[], weightG: number): boolean {
   if (zeilen.length === 0) return false
   if (weightG > KLEINPAKET.maxWeightG) return false
-  let belegt = 0
-  for (const z of zeilen) {
-    if (!z.kleinpaket) return false
-    belegt += z.qty / Math.max(z.kleinpaketMaxQty, 1)
-  }
-  return belegt <= 1
+  if (zeilen.some((z) => !z.kleinpaket)) return false
+  return platzbedarf(zeilen) <= 1
+}
+
+/**
+ * Kleinste passende Kartonage.
+ *
+ * Passend heißt: Fassungsvermögen deckt den Platzbedarf und das Warengewicht
+ * bleibt unter dem Höchstgewicht des Kartons. Gewählt wird die kleinste —
+ * ein Keycap-Set soll nicht im Tastaturkarton reisen. Bei gleichem
+ * Fassungsvermögen entscheidet die gepflegte Reihenfolge.
+ *
+ * Ohne gepflegte Kartonagen (oder wenn nichts passt) gibt es keine Wahl; der
+ * Versand läuft dann wie bisher mit dem reinen Warengewicht weiter.
+ */
+export function waehleKartonage(
+  kartonagen: Kartonage[],
+  zeilen: RegelZeile[],
+  warengewichtG: number,
+): Kartonage | null {
+  const bedarf = platzbedarf(zeilen)
+  const passend = kartonagen.filter(
+    (k) => k.capacity >= bedarf && k.maxContentG >= warengewichtG,
+  )
+  if (passend.length === 0) return null
+  return passend.reduce((klein, k) => (k.capacity < klein.capacity ? k : klein))
 }
 
 /** SKU-Muster: * steht für beliebig viel, Vergleich ohne Groß/Klein. */
@@ -95,11 +139,16 @@ export function skuPasst(muster: string, sku: string): boolean {
   return regex.test(sku)
 }
 
-export function regelTrifft(r: Versandregel, k: RegelKontext): boolean {
-  if (r.minWeightG != null && k.weightG < r.minWeightG) return false
-  if (r.maxWeightG != null && k.weightG > r.maxWeightG) return false
+export function regelTrifft(
+  r: Versandregel,
+  k: RegelKontext,
+  /** Versandgewicht inkl. Karton und Kleinpaket-Eignung — einmal vorberechnet. */
+  vor: { versandgewichtG: number; kleinpaket: boolean },
+): boolean {
+  if (r.minWeightG != null && vor.versandgewichtG < r.minWeightG) return false
+  if (r.maxWeightG != null && vor.versandgewichtG > r.maxWeightG) return false
   if (r.zone != null && r.zone !== k.zone) return false
-  if (r.requireKleinpaketFit && !passtInsKleinpaket(k.zeilen, k.weightG)) return false
+  if (r.requireKleinpaketFit && !vor.kleinpaket) return false
   if (r.skus && r.skus.length > 0) {
     const zeilePasst = (z: RegelZeile) => r.skus!.some((m) => skuPasst(m, z.sku ?? ''))
     const treffer = r.skuScope === 'all'
@@ -111,17 +160,28 @@ export function regelTrifft(r: Versandregel, k: RegelKontext): boolean {
 }
 
 export function wendeRegelnAn(regeln: Versandregel[], k: RegelKontext): Regelergebnis {
+  // Erst die Verpackung, dann die Regeln: der Karton bestimmt Gewicht und
+  // Kleinpaket-Eignung, und beides prüfen die Regeln anschließend.
+  const kartonage = waehleKartonage(k.kartonagen ?? [], k.zeilen, k.weightG)
+  const versandgewichtG = k.weightG + (kartonage?.tareG ?? 0)
+  // Ohne gepflegte Kartonagen entscheiden allein Flags, Platz und Gewicht;
+  // mit Kartonage muss diese zusätzlich als Kleinpaket zugelassen sein.
+  const kleinpaket =
+    passtInsKleinpaket(k.zeilen, versandgewichtG) && (kartonage?.kleinpaket ?? true)
+
   const ergebnis: Regelergebnis = {
     product: null,
     productRegel: null,
     billingNumber: null,
     insuredValue: null,
     insuranceRegel: null,
-    passtInsKleinpaket: passtInsKleinpaket(k.zeilen, k.weightG),
+    passtInsKleinpaket: kleinpaket,
+    kartonage,
+    versandgewichtG,
   }
 
   for (const r of regeln) {
-    if (!regelTrifft(r, k)) continue
+    if (!regelTrifft(r, k, { versandgewichtG, kleinpaket })) continue
     if (ergebnis.product === null && r.dhlProduct) {
       ergebnis.product = r.dhlProduct
       ergebnis.productRegel = r.name

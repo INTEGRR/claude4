@@ -5,6 +5,7 @@ import { requireWrite } from '@/modules/auth'
 import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
 import {
   cancelShipmentById,
+  consumePackagingForPicking,
   createLabelForPicking,
   createReturnLabelForPartner,
   queueFulfillmentForPicking,
@@ -69,6 +70,7 @@ export async function massLabels(formData: FormData) {
       shipmentIds.push(result.shipmentId)
       if (ausbuchen) {
         await sql`select picking_validate(${r.picking_id}, ${sql.json({})}, false)`
+        await consumePackagingForPicking(r.picking_id)
         await queueFulfillmentForPicking(r.picking_id)
       }
     } catch (err) {

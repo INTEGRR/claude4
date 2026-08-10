@@ -2,12 +2,43 @@ import 'server-only'
 import { sql } from '@/db/client'
 import { productForCountry, zoneForCountry } from './dhl-codes'
 import {
+  type Kartonage,
   type RegelKontext,
   type Regelergebnis,
   type Versandregel,
   type Zone,
   wendeRegelnAn,
 } from './regeln-logik'
+
+/** Gepflegte Verpackungen samt Leergewicht aus dem verknüpften Produkt. */
+export async function ladeKartonagen(): Promise<Kartonage[]> {
+  const rows = await sql<
+    {
+      id: string
+      name: string
+      capacity: number
+      max_content_g: number
+      kleinpaket: boolean
+      tare_g: number
+    }[]
+  >`
+    select p.id, p.name, p.capacity, p.max_content_g, p.kleinpaket,
+           coalesce(pt.weight_g, 0) as tare_g
+    from packagings p
+    join product_variants pv on pv.id = p.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where p.active
+    order by p.sequence, p.capacity`
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    capacity: Number(r.capacity),
+    maxContentG: Number(r.max_content_g),
+    kleinpaket: r.kleinpaket,
+    tareG: Number(r.tare_g),
+  }))
+}
 
 /** Aktive Regeln in Auswertungsreihenfolge. */
 export async function ladeRegeln(): Promise<Versandregel[]> {
@@ -66,7 +97,7 @@ export async function vorschlaegeFuerPickings(
   const ergebnis = new Map<string, Versandvorschlag>()
   if (pickingIds.length === 0) return ergebnis
 
-  const regeln = await ladeRegeln()
+  const [regeln, kartonagen] = await Promise.all([ladeRegeln(), ladeKartonagen()])
 
   const zeilen = await sql<
     {
@@ -75,17 +106,17 @@ export async function vorschlaegeFuerPickings(
       qty: number
       weight_g: number
       kleinpaket: boolean
-      kleinpaket_max_qty: number
+      platzbedarf: number
     }[]
   >`
     select m.picking_id, pv.sku, sum(m.qty)::float as qty,
            coalesce(sum(m.qty * pt.weight_g), 0)::int as weight_g,
-           pt.kleinpaket, pt.kleinpaket_max_qty
+           pt.kleinpaket, pt.platzbedarf
     from stock_moves m
     join product_variants pv on pv.id = m.variant_id
     join product_templates pt on pt.id = pv.template_id
     where m.picking_id = any(${pickingIds}) and m.state <> 'cancel'
-    group by m.picking_id, pv.sku, pt.kleinpaket, pt.kleinpaket_max_qty`
+    group by m.picking_id, pv.sku, pt.kleinpaket, pt.platzbedarf`
 
   const koepfe = await sql<
     { id: string; country: string | null; order_value: number }[]
@@ -108,8 +139,9 @@ export async function vorschlaegeFuerPickings(
         sku: z.sku,
         qty: Number(z.qty),
         kleinpaket: z.kleinpaket,
-        kleinpaketMaxQty: Number(z.kleinpaket_max_qty),
+        platzbedarf: Number(z.platzbedarf),
       })),
+      kartonagen,
     }
     ergebnis.set(kopf.id, {
       ...wendeRegelnAn(regeln, kontext),

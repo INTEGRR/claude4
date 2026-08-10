@@ -36,18 +36,18 @@ Aktionen bei (Stapeln):
   Kleinpaket".
 - **Aktionen**: DHL-Produkt, Abrechnungsnummer, Transportversicherung ab
   Warenwert (versichert wird die Auftragssumme).
-- **Kleinpaket-Eignung** steht am Produkt: Flag „passt ins Kleinpaket"
-  (35,5 × 25 × 8 cm) plus „Stück je Kleinpaket". Geprüft wird die ganze
-  Lieferung, drei K.-o.-Kriterien:
+- **Kleinpaket-Eignung** steht am Produkt: Flag „passt ins Kleinpaket" plus
+  **Platzbedarf** (1 = ein volles Kleinpaket, 35,5 × 25 × 8 cm; zwei Stück je
+  Kleinpaket sind also 0,5, eine Tastatur etwa 3). Geprüft wird die ganze
+  Lieferung, vier K.-o.-Kriterien:
   1. **Jede** Position muss markiert sein — eine unmarkierte (die Tastatur
      zum Zubehör) macht die Sendung zum Paket.
-  2. Der Platz reicht: Summe (Menge ÷ Stück je Kleinpaket) ≤ 1. Zwei
-     Produkte, die je allein ein Kleinpaket füllen (max 1), passen zusammen
-     also nicht; zwei mit „max 2" ergeben genau 1,0 und passen.
-  3. Gesamtgewicht ≤ 1 kg, summiert aus den Produktgewichten. Diese Prüfung
-     sitzt in der Eignung selbst, nicht nur im Höchstgewicht der Regel —
-     sonst würde eine entschärfte Regel ein von DHL abgelehntes Label
-     vorschlagen.
+  2. Der Platz reicht: Summe (Menge × Platzbedarf) ≤ 1.
+  3. Versandgewicht ≤ 1 kg — **einschließlich Karton**, denn gewogen wird das
+     Paket. Diese Prüfung sitzt in der Eignung selbst, nicht nur im
+     Höchstgewicht der Regel: sonst würde eine entschärfte Regel ein von DHL
+     abgelehntes Label vorschlagen.
+  4. Die gewählte Kartonage ist als Kleinpaket zugelassen (siehe unten).
 - Die Regeln liefern einen **Vorschlag** am Packtisch (sichtbar mit
   Regelname, Produkt vorausgewählt, überschreibbar) und steuern den
   Massendruck. Ohne Regeltreffer gilt die Länder-Automatik: DE → V01PAK,
@@ -57,6 +57,31 @@ Aktionen bei (Stapeln):
   Verfahren wird ausgetauscht, die Teilnahme bleibt; eine Regel kann eine
   abweichende Nummer explizit setzen. Voraussetzung: die Produkte sind im
   DHL-Geschäftskundenvertrag gebucht.
+
+## Kartonagen (Verpackung und Verbrauch)
+
+Eine Kartonage ist **kein eigener Stammdatenzweig, sondern ein Produkt mit
+Zusatzangaben** (Einstellungen → Kartonagen): Bestand, Einkaufspreis,
+Leergewicht und Meldebestand kommen aus dem verknüpften Artikel, neu sind nur
+Fassungsvermögen (gleiche Skala wie der Platzbedarf), Höchstgewicht des
+Inhalts und die Kleinpaket-Tauglichkeit.
+
+- **Wahl**: die kleinste Kartonage, deren Fassungsvermögen den Platzbedarf
+  deckt und deren Höchstgewicht das Warengewicht trägt. Ein Keycap-Set reist
+  damit nicht im Tastaturkarton.
+- **Gewicht**: Versandgewicht = Warengewicht + Leergewicht der Kartonage. Das
+  ist der Wert, den DHL bekommt und der am Packtisch vorbelegt ist — an der
+  Kleinpaket-Grenze (980 g Ware + 60 g Karton) entscheidet genau das über
+  Annahme oder Ablehnung.
+- **Verbrauch**: beim **Warenausgang** (nicht beim Etikettieren — ein
+  storniertes Label verbraucht keinen Karton) bucht `packaging_consume()` ein
+  Stück als Bestandsbewegung denselben Weg wie die Ware. Damit gilt die
+  Grundregel weiter: jede Bestandsänderung ist eine Bewegung, der Kartonvorrat
+  läuft über Meldebestände und Auswertungen wie jedes andere Material. Die
+  Funktion ist idempotent; scheitert sie (Karton nicht auf Bestand), blockiert
+  das den Warenausgang nicht, sondern hinterlässt einen Fehler am Beleg.
+- Ohne gepflegte Kartonagen bleibt alles wie zuvor: reines Warengewicht, keine
+  Verbrauchsbuchung.
 
 ## Massendruck (Fließband am Packtisch)
 
