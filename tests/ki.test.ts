@@ -1,7 +1,8 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { MAX_ROWS, runReadOnlyQuery } from '../src/modules/ki/sql-tool.ts'
-import { closeDb, db } from './helpers.ts'
+import { produktAnlegen } from '../src/modules/ki/produkt-anlegen.ts'
+import { closeDb, db, withRollback } from './helpers.ts'
 
 after(closeDb)
 
@@ -129,6 +130,157 @@ describe('Schreibende Aktionen', () => {
     assert.equal(werte.kunde, true, 'Vorgabe: Kunde')
     assert.equal(werte.lieferant, false)
     assert.match(aktion.zusammenfassung(werte), /Muster GmbH/)
+  })
+
+  test('Produkt mit Attributen: Variantenzahl steht in der Zusammenfassung', async () => {
+    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
+    const { aktion, werte } = aktionPruefen('produkt_anlegen', {
+      name: 'Anvil Native 1800',
+      verkaufspreis: 349,
+      sku: 'AN1800',
+      attribute: [
+        {
+          name: 'Farbe',
+          werte: [
+            { name: 'Schwarz', kuerzel: 'BK' },
+            { name: 'Blau', kuerzel: 'BL' },
+            { name: 'Grün', kuerzel: 'GN' },
+          ],
+        },
+        {
+          name: 'Switch',
+          werte: [
+            { name: 'Gateron HE 1', kuerzel: 'HE1' },
+            { name: 'Gateron HE 2', kuerzel: 'HE2' },
+            { name: 'Gateron HE 3', kuerzel: 'HE3' },
+            { name: 'Gateron HE 4', kuerzel: 'HE4' },
+          ],
+        },
+      ],
+    })
+    assert.equal(aktion.bereich, 'produkte')
+    assert.equal(werte.verkaufbar, true, 'Vorgabe: verkaufbar')
+    // 3 × 4 — die Zahl muss im Bestätigungstext stehen, sonst bestätigt
+    // niemand bewusst zwölf neue Varianten.
+    assert.match(aktion.zusammenfassung(werte), /12 Varianten/)
+    assert.match(aktion.zusammenfassung(werte), /Anvil Native 1800/)
+  })
+
+  test('die Variantenmatrix ist gedeckelt', async () => {
+    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
+    const viele = (n: number, praefix: string) =>
+      Array.from({ length: n }, (_, i) => ({ name: `${praefix}${i}` }))
+    assert.throws(
+      () =>
+        aktionPruefen('produkt_anlegen', {
+          name: 'Zu viel',
+          attribute: [
+            { name: 'A', werte: viele(20, 'a') },
+            { name: 'B', werte: viele(20, 'b') },
+          ],
+        }),
+      /200 Varianten/,
+    )
+    // Vier Attribute sind unabhängig davon zu viel.
+    assert.throws(
+      () =>
+        aktionPruefen('produkt_anlegen', {
+          name: 'Zu tief',
+          attribute: [1, 2, 3, 4].map((i) => ({ name: `A${i}`, werte: [{ name: 'x' }] })),
+        }),
+      /attribute/,
+    )
+  })
+
+  test('Produkt ohne Attribute ist erlaubt (Einkaufsteil)', async () => {
+    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
+    const { aktion, werte } = aktionPruefen('produkt_anlegen', {
+      name: 'Gateron HE 1',
+      verkaufbar: false,
+      einkaufbar: true,
+      route: 'kaufen',
+      einstandspreis: 0.55,
+    })
+    assert.equal(werte.verkaufbar, false)
+    assert.deepEqual(werte.attribute, [])
+    assert.match(aktion.zusammenfassung(werte), /ohne Varianten/)
+  })
+
+  test('Produktanlage erzeugt die volle Matrix mit Artikelnummern', async () => {
+    await withRollback(async (t) => {
+      const ergebnis = await produktAnlegen(
+        t,
+        {
+          name: 'Anvil Native 1800',
+          verkaufspreis: 349,
+          sku: 'AN1800',
+          route: 'fertigen',
+          attribute: [
+            {
+              name: 'Farbe',
+              werte: [
+                { name: 'Schwarz', kuerzel: 'BK', farbe: '#1a1a1a' },
+                { name: 'Blau', kuerzel: 'BL' },
+                { name: 'Grün', kuerzel: 'GN', aufpreis: 10 },
+              ],
+            },
+            {
+              name: 'Switch',
+              werte: [1, 2, 3, 4].map((n) => ({ name: `Gateron HE ${n}`, kuerzel: `HE${n}` })),
+            },
+          ],
+        },
+        'test',
+      )
+
+      assert.equal(ergebnis.varianten, 12, '3 Farben × 4 Switches')
+      assert.equal(ergebnis.benannt, 12, 'jede Variante bekommt eine Artikelnummer')
+
+      const skus = await t<{ sku: string }[]>`
+        select sku from product_variants where template_id = ${ergebnis.templateId} order by sku`
+      assert.equal(skus.length, 12)
+      assert.ok(
+        skus.some((s) => s.sku === 'AN1800-GN-HE3'),
+        `Kürzel müssen in der Nummer landen, bekommen: ${skus.map((s) => s.sku).join(', ')}`,
+      )
+
+      // Der Aufpreis der grünen Variante muss an der Variante ankommen.
+      const [gruen] = await t<{ price_extra: number }[]>`
+        select price_extra from product_variants
+        where template_id = ${ergebnis.templateId} and sku = 'AN1800-GN-HE1'`
+      assert.equal(Number(gruen.price_extra), 10)
+    })
+  })
+
+  test('vorhandene Attribute werden wiederverwendet, fehlende Werte ergänzt', async () => {
+    await withRollback(async (t) => {
+      // „Farbe" existiert in den Beispieldaten; wird sie doppelt angelegt,
+      // stünden im Produktformular zwei gleichnamige Attribute zur Wahl.
+      const [attribut] = await t<{ id: string }[]>`
+        insert into product_attributes (name) values ('Farbe')
+        on conflict (name) do update set name = excluded.name returning id`
+      await t`
+        insert into product_attribute_values (attribute_id, name) values (${attribut.id}, 'Schwarz')
+        on conflict do nothing`
+
+      const ergebnis = await produktAnlegen(
+        t,
+        {
+          name: 'Testtastatur',
+          attribute: [{ name: 'Farbe', werte: [{ name: 'Schwarz' }, { name: 'Neongelb' }] }],
+        },
+        'test',
+      )
+
+      const [{ anzahl }] = await t<{ anzahl: number }[]>`
+        select count(*)::int as anzahl from product_attributes where name = 'Farbe'`
+      assert.equal(anzahl, 1, 'kein zweites Attribut „Farbe"')
+      assert.equal(ergebnis.varianten, 2)
+
+      const werte = await t<{ name: string }[]>`
+        select name from product_attribute_values where attribute_id = ${attribut.id}`
+      assert.ok(werte.some((w) => w.name === 'Neongelb'), 'neuer Wert wurde ergänzt')
+    })
   })
 
   test('der Fertigungsmitarbeiter darf über die KI keinen Kunden anlegen', async () => {

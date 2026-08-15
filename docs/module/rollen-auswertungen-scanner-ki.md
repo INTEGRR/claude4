@@ -100,7 +100,13 @@ Drei Werkzeuge:
   schreibt **kein** SQL. Er wählt eine Aktion aus einem festen Katalog
   (`src/modules/ki/aktionen.ts`) und füllt deren Felder; der Vorschlag
   erscheint im Chat als Karte mit Zusammenfassung, Begründung und allen
-  Feldern im Klartext. Erst der Klick auf „Ausführen" schickt ihn an
+  Feldern im Klartext. Vor dem Anlegen lässt sich der Vorschlag korrigieren —
+  auf zwei Wegen: „Vor dem Anlegen bearbeiten" macht jedes Feld editierbar
+  (Objektlisten wie Attributwerte als Tabelle mit editierbaren Zellen), und
+  die Zuruf-Zeile („Kürzel für Grün auf GN") lässt die KI den Feldsatz über
+  `/api/ki/aktion/aendern` neu schreiben — eine kurze, isolierte Runde ohne
+  Datenbankzugriff, deren Ergebnis wieder gegen das Aktionsschema geprüft
+  wird. Erst der Klick auf „Anlegen" schickt den Vorschlag an
   `/api/ki/aktion`, wo **erneut** geprüft wird:
 
   - Ist die Aktion im Katalog? (sonst 400 mit der Liste der erlaubten)
@@ -113,7 +119,10 @@ Drei Werkzeuge:
 
   Der Katalog ist bewusst abschließend und legt nur an, nie ändern oder
   löschen: Kontakt, Verkaufsauftrag (Entwurf), Bestellung (Entwurf),
-  Fertigungsauftrag, Meldebestand, Arbeitsplatz, Mitarbeiter, Notiz.
+  Fertigungsauftrag, **Produkt** (samt Attributen und kompletter
+  Variantenmatrix inkl. SKU-Vergabe aus Präfix + Wertekürzeln; vorhandene
+  Attribute werden über den Namen wiederverwendet, die Matrix ist auf
+  200 Varianten gedeckelt), Meldebestand, Arbeitsplatz, Mitarbeiter, Notiz.
   Belege entstehen im Entwurf — das Bestätigen bleibt ein bewusster Schritt
   in der Oberfläche.
 

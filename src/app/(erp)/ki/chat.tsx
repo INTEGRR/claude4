@@ -3,6 +3,7 @@ import { Fragment, useRef, useState } from 'react'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
 import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
+import { VorschlagEditor } from './vorschlag-editor'
 
 /**
  * Chat-Oberfläche des KI-Agenten. Antworten kommen als NDJSON-Stream von
@@ -37,6 +38,7 @@ const BEISPIELE = [
   'Wie viele Tastaturen je Farbe wurden diesen Monat gefertigt?',
   'Welche Komponenten reichen bei aktueller Prognose nicht mehr aus?',
   'Lege für die Schrauben M2x6 einen Meldebestand an: unter 500 auf 4000 auffüllen.',
+  'Leg ein Produkt „Anvil Native 1800" an, in 3 Gehäusefarben und 4 Switch-Typen.',
 ]
 
 // --- Mini-Markdown ---------------------------------------------------------
@@ -199,18 +201,27 @@ function ChartCard({ d }: { d: Diagramm }) {
 
 /**
  * Vorschlag zum Anlegen. Der Agent hat hier nichts ausgeführt — erst der
- * Klick auf "Ausführen" schickt die Aktion an den Server, der Rechte und
- * Felder erneut prüft. Alle Felder stehen offen da, damit man sieht, was man
- * bestätigt.
+ * Klick auf "Anlegen" schickt die Aktion an den Server, der Rechte und Felder
+ * erneut prüft.
+ *
+ * Vorher lässt sich der Vorschlag auf zwei Wegen korrigieren: Felder direkt
+ * in der Tabelle ändern, oder per Zuruf („die Kürzel für Grün auf GN") — dann
+ * schreibt die KI den Feldsatz neu, ohne dass die Frage von vorn beginnt.
  */
 function AktionCard({
   v,
   onEntscheidung,
+  onParameter,
 }: {
   v: Vorschlag
   onEntscheidung: (id: string, ergebnis: NonNullable<Vorschlag['ergebnis']>) => void
+  onParameter: (id: string, parameter: Record<string, unknown>, zusammenfassung?: string) => void
 }) {
   const [busy, setBusy] = useState(false)
+  const [bearbeiten, setBearbeiten] = useState(false)
+  const [anweisung, setAnweisung] = useState('')
+  const [kiBusy, setKiBusy] = useState(false)
+  const [kiHinweis, setKiHinweis] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function ausfuehren() {
     setBusy(true)
@@ -237,6 +248,40 @@ function AktionCard({
     }
   }
 
+  async function perKiAendern() {
+    const text = anweisung.trim()
+    if (!text || kiBusy) return
+    setKiBusy(true)
+    setKiHinweis(null)
+    try {
+      const res = await fetch('/api/ki/aktion/aendern', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aktion: v.aktion, parameter: v.parameter, anweisung: text }),
+      })
+      const data = (await res.json()) as {
+        parameter?: Record<string, unknown>
+        zusammenfassung?: string
+        hinweis?: string | null
+        error?: string
+      }
+      if (!res.ok || !data.parameter) {
+        setKiHinweis({ ok: false, text: data.error ?? `Fehlgeschlagen (${res.status})` })
+        return
+      }
+      onParameter(v.id, data.parameter, data.zusammenfassung)
+      setAnweisung('')
+      setKiHinweis({ ok: true, text: data.hinweis ?? 'Vorschlag überarbeitet.' })
+    } catch (err) {
+      setKiHinweis({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Verbindungsfehler',
+      })
+    } finally {
+      setKiBusy(false)
+    }
+  }
+
   const erledigt = v.ergebnis !== undefined
 
   return (
@@ -252,24 +297,67 @@ function AktionCard({
         <p style={{ margin: '0 0 8px' }}>{v.zusammenfassung}</p>
         {v.begruendung && <p className="muted small" style={{ margin: '0 0 8px' }}>{v.begruendung}</p>}
 
-        <details style={{ marginBottom: 10 }}>
-          <summary className="mono-label" style={{ cursor: 'pointer' }}>Felder im Detail</summary>
-          <div className="display-panel" style={{ margin: '6px 0 0' }}>
-            <div className="display-head">
-              <span>{v.aktion}</span>
-              <span>wird geprüft</span>
+        {!erledigt && bearbeiten ? (
+          <VorschlagEditor
+            parameter={v.parameter}
+            onChange={(neu) => onParameter(v.id, neu)}
+          />
+        ) : (
+          <details style={{ marginBottom: 10 }}>
+            <summary className="mono-label" style={{ cursor: 'pointer' }}>Felder im Detail</summary>
+            <div className="display-panel" style={{ margin: '6px 0 0' }}>
+              <div className="display-head">
+                <span>{v.aktion}</span>
+                <span>wird geprüft</span>
+              </div>
+              <pre style={{ background: 'transparent', border: 0, padding: 0, margin: 0 }}>
+                {JSON.stringify(v.parameter, null, 2)}
+              </pre>
             </div>
-            <pre style={{ background: 'transparent', border: 0, padding: 0, margin: 0 }}>
-              {JSON.stringify(v.parameter, null, 2)}
-            </pre>
+          </details>
+        )}
+
+        {!erledigt && (
+          <div className="row" style={{ alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <input
+              value={anweisung}
+              onChange={(e) => setAnweisung(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void perKiAendern()
+                }
+              }}
+              placeholder={'Änderung per KI, z. B. „Kürzel für Grün auf GN"'}
+              disabled={kiBusy || busy}
+            />
+            <div className="shrink">
+              <button
+                type="button"
+                className="small"
+                disabled={kiBusy || busy || !anweisung.trim()}
+                onClick={() => void perKiAendern()}
+              >
+                {kiBusy && <span className="led" style={{ background: 'currentColor' }} />}
+                Ändern
+              </button>
+            </div>
           </div>
-        </details>
+        )}
+        {kiHinweis && (
+          <div className={`notice ${kiHinweis.ok ? 'info' : 'danger'}`} style={{ marginBottom: 8 }}>
+            {kiHinweis.text}
+          </div>
+        )}
 
         {v.ergebnis === undefined ? (
           <div className="actions">
             <button className="primary" type="button" disabled={busy} onClick={() => void ausfuehren()}>
               {busy && <span className="led" style={{ background: 'currentColor' }} />}
-              Ausführen
+              Anlegen
+            </button>
+            <button type="button" disabled={busy} onClick={() => setBearbeiten((b) => !b)}>
+              {bearbeiten ? 'Bearbeiten beenden' : 'Vor dem Anlegen bearbeiten'}
             </button>
             <button
               type="button"
@@ -432,6 +520,26 @@ export function KiChat() {
                     cur.map((msg) => ({
                       ...msg,
                       aktionen: msg.aktionen.map((a) => (a.id === id ? { ...a, ergebnis } : a)),
+                    })),
+                  )
+                }
+                onParameter={(id, parameter, zusammenfassung) =>
+                  setMsgs((cur) =>
+                    cur.map((msg) => ({
+                      ...msg,
+                      aktionen: msg.aktionen.map((a) =>
+                        a.id === id
+                          ? {
+                              ...a,
+                              parameter,
+                              zusammenfassung: zusammenfassung ?? a.zusammenfassung,
+                              // Von Hand geändert heißt: nicht mehr der
+                              // Vorschlag der KI, also auch nicht mehr deren
+                              // Begründung.
+                              begruendung: zusammenfassung ? a.begruendung : undefined,
+                            }
+                          : a,
+                      ),
                     })),
                   )
                 }
