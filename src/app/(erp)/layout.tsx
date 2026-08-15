@@ -29,6 +29,7 @@ async function badges() {
       anwesend: number
       abwesenheiten: number
       fehler: number
+      offene_bugs: number
     }[]
   >`
     select
@@ -46,7 +47,9 @@ async function badges() {
       (select count(*) from employees_present)::int as anwesend,
       (select count(*) from absences where state = 'requested')::int as abwesenheiten,
       ((select count(*) from integration_jobs where status = 'failed')
-       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler`
+       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler,
+      (select count(*) from bug_reports
+        where status in ('offen', 'in_arbeit'))::int as offene_bugs`
   return row
 }
 
@@ -165,6 +168,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           ? [{ href: '/integrationen', label: 'Integrationen', count: counts.fehler }]
           : []),
         ...(sees('einstellungen') ? [{ href: '/einstellungen', label: 'Einstellungen' }] : []),
+        ...(sees('fehler')
+          ? [{ href: '/fehler', label: 'Fehler melden', count: counts.offene_bugs }]
+          : []),
       ],
     },
   ].filter((g) => g.items.length > 0)

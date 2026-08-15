@@ -31,19 +31,22 @@ export type Area =
   | 'zeiterfassung'
   | 'integrationen'
   | 'einstellungen'
+  | 'fehler'
 
 const ALL_AREAS: Area[] = [
   'verkauf', 'einkauf', 'fertigung', 'lager', 'versand', 'reparatur',
   'produkte', 'kontakte', 'auswertungen', 'ki', 'scanner',
-  'personal', 'zeiterfassung', 'integrationen', 'einstellungen',
+  'personal', 'zeiterfassung', 'integrationen', 'einstellungen', 'fehler',
 ]
 
 /** Bereiche, in denen die Rolle arbeiten (schreiben) darf. */
 const WRITE_AREAS: Record<Role, Area[]> = {
   admin: ALL_AREAS,
   mitarbeiter: ALL_AREAS.filter((a) => a !== 'integrationen' && a !== 'einstellungen'),
-  lager: ['lager', 'versand', 'reparatur', 'scanner', 'zeiterfassung'],
-  fertigung: ['fertigung', 'reparatur', 'scanner', 'zeiterfassung'],
+  // 'fehler' hat jede Rolle: wer am Packtisch auf einen Fehler läuft, soll
+  // ihn dort melden können, wo er auftritt — nicht per Zettel ans Büro.
+  lager: ['lager', 'versand', 'reparatur', 'scanner', 'zeiterfassung', 'fehler'],
+  fertigung: ['fertigung', 'reparatur', 'scanner', 'zeiterfassung', 'fehler'],
 }
 
 /** Bereiche, die die Rolle zusätzlich nur lesend sieht. */
