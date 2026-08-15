@@ -934,3 +934,53 @@ label.field > span {
   .ki-messages { padding: 12px; }
   .ki-beispiele { justify-content: stretch; flex-direction: column; }
 }
+
+/* --- Ticket-Overlay (Fehler melden, ohne die Seite zu verlassen) ---------- */
+
+.ticket-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  padding: 10px 4px;
+  border-radius: 6px 0 0 6px;
+  border: 1px solid var(--border);
+  border-right: none;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  z-index: 60;
+}
+.ticket-tab:hover { color: var(--text); background: var(--surface); }
+
+.ticket-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(92vw, 380px);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.25);
+  padding: 14px 16px;
+  overflow-y: auto;
+  z-index: 70;
+  animation: ticket-slide 0.16s ease-out;
+}
+@keyframes ticket-slide {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.ticket-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+.ticket-panel .field { margin-bottom: 8px; }
+
+@media print { .ticket-tab, .ticket-panel { display: none; } }

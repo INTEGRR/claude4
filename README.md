@@ -14,7 +14,7 @@ Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
 - **Auswertungen** — Inventarwert, Produktion, verbaute Komponenten, Abverkaufsquote; Kennzahlen: Deckungsbeitrag, Rohertrag, Lagerumschlag und Reichweite, Liefertreue, RMA-Quote — mit Diagrammen
 - **KI-Analyse** — Ad-hoc-Auswertungen, Tabellen und Diagramme auf Zuruf: Claude-Agent mit Nur-Lese-Zugriff; anlegen darf er nur aus einem festen Katalog (inkl. Produkte mit kompletter Variantenmatrix) und erst nach Bestätigung — Vorschläge lassen sich vorher Feld für Feld oder per Zuruf an die KI überarbeiten
 - **Rollen & Kommentare** — Lager-/Fertigungs-/Büro-/Admin-Rollen mit passendem Menü; Verlauf + Kommentare an jedem Beleg
-- **Fehlermeldungen** — Bugtracker im System: jede Rolle meldet Fehler mit Seite, Schwere und Beschreibung direkt in die Datenbank; die Entwicklung arbeitet die Liste auf Zuruf ab und schreibt den Bearbeitungsstand zurück
+- **Tickets** — Bugtracker im System: Fehler melden über ein Slide-out am rechten Bildschirmrand (Seite vorbelegt, ohne die Arbeit zu verlassen); die Ticketliste zeigt ID, Status, Behebungsvermerk und den verlinkten GitHub-Commit — abgearbeitet von der Entwicklung auf Zuruf direkt über die Datenbank
 - **Beschaffung** — Meldebestände (Min/Max) mit Vorschlagsliste; ein Klick erzeugt Bestellung oder Fertigungsauftrag
 - **Lose & Seriennummern** — Rückverfolgung je Produkt (Chargen oder Serien), FIFO-Zuteilung, Rückverfolgungsansicht
 - **Ereignis-Monitor** — jede Shopify-/DHL-/Mail-Transaktion protokolliert; Queue mit Backoff, Fehler am Beleg sichtbar

@@ -7,6 +7,7 @@ import { type NavGroup, SidebarNav } from '@/components/sidebar-nav'
 import { ScanBox } from '@/components/scan-box'
 import { AbmeldenKnopf } from '@/components/abmelden'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { TicketOverlay } from '@/components/ticket-overlay'
 
 export const dynamic = 'force-dynamic'
 
@@ -169,7 +170,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           : []),
         ...(sees('einstellungen') ? [{ href: '/einstellungen', label: 'Einstellungen' }] : []),
         ...(sees('fehler')
-          ? [{ href: '/fehler', label: 'Fehler melden', count: counts.offene_bugs }]
+          ? [{ href: '/tickets', label: 'Tickets', count: counts.offene_bugs }]
           : []),
       ],
     },
@@ -216,6 +217,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       }
     >
       {children}
+      {/* Fehler melden von jeder Seite aus — der Reiter am rechten Rand. */}
+      {sees('fehler') && <TicketOverlay />}
     </AppShell>
   )
 }

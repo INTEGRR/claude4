@@ -6,6 +6,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { dateTime } from '@/modules/shared/format'
+import { commitUrl, kurzerSha } from '@/modules/shared/repo'
 import { statusSetzen } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ const STATUS_TEXT: Record<string, string> = {
   verworfen: 'verworfen',
 }
 
-export default async function FehlerDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function TicketDetail({ params }: { params: Promise<{ id: string }> }) {
   await requireArea('fehler')
   const { id } = await params
 
@@ -32,6 +33,7 @@ export default async function FehlerDetail({ params }: { params: Promise<{ id: s
       status: string
       gemeldet_von: string
       aufloesung: string | null
+      commit_sha: string | null
       behoben_am: string | null
       created_at: string
     }[]
@@ -45,7 +47,7 @@ export default async function FehlerDetail({ params }: { params: Promise<{ id: s
       <PageHeader
         title={`${m.number} — ${m.titel}`}
         subtitle={`${STATUS_TEXT[m.status] ?? m.status} · ${m.schwere} · gemeldet von ${m.gemeldet_von} am ${dateTime(m.created_at)}`}
-        actions={<Link className="btn" href="/fehler">Zur Liste</Link>}
+        actions={<Link className="btn" href="/tickets">Zur Liste</Link>}
       />
 
       <Card title="Meldung">
@@ -59,9 +61,17 @@ export default async function FehlerDetail({ params }: { params: Promise<{ id: s
         </p>
       </Card>
 
-      {m.aufloesung && (
-        <Card title="Bearbeitungsstand der Entwicklung">
-          <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{m.aufloesung}</p>
+      {(m.aufloesung || m.commit_sha) && (
+        <Card title="Behebung">
+          {m.aufloesung && <p style={{ whiteSpace: 'pre-wrap', marginTop: 0 }}>{m.aufloesung}</p>}
+          {m.commit_sha && (
+            <p style={{ margin: 0 }}>
+              Commit:{' '}
+              <a className="mono" href={commitUrl(m.commit_sha)} target="_blank" rel="noreferrer">
+                {kurzerSha(m.commit_sha)}
+              </a>
+            </p>
+          )}
           {m.behoben_am && (
             <p className="muted small" style={{ margin: '8px 0 0' }}>
               Abgeschlossen am {dateTime(m.behoben_am)}
@@ -73,10 +83,16 @@ export default async function FehlerDetail({ params }: { params: Promise<{ id: s
       <Card title="Status">
         <ActionForm action={statusSetzen.bind(null, m.id, offen ? 'behoben' : 'offen')}>
           {offen ? (
-            <label className="field">
-              <span>Vermerk zum Abschluss (optional — was war es, was wurde geändert?)</span>
-              <input name="aufloesung" maxLength={2000} />
-            </label>
+            <div className="row">
+              <label className="field" style={{ flex: 2 }}>
+                <span>Vermerk zum Abschluss (was war es, was wurde geändert?)</span>
+                <input name="aufloesung" maxLength={2000} />
+              </label>
+              <label className="field shrink">
+                <span>Commit (SHA)</span>
+                <input className="mono" name="commit_sha" maxLength={64} style={{ width: 130 }} />
+              </label>
+            </div>
           ) : null}
           <div className="actions">
             <button className={offen ? 'primary' : undefined} type="submit">
@@ -91,7 +107,7 @@ export default async function FehlerDetail({ params }: { params: Promise<{ id: s
         )}
       </Card>
 
-      <RecordComments model="bug_report" recordId={m.id} path={`/fehler/${m.id}`} />
+      <RecordComments model="bug_report" recordId={m.id} path={`/tickets/${m.id}`} />
     </>
   )
 }
