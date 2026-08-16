@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
+import { ActionButton } from '@/components/action-button'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { repository } from '@/modules/prozesse/introspektion'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
+import { paketAktivieren } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +20,8 @@ export default async function ProzesseRepositoryPage({
 }: {
   searchParams: Promise<{ reiter?: string }>
 }) {
-  await requireArea('einstellungen')
+  const user = await requireArea('einstellungen')
+  const admin = user.role === 'admin'
   const { reiter } = await searchParams
   const aktiv =
     reiter === 'dienste' ? 'dienste' : reiter === 'ablaeufe' ? 'ablaeufe' : 'aktionen'
@@ -32,12 +35,13 @@ export default async function ProzesseRepositoryPage({
             name: string
             bereich: string
             modell: string | null
+            aktiv: boolean
             version: number
             schritte: number
             abgeschaltet: number
           }[]
         >`
-          select p.code, p.name, p.bereich, p.modell, v.version,
+          select p.code, p.name, p.bereich, p.modell, p.aktiv, v.version,
                  (select count(*)::int from prozess_schritte s
                    where s.version_id = v.id and s.art not in ('start', 'ende')) as schritte,
                  (select count(*)::int from prozess_overrides o
@@ -45,9 +49,18 @@ export default async function ProzesseRepositoryPage({
                    where o.prozess_code = p.code and o.aktiv = false and s.optional) as abgeschaltet
           from prozesse p
           join prozess_versionen v on v.id = prozess_aktive_version(p.code)
-          where p.aktiv
           order by p.bereich, p.code`
       : []
+
+  const pakete =
+    aktiv === 'ablaeufe'
+      ? await sql<
+          { code: string; name: string; beschreibung: string | null; prozess_codes: string[] }[]
+        >`select code, name, beschreibung, prozess_codes from prozess_pakete order by code`
+      : []
+  const prozessAktiv = new Map(prozesse.map((p) => [p.code, p.aktiv]))
+  const paketPasst = (codes: string[]) =>
+    prozesse.every((p) => p.aktiv === (codes.includes(p.code) || p.code === 'bug_ticket'))
 
   return (
     <>
@@ -76,53 +89,99 @@ export default async function ProzesseRepositoryPage({
       />
 
       {aktiv === 'ablaeufe' ? (
-        <Card title={`Aktive Prozesse (${prozesse.length})`} tight>
-          <TableWrap>
-            <table>
-              <thead>
-                <tr>
-                  <th>Prozess</th>
-                  <th>Bereich</th>
-                  <th>Beleg</th>
-                  <th className="num">Version</th>
-                  <th className="num">Schritte</th>
-                  <th>Prozesstest</th>
-                  <th>Laufzeit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prozesse.map((p) => (
-                  <tr key={p.code}>
-                    <td>
-                      <Link href={`/prozesse/${p.code}`}>{p.name}</Link>{' '}
-                      <span className="mono small muted">{p.code}</span>
-                    </td>
-                    <td>
-                      <span className="mono-label">{p.bereich}</span>
-                    </td>
-                    <td className="mono small">
-                      {p.modell ?? <Link href={`/p/${p.code}`}>Assistent</Link>}
-                    </td>
-                    <td className="num mono">{Number(p.version)}</td>
-                    <td className="num">{p.schritte}</td>
-                    <td>
-                      {Object.values(FIXTURES).some((f) => f.prozess === p.code) ? (
-                        <span className="badge success">abgedeckt</span>
-                      ) : (
-                        <span className="badge warn">ohne Fixture</span>
-                      )}
-                    </td>
-                    <td className="small">
-                      {Number(p.abgeschaltet) > 0
-                        ? `${p.abgeschaltet} Schritt(e) abgeschaltet`
-                        : 'Standard'}
-                    </td>
+        <>
+          <Card title={`Prozesse (${prozesse.filter((p) => p.aktiv).length} aktiv)`} tight>
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Prozess</th>
+                    <th>Bereich</th>
+                    <th>Beleg</th>
+                    <th className="num">Version</th>
+                    <th className="num">Schritte</th>
+                    <th>Prozesstest</th>
+                    <th>Laufzeit</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
-        </Card>
+                </thead>
+                <tbody>
+                  {prozesse.map((p) => (
+                    <tr key={p.code} style={p.aktiv ? undefined : { opacity: 0.55 }}>
+                      <td>
+                        <Link href={`/prozesse/${p.code}`}>{p.name}</Link>{' '}
+                        <span className="mono small muted">{p.code}</span>
+                      </td>
+                      <td>
+                        <span className="mono-label">{p.bereich}</span>
+                      </td>
+                      <td className="mono small">
+                        {p.modell ?? (p.aktiv ? <Link href={`/p/${p.code}`}>Assistent</Link> : 'Assistent')}
+                      </td>
+                      <td className="num mono">{Number(p.version)}</td>
+                      <td className="num">{p.schritte}</td>
+                      <td>
+                        {Object.values(FIXTURES).some((f) => f.prozess === p.code) ? (
+                          <span className="badge success">abgedeckt</span>
+                        ) : (
+                          <span className="badge warn">ohne Fixture</span>
+                        )}
+                      </td>
+                      <td className="small">
+                        {!p.aktiv ? (
+                          <span className="badge neutral">abgeschaltet</span>
+                        ) : Number(p.abgeschaltet) > 0 ? (
+                          `${p.abgeschaltet} Schritt(e) abgeschaltet`
+                        ) : (
+                          'Standard'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </Card>
+
+          {/* Chamäleon: Pivot = Paketwechsel. Ein Paket schaltet genau seine
+              Prozesse aktiv — Navigation und Assistenten folgen automatisch,
+              Belege und Historie abgeschalteter Prozesse bleiben lesbar. */}
+          <div className="grid-3">
+            {pakete.map((paket) => (
+              <Card
+                key={paket.code}
+                title={paket.name}
+                actions={
+                  paketPasst(paket.prozess_codes) && <span className="badge success">aktiv</span>
+                }
+              >
+                {paket.beschreibung && (
+                  <p className="muted small" style={{ marginTop: 0 }}>{paket.beschreibung}</p>
+                )}
+                <ul className="small" style={{ margin: '0 0 10px', paddingLeft: 0, listStyle: 'none' }}>
+                  {paket.prozess_codes.map((code) => (
+                    <li key={code} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className={`led ${prozessAktiv.get(code) ? 'ok' : 'off'}`} />
+                      <span className="mono">{code}</span>
+                    </li>
+                  ))}
+                </ul>
+                {admin && !paketPasst(paket.prozess_codes) && (
+                  <ActionButton
+                    action={paketAktivieren.bind(null, paket.code)}
+                    confirm={`Paket „${paket.name}" aktivieren? Genau diese Prozesse werden aktiv, alle anderen abgeschaltet (der Bug-Loop bleibt an). Belege und Historie bleiben lesbar.`}
+                  >
+                    Paket aktivieren
+                  </ActionButton>
+                )}
+              </Card>
+            ))}
+          </div>
+          <p className="muted small" style={{ margin: '4px 0 0' }}>
+            Ein Pivot ist ein Paketwechsel, kein Code-Umbau: Navigation und Assistenten sind eine
+            Projektion der aktiven Prozesse. Einzelne Prozesse lassen sich auf ihrer Detailseite
+            an- und abschalten.
+          </p>
+        </>
       ) : aktiv === 'aktionen' ? (
         <>
           <div className="notice info">

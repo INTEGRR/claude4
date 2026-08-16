@@ -31,6 +31,47 @@ export const EINSTELLUNGEN = {
     revalidate: ['/prozesse', '/prozesse/:ergebnis'],
   },
 
+  'einstellungen.prozess_schalten': {
+    label: 'Prozess an/aus',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Schaltet einen ganzen Prozess für diese Firma ab oder wieder an. Abgeschaltete ' +
+      'Prozesse verschwinden aus Navigation und Assistenten; Belege und Historie bleiben ' +
+      'lesbar. Der Bug-Loop (bug_ticket) ist Infrastruktur und nicht abschaltbar.',
+    bindung: 'frei',
+    schema: z.object({
+      prozess_code: z.string().min(1),
+      aktiv: z.boolean(),
+    }),
+    zusammenfassung: (p) => `${p.prozess_code} → ${p.aktiv ? 'aktiv' : 'abgeschaltet'}`,
+    formdata: (fd) => ({
+      prozess_code: String(fd.get('prozess_code') ?? ''),
+      aktiv: fd.get('aktiv') === 'on' || fd.get('aktiv') === 'true',
+    }),
+    revalidate: ['/prozesse', '/prozesse/:ergebnis', '/'],
+  },
+
+  'einstellungen.paket_aktivieren': {
+    label: 'Geschäftsmodell-Paket aktivieren',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    ki: true,
+    beschreibung:
+      'Aktiviert ein Geschäftsmodell-Paket: genau die Prozesse des Pakets werden aktiv, ' +
+      'alle anderen abgeschaltet (Pivot = Paketwechsel). Der Bug-Loop bleibt immer an; ' +
+      'Belege und Historie abgeschalteter Prozesse bleiben lesbar.',
+    bindung: 'frei',
+    schema: z.object({
+      paket_code: z.string().min(1),
+    }),
+    zusammenfassung: (p) => `Paket ${p.paket_code}`,
+    formdata: (fd) => ({ paket_code: String(fd.get('paket_code') ?? '') }),
+    revalidate: ['/prozesse', '/'],
+  },
+
   // --- Eigene Felder (Chamäleon) --------------------------------------------
 
   'einstellungen.feld_anlegen': {

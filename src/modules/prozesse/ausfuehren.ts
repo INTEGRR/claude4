@@ -44,6 +44,8 @@ export const AUSFUEHRUNG = {
   'einkauf.wechselkurs_erfassen': einkauf.wechselkursErfassen,
 
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
+  'einstellungen.prozess_schalten': einstellungen.prozessSchalten,
+  'einstellungen.paket_aktivieren': einstellungen.paketAktivieren,
   'einstellungen.feld_anlegen': einstellungen.feldAnlegen,
   'einstellungen.feld_loeschen': einstellungen.feldLoeschen,
   'einstellungen.benutzer_anlegen': einstellungen.benutzerAnlegen,

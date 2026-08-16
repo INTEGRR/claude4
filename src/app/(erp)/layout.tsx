@@ -64,6 +64,18 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     select value ->> 'name' as name from settings where key = 'company'`
   const firma = company?.name ?? 'ERP'
 
+  // Chamäleon: die Navigation ist eine PROJEKTION der aktiven Prozesse.
+  // Klar prozessgebundene Gruppen (Fertigung, Einkauf, Service, Versand)
+  // verschwinden, wenn ihr Bereich keinen aktiven Prozess hat — Belege
+  // bleiben über Links/URLs erreichbar, nur das Menü passt sich dem
+  // Geschäftsmodell an. Grundfunktionen (Lager, Personal, Stammdaten,
+  // Auswertungen) bleiben immer.
+  const prozessBereiche = new Set(
+    (await sql<{ bereich: string }[]>`
+      select distinct bereich from prozesse where aktiv`).map((b) => b.bereich),
+  )
+  const prozessAktiv = (bereich: string) => prozessBereiche.has(bereich)
+
   const systemzustand =
     counts.fehler > 0
       ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
@@ -87,14 +99,14 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               { href: '/vorgaenge', label: 'Vorgänge' },
             ]
           : []),
-        ...(sees('versand')
+        ...(sees('versand') && prozessAktiv('versand')
           ? [{ href: '/versand', label: 'Versand', count: counts.versandbereit }]
           : []),
       ],
     },
     {
       label: 'Fertigung',
-      items: sees('fertigung')
+      items: sees('fertigung') && prozessAktiv('fertigung')
         ? [
             { href: '/fertigung', label: 'Fertigungsaufträge', count: counts.offene_mos },
             { href: '/fertigung/stuecklisten', label: 'Stücklisten' },
@@ -104,7 +116,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     },
     {
       label: 'Einkauf',
-      items: sees('einkauf')
+      items: sees('einkauf') && prozessAktiv('einkauf')
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },
@@ -127,7 +139,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     },
     {
       label: 'Service',
-      items: sees('reparatur')
+      items: sees('reparatur') && prozessAktiv('reparatur')
         ? [{ href: '/reparatur', label: 'Reparaturen', count: counts.offene_reparaturen }]
         : [],
     },

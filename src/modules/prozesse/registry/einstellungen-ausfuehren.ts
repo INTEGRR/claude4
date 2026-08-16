@@ -32,6 +32,53 @@ export async function prozessschrittSchalten(
   }
 }
 
+export async function prozessSchalten(
+  p: { prozess_code: string; aktiv: boolean },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  if (p.prozess_code === 'bug_ticket' && !p.aktiv) {
+    throw new Error('Der Bug-Loop ist Infrastruktur und lässt sich nicht abschalten.')
+  }
+  const [prozess] = await sql<{ name: string }[]>`
+    update prozesse set aktiv = ${p.aktiv}
+    where code = ${p.prozess_code}
+    returning name`
+  if (!prozess) throw new Error(`Prozess „${p.prozess_code}" existiert nicht.`)
+
+  await sql`select log_event('prozess', gen_random_uuid(), 'state',
+    ${`Prozess ${p.prozess_code} ${p.aktiv ? 'aktiviert' : 'abgeschaltet'}`}, ${ctx.actor})`
+  return {
+    text: `„${prozess.name}" ist jetzt ${p.aktiv ? 'aktiv' : 'abgeschaltet'}.`,
+    recordId: p.prozess_code,
+  }
+}
+
+export async function paketAktivieren(
+  p: { paket_code: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [paket] = await sql<{ name: string; prozess_codes: string[] }[]>`
+    select name, prozess_codes from prozess_pakete where code = ${p.paket_code}`
+  if (!paket) throw new Error(`Paket „${p.paket_code}" existiert nicht.`)
+
+  // Pivot = Paketwechsel: exakt die Paket-Prozesse an, der Rest aus.
+  // bug_ticket ist Infrastruktur und bleibt in jedem Geschäftsmodell an.
+  await sql`
+    update prozesse
+    set aktiv = (code = any(${paket.prozess_codes}) or code = 'bug_ticket')`
+
+  const aktive = await sql<{ code: string }[]>`
+    select code from prozesse where aktiv order by code`
+  await sql`select log_event('prozess', gen_random_uuid(), 'state',
+    ${`Paket ${p.paket_code} aktiviert: ${aktive.map((a) => a.code).join(', ')}`}, ${ctx.actor})`
+  return {
+    text: `Paket „${paket.name}" aktiviert — aktive Prozesse: ${aktive
+      .map((a) => a.code)
+      .join(', ')}.`,
+    recordId: p.paket_code,
+  }
+}
+
 // --- Eigene Felder (Chamäleon) -----------------------------------------------
 
 export async function feldAnlegen(

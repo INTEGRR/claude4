@@ -383,17 +383,32 @@ Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
   Prozesstest spielt ihn end-to-end durch und beweist dabei das eigene
   Feld (budget in Maske UND als Bedingungspfad).
 - **`prozess_pakete`**: Geschäftsmodell-Vorlagen als Bündel
-  (D2C-Hersteller, Händler, Werkstatt/Service) — die Datengrundlage;
-  Paketwechsel-UI und Navigation als Projektion folgen.
+  (D2C-Hersteller, Händler, Werkstatt/Service).
+- **Paketwechsel** (Pivot = andere Prozesse aktivieren, kein Code-Umbau):
+  Registry-Aktionen `einstellungen.paket_aktivieren` (exakt die
+  Paket-Prozesse aktiv, Rest aus) und `einstellungen.prozess_schalten`
+  (einzeln an/aus), beide nur Admin. Der Bug-Loop (`bug_ticket`) ist
+  Infrastruktur und nicht abschaltbar. UI: Paket-Karten auf
+  /prozesse?reiter=ablaeufe (LEDs je enthaltenem Prozess, „aktiv"-Badge
+  wenn der Ist-Zustand exakt dem Paket entspricht), Einzel-Schalter auf
+  /prozesse/[code] — die Detailseite zeigt auch abgeschaltete Prozesse
+  (Badge statt 404), nur /p-Assistenten verlangen aktiv.
+- **Navigation als Projektion**: die Sidebar blendet klar prozessgebundene
+  Gruppen (Versand, Fertigung, Einkauf, Service) aus, wenn ihr Bereich
+  keinen aktiven Prozess hat — Belege bleiben per URL erreichbar,
+  Grundfunktionen (Verkauf, Lager, Personal, Auswertungen, Stammdaten,
+  System) bleiben immer. Rechte (Areas) bleiben das Sicherheitsraster
+  darunter. Der Prozesstest spielt den Paketwechsel durch
+  (werkstatt → fertigung aus, anfrage an, bug_ticket an → restauriert).
 - Neustart-Riegel: feld_definitionen und prozess_pakete sind Struktur
   (BEHALTEN), vorgaenge sind Bewegung.
 
 ## Noch offen (Kurzfassung)
 
-- Pakete-UI (Paket aktivieren = Prozesse an/aus) und Navigation/KPIs als
-  Projektion der aktiven Prozesse.
 - KI-Prozessentwurf (`prozess_entwerfen` als Entwurf, Mensch aktiviert)
   samt Aktivieren-Knopf auf /prozesse/[code].
+- Dashboard-KPIs als Projektion der aktiven Prozesse (die Navigation ist
+  es schon).
 - Inline-Seiten-Actions (Kartonagen, Versandregeln, Klärliste);
   Inventur-Assistent (braucht beleggebundene Folgeschritte in der
   Instanz-Ausführung); manueller Verkaufsprozess; Fähigkeits-Umbenennung

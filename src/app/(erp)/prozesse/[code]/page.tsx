@@ -7,7 +7,7 @@ import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { ProzessDiagramm } from '@/components/prozess-diagramm'
 import { type LayoutKante, type LayoutSchritt, layout } from '@/modules/prozesse/diagramm-layout'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
-import { schrittSchalten } from '../actions'
+import { prozessSchalten, schrittSchalten } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +24,8 @@ export default async function ProzessDetailPage({
   const user = await requireArea('einstellungen')
   const { code } = await params
 
+  // Bewusst OHNE `and p.aktiv`: abgeschaltete Prozesse bleiben hier sichtbar
+  // (Historie + Wiedereinschalten), sie fehlen nur in Navigation und Assistenten.
   const [prozess] = await sql<
     {
       code: string
@@ -31,13 +33,14 @@ export default async function ProzessDetailPage({
       beschreibung: string | null
       bereich: string
       modell: string | null
+      aktiv: boolean
       version: number
     }[]
   >`
-    select p.code, p.name, p.beschreibung, p.bereich, p.modell, v.version
+    select p.code, p.name, p.beschreibung, p.bereich, p.modell, p.aktiv, v.version
     from prozesse p
     join prozess_versionen v on v.id = prozess_aktive_version(p.code)
-    where p.code = ${code} and p.aktiv`
+    where p.code = ${code}`
   if (!prozess) notFound()
 
   const schritte = await sql<
@@ -97,12 +100,25 @@ export default async function ProzessDetailPage({
         }
         actions={
           <>
+            {!prozess.aktiv && <span className="badge neutral">abgeschaltet</span>}
             {fixture ? (
               <span className="badge success" title="Der Prozesstest spielt diesen Ablauf durch">
                 Prozesstest ✓
               </span>
             ) : (
               <span className="badge warn">ohne Fixture</span>
+            )}
+            {admin && prozess.code !== 'bug_ticket' && (
+              <ActionButton
+                action={prozessSchalten.bind(null, code, !prozess.aktiv)}
+                confirm={
+                  prozess.aktiv
+                    ? `„${prozess.name}" abschalten? Der Prozess verschwindet aus Navigation und Assistenten — Belege und Historie bleiben lesbar.`
+                    : undefined
+                }
+              >
+                {prozess.aktiv ? 'Prozess abschalten' : 'Prozess aktivieren'}
+              </ActionButton>
             )}
             <Link className="btn" href="/prozesse?reiter=ablaeufe">Alle Abläufe</Link>
           </>
