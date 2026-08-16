@@ -1,4 +1,5 @@
 import type { RegistrierteAktion } from './typen.ts'
+import { EINSTELLUNGEN } from './einstellungen.ts'
 import { FEHLER } from './fehler.ts'
 import { LAGER } from './lager.ts'
 import { PRODUKTE } from './produkte.ts'
@@ -14,6 +15,7 @@ import { VERSAND } from './versand.ts'
  * einkauf/fertigung → einstellungen/integrationen).
  */
 export const REGISTRY = {
+  ...EINSTELLUNGEN,
   ...FEHLER,
   ...LAGER,
   ...PRODUKTE,

@@ -1,5 +1,6 @@
 import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
+import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
 import * as produkte from './registry/produkte-ausfuehren.ts'
@@ -14,6 +15,8 @@ import * as versand from './registry/versand-ausfuehren.ts'
  * den Typecheck — nicht erst den Klick.
  */
 export const AUSFUEHRUNG = {
+  'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
+
   'fehler.ticket_melden': fehler.ticketMelden,
   'fehler.ticket_status': fehler.ticketStatus,
 

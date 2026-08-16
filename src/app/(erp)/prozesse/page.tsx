@@ -1,15 +1,17 @@
 import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
+import { sql } from '@/db/client'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { repository } from '@/modules/prozesse/introspektion'
+import { FIXTURES } from '@/modules/prozesse/fixtures'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Das Repository der Knöpfe: jede registrierte Aktion mit Bereich, Feldern,
- * Statusübergang und API-Adresse — damit beim automatisierten Testen nichts
- * vergessen wird und jeder Knopf adressierbar ist. Die Prozessdefinitionen
- * selbst (Diagramme, Schritte) kommen mit der nächsten Ausbaustufe dazu.
+ * Das Repository der Knöpfe UND der Abläufe: jede registrierte Aktion mit
+ * Bereich, Feldern, Statusübergang und API-Adresse — und jede
+ * Prozessdefinition mit Version, Testabdeckung und Laufzeit-Schaltern
+ * (Detailseite je Prozess).
  */
 export default async function ProzesseRepositoryPage({
   searchParams,
@@ -18,16 +20,48 @@ export default async function ProzesseRepositoryPage({
 }) {
   await requireArea('einstellungen')
   const { reiter } = await searchParams
-  const aktiv = reiter === 'dienste' ? 'dienste' : 'aktionen'
+  const aktiv =
+    reiter === 'dienste' ? 'dienste' : reiter === 'ablaeufe' ? 'ablaeufe' : 'aktionen'
   const repo = repository()
+
+  const prozesse =
+    aktiv === 'ablaeufe'
+      ? await sql<
+          {
+            code: string
+            name: string
+            bereich: string
+            modell: string | null
+            version: number
+            schritte: number
+            abgeschaltet: number
+          }[]
+        >`
+          select p.code, p.name, p.bereich, p.modell, v.version,
+                 (select count(*)::int from prozess_schritte s
+                   where s.version_id = v.id and s.art not in ('start', 'ende')) as schritte,
+                 (select count(*)::int from prozess_overrides o
+                   join prozess_schritte s on s.version_id = v.id and s.code = o.schritt_code
+                   where o.prozess_code = p.code and o.aktiv = false and s.optional) as abgeschaltet
+          from prozesse p
+          join prozess_versionen v on v.id = prozess_aktive_version(p.code)
+          where p.aktiv
+          order by p.bereich, p.code`
+      : []
 
   return (
     <>
       <PageHeader
         title="Prozesse"
-        subtitle="Das Repository der Aktionen: jeder Knopf ist ein registrierter, API-aufrufbarer Aufruf"
+        subtitle="Abläufe und das Repository der Aktionen: jeder Knopf ist ein registrierter, API-aufrufbarer Aufruf"
         actions={
           <>
+            <Link
+              className={`btn${aktiv === 'ablaeufe' ? ' primary' : ''}`}
+              href="/prozesse?reiter=ablaeufe"
+            >
+              Abläufe
+            </Link>
             <Link className={`btn${aktiv === 'aktionen' ? ' primary' : ''}`} href="/prozesse">
               Aktionen ({repo.aktionen.length})
             </Link>
@@ -41,7 +75,55 @@ export default async function ProzesseRepositoryPage({
         }
       />
 
-      {aktiv === 'aktionen' ? (
+      {aktiv === 'ablaeufe' ? (
+        <Card title={`Aktive Prozesse (${prozesse.length})`} tight>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Prozess</th>
+                  <th>Bereich</th>
+                  <th>Beleg</th>
+                  <th className="num">Version</th>
+                  <th className="num">Schritte</th>
+                  <th>Prozesstest</th>
+                  <th>Laufzeit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prozesse.map((p) => (
+                  <tr key={p.code}>
+                    <td>
+                      <Link href={`/prozesse/${p.code}`}>{p.name}</Link>{' '}
+                      <span className="mono small muted">{p.code}</span>
+                    </td>
+                    <td>
+                      <span className="mono-label">{p.bereich}</span>
+                    </td>
+                    <td className="mono small">
+                      {p.modell ?? <Link href={`/p/${p.code}`}>Assistent</Link>}
+                    </td>
+                    <td className="num mono">{Number(p.version)}</td>
+                    <td className="num">{p.schritte}</td>
+                    <td>
+                      {Object.values(FIXTURES).some((f) => f.prozess === p.code) ? (
+                        <span className="badge success">abgedeckt</span>
+                      ) : (
+                        <span className="badge warn">ohne Fixture</span>
+                      )}
+                    </td>
+                    <td className="small">
+                      {Number(p.abgeschaltet) > 0
+                        ? `${p.abgeschaltet} Schritt(e) abgeschaltet`
+                        : 'Standard'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      ) : aktiv === 'aktionen' ? (
         <>
           <div className="notice info">
             Jede Aktion ist über <code className="mono">POST /api/aktion/&lt;name&gt;</code> aufrufbar
