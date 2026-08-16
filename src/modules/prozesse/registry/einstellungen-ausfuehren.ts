@@ -1,4 +1,5 @@
-import { sql } from '@/db/client'
+import { sql, tx } from '@/db/client'
+import { REGISTRY } from './index.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
@@ -76,6 +77,146 @@ export async function paketAktivieren(
       .map((a) => a.code)
       .join(', ')}.`,
     recordId: p.paket_code,
+  }
+}
+
+// --- Prozessentwurf (KI entwirft, Mensch aktiviert) --------------------------
+
+interface EntwurfSchritt {
+  code: string
+  name: string
+  art: 'start' | 'aktion' | 'xor' | 'ende'
+  aktion?: string
+  zustand?: string
+  rollen?: string[]
+  params?: Record<string, unknown>
+  optional: boolean
+}
+
+export async function prozessEntwerfen(
+  p: {
+    code: string
+    name: string
+    beschreibung?: string
+    bereich: string
+    modell?: 'vorgang'
+    schritte: EntwurfSchritt[]
+    uebergaenge: { von: string; nach: string; bedingung?: unknown; beschriftung?: string }[]
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Struktur früh und verständlich prüfen — die harte Validierung (erreichbar,
+  // azyklisch, XOR-Regeln) sitzt in prozess_version_aktivieren und läuft erst,
+  // wenn ein Mensch den Entwurf aktiviert.
+  const starts = p.schritte.filter((s) => s.art === 'start').length
+  if (starts !== 1) {
+    throw new Error(`Ein Prozess braucht genau einen Startschritt (der Entwurf hat ${starts}).`)
+  }
+  if (!p.schritte.some((s) => s.art === 'ende')) {
+    throw new Error('Ein Prozess braucht mindestens einen Endschritt.')
+  }
+  const codes = new Set(p.schritte.map((s) => s.code))
+  if (codes.size !== p.schritte.length) {
+    throw new Error('Schritt-Codes müssen eindeutig sein.')
+  }
+  for (const s of p.schritte) {
+    if (s.art === 'aktion' && !s.aktion) {
+      throw new Error(`Schritt „${s.code}": art=aktion braucht eine registrierte Aktion.`)
+    }
+    if (s.aktion && !(s.aktion in REGISTRY)) {
+      throw new Error(
+        `Schritt „${s.code}": unbekannte Aktion „${s.aktion}" — der Katalog steht auf /prozesse.`,
+      )
+    }
+  }
+  for (const u of p.uebergaenge) {
+    if (!codes.has(u.von) || !codes.has(u.nach)) {
+      throw new Error(`Übergang ${u.von} → ${u.nach}: beide Enden müssen Schritt-Codes sein.`)
+    }
+  }
+
+  const version = await tx(async (t) => {
+    const [vorhanden] = await t<{ id: string; modell: string | null }[]>`
+      select id, modell from prozesse where code = ${p.code}`
+    let prozessId: string
+    if (vorhanden) {
+      if ((vorhanden.modell ?? null) !== (p.modell ?? null)) {
+        throw new Error(
+          `Prozess „${p.code}" existiert mit anderem Beleg (${vorhanden.modell ?? 'beleglos'}) — ` +
+            'ein Entwurf kann das Modell nicht wechseln.',
+        )
+      }
+      prozessId = vorhanden.id
+    } else {
+      // Neue Prozesse entstehen INAKTIV — sichtbar werden sie erst, wenn ein
+      // Mensch eine Version aktiviert (das setzt auch prozesse.aktiv).
+      const [neu] = await t<{ id: string }[]>`
+        insert into prozesse (code, name, beschreibung, bereich, modell, aktiv)
+        values (${p.code}, ${p.name}, ${p.beschreibung ?? null}, ${p.bereich},
+                ${p.modell ?? null}, false)
+        returning id`
+      prozessId = neu.id
+    }
+
+    const [{ nr }] = await t<{ nr: number }[]>`
+      select coalesce(max(version), 0) + 1 as nr
+      from prozess_versionen where prozess_id = ${prozessId}`
+    const [v] = await t<{ id: string }[]>`
+      insert into prozess_versionen (prozess_id, version, status, created_by)
+      values (${prozessId}, ${nr}, 'entwurf', ${ctx.actor})
+      returning id`
+
+    for (const [i, s] of p.schritte.entries()) {
+      await t`
+        insert into prozess_schritte (version_id, code, name, art, sequence, aktion,
+                                      zustand, rollen, params, optional)
+        values (${v.id}, ${s.code}, ${s.name}, ${s.art}, ${i * 10}, ${s.aktion ?? null},
+                ${s.zustand ?? null}, ${s.rollen ?? null},
+                ${JSON.stringify(s.params ?? {})}::jsonb, ${s.optional})`
+    }
+    for (const [i, u] of p.uebergaenge.entries()) {
+      await t`
+        insert into prozess_uebergaenge (version_id, von_code, nach_code, sequence,
+                                         bedingung, beschriftung)
+        values (${v.id}, ${u.von}, ${u.nach}, ${(i + 1) * 10},
+                ${u.bedingung == null ? null : JSON.stringify(u.bedingung)}::jsonb,
+                ${u.beschriftung ?? null})`
+    }
+    return nr
+  })
+
+  await sql`select log_event('prozess', gen_random_uuid(), 'state',
+    ${`Prozessentwurf ${p.code} v${version} (${p.schritte.length} Schritte)`}, ${ctx.actor})`
+  return {
+    text:
+      `Entwurf gespeichert: ${p.code} Version ${version} — Diagramm prüfen und dann ` +
+      'bewusst aktivieren.',
+    recordId: p.code,
+    link: `/prozesse/${p.code}?version=${version}`,
+  }
+}
+
+export async function prozessversionAktivieren(
+  p: { prozess_code: string; version: number },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [v] = await sql<{ id: string; status: string }[]>`
+    select v.id, v.status
+    from prozess_versionen v
+    join prozesse p on p.id = v.prozess_id
+    where p.code = ${p.prozess_code} and v.version = ${p.version}`
+  if (!v) throw new Error(`Version ${p.version} von „${p.prozess_code}" existiert nicht.`)
+  if (v.status === 'aktiv') throw new Error('Diese Version ist bereits aktiv.')
+
+  // Die DB-Funktion validiert (Start/Ende, erreichbar, azyklisch, XOR,
+  // eindeutige Zustände) und archiviert die bisher aktive Version.
+  await sql`select prozess_version_aktivieren(${v.id})`
+  await sql`update prozesse set aktiv = true where code = ${p.prozess_code}`
+  await sql`select log_event('prozess', gen_random_uuid(), 'state',
+    ${`Prozessversion aktiviert: ${p.prozess_code} v${p.version}`}, ${ctx.actor})`
+  return {
+    text: `„${p.prozess_code}" läuft jetzt mit Version ${p.version}.`,
+    recordId: p.prozess_code,
   }
 }
 

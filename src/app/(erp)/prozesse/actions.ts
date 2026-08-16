@@ -26,3 +26,12 @@ export async function paketAktivieren(paketCode: string): Promise<ActionResult> 
     parameter: { paket_code: paketCode },
   })
 }
+
+export async function versionAktivieren(
+  prozessCode: string,
+  version: number,
+): Promise<ActionResult> {
+  return serverAktion('einstellungen.prozessversion_aktivieren', {
+    parameter: { prozess_code: prozessCode, version },
+  })
+}

@@ -106,3 +106,158 @@ describe('Chamäleon: Paketwechsel', () => {
     )
   })
 })
+
+// Der ganze Chamäleon-Bogen: die KI entwirft einen Prozess (nur als Entwurf),
+// der Mensch aktiviert nach Prüfung — und der designte Prozess läuft sofort
+// auf generischen Vorgängen, ohne eine Zeile neuen Codes.
+describe('Chamäleon: KI-Prozessentwurf', () => {
+  const admin = { name: 'prozesstest', role: 'admin' as const }
+
+  const ENTWURF = {
+    code: 'ruecknahme',
+    name: 'Rücknahme (designter Prozess)',
+    beschreibung: 'Testentwurf: Rückgabe annehmen und erstatten.',
+    bereich: 'verkauf',
+    modell: 'vorgang',
+    schritte: [
+      { code: 'start', name: 'Rückgabe gemeldet', art: 'start' },
+      {
+        code: 'annehmen',
+        name: 'Annehmen',
+        art: 'aktion',
+        aktion: 'vorgang.anlegen',
+        zustand: 'angenommen',
+        params: { prozess_code: 'ruecknahme' },
+      },
+      {
+        code: 'erstatten',
+        name: 'Erstatten',
+        art: 'aktion',
+        aktion: 'vorgang.status_setzen',
+        zustand: 'erstattet',
+        params: { state: 'erstattet' },
+      },
+      { code: 'ende', name: 'Erledigt', art: 'ende' },
+    ],
+    uebergaenge: [
+      { von: 'start', nach: 'annehmen' },
+      { von: 'annehmen', nach: 'erstatten' },
+      { von: 'erstatten', nach: 'ende' },
+    ],
+  }
+
+  after(async () => {
+    // Vorgänge zuerst (FK ohne Cascade), dann reißt der Prozess seine
+    // Versionen, Schritte und Übergänge per Cascade mit.
+    await h.sql`delete from vorgaenge where prozess_code in ('ruecknahme', 'kaputt')`
+    await h.sql`delete from prozesse where code in ('ruecknahme', 'kaputt')`
+  })
+
+  test('Entwurf entsteht inaktiv — nichts läuft, bis ein Mensch aktiviert', async () => {
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_entwerfen',
+      { parameter: ENTWURF },
+      admin,
+    )
+    assert.match(ergebnis.text ?? '', /Entwurf/)
+
+    const [prozess] = await h.sql<{ aktiv: boolean }[]>`
+      select aktiv from prozesse where code = 'ruecknahme'`
+    assert.equal(prozess.aktiv, false, 'neue Prozesse entstehen inaktiv')
+    const [version] = await h.sql<{ status: string; version: number }[]>`
+      select v.status, v.version from prozess_versionen v
+      join prozesse p on p.id = v.prozess_id where p.code = 'ruecknahme'`
+    assert.equal(version.status, 'entwurf')
+
+    // Der Vorgangs-Start verweigert den inaktiven Prozess.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'vorgang.anlegen',
+        { parameter: { prozess_code: 'ruecknahme' } },
+        admin,
+      ),
+      /kein aktiver Vorgangs-Prozess/,
+    )
+  })
+
+  test('nach der Aktivierung läuft der designte Prozess sofort', async () => {
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.prozessversion_aktivieren',
+      { parameter: { prozess_code: 'ruecknahme', version: 1 } },
+      admin,
+    )
+    const [prozess] = await h.sql<{ aktiv: boolean }[]>`
+      select aktiv from prozesse where code = 'ruecknahme'`
+    assert.equal(prozess.aktiv, true)
+
+    // Ohne neuen Code: anlegen (Startzustand aus der Definition) und
+    // weiterschalten über den Torwächter.
+    const angelegt = await aktionAusfuehrenGeprueft(
+      'vorgang.anlegen',
+      { parameter: { prozess_code: 'ruecknahme', titel: 'Testrückgabe' } },
+      admin,
+    )
+    const vorgangId = angelegt.recordId!
+    const [vorgang] = await h.sql<{ state: string }[]>`
+      select state from vorgaenge where id = ${vorgangId}`
+    assert.equal(vorgang.state, 'angenommen', 'Startzustand kommt aus dem Entwurf')
+
+    await aktionAusfuehrenGeprueft(
+      'vorgang.status_setzen',
+      { parameter: { state: 'erstattet' }, recordId: vorgangId },
+      admin,
+    )
+    const [fertig] = await h.sql<{ state: string }[]>`
+      select state from vorgaenge where id = ${vorgangId}`
+    assert.equal(fertig.state, 'erstattet')
+  })
+
+  test('Unfug scheitert: unbekannte Aktion sofort, Strukturfehler bei der Aktivierung', async () => {
+    // Unbekannte Aktionsnamen fängt schon der Entwurf ab.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            schritte: ENTWURF.schritte.map((s) =>
+              s.code === 'annehmen' ? { ...s, aktion: 'gibts.nicht' } : s,
+            ),
+          },
+        },
+        admin,
+      ),
+      /unbekannte Aktion/,
+    )
+
+    // Ein nicht erreichbarer Schritt darf als Entwurf existieren — die harte
+    // Validierung sitzt im Aktivieren und lehnt ab.
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_entwerfen',
+      {
+        parameter: {
+          ...ENTWURF,
+          code: 'kaputt',
+          name: 'Kaputter Entwurf',
+          schritte: ENTWURF.schritte.map((s) =>
+            s.code === 'annehmen' ? { ...s, params: { prozess_code: 'kaputt' } } : s,
+          ),
+          uebergaenge: ENTWURF.uebergaenge.filter((u) => u.nach !== 'erstatten'),
+        },
+      },
+      admin,
+    )
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozessversion_aktivieren',
+        { parameter: { prozess_code: 'kaputt', version: 1 } },
+        admin,
+      ),
+      /erreichbar/,
+    )
+    const [kaputt] = await h.sql<{ aktiv: boolean }[]>`
+      select aktiv from prozesse where code = 'kaputt'`
+    assert.equal(kaputt.aktiv, false, 'ein abgelehnter Entwurf schaltet nichts aktiv')
+  })
+})

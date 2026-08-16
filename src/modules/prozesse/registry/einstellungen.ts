@@ -72,6 +72,112 @@ export const EINSTELLUNGEN = {
     revalidate: ['/prozesse', '/'],
   },
 
+  // --- Prozessentwurf (Chamäleon: KI entwirft, Mensch aktiviert) ------------
+
+  'einstellungen.prozess_entwerfen': {
+    label: 'Prozess entwerfen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    ki: true,
+    beschreibung:
+      'Legt eine Prozessversion als ENTWURF an — es wird nichts aktiv: der Mensch prüft das ' +
+      'Diagramm auf /prozesse/<code> und aktiviert bewusst. Erlaubt sind Laufzeit-Prozesse ' +
+      "ohne Fachtabelle: modell 'vorgang' (Belege VG/… mit frei definierten Zuständen) oder " +
+      'ohne modell (beleglose Assistenten). Schritte: genau ein start, mindestens ein ende; ' +
+      "art 'aktion' braucht eine registrierte Aktion — bei Vorgängen zuerst vorgang.anlegen " +
+      'mit params {"prozess_code": "<code>"}, danach vorgang.status_setzen mit params ' +
+      '{"state": "<zustand>"} und demselben Wert als zustand des Schritts. Übergänge ' +
+      'verbinden Schritt-Codes; Verzweigungen entstehen durch mehrere ausgehende Übergänge, ' +
+      'optional mit bedingung ({"feld","op","wert"}, Pfade wie zusatz.budget erlaubt). ' +
+      'Schleifen sind verboten.',
+    bindung: 'frei',
+    schema: z.object({
+      code: z
+        .string()
+        .min(1)
+        .max(40)
+        .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
+      name: z.string().min(1).max(120),
+      beschreibung: z.string().max(500).optional(),
+      bereich: z.enum([
+        'verkauf', 'einkauf', 'fertigung', 'lager', 'versand', 'reparatur',
+        'produkte', 'kontakte', 'personal', 'fehler',
+      ]),
+      modell: z
+        .enum(['vorgang'])
+        .optional()
+        .describe("'vorgang' = generische Belege VG/…; leer = belegloser Assistent"),
+      schritte: z
+        .array(
+          z.object({
+            code: z
+              .string()
+              .min(1)
+              .max(40)
+              .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
+            name: z.string().min(1).max(80),
+            art: z.enum(['start', 'aktion', 'xor', 'ende']),
+            aktion: z.string().optional().describe('Registry-Name, Pflicht bei art=aktion'),
+            zustand: z
+              .string()
+              .max(60)
+              .optional()
+              .describe('Belegzustand nach dem Schritt (nur modell vorgang)'),
+            rollen: z.array(z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung'])).optional(),
+            params: z
+              .record(z.unknown())
+              .optional()
+              .describe('Vorbelegte Aktionsfelder, z. B. {"state": "geprueft"}'),
+            optional: z.boolean().default(false),
+          }),
+        )
+        .min(2)
+        .max(30),
+      uebergaenge: z
+        .array(
+          z.object({
+            von: z.string().min(1),
+            nach: z.string().min(1),
+            bedingung: z
+              .unknown()
+              .optional()
+              .describe('{"feld","op","wert"} oder {"alle"/"eine"/"nicht": …}'),
+            beschriftung: z.string().max(80).optional(),
+          }),
+        )
+        .min(1)
+        .max(60),
+    }),
+    zusammenfassung: (p) =>
+      `${p.code} („${p.name}"): ${p.schritte.length} Schritte, ` +
+      `${p.uebergaenge.length} Übergänge — als Entwurf, aktiviert erst nach Prüfung`,
+    revalidate: ['/prozesse', '/prozesse/:ergebnis'],
+  },
+
+  'einstellungen.prozessversion_aktivieren': {
+    label: 'Prozessversion aktivieren',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Prüft einen Entwurf (genau ein Start, alles erreichbar, azyklisch, XOR-Regeln, ' +
+      'eindeutige Zustände) und schaltet ihn aktiv — die bisher aktive Version wird ' +
+      'archiviert, der Prozess selbst aktiv. Bewusst OHNE ki: das Aktivieren bleibt ein ' +
+      'menschlicher Klick nach Blick aufs Diagramm.',
+    bindung: 'frei',
+    schema: z.object({
+      prozess_code: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+    zusammenfassung: (p) => `${p.prozess_code} → Version ${p.version} aktiv`,
+    formdata: (fd) => ({
+      prozess_code: String(fd.get('prozess_code') ?? ''),
+      version: Number(fd.get('version') ?? 0),
+    }),
+    revalidate: ['/prozesse', '/prozesse/:ergebnis'],
+  },
+
   // --- Eigene Felder (Chamäleon) --------------------------------------------
 
   'einstellungen.feld_anlegen': {

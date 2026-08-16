@@ -7,7 +7,8 @@ import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { ProzessDiagramm } from '@/components/prozess-diagramm'
 import { type LayoutKante, type LayoutSchritt, layout } from '@/modules/prozesse/diagramm-layout'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
-import { prozessSchalten, schrittSchalten } from '../actions'
+import { dateTime } from '@/modules/shared/format'
+import { prozessSchalten, schrittSchalten, versionAktivieren } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,30 +19,56 @@ export const dynamic = 'force-dynamic'
  */
 export default async function ProzessDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>
+  searchParams: Promise<{ version?: string }>
 }) {
   const user = await requireArea('einstellungen')
   const { code } = await params
+  const { version: versionParam } = await searchParams
 
-  // Bewusst OHNE `and p.aktiv`: abgeschaltete Prozesse bleiben hier sichtbar
-  // (Historie + Wiedereinschalten), sie fehlen nur in Navigation und Assistenten.
+  // Bewusst OHNE `and p.aktiv` und ohne Join auf die aktive Version:
+  // abgeschaltete Prozesse und reine Entwürfe (KI-Vorschläge ohne aktive
+  // Version) bleiben hier sichtbar — sie fehlen nur in Navigation und
+  // Assistenten.
   const [prozess] = await sql<
     {
+      id: string
       code: string
       name: string
       beschreibung: string | null
       bereich: string
       modell: string | null
       aktiv: boolean
-      version: number
     }[]
   >`
-    select p.code, p.name, p.beschreibung, p.bereich, p.modell, p.aktiv, v.version
-    from prozesse p
-    join prozess_versionen v on v.id = prozess_aktive_version(p.code)
-    where p.code = ${code}`
+    select id, code, name, beschreibung, bereich, modell, aktiv
+    from prozesse where code = ${code}`
   if (!prozess) notFound()
+
+  const versionen = await sql<
+    {
+      id: string
+      version: number
+      status: string
+      created_by: string | null
+      created_at: string
+      aktiviert_am: string | null
+    }[]
+  >`
+    select id, version, status, created_by, created_at, aktiviert_am
+    from prozess_versionen
+    where prozess_id = ${prozess.id}
+    order by version desc`
+  if (versionen.length === 0) notFound()
+
+  // Angezeigt wird: die per ?version gewählte, sonst die aktive, sonst die
+  // neueste (reiner Entwurf).
+  const gezeigt =
+    (versionParam && versionen.find((v) => Number(v.version) === Number(versionParam))) ||
+    versionen.find((v) => v.status === 'aktiv') ||
+    versionen[0]
 
   const schritte = await sql<
     (LayoutSchritt & {
@@ -60,13 +87,13 @@ export default async function ProzessDetailPage({
     from prozess_schritte s
     left join prozess_overrides o
       on o.prozess_code = ${code} and o.schritt_code = s.code
-    where s.version_id = prozess_aktive_version(${code})
+    where s.version_id = ${gezeigt.id}
     order by s.sequence`
 
   const kanten = await sql<LayoutKante[]>`
     select von_code as von, nach_code as nach, sequence, beschriftung
     from prozess_uebergaenge
-    where version_id = prozess_aktive_version(${code})
+    where version_id = ${gezeigt.id}
     order by sequence`
 
   const diagramm = layout(schritte, kanten, null)
@@ -89,8 +116,8 @@ export default async function ProzessDetailPage({
         title={prozess.name}
         subtitle={
           <>
-            <span className="mono">{prozess.code}</span> · Version {Number(prozess.version)} ·
-            Bereich {prozess.bereich} ·{' '}
+            <span className="mono">{prozess.code}</span> · Version {Number(gezeigt.version)}
+            {gezeigt.status !== 'aktiv' && ` (${gezeigt.status})`} · Bereich {prozess.bereich} ·{' '}
             {prozess.modell ? (
               <>Beleg <span className="mono">{prozess.modell}</span></>
             ) : (
@@ -100,6 +127,15 @@ export default async function ProzessDetailPage({
         }
         actions={
           <>
+            {gezeigt.status === 'entwurf' && <span className="badge warn">Entwurf</span>}
+            {gezeigt.status === 'entwurf' && admin && (
+              <ActionButton
+                action={versionAktivieren.bind(null, code, Number(gezeigt.version))}
+                confirm={`Version ${Number(gezeigt.version)} von „${prozess.name}" aktivieren? Der Entwurf wird validiert, die bisher aktive Version archiviert — ab dann führt diese Version die Abläufe.`}
+              >
+                Version aktivieren
+              </ActionButton>
+            )}
             {!prozess.aktiv && <span className="badge neutral">abgeschaltet</span>}
             {fixture ? (
               <span className="badge success" title="Der Prozesstest spielt diesen Ablauf durch">
@@ -186,6 +222,67 @@ export default async function ProzessDetailPage({
           optionale Schritte verschwinden aus „Als Nächstes möglich" — die Nachfolger rücken nach.
         </p>
       </Card>
+
+      {versionen.length > 1 && (
+        <Card title={`Versionen (${versionen.length})`} tight>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th className="num">Version</th>
+                  <th>Status</th>
+                  <th>Angelegt</th>
+                  <th>Aktiviert</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {versionen.map((v) => (
+                  <tr key={v.id}>
+                    <td className="num mono">
+                      <Link href={`/prozesse/${code}?version=${Number(v.version)}`}>
+                        {Number(v.version)}
+                      </Link>
+                      {v.id === gezeigt.id && <span className="muted small"> (angezeigt)</span>}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          v.status === 'aktiv' ? 'success' : v.status === 'entwurf' ? 'warn' : 'neutral'
+                        }`}
+                      >
+                        {v.status}
+                      </span>
+                    </td>
+                    <td className="mono small muted">
+                      {dateTime(v.created_at)}
+                      {v.created_by ? ` · ${v.created_by}` : ''}
+                    </td>
+                    <td className="mono small muted">
+                      {v.aktiviert_am ? dateTime(v.aktiviert_am) : '—'}
+                    </td>
+                    <td>
+                      {v.status === 'entwurf' && admin && (
+                        <ActionButton
+                          className="small"
+                          action={versionAktivieren.bind(null, code, Number(v.version))}
+                          confirm={`Version ${Number(v.version)} aktivieren? Der Entwurf wird validiert, die bisher aktive Version archiviert.`}
+                        >
+                          Aktivieren
+                        </ActionButton>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+          <p className="muted small" style={{ padding: '8px 12px', margin: 0 }}>
+            Entwürfe entstehen aus KI-Vorschlägen (prozess_entwerfen) — aktiv wird eine Version
+            erst durch den Klick hier, nach Prüfung des Diagramms.
+          </p>
+        </Card>
+      )}
     </>
   )
 }

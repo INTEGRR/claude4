@@ -400,13 +400,28 @@ Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
   System) bleiben immer. Rechte (Areas) bleiben das Sicherheitsraster
   darunter. Der Prozesstest spielt den Paketwechsel durch
   (werkstatt → fertigung aus, anfrage an, bug_ticket an → restauriert).
+- **KI-Prozessentwurf** (`einstellungen.prozess_entwerfen`, ki: true):
+  der Agent entwirft eine Prozessversion — aber immer nur als ENTWURF,
+  und für neue Codes entsteht der Prozess INAKTIV. Erlaubt sind
+  Laufzeit-Prozesse ohne Fachtabelle (modell `vorgang` oder beleglos);
+  Aktionsnamen werden gegen die Registry geprüft, Übergangs-Enden gegen
+  die Schritt-Codes, genau ein Start / mindestens ein Ende schon beim
+  Entwurf. Die harte Validierung (erreichbar, azyklisch, XOR-Regeln,
+  eindeutige Zustände) sitzt in `prozess_version_aktivieren` und läuft
+  erst beim bewussten Klick des Menschen:
+  `einstellungen.prozessversion_aktivieren` (ohne ki!) schaltet die
+  Version aktiv, archiviert die bisherige und setzt den Prozess aktiv.
+  /prozesse/[code] zeigt Entwürfe per `?version=N` (Diagramm + Badge),
+  listet alle Versionen mit Aktivieren-Knopf und kommt jetzt auch ohne
+  aktive Version aus (reiner KI-Entwurf). Der Prozesstest beweist den
+  ganzen Bogen: Entwurf → inaktiv → aktivieren → der designte Prozess
+  läuft sofort auf Vorgängen; Unfug (unbekannte Aktion, unerreichbare
+  Schritte) wird abgefangen.
 - Neustart-Riegel: feld_definitionen und prozess_pakete sind Struktur
   (BEHALTEN), vorgaenge sind Bewegung.
 
 ## Noch offen (Kurzfassung)
 
-- KI-Prozessentwurf (`prozess_entwerfen` als Entwurf, Mensch aktiviert)
-  samt Aktivieren-Knopf auf /prozesse/[code].
 - Dashboard-KPIs als Projektion der aktiven Prozesse (die Navigation ist
   es schon).
 - Inline-Seiten-Actions (Kartonagen, Versandregeln, Klärliste);

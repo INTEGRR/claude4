@@ -46,6 +46,8 @@ export const AUSFUEHRUNG = {
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
   'einstellungen.prozess_schalten': einstellungen.prozessSchalten,
   'einstellungen.paket_aktivieren': einstellungen.paketAktivieren,
+  'einstellungen.prozess_entwerfen': einstellungen.prozessEntwerfen,
+  'einstellungen.prozessversion_aktivieren': einstellungen.prozessversionAktivieren,
   'einstellungen.feld_anlegen': einstellungen.feldAnlegen,
   'einstellungen.feld_loeschen': einstellungen.feldLoeschen,
   'einstellungen.benutzer_anlegen': einstellungen.benutzerAnlegen,

@@ -36,9 +36,10 @@ export default async function ProzesseRepositoryPage({
             bereich: string
             modell: string | null
             aktiv: boolean
-            version: number
+            version: number | null
             schritte: number
             abgeschaltet: number
+            entwuerfe: number
           }[]
         >`
           select p.code, p.name, p.bereich, p.modell, p.aktiv, v.version,
@@ -46,9 +47,11 @@ export default async function ProzesseRepositoryPage({
                    where s.version_id = v.id and s.art not in ('start', 'ende')) as schritte,
                  (select count(*)::int from prozess_overrides o
                    join prozess_schritte s on s.version_id = v.id and s.code = o.schritt_code
-                   where o.prozess_code = p.code and o.aktiv = false and s.optional) as abgeschaltet
+                   where o.prozess_code = p.code and o.aktiv = false and s.optional) as abgeschaltet,
+                 (select count(*)::int from prozess_versionen pv
+                   where pv.prozess_id = p.id and pv.status = 'entwurf') as entwuerfe
           from prozesse p
-          join prozess_versionen v on v.id = prozess_aktive_version(p.code)
+          left join prozess_versionen v on v.id = prozess_aktive_version(p.code)
           order by p.bereich, p.code`
       : []
 
@@ -117,7 +120,14 @@ export default async function ProzesseRepositoryPage({
                       <td className="mono small">
                         {p.modell ?? (p.aktiv ? <Link href={`/p/${p.code}`}>Assistent</Link> : 'Assistent')}
                       </td>
-                      <td className="num mono">{Number(p.version)}</td>
+                      <td className="num mono">
+                        {p.version === null ? '—' : Number(p.version)}
+                        {Number(p.entwuerfe) > 0 && (
+                          <span className="badge warn" style={{ marginLeft: 6 }}>
+                            {p.entwuerfe} Entwurf/Entwürfe
+                          </span>
+                        )}
+                      </td>
                       <td className="num">{p.schritte}</td>
                       <td>
                         {Object.values(FIXTURES).some((f) => f.prozess === p.code) ? (
