@@ -33,6 +33,18 @@ async function baugruppeMitStueckliste(sql: Sql, ctx: FixtureKontext): Promise<v
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.id = ${ctx.teilId}`
 
+  // Arbeitsplan: ein Arbeitsgang an einem Arbeitsplatz — die Aufträge aus
+  // dieser Stückliste bekommen dadurch mo_operations für die
+  // Arbeitsgang-Schritte des Prozesses.
+  const [platz] = await sql<{ id: string }[]>`
+    insert into work_centers (code, name, cost_per_hour)
+    values ('PT-MONTAGE', 'Prozesstest Montage', 60)
+    on conflict (code) do update set name = excluded.name
+    returning id`
+  await sql`
+    insert into bom_operations (bom_id, sequence, name, work_center_id, duration_minutes)
+    values (${bom.id}, 10, 'Montieren', ${platz.id}, 15)`
+
   ctx.baugruppeId = variante.id
 }
 
@@ -72,6 +84,34 @@ export const FERTIGUNG_FIXTURE: ProzessFixture = {
         fertig_melden: { mengen: {}, backorder: true },
       },
       danachKeineSchritte: true,
+    },
+    {
+      name: 'mit Arbeitsgang: starten, beenden, Lohnkosten verbucht',
+      pfad: [
+        'anlegen', 'bestaetigen', 'beginnen',
+        'arbeitsgang_starten', 'arbeitsgang_beenden', 'fertig_melden',
+      ],
+      eingaben: {
+        anlegen: (ctx) => ({ variant_id: ctx.baugruppeId, qty: 1 }),
+        arbeitsgang_starten: async (ctx, sql) => {
+          const [op] = await sql<{ id: string }[]>`
+            select id from mo_operations where mo_id = ${ctx.fertigung_beleg_id} order by sequence`
+          return { operation_id: op.id }
+        },
+        arbeitsgang_beenden: async (ctx, sql) => {
+          const [op] = await sql<{ id: string }[]>`
+            select id from mo_operations where mo_id = ${ctx.fertigung_beleg_id} order by sequence`
+          return { operation_id: op.id, minutes: 20 }
+        },
+        fertig_melden: { mengen: {}, backorder: true },
+      },
+      danachKeineSchritte: true,
+      pruefen: async (sql, _ctx, moId) => {
+        const [op] = await sql<{ state: string; duration_real: number }[]>`
+          select state, duration_real from mo_operations where mo_id = ${moId}`
+        assert.equal(op.state, 'done')
+        assert.equal(Number(op.duration_real), 20)
+      },
     },
     {
       name: 'Storno gibt Reservierungen frei',

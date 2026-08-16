@@ -203,8 +203,8 @@ describe('Bug-Loop: prozess_fuer_pfad', () => {
       // … und routen_muster der Modelle (':id' = ein Pfadsegment).
       assert.equal(await fuer('/reparatur/0e8f6c2a-1111-2222-3333-444455556666'), 'reparatur')
       assert.equal(await fuer('/tickets/irgendeine-id'), 'bug_ticket')
-      // Kein aktiver Prozess fürs Modell / unbekannte Seite → keine Zuordnung.
-      assert.equal(await fuer('/verkauf/123'), null)
+      assert.equal(await fuer('/verkauf/123'), 'verkauf')
+      // Unbekannte Seite → keine Zuordnung.
       assert.equal(await fuer('/auswertungen'), null)
       assert.equal(await fuer(''), null)
     })

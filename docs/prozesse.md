@@ -420,11 +420,33 @@ Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
 - Neustart-Riegel: feld_definitionen und prozess_pakete sind Struktur
   (BEHALTEN), vorgaenge sind Bewegung.
 
+## Manueller Verkauf + Arbeitsgänge (Migration 0044, umgesetzt)
+
+- **P: `verkauf`** (sales_order): Angebot anlegen → Positionen erfassen
+  (optional, wiederholbar — der Zustand bleibt draft, der Schritt wird
+  erneut angeboten) → bestätigen (Lieferung entsteht) | stornieren.
+  `verkauf.zurueck_auf_angebot` ist bewusst prozessfrei: cancel → draft
+  wäre eine Schleife im Graphen — es ist eine Korrektur, kein Ablauf.
+  Toter Zustand `sent` steht auf der Unabgebildet-Liste. Das Paket
+  gehört zu D2C-Hersteller und Händler (die Werkstatt bleibt schlank).
+- **Fertigung, Version 2**: die Arbeitsgang-Schritte
+  (`arbeitsgang_starten`/`_beenden`, optional, ohne Belegzustand — die
+  Arbeitsgänge haben ihre eigene Maschine in mo_operations). Bewusst
+  NICHT als Seed-Änderung, sondern als neue Version über
+  `prozess_version_kopieren` → ergänzen → `prozess_version_aktivieren`
+  IN der Migration — der erste Kunde der eigenen Versionsmaschine.
+  Beide Schritte hängen direkt an „beginnen" (Zustand progress bleibt
+  der Standort, solange gearbeitet wird; Wiederholung ergibt sich ohne
+  Graph-Schleife). Fixture mit Arbeitsplatz + Arbeitsplan beweist
+  Start/Ende samt verbuchter Ist-Zeit.
+- NOCH_OHNE_PROZESS enthält nur noch die Lager-Aktionen (Transfers,
+  Zählung/Inventur, Ausschuss, Beschaffung).
+
 ## Noch offen (Kurzfassung)
 
 - Dashboard-KPIs als Projektion der aktiven Prozesse (die Navigation ist
   es schon).
 - Inline-Seiten-Actions (Kartonagen, Versandregeln, Klärliste);
   Inventur-Assistent (braucht beleggebundene Folgeschritte in der
-  Instanz-Ausführung); manueller Verkaufsprozess; Fähigkeits-Umbenennung
-  der Job-Kinds.
+  Instanz-Ausführung; deckt die restlichen Lager-Aktionen ab);
+  Fähigkeits-Umbenennung der Job-Kinds.

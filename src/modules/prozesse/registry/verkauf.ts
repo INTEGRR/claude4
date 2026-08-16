@@ -55,6 +55,9 @@ export const VERKAUF = {
     bindung: 'beleg',
     modell: 'sales_order',
     uebergang: { von: ['cancel', 'sent'], nach: ['draft'] },
+    // Korrektur-Aktion, kein Prozessschritt: cancel → draft liefe dem
+    // Ablauf entgegen (Schleifen sind im Prozessgraphen verboten).
+    prozessfrei: true,
     schema: z.object({}),
     revalidate: ['/verkauf/:id'],
   },
@@ -106,7 +109,6 @@ export const VERKAUF = {
     beschreibung: 'Nimmt ein Produkt in den Beleg auf (Preis aus der Liste, überschreibbar).',
     bindung: 'beleg',
     modell: 'sales_order',
-    prozessfrei: true,
     schema: z.object({
       variant_id: z.string().min(1, 'Bitte ein Produkt auswählen'),
       qty: z.number().positive('Die Menge muss größer als 0 sein'),

@@ -31,19 +31,12 @@ const NOCH_OHNE_PROZESS = new Set([
   'lager.transfer_bestaetigen',
   'lager.transfer_stornieren',
   'lager.transfer_retoure',
+  // Die Zählungs-Aktionen warten auf den Inventur-Assistenten (braucht
+  // beleggebundene Folgeschritte in der Instanz-Ausführung).
   'lager.zaehlung_erfassen',
   'lager.zaehlung_buchen',
   'lager.ausschuss_buchen',
   'lager.beschaffung_ausfuehren',
-  // Der MANUELLE Verkaufsprozess ist noch nicht gesät (der Shop-Weg ist P4).
-  'verkauf.auftrag_anlegen',
-  'verkauf.bestaetigen',
-  'verkauf.stornieren',
-  'verkauf.zurueck_auf_angebot',
-  // Arbeitsgang-Schritte folgen mit einer Arbeitsplan-Prozessvariante
-  // (brauchen die operation_id des konkreten Auftrags).
-  'fertigung.arbeitsgang_starten',
-  'fertigung.arbeitsgang_beenden',
 ])
 
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */
@@ -55,6 +48,8 @@ const UNABGEBILDET: Record<string, string[]> = {
   fertigung: ['to_close'],
   // sent hat keinen Erzeuger; done setzt der Wareneingang außerhalb des Prozesses.
   einkauf_wareneingang_rechnung: ['sent', 'done'],
+  // sent ist auch im Verkauf ein toter Zustand (kein Erzeuger — Inventar-Befund).
+  verkauf: ['sent'],
 }
 
 let h: Harness
