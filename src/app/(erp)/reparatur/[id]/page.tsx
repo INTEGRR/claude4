@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { TagEditor } from '@/components/tag-editor'
 import { RecordComments } from '@/components/record-comments'
+import { ProzessPanel } from '@/components/prozess-panel'
 import { date, qty } from '@/modules/shared/format'
 import {
   addPart,
@@ -28,7 +29,7 @@ const PART_TYPES = {
 } as const
 
 export default async function RepairPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('reparatur')
+  const user = await requireArea('reparatur')
   const { id } = await params
 
   const [repair] = await sql<
@@ -141,6 +142,8 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
         <ResponsibleForm action={updateRepairDetails.bind(null, id)} userId={repair.user_id} priority={repair.priority} />
         <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
       </div>
+
+      <ProzessPanel prozessCode="reparatur" recordId={id} rolle={user.role} />
 
       {/* Der Rohtext des Kunden — am Arbeitsplatz gelesen, darum als Geräteanzeige. */}
       {repair.note && (

@@ -5,6 +5,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
+import { ProzessPanel } from '@/components/prozess-panel'
 import { dateTime } from '@/modules/shared/format'
 import { commitUrl, kurzerSha } from '@/modules/shared/repo'
 import { statusSetzen } from '../actions'
@@ -19,7 +20,7 @@ const STATUS_TEXT: Record<string, string> = {
 }
 
 export default async function TicketDetail({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('fehler')
+  const user = await requireArea('fehler')
   const { id } = await params
 
   const [m] = await sql<
@@ -49,6 +50,8 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
         subtitle={`${STATUS_TEXT[m.status] ?? m.status} · ${m.schwere} · gemeldet von ${m.gemeldet_von} am ${dateTime(m.created_at)}`}
         actions={<Link className="btn" href="/tickets">Zur Liste</Link>}
       />
+
+      <ProzessPanel prozessCode="bug_ticket" recordId={m.id} rolle={user.role} />
 
       <Card title="Meldung">
         {m.seite && (

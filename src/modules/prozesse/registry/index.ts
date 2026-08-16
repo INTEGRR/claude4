@@ -1,6 +1,7 @@
 import type { RegistrierteAktion } from './typen.ts'
 import { FEHLER } from './fehler.ts'
 import { LAGER } from './lager.ts'
+import { REPARATUR } from './reparatur.ts'
 
 /**
  * Das Repository der Knöpfe: alle registrierten Aktionen des Hauses.
@@ -13,6 +14,7 @@ import { LAGER } from './lager.ts'
 export const REGISTRY = {
   ...FEHLER,
   ...LAGER,
+  ...REPARATUR,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>
 

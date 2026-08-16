@@ -2,6 +2,7 @@ import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
+import * as reparatur from './registry/reparatur-ausfuehren.ts'
 
 /**
  * Ausführung je Registry-Aktion.
@@ -30,5 +31,15 @@ export const AUSFUEHRUNG = {
   'lager.meldebestand_wecken': lager.meldebestandWecken,
   'lager.beschaffung_ausfuehren': lager.beschaffungAusfuehren,
   'lager.eroeffnungsbewertung': lager.eroeffnungsbewertung,
+
+  'reparatur.auftrag_anlegen': reparatur.auftragAnlegen,
+  'reparatur.teil_hinzufuegen': reparatur.teilHinzufuegen,
+  'reparatur.teil_entfernen': reparatur.teilEntfernen,
+  'reparatur.bestaetigen': reparatur.bestaetigen,
+  'reparatur.beginnen': reparatur.beginnen,
+  'reparatur.abschliessen': reparatur.abschliessen,
+  'reparatur.stornieren': reparatur.stornieren,
+  'reparatur.angebot_erstellen': reparatur.angebotErstellen,
+  'reparatur.details': reparatur.details,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

@@ -77,6 +77,11 @@ describe('Neustart: demodaten_loeschen', () => {
       insert into partners (name, is_customer) values ('Kunde', true) returning id`
     await sql`
       insert into sales_orders (number, partner_id) values (next_sequence('sale'), ${partner.id})`
+    // Ein Ticket ist Bewegung — es muss beim Neustart verschwinden, während
+    // die Prozessdefinitionen (Struktur) stehen bleiben.
+    await sql`
+      insert into bug_reports (number, titel, gemeldet_von)
+      values (next_sequence('bug'), 'Testfehler', 'admin@example.com')`
   })
 
   after(async () => {
@@ -90,7 +95,8 @@ describe('Neustart: demodaten_loeschen', () => {
     await sql`select demodaten_loeschen()`
 
     for (const tabelle of ['product_templates', 'partners', 'sales_orders',
-                           'stock_moves', 'stock_quants', 'stock_valuation_layers']) {
+                           'stock_moves', 'stock_quants', 'stock_valuation_layers',
+                           'bug_reports', 'prozess_instanzen']) {
       const [{ n }] = await sql<{ n: number }[]>`
         select count(*)::int as n from ${sql(tabelle)}`
       assert.equal(n, 0, `${tabelle} sollte leer sein`)
@@ -105,6 +111,23 @@ describe('Neustart: demodaten_loeschen', () => {
     const [firma] = await sql<{ value: { name?: string } }[]>`
       select value from settings where key = 'company'`
     assert.ok(firma.value.name, 'Firmendaten müssen erhalten bleiben')
+  })
+
+  test('Prozessdefinitionen überleben den Neustart', async () => {
+    // Prozesse sind Struktur wie Lagerorte oder Konten — ein Neustart der
+    // Daten darf die Ablauf-Definitionen nicht mitreißen.
+    const [{ modelle }] = await sql<{ modelle: number }[]>`
+      select count(*)::int as modelle from prozess_modelle`
+    assert.ok(modelle > 0, 'Modell-Whitelist muss erhalten bleiben')
+    const prozesse = await sql<{ code: string }[]>`
+      select code from prozesse order by code`
+    assert.deepEqual(prozesse.map((p) => p.code), ['bug_ticket', 'reparatur'])
+    const [{ schritte }] = await sql<{ schritte: number }[]>`
+      select count(*)::int as schritte
+      from prozess_schritte s
+      join prozess_versionen v on v.id = s.version_id
+      where v.status = 'aktiv'`
+    assert.ok(schritte > 0, 'Schritte der aktiven Versionen müssen erhalten bleiben')
   })
 
   test('Belegnummern starten wieder bei 1', async () => {

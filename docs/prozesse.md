@@ -46,12 +46,76 @@ src/modules/prozesse/
   Es folgen: reparatur → produkte/kontakte/personal → verkauf/versand →
   einkauf/fertigung → einstellungen/integrationen.
 
+## Phase 2 — Prozessmodell in der Datenbank (umgesetzt)
+
+**Grundsatz: kein doppelter Zustand.** Der Belegstatus (die ~20 vorhandenen
+Statusmaschinen) bleibt die einzige Wahrheit. Ein Prozessschritt trägt ein
+`zustand`-Feld und mappt damit auf den Status seiner Belegtabelle — es gibt
+kein Token-Modell, das aus dem Tritt geraten könnte. Nur beleglose
+Assistenten (künftig „Artikel anlegen") bekommen eine eigene Instanzzeile.
+
+**Migration `0036_prozesse.sql`** — das Modell:
+
+- `prozess_modelle`: Whitelist Modell → Tabelle/Statusspalte/Routenmuster.
+  `prozess_beleg_daten(modell, id)` liest ausschließlich diese Tabellen
+  (Bezeichner über `format %I`, nie Nutzertext).
+- `prozesse` + `prozess_versionen` (entwurf|aktiv|archiviert, genau eine
+  aktive je Prozess) + `prozess_schritte` (code stabil über Versionen; Art
+  start|aktion|dienst|ereignis|matching|xor|ende; `aktion` = Registry-Name,
+  `zustand` = Belegstatus nach dem Schritt, `rollen`, `params`, `optional`)
+  + `prozess_uebergaenge` (sequence = XOR-Reihenfolge, `bedingung` jsonb).
+- **Bedingungssprache** `bedingung_pruefen(daten, bedingung)`: rekursives
+  jsonb — `{"alle":[…]}`, `{"eine":[…]}`, `{"nicht":…}` und Blätter
+  `{"feld","op","wert"}` mit `= != in > >= < <= leer nicht_leer beginnt_mit`
+  (numerischer Vergleich, wenn beide Seiten Zahlen sind). Kein eval.
+- **Laufzeitänderung** = `prozess_version_kopieren(code)` → editieren →
+  `prozess_version_aktivieren(id)`. Die Aktivierung validiert: genau ein
+  Start, mindestens ein Ende, alles erreichbar, azyklisch (Kahn),
+  XOR-Default-Regeln, `zustand` je Version eindeutig. Seeds bleiben
+  unangetastet — verträgt sich mit checksummierten Migrationen.
+- `prozess_overrides` binden an **Codes** (nicht Versions-IDs), überleben
+  also Versionswechsel: optionale Schritte je Firma abschalten, Rollen und
+  params übersteuern. `prozess_naechste_schritte` überspringt abgeschaltete
+  Schritte und liefert deren Nachfolger — mit Dedupe, wenn ein Schritt auf
+  zwei Wegen erreichbar würde.
+- Auskunftsfunktionen: `prozess_aktive_version`, `prozess_aktueller_schritt`
+  (Schritt, dessen `zustand` = Belegstatus), `prozess_naechste_schritte`
+  (ausgehende Übergänge, Bedingungen gegen die Belegdaten ausgewertet,
+  Overrides angewandt), `prozess_instanz_starten/_weiter` (nur beleglos,
+  Nummernkreis `PRZ/`).
+- `demodaten_loeschen()` behandelt die Prozessdefinitionen als Struktur
+  (BEHALTEN) — Tickets und Instanzen sind Bewegung und fallen weg.
+
+**Migration `0037_prozess_seeds.sql`** — die ersten Prozesse als Daten:
+`bug_ticket` (melden → übernehmen → beheben|verwerfen; Nutzerwahl als
+mehrere Übergänge, kein XOR) und `reparatur` (anlegen → bestätigen →
+beginnen → optional Teile → abschließen → **XOR Garantie**: kostenpflichtig
+→ Angebot, sonst Ende; Storno von überall erreichbar).
+
+**Viewer + Panel:**
+
+```
+src/modules/prozesse/diagramm-layout.ts   pures Layout: Kahn-Topologie,
+                                          Zeile = längster Pfad, Spalten je Zweig
+src/components/prozess-diagramm.tsx       SVG (Server Component): Kreis Start/Ende,
+                                          Rechteck Aktion, Raute XOR; aktueller
+                                          Schritt mit Akzent + LED, Erledigtes
+                                          gedimmt + Häkchen, Abgeschaltetes gestrichelt
+src/components/prozess-panel.tsx          Diagramm + „Als Nächstes möglich"
+                                          (prozess_naechste_schritte × Rolle)
+```
+
+Eingebaut auf `/tickets/[id]` und `/reparatur/[id]`: der Beleg zeigt, wo er
+im Prozess steht und was jetzt möglich ist. Die Reparatur ist dafür komplett
+auf die Registry migriert (9 Aktionen, `reparatur.*`).
+
+**Tests:** `tests/prozesse-modell.test.ts` (Bedingungsmatrix, Ticket- und
+Reparatur-Durchlauf, Overrides, Versionskopie + Aktivierungs-Validierung,
+Instanzen), `tests/prozess-diagramm.test.ts` (Layout, DB-frei),
+`tests/demodaten.test.ts` (Prozessdefinitionen überleben den Neustart).
+
 ## Kommende Phasen (Kurzfassung)
 
-2. **Prozessmodell in der DB** (Migration 0036/0037): Prozesse/Versionen/
-   Schritte/Übergänge mit jsonb-Bedingungssprache (kein eval); Schritte
-   mappen auf die vorhandenen Statusmaschinen — kein doppelter Zustand.
-   SVG-Viewer mit „Beleg steht hier".
 3. **Prozesstest-Harness + Testdatensatz**: Fixtures je Prozess
    (mitversioniert, Vollständigkeits-Check), Wegwerf-DB lokal, per
    DATABASE_URL gegen Staging; Fake-Adapter für Shopify/DHL/Mail.
