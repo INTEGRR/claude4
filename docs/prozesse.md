@@ -356,10 +356,45 @@ von Vorschlägen („die Menge auf 5") funktioniert für Registry-Aktionen
 `prozesse/introspektion.kiKatalog()` — nicht im KI-Modul, weil die
 Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
 
-## Kommende Phasen (Kurzfassung)
-6. **Rest**: Inline-Seiten-Actions (Kartonagen, Versandregeln,
-   Integrationen-Klärliste); Inventur-Assistent (braucht beleggebundene
-   Folgeschritte in der Instanz-Ausführung).
-7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
-   Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer
-   Vorgang, Fähigkeits-Adapter, KI-Prozessentwurf.
+## Phase 7 — Chamäleon-Fundament (umgesetzt)
+
+**Pivot heißt „andere Prozesse aktivieren", nicht „Code umschreiben"**
+(Migration 0043):
+
+- **Eigene Felder ohne Migration**: `feld_definitionen` (Modell, Name,
+  Typ text/nummer/schalter/auswahl/datum, Pflicht, Auswahlwerte) +
+  `zusatz jsonb` auf partners, product_templates, sales_orders,
+  repair_orders und vorgaenge. Die generierten Masken mischen sie
+  automatisch ein (angebote.ts → `zusatz.<name>`, der Client
+  verschachtelt), und die Bedingungssprache erreicht sie über PFADE
+  (`{"feld": "zusatz.budget", "op": ">", "wert": 1000}`) — eigene Felder
+  sind sofort prozessfähig. Verwaltung über die Registry-Aktionen
+  `einstellungen.feld_anlegen`/`feld_loeschen` (nur Admin).
+- **Generische Vorgänge** (`vorgaenge`, Nummernkreis VG/): der Beleg für
+  neue Business-Linien. `state` ist TEXT — die Zustände definiert die
+  Prozessdefinition, kein Enum, keine Fachtabelle. Aktionen
+  `vorgang.anlegen` (Startzustand aus der Definition) und
+  `vorgang.status_setzen` (Zielzustand aus den Schritt-params). Seiten
+  `/vorgaenge` (+ Detail mit Prozess-Panel und eigenen Feldern) kennen
+  keinen Prozess beim Namen. Bei Erfolg „graduiert" eine Linie zur
+  Fachtabelle, sonst Archiv.
+- **Muster-Prozess `anfrage`** (gesät, Bereich verkauf): erfassen →
+  prüfen → anbieten|ablehnen — komplett zur Laufzeit definiert. Der
+  Prozesstest spielt ihn end-to-end durch und beweist dabei das eigene
+  Feld (budget in Maske UND als Bedingungspfad).
+- **`prozess_pakete`**: Geschäftsmodell-Vorlagen als Bündel
+  (D2C-Hersteller, Händler, Werkstatt/Service) — die Datengrundlage;
+  Paketwechsel-UI und Navigation als Projektion folgen.
+- Neustart-Riegel: feld_definitionen und prozess_pakete sind Struktur
+  (BEHALTEN), vorgaenge sind Bewegung.
+
+## Noch offen (Kurzfassung)
+
+- Pakete-UI (Paket aktivieren = Prozesse an/aus) und Navigation/KPIs als
+  Projektion der aktiven Prozesse.
+- KI-Prozessentwurf (`prozess_entwerfen` als Entwurf, Mensch aktiviert)
+  samt Aktivieren-Knopf auf /prozesse/[code].
+- Inline-Seiten-Actions (Kartonagen, Versandregeln, Klärliste);
+  Inventur-Assistent (braucht beleggebundene Folgeschritte in der
+  Instanz-Ausführung); manueller Verkaufsprozess; Fähigkeits-Umbenennung
+  der Job-Kinds.

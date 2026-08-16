@@ -12,6 +12,7 @@ import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
 import * as verkauf from './registry/verkauf-ausfuehren.ts'
 import * as versand from './registry/versand-ausfuehren.ts'
+import * as vorgang from './registry/vorgang-ausfuehren.ts'
 
 /**
  * Ausführung je Registry-Aktion.
@@ -43,6 +44,8 @@ export const AUSFUEHRUNG = {
   'einkauf.wechselkurs_erfassen': einkauf.wechselkursErfassen,
 
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
+  'einstellungen.feld_anlegen': einstellungen.feldAnlegen,
+  'einstellungen.feld_loeschen': einstellungen.feldLoeschen,
   'einstellungen.benutzer_anlegen': einstellungen.benutzerAnlegen,
   'einstellungen.benutzer_rolle': einstellungen.benutzerRolle,
   'einstellungen.benutzer_aktiv': einstellungen.benutzerAktiv,
@@ -131,6 +134,9 @@ export const AUSFUEHRUNG = {
   'verkauf.sperren': verkauf.sperren,
   'verkauf.position_hinzufuegen': verkauf.positionHinzufuegen,
   'verkauf.position_entfernen': verkauf.positionEntfernen,
+
+  'vorgang.anlegen': vorgang.anlegen,
+  'vorgang.status_setzen': vorgang.statusSetzen,
 
   'versand.label_erstellen': versand.labelErstellen,
   'versand.label_stornieren': versand.labelStornieren,

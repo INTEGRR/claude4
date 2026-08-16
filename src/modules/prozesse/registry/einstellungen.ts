@@ -31,6 +31,59 @@ export const EINSTELLUNGEN = {
     revalidate: ['/prozesse', '/prozesse/:ergebnis'],
   },
 
+  // --- Eigene Felder (Chamäleon) --------------------------------------------
+
+  'einstellungen.feld_anlegen': {
+    label: 'Eigenes Feld anlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Legt ein eigenes Feld für ein Modell an (landet im zusatz-jsonb, erscheint in ' +
+      'generierten Masken, ist über Bedingungspfade zusatz.<name> prozessfähig).',
+    bindung: 'frei',
+    schema: z.object({
+      modell: z.string().min(1),
+      name: z
+        .string()
+        .min(1)
+        .max(40)
+        .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
+      label: z.string().min(1).max(80),
+      typ: z.enum(['text', 'nummer', 'schalter', 'auswahl', 'datum']),
+      pflicht: z.boolean().default(false),
+      auswahl: z.array(z.string()).optional().describe('Werte für typ auswahl'),
+    }),
+    zusammenfassung: (p) => `${p.modell}.${p.name} (${p.typ})`,
+    formdata: (fd) => ({
+      modell: String(fd.get('modell') ?? ''),
+      name: String(fd.get('name') ?? '').trim(),
+      label: String(fd.get('label') ?? '').trim(),
+      typ: String(fd.get('typ') ?? 'text'),
+      pflicht: fd.get('pflicht') === 'on',
+      auswahl:
+        String(fd.get('auswahl') ?? '')
+          .split(/[,\n]/)
+          .map((v) => v.trim())
+          .filter(Boolean) || undefined,
+    }),
+    revalidate: ['/prozesse'],
+  },
+
+  'einstellungen.feld_loeschen': {
+    label: 'Eigenes Feld löschen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Entfernt die Felddefinition — bereits erfasste Werte bleiben im zusatz-jsonb stehen.',
+    bindung: 'frei',
+    schema: z.object({
+      modell: z.string().min(1),
+      name: z.string().min(1),
+    }),
+    revalidate: ['/prozesse'],
+  },
+
   // --- Benutzerverwaltung (nur Admin) ---------------------------------------
 
   'einstellungen.benutzer_anlegen': {

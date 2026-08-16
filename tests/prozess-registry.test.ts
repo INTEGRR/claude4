@@ -15,9 +15,18 @@ import { JOB_KATALOG } from '../src/modules/prozesse/jobs-katalog.ts'
 
 describe('Aktions-Registry: Katalog', () => {
   test('jeder Eintrag ist vollständig und konsistent benannt', () => {
+    // Modellbezogene Namensräume, die bewusst NICHT nach ihrem Bereich heißen:
+    // Vorgänge sind bereichsübergreifend gedacht (der Bereich regelt nur die
+    // Rechte, das Muster-Paket hängt sie an den Verkauf).
+    const NAMENSRAUM_AUSNAHMEN: Record<string, string> = { vorgang: 'verkauf' }
+
     for (const [name, a] of alleAktionen()) {
       assert.match(name, /^[a-z]+\.[a-z_]+$/, `${name}: Namensschema <bereich>.<verb_objekt>`)
-      assert.ok(name.startsWith(`${a.bereich}.`), `${name}: Präfix muss dem Bereich entsprechen`)
+      const praefix = name.split('.')[0]
+      assert.ok(
+        name.startsWith(`${a.bereich}.`) || NAMENSRAUM_AUSNAHMEN[praefix] === a.bereich,
+        `${name}: Präfix muss dem Bereich entsprechen`,
+      )
       // Der Bereich selbst ist über den TS-Typ Area abgesichert; zur Laufzeit
       // genügt: der Admin muss ihn kennen (er darf überall schreiben).
       assert.equal(canWrite('admin', a.bereich), true, `${name}: unbekannter Bereich ${a.bereich}`)

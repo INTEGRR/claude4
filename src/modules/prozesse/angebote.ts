@@ -72,6 +72,25 @@ export async function naechsteAngebote(
     if (!eintrag) continue
     const vorbelegung = s.params ?? {}
     const felder = formularFelder(eintrag)
+    // Chamäleon: eigene Felder des Modells (feld_definitionen) erscheinen im
+    // generierten Formular — als zusatz.<name>, das der Client verschachtelt.
+    if (eintrag.modell) {
+      const eigene = await sql<
+        { name: string; label: string; typ: string; pflicht: boolean; auswahl: string[] | null }[]
+      >`
+        select name, label, typ, pflicht, auswahl from feld_definitionen
+        where modell = ${eintrag.modell} and 'formular' = any(sichtbar_in)
+        order by sequence, name`
+      for (const f of eigene) {
+        felder.push({
+          name: `zusatz.${f.name}`,
+          label: f.label,
+          typ: f.typ as SchrittAngebot['felder'][number]['typ'],
+          pflicht: f.pflicht,
+          ...(f.auswahl?.length ? { auswahl: f.auswahl } : {}),
+        })
+      }
+    }
     for (const feld of felder) {
       if (feld.typ === 'verweis' && feld.quelle && !(feld.name in vorbelegung)) {
         quellen.add(feld.quelle)

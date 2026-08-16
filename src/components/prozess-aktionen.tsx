@@ -84,6 +84,13 @@ function Feld({ feld, optionen }: { feld: FormularFeld; optionen?: { id: string;
           </select>
         </label>
       )
+    case 'datum':
+      return (
+        <label className="field shrink">
+          <span>{feld.label}</span>
+          <input type="date" name={name} required={feld.pflicht} />
+        </label>
+      )
     case 'mehrzeilig':
       return (
         <label className="field" style={{ flex: '1 1 100%' }}>
@@ -175,7 +182,14 @@ export function ProzessAktionen({
       for (const feld of schritt.felder) {
         if (feld.name in schritt.vorbelegung) continue
         const wert = eingabeWert(feld, daten.get(feld.name))
-        if (wert !== undefined) parameter[feld.name] = wert
+        if (wert === undefined) continue
+        // Eigene Felder (zusatz.<name>) verschachtelt ablegen.
+        if (feld.name.startsWith('zusatz.')) {
+          const zusatz = (parameter.zusatz ??= {}) as Record<string, unknown>
+          zusatz[feld.name.slice('zusatz.'.length)] = wert
+        } else {
+          parameter[feld.name] = wert
+        }
       }
     } catch {
       setFehler('Ungültige JSON-Eingabe.')

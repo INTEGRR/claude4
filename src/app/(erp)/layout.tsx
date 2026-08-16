@@ -82,7 +82,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       label: 'Verkauf',
       items: [
         ...(sees('verkauf')
-          ? [{ href: '/verkauf', label: 'Verkaufsaufträge', count: counts.offene_auftraege }]
+          ? [
+              { href: '/verkauf', label: 'Verkaufsaufträge', count: counts.offene_auftraege },
+              { href: '/vorgaenge', label: 'Vorgänge' },
+            ]
           : []),
         ...(sees('versand')
           ? [{ href: '/versand', label: 'Versand', count: counts.versandbereit }]

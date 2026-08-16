@@ -122,8 +122,8 @@ describe('Neustart: demodaten_loeschen', () => {
     const prozesse = await sql<{ code: string }[]>`
       select code from prozesse order by code`
     assert.deepEqual(prozesse.map((p) => p.code),
-      ['artikel_anlegen', 'bug_ticket', 'einkauf_wareneingang_rechnung', 'fertigung',
-       'lieferantenrechnung', 'reparatur', 'shopify_bestellung_versand'])
+      ['anfrage', 'artikel_anlegen', 'bug_ticket', 'einkauf_wareneingang_rechnung',
+       'fertigung', 'lieferantenrechnung', 'reparatur', 'shopify_bestellung_versand'])
     const [{ schritte }] = await sql<{ schritte: number }[]>`
       select count(*)::int as schritte
       from prozess_schritte s

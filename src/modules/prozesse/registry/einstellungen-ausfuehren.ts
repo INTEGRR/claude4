@@ -32,6 +32,39 @@ export async function prozessschrittSchalten(
   }
 }
 
+// --- Eigene Felder (Chamäleon) -----------------------------------------------
+
+export async function feldAnlegen(
+  p: {
+    modell: string
+    name: string
+    label: string
+    typ: string
+    pflicht: boolean
+    auswahl?: string[]
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into feld_definitionen (modell, name, label, typ, pflicht, auswahl)
+    values (${p.modell}, ${p.name}, ${p.label}, ${p.typ}, ${p.pflicht},
+            ${p.auswahl && p.auswahl.length ? p.auswahl : null})
+    on conflict (modell, name) do update
+      set label = excluded.label, typ = excluded.typ,
+          pflicht = excluded.pflicht, auswahl = excluded.auswahl`
+  await sql`select log_event('feld_definition', gen_random_uuid(), 'state',
+    ${`Eigenes Feld: ${p.modell}.${p.name} (${p.typ})`}, ${ctx.actor})`
+  return { text: `Feld ${p.modell}.${p.name} angelegt.` }
+}
+
+export async function feldLoeschen(p: {
+  modell: string
+  name: string
+}): Promise<AktionsErgebnis> {
+  await sql`delete from feld_definitionen where modell = ${p.modell} and name = ${p.name}`
+  return { text: `Feld ${p.modell}.${p.name} entfernt — erfasste Werte bleiben im zusatz stehen.` }
+}
+
 // --- Benutzerverwaltung ------------------------------------------------------
 
 /** Wirft, wenn nach der Änderung kein aktiver Administrator übrig bliebe. */

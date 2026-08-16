@@ -16,6 +16,7 @@ export type FeldTyp =
   | 'schalter'
   | 'auswahl'
   | 'verweis'
+  | 'datum'
   | 'json'
 
 export interface FormularFeld {
