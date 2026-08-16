@@ -1,7 +1,8 @@
 import { sql } from '@/db/client'
 import { Card } from '@/components/ui'
-import { ProzessDiagramm } from '@/components/prozess-diagramm'
-import { type LayoutKante, type LayoutSchritt, layout } from '@/modules/prozesse/diagramm-layout'
+import { ProzessFlow } from '@/components/prozess-flow'
+import type { FlowKante, FlowSchritt } from '@/modules/prozesse/flow-daten'
+import { flowLayout } from '@/modules/prozesse/flow-layout'
 import { naechsteAngebote } from '@/modules/prozesse/angebote'
 import type { Role } from '@/modules/auth/permissions'
 import { ProzessAktionen } from '@/components/prozess-aktionen'
@@ -30,9 +31,10 @@ export async function ProzessPanel({
   if (!prozess) return null
 
   const schritte = await sql<
-    (LayoutSchritt & { rollen: string[] | null })[]
+    (FlowSchritt & { teilprozess_link: Record<string, unknown> | null })[]
   >`
     select s.code, s.name, s.art::text as art, s.optional, s.rollen,
+           s.aktion, s.job_kind, s.ereignis, s.teilprozess, s.teilprozess_link, s.zustand,
            coalesce(o.aktiv, true) = false and s.optional as abgeschaltet
     from prozess_schritte s
     left join prozess_overrides o
@@ -41,7 +43,7 @@ export async function ProzessPanel({
     order by s.sequence`
   if (schritte.length === 0) return null
 
-  const kanten = await sql<LayoutKante[]>`
+  const kanten = await sql<FlowKante[]>`
     select von_code as von, nach_code as nach, sequence, beschriftung
     from prozess_uebergaenge
     where version_id = prozess_aktive_version(${prozessCode})
@@ -50,12 +52,23 @@ export async function ProzessPanel({
   const [standort] = await sql<{ schritt: string | null }[]>`
     select prozess_aktueller_schritt(${prozessCode}, ${recordId}) as schritt`
 
-  const diagramm = layout(schritte, kanten, standort?.schritt)
+  // Fortschritt der Teilprozesse — nur mit Beleg sinnvoll.
+  for (const s of schritte) {
+    if (s.art !== 'prozess' || !s.teilprozess) continue
+    const [stand] = await sql<{ gesamt: number; fertig: number }[]>`
+      select gesamt, fertig from teilprozess_stand(
+        ${s.teilprozess},
+        ${s.teilprozess_link ? sql.json(s.teilprozess_link as never) : null},
+        (select modell from prozesse where code = ${prozessCode}), ${recordId})`
+    s.teilprozessStand = { gesamt: Number(stand.gesamt), fertig: Number(stand.fertig) }
+  }
+
+  const diagramm = await flowLayout(schritte, kanten, standort?.schritt)
   const { angebote, passiv } = await naechsteAngebote(prozessCode, recordId, rolle)
 
   return (
     <Card title={`Prozess: ${prozess.name}`}>
-      <ProzessDiagramm d={diagramm} />
+      <ProzessFlow d={diagramm} />
       <div style={{ marginTop: 10 }}>
         <span className="mono-label">Als Nächstes möglich</span>
         <div style={{ marginTop: 6 }}>

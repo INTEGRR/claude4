@@ -1008,3 +1008,131 @@ label.field > span {
 }
 
 @media print { .ticket-tab, .ticket-panel { display: none; } }
+
+/* --- Prozessdiagramm (React Flow + ELK) ------------------------------------ */
+
+.flow-rahmen {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+.flow-hintergrund { color: var(--border); }
+.flow-schritt { position: relative; font-size: 12px; }
+.flow-griff { opacity: 0; pointer-events: none; }
+
+.flow-karte {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+/* Teilprozess: doppelter Rahmen wie in BPMN die Call Activity. */
+.flow-art-prozess .flow-karte { outline: 1px solid var(--border-strong); outline-offset: 2.5px; }
+
+.flow-kopf { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; min-width: 0; }
+.flow-name {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.flow-haken { color: var(--success); }
+.flow-zustand {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.flow-meta { display: flex; gap: 10px; overflow: hidden; white-space: nowrap; }
+.flow-meta > * { overflow: hidden; text-overflow: ellipsis; }
+.flow-verknuepfung {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-rund {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-weight: 650;
+  padding: 0 12px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.flow-art-ende .flow-rund { border-width: 3px; }
+
+.flow-xor { width: 100%; height: 100%; position: relative; }
+.flow-xor::before {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  transform: rotate(45deg);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+.flow-xor > span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.flow-xor-label {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Laufzeit-Markierung: Standort leuchtet, Erledigtes tritt zurück,
+   Abgeschaltetes ist gestrichelt. */
+.ist-aktuell .flow-karte,
+.ist-aktuell .flow-rund {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(255, 90, 31, 0.25);
+}
+.ist-erledigt { opacity: 0.62; }
+.ist-abgeschaltet { opacity: 0.5; }
+.ist-abgeschaltet .flow-karte { border-style: dashed; }
+
+/* Kanten im Systemton; der aktive Weg in Akzentfarbe. */
+.flow-kante .react-flow__edge-path { stroke: var(--border-strong); stroke-width: 1.5; }
+.flow-kante.ist-erledigt .react-flow__edge-path { opacity: 0.55; }
+.flow-kante.ist-aktiv .react-flow__edge-path { stroke: var(--accent); stroke-width: 2; }
+
+/* React-Flow-Zubehör ans Farbsystem anschließen. */
+.react-flow__controls { box-shadow: var(--shadow); border-radius: 6px; overflow: hidden; }
+.react-flow__controls-button {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.react-flow__controls-button:hover { background: var(--surface-2); }
+.react-flow__controls-button svg { fill: var(--text-muted); }

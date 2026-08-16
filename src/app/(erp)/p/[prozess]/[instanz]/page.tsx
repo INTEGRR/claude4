@@ -5,9 +5,10 @@ import { type Area, canAccess, canWrite } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
-import { ProzessDiagramm } from '@/components/prozess-diagramm'
+import { ProzessFlow } from '@/components/prozess-flow'
 import { ProzessAktionen } from '@/components/prozess-aktionen'
-import { type LayoutKante, type LayoutSchritt, layout } from '@/modules/prozesse/diagramm-layout'
+import type { FlowKante, FlowSchritt } from '@/modules/prozesse/flow-daten'
+import { flowLayout } from '@/modules/prozesse/flow-layout'
 import { naechsteAngebote } from '@/modules/prozesse/angebote'
 import { dateTime } from '@/modules/shared/format'
 import { instanzAbschliessen } from '../../actions'
@@ -49,8 +50,9 @@ export default async function AssistentLaufPage({
     where i.id = ${instanzId} and p.code = ${code} and p.modell is null`
   if (!kopf || !canAccess(user.role, kopf.bereich)) notFound()
 
-  const schritte = await sql<LayoutSchritt[]>`
+  const schritte = await sql<FlowSchritt[]>`
     select s.code, s.name, s.art::text as art, s.optional,
+           s.aktion, s.job_kind, s.ereignis, s.teilprozess, s.zustand, s.rollen,
            coalesce(o.aktiv, true) = false and s.optional as abgeschaltet
     from prozess_schritte s
     left join prozess_overrides o
@@ -58,12 +60,12 @@ export default async function AssistentLaufPage({
     where s.version_id = ${kopf.version_id}
     order by s.sequence`
 
-  const kanten = await sql<LayoutKante[]>`
+  const kanten = await sql<FlowKante[]>`
     select von_code as von, nach_code as nach, sequence, beschriftung
     from prozess_uebergaenge where version_id = ${kopf.version_id}
     order by sequence`
 
-  const diagramm = layout(schritte, kanten, kopf.schritt_code)
+  const diagramm = await flowLayout(schritte, kanten, kopf.schritt_code)
   const laufend = kopf.status === 'laufend'
   const darfSchreiben = canWrite(user.role, kopf.bereich)
 
@@ -110,7 +112,7 @@ export default async function AssistentLaufPage({
       />
 
       <Card title="Ablauf">
-        <ProzessDiagramm d={diagramm} />
+        <ProzessFlow d={diagramm} />
         {laufend && (
           <div style={{ marginTop: 10 }}>
             <span className="mono-label">Als Nächstes möglich</span>

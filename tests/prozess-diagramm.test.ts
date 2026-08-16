@@ -1,62 +1,70 @@
-/** Layout des Prozessdiagramms — rein, ohne Datenbank. */
+/** Datenaufbereitung des Prozessdiagramms — rein, ohne Datenbank. */
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  type LayoutKante,
-  type LayoutSchritt,
-  layout,
-} from '../src/modules/prozesse/diagramm-layout.ts'
+  type FlowKante,
+  type FlowSchritt,
+  MASSE,
+  flowDaten,
+} from '../src/modules/prozesse/flow-daten.ts'
 
-const schritte: LayoutSchritt[] = [
+const schritte: FlowSchritt[] = [
   { code: 'start', name: 'Start', art: 'start' },
-  { code: 'a', name: 'Schritt A', art: 'aktion' },
+  { code: 'a', name: 'Schritt A', art: 'aktion', aktion: 'lager.transfer_buchen', zustand: 'done' },
   { code: 'x', name: 'Entscheidung', art: 'xor' },
-  { code: 'b', name: 'Zweig B', art: 'aktion' },
-  { code: 'c', name: 'Zweig C', art: 'dienst' },
+  { code: 'b', name: 'Zweig B', art: 'aktion', aktion: 'fehler.ticket_melden' },
+  { code: 'c', name: 'Zweig C', art: 'dienst', job_kind: 'shopify_fulfillment_create' },
+  { code: 't', name: 'Teil', art: 'prozess', teilprozess: 'wareneingang' },
   { code: 'ende', name: 'Ende', art: 'ende' },
 ]
-const kanten: LayoutKante[] = [
+const kanten: FlowKante[] = [
   { von: 'start', nach: 'a', sequence: 10 },
   { von: 'a', nach: 'x', sequence: 10 },
-  { von: 'x', nach: 'b', sequence: 10 },
+  { von: 'x', nach: 'b', sequence: 10, beschriftung: 'links' },
   { von: 'x', nach: 'c', sequence: 20 },
-  { von: 'b', nach: 'ende', sequence: 10 },
-  { von: 'c', nach: 'ende', sequence: 10 },
+  { von: 'b', nach: 't', sequence: 10 },
+  { von: 'c', nach: 't', sequence: 10 },
+  { von: 't', nach: 'ende', sequence: 10 },
+  // Kante zu unbekanntem Schritt fliegt raus statt zu crashen.
+  { von: 'a', nach: 'gibtsnicht', sequence: 10 },
 ]
 
-describe('Prozessdiagramm-Layout', () => {
-  test('Ränge folgen dem längsten Pfad, Zweige öffnen Spalten', () => {
-    const d = layout(schritte, kanten)
-    const von = (code: string) => d.knoten.find((k) => k.code === code)!
+describe('Prozessdiagramm: Datenaufbereitung', () => {
+  test('Größen je Art, Verknüpfung wird sichtbar', () => {
+    const d = flowDaten(schritte, kanten)
+    const von = (code: string) => d.knoten.find((k) => k.id === code)!
 
-    // Zeilen: start < a < x < b/c < ende.
-    assert.ok(von('a').y > von('start').y)
-    assert.ok(von('x').y > von('a').y)
-    assert.equal(von('b').y, von('c').y, 'Zweige liegen auf einer Zeile')
-    assert.ok(von('ende').y > von('b').y)
+    assert.equal(von('start').breite, MASSE.rund.b)
+    assert.equal(von('x').breite, MASSE.xor.b)
+    assert.equal(von('a').breite, MASSE.schritt.b)
+    assert.equal(von('a').daten.verknuepfung, 'lager.transfer_buchen')
+    assert.equal(von('c').daten.verknuepfung, 'shopify_fulfillment_create')
+    assert.equal(von('t').daten.verknuepfung, 'wareneingang')
 
-    // Spalten: Hauptpfad bleibt links, der zweite Zweig rückt nach rechts.
-    assert.equal(von('b').x < von('c').x, true)
-    // Der Join fällt auf die Spalte des Hauptpfads zurück.
-    assert.ok(von('ende').x <= von('b').x + 1)
-
-    assert.ok(d.breite > 0 && d.hoehe > 0)
-    assert.equal(d.kanten.length, 6)
+    // Ungültige Kanten sind gefiltert, gültige tragen die Beschriftung.
+    assert.equal(d.verbindungen.length, kanten.length - 1)
+    assert.equal(d.verbindungen.find((v) => v.id === 'x->b')?.beschriftung, 'links')
   })
 
-  test('aktueller Schritt und Vorfahren sind markiert', () => {
-    const d = layout(schritte, kanten, 'b')
-    const von = (code: string) => d.knoten.find((k) => k.code === code)!
-    assert.equal(von('b').aktuell, true)
-    assert.equal(von('a').erledigt, true, 'Vorfahre des aktuellen Schritts')
-    assert.equal(von('start').erledigt, true)
-    assert.equal(von('c').erledigt, false, 'der nicht gegangene Zweig ist nicht erledigt')
-    assert.equal(von('ende').erledigt, false)
+  test('Standort: aktuell leuchtet, Vorfahren sind erledigt, Kanten folgen', () => {
+    const d = flowDaten(schritte, kanten, 'x')
+    const von = (code: string) => d.knoten.find((k) => k.id === code)!
+
+    assert.equal(von('x').daten.aktuell, true)
+    assert.equal(von('a').daten.erledigt, true)
+    assert.equal(von('start').daten.erledigt, true)
+    assert.equal(von('b').daten.erledigt, false)
+    assert.equal(von('ende').daten.erledigt, false)
+
+    // Der gelaufene Weg ist markiert, die Kanten AUS dem Standort sind aktiv.
+    assert.equal(d.verbindungen.find((v) => v.id === 'start->a')?.erledigt, true)
+    assert.equal(d.verbindungen.find((v) => v.id === 'x->b')?.aktiv, true)
+    assert.equal(d.verbindungen.find((v) => v.id === 'b->t')?.aktiv, false)
   })
 
-  test('unbekannte Kanten und leerer Standort stören nicht', () => {
-    const d = layout(schritte, [...kanten, { von: 'geist', nach: 'a', sequence: 10 }], null)
-    assert.equal(d.kanten.length, 6, 'Kanten zu unbekannten Schritten fallen weg')
-    assert.ok(d.knoten.every((k) => !k.aktuell && !k.erledigt))
+  test('ohne Standort ist nichts markiert', () => {
+    const d = flowDaten(schritte, kanten)
+    assert.ok(d.knoten.every((k) => !k.daten.aktuell && !k.daten.erledigt))
+    assert.ok(d.verbindungen.every((v) => !v.aktiv && !v.erledigt))
   })
 })

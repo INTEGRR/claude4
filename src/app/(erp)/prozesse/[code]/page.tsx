@@ -4,8 +4,9 @@ import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
-import { ProzessDiagramm } from '@/components/prozess-diagramm'
-import { type LayoutKante, type LayoutSchritt, layout } from '@/modules/prozesse/diagramm-layout'
+import { ProzessFlow } from '@/components/prozess-flow'
+import type { FlowKante, FlowSchritt } from '@/modules/prozesse/flow-daten'
+import { flowLayout } from '@/modules/prozesse/flow-layout'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
 import { dateTime } from '@/modules/shared/format'
 import { prozessSchalten, schrittSchalten, versionAktivieren } from '../actions'
@@ -71,17 +72,10 @@ export default async function ProzessDetailPage({
     versionen[0]
 
   const schritte = await sql<
-    (LayoutSchritt & {
-      aktion: string | null
-      job_kind: string | null
-      ereignis: string | null
-      zustand: string | null
-      rollen: string[] | null
-      override_aktiv: boolean | null
-    })[]
+    (FlowSchritt & { override_aktiv: boolean | null })[]
   >`
     select s.code, s.name, s.art::text as art, s.optional,
-           s.aktion, s.job_kind, s.ereignis, s.zustand, s.rollen,
+           s.aktion, s.job_kind, s.ereignis, s.teilprozess, s.zustand, s.rollen,
            o.aktiv as override_aktiv,
            coalesce(o.aktiv, true) = false and s.optional as abgeschaltet
     from prozess_schritte s
@@ -90,13 +84,13 @@ export default async function ProzessDetailPage({
     where s.version_id = ${gezeigt.id}
     order by s.sequence`
 
-  const kanten = await sql<LayoutKante[]>`
+  const kanten = await sql<FlowKante[]>`
     select von_code as von, nach_code as nach, sequence, beschriftung
     from prozess_uebergaenge
     where version_id = ${gezeigt.id}
     order by sequence`
 
-  const diagramm = layout(schritte, kanten, null)
+  const diagramm = await flowLayout(schritte, kanten, null)
   const fixture = Object.values(FIXTURES).some((f) => f.prozess === code)
   const admin = user.role === 'admin'
 
@@ -166,7 +160,7 @@ export default async function ProzessDetailPage({
       )}
 
       <Card title="Diagramm">
-        <ProzessDiagramm d={diagramm} />
+        <ProzessFlow d={diagramm} />
       </Card>
 
       <Card title="Schritte" tight>
