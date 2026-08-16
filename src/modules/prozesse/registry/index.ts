@@ -1,9 +1,12 @@
 import type { RegistrierteAktion } from './typen.ts'
+import { AUSWERTUNGEN } from './auswertungen.ts'
 import { EINKAUF } from './einkauf.ts'
 import { EINSTELLUNGEN } from './einstellungen.ts'
 import { FEHLER } from './fehler.ts'
 import { FERTIGUNG } from './fertigung.ts'
+import { KONTAKTE } from './kontakte.ts'
 import { LAGER } from './lager.ts'
+import { PERSONAL } from './personal.ts'
 import { PRODUKTE } from './produkte.ts'
 import { REPARATUR } from './reparatur.ts'
 import { VERKAUF } from './verkauf.ts'
@@ -18,11 +21,14 @@ import { VERSAND } from './versand.ts'
  * einkauf/fertigung → einstellungen/integrationen).
  */
 export const REGISTRY = {
+  ...AUSWERTUNGEN,
   ...EINKAUF,
   ...EINSTELLUNGEN,
   ...FEHLER,
   ...FERTIGUNG,
+  ...KONTAKTE,
   ...LAGER,
+  ...PERSONAL,
   ...PRODUKTE,
   ...REPARATUR,
   ...VERKAUF,

@@ -297,10 +297,28 @@ validiert gegen die aktive Version). Overrides binden an Schritt-Codes,
 überleben Versionswechsel; Nachfolger rücken in „Als Nächstes möglich"
 automatisch nach (Dedupe in prozess_naechste_schritte).
 
+## Phase 6b–e — Breitenmigration der Aktionen (umgesetzt)
+
+**Die Restliste ist leer:** alle actions.ts-Module laufen über die
+Registry — verkauf (8), einkauf (18), fertigung (20), personal +
+zeiterfassung (11), kontakte (2), produkte (7), einstellungen/benutzer
+(4, nur Admin), auswertungen (1). Zusammen mit fehler, lager, reparatur,
+versand, produkte.produkt_anlegen und den Prozess-Verwaltungsaktionen
+sind das **99 registrierte Aktionen** — jede mit Schema, Bereich,
+Formdata-Adapter und API-Adresse, jede über `/api/aktion/<name>`
+aufrufbar. Die statische Abdeckungsanalyse erzwingt: neue Server Actions
+nutzen serverAktion() oder stehen auf der geschlossenen
+Rahmenaktionen-Liste.
+
+Statusübergänge ohne gesäten Prozess (manueller Verkauf, Einkauf P6,
+Fertigung P5, Inventur P7) stehen auf der schrumpfenden
+`NOCH_OHNE_PROZESS`-Liste des Vollständigkeitstests — sobald der Seed
+kommt, zwingt der Test die Einträge von der Liste.
+
 ## Kommende Phasen (Kurzfassung)
-6. **Breitenmigration** (Rest): ~80 Actions (verkauf, einkauf, fertigung,
-   personal, kontakte, produkte-Rest, einstellungen, integrationen),
-   P5–P7-Seeds, KI-Katalog aus der Registry (`ki: true`).
+6. **Rest**: P5–P7-Seeds (fertigung, einkauf_wareneingang_rechnung,
+   inventur) mit Fixtures; KI-Katalog aus der Registry (`ki: true`);
+   Inline-Seiten-Actions (Kartonagen, Versandregeln, Integrationen).
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
    Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer
    Vorgang, Fähigkeits-Adapter, KI-Prozessentwurf.

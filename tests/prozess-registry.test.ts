@@ -150,15 +150,10 @@ function modulVon(datei: string): string {
  * auf serverAktion() um, muss ihr Eintrag hier raus — sonst schlägt der
  * Gegen-Check an und die Liste verrottet.
  */
-const NOCH_NICHT_MIGRIERT = new Set([
-  'auswertungen:refreshAnalytics',
-  ...['createUser', 'setRole', 'setActive', 'resetPassword'].map((n) => `einstellungen/benutzer:${n}`),
-  ...['updatePartner', 'createChildContact'].map((n) => `kontakte:${n}`),
-  ...['createEmployee', 'updateEmployee', 'clockToggle', 'clockByBarcode', 'stopEntry',
-    'addTimeEntry', 'deleteTimeEntry', 'createShift', 'deleteShift', 'requestAbsence',
-    'decideAbsence'].map((n) => `personal:${n}`),
-  ...['createProduct', 'updateProduct', 'addAttribute', 'setVariantCodes', 'createAttribute',
-    'produktZuShopify'].map((n) => `produkte:${n}`),
+const NOCH_NICHT_MIGRIERT = new Set<string>([
+  // LEER — alle actions.ts-Module sind auf die Registry migriert. Neue
+  // Server Actions müssen serverAktion() nutzen (oder als Rahmenaktion in
+  // RAHMEN_AKTIONEN stehen); diese Liste bleibt nur für künftige Übergänge.
 ])
 
 /**

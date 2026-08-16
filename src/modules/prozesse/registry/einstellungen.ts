@@ -30,5 +30,70 @@ export const EINSTELLUNGEN = {
     }),
     revalidate: ['/prozesse', '/prozesse/:ergebnis'],
   },
+
+  // --- Benutzerverwaltung (nur Admin) ---------------------------------------
+
+  'einstellungen.benutzer_anlegen': {
+    label: 'Benutzer anlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Legt ein Benutzerkonto mit Rolle an (E-Mail eindeutig).',
+    bindung: 'frei',
+    schema: z.object({
+      email: z.string().email('Bitte eine gültige E-Mail-Adresse angeben'),
+      name: z.string().min(1, 'Bitte einen Namen angeben').max(100),
+      password: z.string().min(8, 'Das Passwort braucht mindestens 8 Zeichen'),
+      role: z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung']),
+    }),
+    zusammenfassung: (p) => `${p.email} (${p.role})`,
+    formdata: (fd) => ({
+      email: String(fd.get('email') ?? '').trim(),
+      name: String(fd.get('name') ?? '').trim(),
+      password: String(fd.get('password') ?? ''),
+      role: String(fd.get('role') ?? ''),
+    }),
+    revalidate: ['/einstellungen/benutzer'],
+  },
+
+  'einstellungen.benutzer_rolle': {
+    label: 'Rolle ändern',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Ändert die Rolle eines Benutzers — der letzte aktive Administrator ist geschützt.',
+    bindung: 'beleg',
+    schema: z.object({
+      role: z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung']),
+    }),
+    formdata: (fd) => ({ role: String(fd.get('role') ?? '') }),
+    revalidate: ['/einstellungen/benutzer'],
+  },
+
+  'einstellungen.benutzer_aktiv': {
+    label: 'Aktivieren/Deaktivieren',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Aktiviert oder deaktiviert ein Konto; beim Deaktivieren enden laufende Sitzungen sofort.',
+    bindung: 'beleg',
+    schema: z.object({ active: z.boolean() }),
+    revalidate: ['/einstellungen/benutzer'],
+  },
+
+  'einstellungen.benutzer_passwort': {
+    label: 'Passwort zurücksetzen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Setzt ein neues Passwort und beendet alle Sitzungen des Kontos.',
+    bindung: 'beleg',
+    schema: z.object({
+      password: z.string().min(8, 'Das Passwort braucht mindestens 8 Zeichen'),
+    }),
+    formdata: (fd) => ({ password: String(fd.get('password') ?? '') }),
+    revalidate: ['/einstellungen/benutzer'],
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>
