@@ -103,7 +103,7 @@ export function ProzessDiagramm({ d }: { d: Diagramm }) {
               )}
               {/* Art-Kennzeichen unter dem Namen — Dienst/Ereignis/Matching
                   sind asynchrone bzw. wartende Schritte. */}
-              {(k.art === 'dienst' || k.art === 'ereignis' || k.art === 'matching' || k.optional) && (
+              {(k.art === 'dienst' || k.art === 'ereignis' || k.art === 'matching' || k.art === 'prozess' || k.optional) && (
                 <text
                   x={mitteX}
                   y={mitteY + 12}
@@ -115,6 +115,7 @@ export function ProzessDiagramm({ d }: { d: Diagramm }) {
                     k.art === 'dienst' && '⚙ asynchron',
                     k.art === 'ereignis' && '⚡ wartet auf Ereignis',
                     k.art === 'matching' && '≡ Klärliste',
+                    k.art === 'prozess' && '▣ Teilprozess',
                     k.optional && 'optional',
                   ]
                     .filter(Boolean)

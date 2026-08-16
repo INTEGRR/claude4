@@ -30,6 +30,8 @@ interface Schritt {
   params: Record<string, unknown> | null
   rollen: string[] | null
   matching_tabelle?: string | null
+  teilprozess?: string | null
+  teilprozess_link?: Record<string, unknown> | null
 }
 
 /** Schritt aus der aktiven Version lesen (für Start-Schritte und zustand). */
@@ -40,7 +42,7 @@ async function schrittAusDefinition(
 ): Promise<Schritt | undefined> {
   const [schritt] = await sql<Schritt[]>`
     select s.code, s.art::text as art, s.aktion, s.job_kind, s.zustand, s.params, s.rollen,
-           s.matching_tabelle
+           s.matching_tabelle, s.teilprozess, s.teilprozess_link
     from prozess_schritte s
     where s.version_id = prozess_aktive_version(${prozess}) and s.code = ${code}`
   return schritt
@@ -134,13 +136,16 @@ export async function prozessDurchspielen(
       const definiert = await schrittAusDefinition(sql, prozess, code)
       assert.ok(definiert, `${prozess}: Schritt „${code}" existiert nicht in der aktiven Version`)
       if (definiert.art !== 'matching') {
+        // Mehrfach-Starts: der Schritt muss an IRGENDEINEM Startknoten hängen.
         const [amStart] = await sql<{ ok: boolean }[]>`
           select exists(
             select 1 from prozess_uebergaenge u
+            join prozess_schritte s
+              on s.version_id = u.version_id and s.code = u.von_code and s.art = 'start'
             where u.version_id = prozess_aktive_version(${prozess})
-              and u.von_code = 'start' and u.nach_code = ${code}
+              and u.nach_code = ${code}
           ) as ok`
-        assert.ok(amStart.ok, `${prozess}: „${code}" hängt nicht am Start`)
+        assert.ok(amStart.ok, `${prozess}: „${code}" hängt an keinem Start`)
       }
       schritt = definiert
     } else {
@@ -153,12 +158,14 @@ export async function prozessDurchspielen(
         `${prozess}: „${code}" wird nicht angeboten ` +
           `(möglich: ${naechste.map((n) => n.code).join(', ') || '—'})`,
       )
-      // zustand/matching_tabelle liefert die Funktion nicht mit — ergänzen.
+      // zustand/matching/teilprozess liefert die Funktion nicht mit — ergänzen.
       const definiert = await schrittAusDefinition(sql, prozess, code)
       schritt = {
         ...angeboten,
         zustand: definiert?.zustand ?? null,
         matching_tabelle: definiert?.matching_tabelle ?? null,
+        teilprozess: definiert?.teilprozess ?? null,
+        teilprozess_link: definiert?.teilprozess_link ?? null,
       }
     }
 
@@ -204,6 +211,30 @@ export async function prozessDurchspielen(
       continue
     }
 
+    // Teilprozess (Call Activity): der Auslöser der Fixture treibt die
+    // Kindbelege (z. B. bucht den Wareneingang) — danach müssen ALLE
+    // Kindbelege am Ende ihres Prozesses stehen, sonst rückt der
+    // Elternprozess nicht weiter.
+    if (schritt.art === 'prozess') {
+      const ausloeser = lauf.ereignisse?.[code]
+      assert.ok(ausloeser, `${prozess}/${code}: Teilprozess-Schritt ohne Auslöser in der Fixture`)
+      await ausloeser(ctx, sql)
+
+      const stand: { gesamt: number; fertig: number } = (
+        await sql<{ gesamt: number; fertig: number }[]>`
+          select gesamt, fertig from teilprozess_stand(
+            ${schritt.teilprozess!},
+            ${schritt.teilprozess_link ? sql.json(schritt.teilprozess_link as never) : null},
+            (select modell from prozesse where code = ${prozess}), ${recordId!})`
+      )[0]
+      assert.ok(Number(stand.gesamt) > 0,
+        `${prozess}/${code}: kein Kindbeleg für Teilprozess „${schritt.teilprozess}"`)
+      assert.equal(Number(stand.fertig), Number(stand.gesamt),
+        `${prozess}/${code}: Teilprozess „${schritt.teilprozess}" ist nicht fertig (${stand.fertig}/${stand.gesamt})`)
+      await assertLedgerConsistent(sql)
+      continue
+    }
+
     assert.equal(schritt.art, 'aktion', `${prozess}/${code}: Läufe führen nur Aktionsschritte aus`)
     assert.ok(schritt.aktion, `${prozess}/${code}: Aktionsschritt ohne Aktion`)
     if (schritt.rollen?.length) {
@@ -218,12 +249,21 @@ export async function prozessDurchspielen(
     // Die Prozessdefinition legt vor (params), der Lauf ergänzt/übersteuert.
     const parameter = { ...(schritt.params ?? {}), ...werte }
 
+    // Anlage-Schritte, deren Aktion an einem ANDEREN Beleg hängt (z. B.
+    // Beschaffung an der Meldebestand-Regel): die Fixture liefert die
+    // record_id im Eingabeobjekt — dieselbe Konvention wie /api/aktion.
+    let aufrufRecordId: string | undefined = recordId
+    if (!recordId && typeof parameter.record_id === 'string') {
+      aufrufRecordId = parameter.record_id
+      delete parameter.record_id
+    }
+
     // Explizit typisiert: die Schleifen-Flussanalyse um das asserted
     // `recordId` macht die Inferenz hier sonst zirkulär (TS7022).
     const vorher: string | null = recordId ? await standort(sql, prozess, recordId) : null
     const ergebnis = await aktionAusfuehrenGeprueft(
       schritt.aktion,
-      { parameter, recordId },
+      { parameter, recordId: aufrufRecordId },
       nutzer,
     )
 

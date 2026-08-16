@@ -7,13 +7,14 @@ import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { LandedCosts } from '@/components/landed-costs'
 import { RecordComments } from '@/components/record-comments'
+import { ProzessPanel } from '@/components/prozess-panel'
 import { date, qty } from '@/modules/shared/format'
 import { cancelPicking, checkAvailability, confirmPicking, returnPicking, updatePickingDetails, validatePicking } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PickingPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('lager')
+  const user = await requireArea('lager')
   const { id } = await params
 
   const [picking] = await sql<
@@ -48,6 +49,10 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
     where p.id = ${id}`
 
   if (!picking) notFound()
+
+  const [prozessWahl] = await sql<{ code: string | null }[]>`
+    select prozess_fuer_beleg('stock_picking', ${id}) as code`
+  const prozessCode = prozessWahl?.code ?? null
 
   const moves = await sql<
     {
@@ -285,6 +290,10 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       {picking.kind === 'receipt' && picking.state === 'done' && (
         <LandedCosts pickingId={id} />
       )}
+
+      {/* Welcher Prozess diesen Transfer führt, entscheidet der Beleg-Filter
+          (Eingang = Wareneingang, Ausgang = Shop-Versand). */}
+      {prozessCode && <ProzessPanel prozessCode={prozessCode} recordId={id} rolle={user.role} />}
 
       <RecordComments model="stock_picking" recordId={id} path={`/lager/${id}`} />
     </>

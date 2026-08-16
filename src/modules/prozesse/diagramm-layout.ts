@@ -11,7 +11,7 @@
 export interface LayoutSchritt {
   code: string
   name: string
-  art: 'start' | 'aktion' | 'dienst' | 'ereignis' | 'matching' | 'xor' | 'ende'
+  art: 'start' | 'aktion' | 'dienst' | 'ereignis' | 'matching' | 'prozess' | 'xor' | 'ende'
   optional?: boolean
   abgeschaltet?: boolean
 }

@@ -41,8 +41,12 @@ const UNABGEBILDET: Record<string, string[]> = {
   shopify_bestellung_versand: ['draft', 'waiting', 'cancel'],
   // to_close ist ein toter Zustand (kein Erzeuger — siehe Inventar-Befund).
   fertigung: ['to_close'],
-  // sent hat keinen Erzeuger; done setzt der Wareneingang außerhalb des Prozesses.
+  // sent hat keinen Erzeuger; done ist der manuelle Sperr-Zustand
+  // (purchase_order_lock) außerhalb des Ablaufs.
   einkauf_wareneingang_rechnung: ['sent', 'done'],
+  // Durchgangszustände vor der Buchung — frische Eingänge stehen ohne
+  // Zustandsschritt am Start, der Prozess bietet direkt das Buchen an.
+  wareneingang: ['draft', 'waiting', 'confirmed', 'assigned'],
   // sent ist auch im Verkauf ein toter Zustand (kein Erzeuger — Inventar-Befund).
   verkauf: ['sent'],
 }
@@ -64,6 +68,7 @@ interface SchrittZeile {
   aktion: string | null
   job_kind: string | null
   ereignis: string | null
+  teilprozess: string | null
   rollen: string[] | null
   zustand: string | null
 }
@@ -71,7 +76,7 @@ interface SchrittZeile {
 async function aktiveSchritte(): Promise<SchrittZeile[]> {
   const zeilen = await h.sql<SchrittZeile[]>`
     select p.code as prozess, s.code, s.art::text as art,
-           s.aktion, s.job_kind, s.ereignis, s.rollen, s.zustand
+           s.aktion, s.job_kind, s.ereignis, s.teilprozess, s.rollen, s.zustand
     from prozesse p
     join prozess_schritte s on s.version_id = prozess_aktive_version(p.code)
     where p.aktiv`
@@ -119,6 +124,13 @@ describe('Vollständigkeit: Registry ↔ Prozesse', () => {
       if (s.art === 'ereignis') {
         assert.ok(s.ereignis, `${wo}: Ereignisschritt ohne Topic`)
         assert.ok(s.ereignis! in EREIGNISSE, `${wo}: Ereignis „${s.ereignis}" fehlt im Katalog`)
+      }
+      if (s.art === 'prozess') {
+        assert.ok(s.teilprozess, `${wo}: Teilprozess-Schritt ohne Kindprozess`)
+        const [kind] = await h.sql<{ aktiv: boolean }[]>`
+          select aktiv from prozesse where code = ${s.teilprozess!}`
+        assert.ok(kind, `${wo}: Teilprozess „${s.teilprozess}" existiert nicht`)
+        assert.ok(kind.aktiv, `${wo}: Teilprozess „${s.teilprozess}" ist nicht aktiv`)
       }
       for (const rolle of s.rollen ?? []) {
         assert.ok(
@@ -197,16 +209,17 @@ describe('Vollständigkeit: Fixtures', () => {
           const schritt = codes.get(code)
           assert.ok(schritt, `${name}/${lauf.name}: Schritt „${code}" existiert nicht`)
           // Erlaubt im Pfad: Aktionen, Dienste (Outbox), Ereignisse (mit
-          // Auslöser aus der Fixture), Klärungen (matching mit Auflöse-Aktion)
+          // Auslöser aus der Fixture), Klärungen (matching mit Auflöse-Aktion),
+          // Teilprozesse (prozess, mit Auslöser der den Kindbeleg treibt)
           // und 'ende' (schließt Assistenten ab).
           assert.ok(
-            ['aktion', 'dienst', 'ereignis', 'matching', 'ende'].includes(schritt!.art),
+            ['aktion', 'dienst', 'ereignis', 'matching', 'prozess', 'ende'].includes(schritt!.art),
             `${name}/${lauf.name}: „${code}" (${schritt!.art}) ist im Pfad nicht ausführbar`,
           )
-          if (schritt!.art === 'ereignis') {
+          if (schritt!.art === 'ereignis' || schritt!.art === 'prozess') {
             assert.ok(
               lauf.ereignisse?.[code],
-              `${name}/${lauf.name}: Ereignisschritt „${code}" braucht einen Auslöser (lauf.ereignisse)`,
+              `${name}/${lauf.name}: Schritt „${code}" (${schritt!.art}) braucht einen Auslöser (lauf.ereignisse)`,
             )
           }
         }

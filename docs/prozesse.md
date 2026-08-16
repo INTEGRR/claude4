@@ -502,8 +502,46 @@ jede der Aktionen hat einen Prozessschritt oder ist BEGRÜNDET prozessfrei
 (Korrekturen wie Transfer-Storno/-Retoure, Verwaltung, alternative
 Einstiege wie die Beschaffung; Begründung als Kommentar am Katalogeintrag).
 
+## Komponierte Prozesse (Migrationen 0049/0050, umgesetzt)
+
+Drei BPMN-Konzepte im Beleg-als-Token-Modell — ohne Token-Engine:
+
+- **Mehrfach-Starts**: ein Prozess darf mehrere Einstiege haben; die
+  Validierung verlangt nur noch MINDESTENS einen Start, erreichbar sein
+  muss jeder Schritt von irgendeinem Start aus.
+- **Teilprozesse** (Schrittart `prozess`, Call-Activity-Äquivalent): ein
+  Schritt verweist auf einen Kindprozess; der Kindbeleg hängt über die
+  Beleg-Herkunft (origin) oder eine Fremdschlüsselspalte
+  (`teilprozess_link {"spalte": …}`) am Elternbeleg. Solange der
+  Teilprozess läuft, wird der Schritt wartend angeboten; sind alle
+  Kindbelege am Ende (Semantik: ihr Prozess bietet nichts mehr an —
+  `teilprozess_stand()`), rücken die Nachfolger nach. Jeder Teil bleibt
+  einzeln testbar.
+- **Beleg-Filter** (`prozesse.beleg_filter`, Bedingungssprache): mehrere
+  Prozesse je Belegart; `prozess_fuer_beleg()` wählt (spezifische Filter
+  gewinnen). Eingangs-Transfers → Wareneingang, Ausgangs-Transfers →
+  Shop-Versand; die Transfer-Detailseite zeigt das passende Panel.
+
+Pilot ist der **Einkauf** (V2): zwei Starts („Meldebestand erreicht" →
+`lager.beschaffung_ausfuehren` mit der Regel als record_id | „Bedarf
+erkannt" → Bestellung anlegen) laufen bei „Bestellen" zusammen; danach
+Teilprozess **Wareneingang** (eigener Prozess am Eingangs-Transfer:
+validieren/buchen, Storno als Ausstieg), Rechnung erstellen, Teilprozess
+**Lieferantenrechnung** (bestehender Prozess bis „bezahlt"), Ende. Die
+Fixtures spielen beide Starts und die ganze Kette end-to-end durch; der
+Interpreter kennt Teilprozess-Schritte (Auslöser treibt den Kindbeleg,
+danach müssen ALLE Kindbelege fertig sein) und die
+record_id-Konvention für Anlage-Schritte an fremden Belegen.
+
+Bewusste Grenzen: `purchase_orders.done` bleibt der manuelle
+Sperr-Zustand (kein Automatik-Mapping); direkte Teilprozess-Rekursion
+ist verboten, tiefere Zyklen zwischen Prozessen prüft die Aktivierung
+noch nicht.
+
 ## Noch offen (Kurzfassung)
 
+- Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),
+  nach dem Muster des Einkaufs-Piloten.
 - Fähigkeits-Umbenennung der Job-Kinds — bewusst zurückgestellt: die
   Fähigkeits-Schicht liegt bereits im JOB_KATALOG (anbieterneutral,
   getestet), ein Umbenennen der persistierten Kinds (integration_jobs,

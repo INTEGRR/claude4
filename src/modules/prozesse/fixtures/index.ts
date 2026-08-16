@@ -8,6 +8,7 @@ import { INVENTUR_FIXTURE } from './inventur.ts'
 import { REPARATUR } from './reparatur.ts'
 import { SHOPIFY_VERSAND } from './shopify-versand.ts'
 import { VERKAUF_FIXTURE } from './verkauf.ts'
+import { WARENEINGANG_FIXTURE } from './wareneingang.ts'
 import type { ProzessFixture } from './typen.ts'
 
 export type { Eingabe, FixtureKontext, ProzessFixture, ProzessLauf } from './typen.ts'
@@ -30,6 +31,7 @@ export const FIXTURES = {
   reparatur: REPARATUR,
   shopify_bestellung_versand: SHOPIFY_VERSAND,
   verkauf: VERKAUF_FIXTURE,
+  wareneingang: WARENEINGANG_FIXTURE,
 } satisfies Record<string, ProzessFixture>
 
 export type FixtureName = keyof typeof FIXTURES

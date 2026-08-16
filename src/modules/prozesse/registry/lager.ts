@@ -72,8 +72,6 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung: 'Storniert einen nicht erledigten Transfer samt Bewegungen.',
     bindung: 'beleg',
-    // Korrektur: der Abbruch außerhalb des Happy Path (siehe UNABGEBILDET cancel).
-    prozessfrei: true,
     modell: 'stock_picking',
     uebergang: { von: ['draft', 'waiting', 'confirmed', 'assigned'], nach: ['cancel'] },
     schema: z.object({}),
@@ -240,8 +238,6 @@ export const LAGER = {
       'Führt einen Beschaffungsvorschlag aus: Position in eine Entwurfs-Bestellung ' +
       'aufnehmen oder einen Fertigungsauftrag anlegen und bestätigen.',
     bindung: 'beleg',
-    // Alternativer EINSTIEG in Einkauf/Fertigung: erzeugt deren Startbelege.
-    prozessfrei: true,
     modell: 'stock_orderpoint',
     schema: z.object({}),
     revalidate: ['/lager/beschaffung', '/einkauf', '/fertigung'],
