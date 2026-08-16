@@ -1,9 +1,8 @@
-import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { sql } from '@/db/client'
-import { requireAdmin, requireArea } from '@/modules/auth'
+import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
+import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 
@@ -39,104 +38,28 @@ interface Regel {
   insurance_from_value: number | null
 }
 
-function formWerte(formData: FormData) {
-  const zahl = (name: string): number | null => {
-    const raw = String(formData.get(name) ?? '').trim().replace(',', '.')
-    return raw === '' ? null : Number(raw)
-  }
-  const skus = String(formData.get('skus') ?? '')
-    .split(/[,\n;]/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-  return {
-    name: String(formData.get('name') ?? '').trim(),
-    sequence: zahl('sequence') ?? 10,
-    minWeight: zahl('min_weight_g'),
-    maxWeight: zahl('max_weight_g'),
-    zone: String(formData.get('zone') ?? '') || null,
-    skus: skus.length ? skus : null,
-    skuScope: String(formData.get('sku_scope') ?? 'any'),
-    kleinpaketFit: formData.get('require_kleinpaket_fit') === 'on',
-    product: String(formData.get('dhl_product') ?? '') || null,
-    billing: String(formData.get('billing_number') ?? '').trim() || null,
-    insuranceFrom: zahl('insurance_from_value'),
-  }
-}
-
 async function saveRule(formData: FormData) {
   'use server'
-  await requireAdmin()
-  const id = String(formData.get('id') ?? '')
-  const w = formWerte(formData)
-  if (!w.name) return actionError('Die Regel braucht einen Namen.')
-  if (!w.product && !w.billing && w.insuranceFrom === null) {
-    return actionError('Die Regel braucht mindestens eine Aktion (Produkt, Abrechnungsnummer oder Versicherung).')
-  }
-  try {
-    if (id) {
-      await sql`
-        update shipping_rules set
-          name = ${w.name}, sequence = ${w.sequence},
-          min_weight_g = ${w.minWeight}, max_weight_g = ${w.maxWeight},
-          zone = ${w.zone}, skus = ${w.skus}, sku_scope = ${w.skuScope},
-          require_kleinpaket_fit = ${w.kleinpaketFit},
-          dhl_product = ${w.product}, billing_number = ${w.billing},
-          insurance_from_value = ${w.insuranceFrom}
-        where id = ${id}`
-    } else {
-      await sql`
-        insert into shipping_rules
-          (name, sequence, min_weight_g, max_weight_g, zone, skus, sku_scope,
-           require_kleinpaket_fit, dhl_product, billing_number, insurance_from_value)
-        values
-          (${w.name}, ${w.sequence}, ${w.minWeight}, ${w.maxWeight}, ${w.zone},
-           ${w.skus}, ${w.skuScope}, ${w.kleinpaketFit}, ${w.product},
-           ${w.billing}, ${w.insuranceFrom})`
-    }
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/einstellungen/versandregeln')
-  revalidatePath('/versand')
-  return actionInfo('Regel gespeichert.')
+  return serverAktion('versand.versandregel_speichern', { formData })
 }
 
 async function toggleRule(id: string) {
   'use server'
-  await requireAdmin()
-  await sql`update shipping_rules set active = not active where id = ${id}`
-  revalidatePath('/einstellungen/versandregeln')
-  revalidatePath('/versand')
+  return serverAktion('versand.versandregel_schalten', { recordId: id })
 }
 
 async function deleteRule(id: string) {
   'use server'
-  await requireAdmin()
-  await sql`delete from shipping_rules where id = ${id}`
-  revalidatePath('/einstellungen/versandregeln')
-  revalidatePath('/versand')
+  return serverAktion('versand.versandregel_loeschen', { recordId: id })
 }
 
 /** Tauscht die Reihenfolge mit dem Nachbarn — Regeln werden von oben nach unten ausgewertet. */
 async function moveRule(id: string, richtung: 'hoch' | 'runter') {
   'use server'
-  await requireAdmin()
-  const regeln = await sql<{ id: string; sequence: number }[]>`
-    select id, sequence from shipping_rules order by sequence, name`
-  const index = regeln.findIndex((r) => r.id === id)
-  const nachbar = richtung === 'hoch' ? index - 1 : index + 1
-  if (index < 0 || nachbar < 0 || nachbar >= regeln.length) return
-  // Gleiche sequence-Werte machen den Tausch wirkungslos — dann neu durchnummerieren.
-  if (regeln[index].sequence === regeln[nachbar].sequence) {
-    for (const [i, r] of regeln.entries()) {
-      await sql`update shipping_rules set sequence = ${(i + 1) * 10} where id = ${r.id}`
-    }
-    return moveRule(id, richtung)
-  }
-  await sql`update shipping_rules set sequence = ${regeln[nachbar].sequence} where id = ${regeln[index].id}`
-  await sql`update shipping_rules set sequence = ${regeln[index].sequence} where id = ${regeln[nachbar].id}`
-  revalidatePath('/einstellungen/versandregeln')
-  revalidatePath('/versand')
+  return serverAktion('versand.versandregel_verschieben', {
+    recordId: id,
+    parameter: { richtung },
+  })
 }
 
 function RegelFormular({ regel }: { regel?: Regel }) {

@@ -111,3 +111,127 @@ export async function retourenlabelErstellen(p: {
   await createReturnLabelForPartner(p.partner_id, { reference: p.reference })
   return { text: 'Retourenlabel erstellt und an den Kunden gemailt.' }
 }
+
+// --- Kartonagen (Versand-Konfiguration) --------------------------------------
+
+export async function kartonageSpeichern(p: {
+  id?: string
+  name: string
+  variant_id: string
+  capacity: number
+  max_content_g: number
+  kleinpaket: boolean
+  sequence: number
+}): Promise<AktionsErgebnis> {
+  if (p.id) {
+    await sql`
+      update packagings set
+        name = ${p.name}, variant_id = ${p.variant_id}, capacity = ${p.capacity},
+        max_content_g = ${p.max_content_g}, kleinpaket = ${p.kleinpaket},
+        sequence = ${p.sequence}
+      where id = ${p.id}`
+  } else {
+    await sql`
+      insert into packagings (name, variant_id, capacity, max_content_g, kleinpaket, sequence)
+      values (${p.name}, ${p.variant_id}, ${p.capacity}, ${p.max_content_g},
+              ${p.kleinpaket}, ${p.sequence})`
+  }
+  return { text: 'Kartonage gespeichert.' }
+}
+
+export async function kartonageSchalten(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`update packagings set active = not active where id = ${ctx.recordId!}`
+  return {}
+}
+
+export async function kartonageLoeschen(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`delete from packagings where id = ${ctx.recordId!}`
+  return {}
+}
+
+// --- Versandregeln -----------------------------------------------------------
+
+export async function versandregelSpeichern(p: {
+  id?: string
+  name: string
+  sequence: number
+  min_weight_g: number | null
+  max_weight_g: number | null
+  zone: string | null
+  skus: string[] | null
+  sku_scope: string
+  require_kleinpaket_fit: boolean
+  dhl_product: string | null
+  billing_number: string | null
+  insurance_from_value: number | null
+}): Promise<AktionsErgebnis> {
+  if (p.id) {
+    await sql`
+      update shipping_rules set
+        name = ${p.name}, sequence = ${p.sequence},
+        min_weight_g = ${p.min_weight_g}, max_weight_g = ${p.max_weight_g},
+        zone = ${p.zone}, skus = ${p.skus}, sku_scope = ${p.sku_scope},
+        require_kleinpaket_fit = ${p.require_kleinpaket_fit},
+        dhl_product = ${p.dhl_product}, billing_number = ${p.billing_number},
+        insurance_from_value = ${p.insurance_from_value}
+      where id = ${p.id}`
+  } else {
+    await sql`
+      insert into shipping_rules
+        (name, sequence, min_weight_g, max_weight_g, zone, skus, sku_scope,
+         require_kleinpaket_fit, dhl_product, billing_number, insurance_from_value)
+      values
+        (${p.name}, ${p.sequence}, ${p.min_weight_g}, ${p.max_weight_g}, ${p.zone},
+         ${p.skus}, ${p.sku_scope}, ${p.require_kleinpaket_fit}, ${p.dhl_product},
+         ${p.billing_number}, ${p.insurance_from_value})`
+  }
+  return { text: 'Regel gespeichert.' }
+}
+
+export async function versandregelSchalten(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`update shipping_rules set active = not active where id = ${ctx.recordId!}`
+  return {}
+}
+
+export async function versandregelLoeschen(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`delete from shipping_rules where id = ${ctx.recordId!}`
+  return {}
+}
+
+export async function versandregelVerschieben(
+  p: { richtung: 'hoch' | 'runter' },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const id = ctx.recordId!
+  const regeln = await sql<{ id: string; sequence: number }[]>`
+    select id, sequence from shipping_rules order by sequence, name`
+  const index = regeln.findIndex((r) => r.id === id)
+  const nachbar = p.richtung === 'hoch' ? index - 1 : index + 1
+  if (index < 0 || nachbar < 0 || nachbar >= regeln.length) return {}
+
+  // Gleiche sequence-Werte machen den Tausch wirkungslos — dann neu
+  // durchnummerieren und noch einmal.
+  if (regeln[index].sequence === regeln[nachbar].sequence) {
+    for (const [i, r] of regeln.entries()) {
+      await sql`update shipping_rules set sequence = ${(i + 1) * 10} where id = ${r.id}`
+    }
+    return versandregelVerschieben(p, ctx)
+  }
+  await sql`update shipping_rules set sequence = ${regeln[nachbar].sequence}
+            where id = ${regeln[index].id}`
+  await sql`update shipping_rules set sequence = ${regeln[index].sequence}
+            where id = ${regeln[nachbar].id}`
+  return {}
+}

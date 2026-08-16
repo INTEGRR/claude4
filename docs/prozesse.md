@@ -442,11 +442,24 @@ Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
 - NOCH_OHNE_PROZESS enthält nur noch die Lager-Aktionen (Transfers,
   Zählung/Inventur, Ausschuss, Beschaffung).
 
+## Inline-Aktionen registriert (umgesetzt)
+
+Die drei dokumentierten Inline-Seiten-Actions laufen jetzt über die
+Registry: `versand.kartonage_speichern/_schalten/_loeschen`,
+`versand.versandregel_speichern/_schalten/_loeschen/_verschieben`
+(alle nur Admin, prozessfrei — Versand-Konfiguration) und
+`integrationen.klaerfall_aufloesen` (neuer Katalog integrationen.ts) —
+Letztere ist genau die Auflöse-Aktion, die der matching-Schritttyp der
+Prozesse künftig referenziert. Die Seiten sind reine Transporte
+(serverAktion); Validierung, Rechte und Audit sitzen im Torwächter, alle
+drei sind über POST /api/aktion erreichbar. Die übrigen Inline-Actions
+der Integrationen-Seite (Queue-Wartung: runJobs, retry, …) bleiben
+bewusst außerhalb — sie schalten die Infrastruktur, keine Fachlichkeit.
+
 ## Noch offen (Kurzfassung)
 
 - Dashboard-KPIs als Projektion der aktiven Prozesse (die Navigation ist
   es schon).
-- Inline-Seiten-Actions (Kartonagen, Versandregeln, Klärliste);
-  Inventur-Assistent (braucht beleggebundene Folgeschritte in der
+- Inventur-Assistent (braucht beleggebundene Folgeschritte in der
   Instanz-Ausführung; deckt die restlichen Lager-Aktionen ab);
   Fähigkeits-Umbenennung der Job-Kinds.

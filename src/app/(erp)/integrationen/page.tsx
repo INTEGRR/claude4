@@ -9,6 +9,7 @@ import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
+import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { actionError, actionInfo } from '@/modules/shared/action'
 
 export const dynamic = 'force-dynamic'
@@ -156,29 +157,10 @@ async function retryWebhook(eventId: string) {
   revalidatePath('/integrationen')
 }
 
-/** Ordnet eine unbekannte Shopify-SKU einer Variante zu. */
+/** Ordnet eine unbekannte Shopify-SKU einer Variante zu (Registry: Klärfall). */
 async function resolveUnmatched(lineId: string, formData: FormData) {
   'use server'
-  await requireAdmin()
-  const variantId = String(formData.get('variant_id') ?? '')
-  if (!variantId) return actionError('Bitte eine Variante auswählen')
-
-  const [line] = await sql<{ sku: string | null; variant_gid: string | null }[]>`
-    select sku, variant_gid from shopify_unmatched_lines where id = ${lineId}`
-
-  // Zuordnung dauerhaft an der Variante speichern, damit der nächste Import passt.
-  if (line?.variant_gid) {
-    await sql`update product_variants set shopify_variant_id = ${line.variant_gid}
-              where id = ${variantId} and shopify_variant_id is null`
-  }
-  if (line?.sku) {
-    await sql`update product_variants set sku = ${line.sku}
-              where id = ${variantId} and sku is null`
-  }
-
-  await sql`update shopify_unmatched_lines
-            set resolved_at = now(), resolved_variant = ${variantId} where id = ${lineId}`
-  revalidatePath('/integrationen')
+  return serverAktion('integrationen.klaerfall_aufloesen', { recordId: lineId, formData })
 }
 
 /** Deutsche Beschriftungen der technischen Queue-Zustände. */

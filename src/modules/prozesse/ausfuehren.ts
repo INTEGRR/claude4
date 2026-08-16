@@ -5,6 +5,7 @@ import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
+import * as integrationen from './registry/integrationen-ausfuehren.ts'
 import * as kontakte from './registry/kontakte-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
 import * as personal from './registry/personal-ausfuehren.ts'
@@ -147,5 +148,14 @@ export const AUSFUEHRUNG = {
   'versand.tracking_aktualisieren': versand.trackingAktualisieren,
   'versand.massendruck': versand.massendruck,
   'versand.retourenlabel_erstellen': versand.retourenlabelErstellen,
+  'versand.kartonage_speichern': versand.kartonageSpeichern,
+  'versand.kartonage_schalten': versand.kartonageSchalten,
+  'versand.kartonage_loeschen': versand.kartonageLoeschen,
+  'versand.versandregel_speichern': versand.versandregelSpeichern,
+  'versand.versandregel_schalten': versand.versandregelSchalten,
+  'versand.versandregel_loeschen': versand.versandregelLoeschen,
+  'versand.versandregel_verschieben': versand.versandregelVerschieben,
+
+  'integrationen.klaerfall_aufloesen': integrationen.klaerfallAufloesen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

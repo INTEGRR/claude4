@@ -4,6 +4,7 @@ import { EINKAUF } from './einkauf.ts'
 import { EINSTELLUNGEN } from './einstellungen.ts'
 import { FEHLER } from './fehler.ts'
 import { FERTIGUNG } from './fertigung.ts'
+import { INTEGRATIONEN } from './integrationen.ts'
 import { KONTAKTE } from './kontakte.ts'
 import { LAGER } from './lager.ts'
 import { PERSONAL } from './personal.ts'
@@ -27,6 +28,7 @@ export const REGISTRY = {
   ...EINSTELLUNGEN,
   ...FEHLER,
   ...FERTIGUNG,
+  ...INTEGRATIONEN,
   ...KONTAKTE,
   ...LAGER,
   ...PERSONAL,

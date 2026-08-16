@@ -1,9 +1,8 @@
-import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { sql } from '@/db/client'
-import { requireAdmin, requireArea } from '@/modules/auth'
+import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
+import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 
@@ -26,58 +25,17 @@ interface Kartonage {
 
 async function saveKartonage(formData: FormData) {
   'use server'
-  await requireAdmin()
-  const id = String(formData.get('id') ?? '')
-  const name = String(formData.get('name') ?? '').trim()
-  const variantId = String(formData.get('variant_id') ?? '')
-  const capacity = Number(String(formData.get('capacity') ?? '').replace(',', '.'))
-  const maxContent = Math.round(Number(formData.get('max_content_g') ?? 0))
-  const kleinpaket = formData.get('kleinpaket') === 'on'
-  const sequence = Math.round(Number(formData.get('sequence') ?? 10)) || 10
-
-  if (!name) return actionError('Die Kartonage braucht einen Namen.')
-  if (!variantId) return actionError('Bitte den Bestandsartikel wählen — ohne ihn gibt es keinen Verbrauch zu buchen.')
-  if (!(capacity > 0)) return actionError('Das Fassungsvermögen muss größer als 0 sein.')
-  if (!(maxContent > 0)) return actionError('Das Höchstgewicht muss größer als 0 sein.')
-
-  try {
-    if (id) {
-      await sql`
-        update packagings set
-          name = ${name}, variant_id = ${variantId}, capacity = ${capacity},
-          max_content_g = ${maxContent}, kleinpaket = ${kleinpaket}, sequence = ${sequence}
-        where id = ${id}`
-    } else {
-      await sql`
-        insert into packagings (name, variant_id, capacity, max_content_g, kleinpaket, sequence)
-        values (${name}, ${variantId}, ${capacity}, ${maxContent}, ${kleinpaket}, ${sequence})`
-    }
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/einstellungen/kartonagen')
-  revalidatePath('/versand')
-  return actionInfo('Kartonage gespeichert.')
+  return serverAktion('versand.kartonage_speichern', { formData })
 }
 
 async function toggleKartonage(id: string) {
   'use server'
-  await requireAdmin()
-  await sql`update packagings set active = not active where id = ${id}`
-  revalidatePath('/einstellungen/kartonagen')
-  revalidatePath('/versand')
+  return serverAktion('versand.kartonage_schalten', { recordId: id })
 }
 
 async function deleteKartonage(id: string) {
   'use server'
-  await requireAdmin()
-  try {
-    await sql`delete from packagings where id = ${id}`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/einstellungen/kartonagen')
-  revalidatePath('/versand')
+  return serverAktion('versand.kartonage_loeschen', { recordId: id })
 }
 
 function Formular({
