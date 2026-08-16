@@ -285,8 +285,22 @@ start → ereignis „Bestellung eingegangen" (shop:bestellung_eingegangen, conf
 - Noch offen für später: der matching-Schritt (Klärliste als Prozessschritt,
   sobald die Auflöse-Aktion registriert ist) und ein Storno-Zweig.
 
+## Phase 6a — Laufzeit-Overrides mit Verwaltung (umgesetzt)
+
+Das Chamäleon-Stellwerk: **eine Firma passt ihre Abläufe zur Laufzeit an,
+ohne Code anzufassen.** `/prozesse` hat jetzt den Reiter „Abläufe" (alle
+aktiven Prozesse mit Version, Schrittzahl, Testabdeckung und
+Override-Stand); die Detailseite `/prozesse/[code]` zeigt Diagramm und
+Schritte und schaltet OPTIONALE Schritte je Firma ab/an — über die
+Registry-Aktion `einstellungen.prozessschritt_schalten` (nur Admin,
+validiert gegen die aktive Version). Overrides binden an Schritt-Codes,
+überleben Versionswechsel; Nachfolger rücken in „Als Nächstes möglich"
+automatisch nach (Dedupe in prozess_naechste_schritte).
+
 ## Kommende Phasen (Kurzfassung)
-6. **Breitenmigration + Laufzeit-Overrides** (Schritte an/aus je Firma).
+6. **Breitenmigration** (Rest): ~80 Actions (verkauf, einkauf, fertigung,
+   personal, kontakte, produkte-Rest, einstellungen, integrationen),
+   P5–P7-Seeds, KI-Katalog aus der Registry (`ki: true`).
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
    Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer
    Vorgang, Fähigkeits-Adapter, KI-Prozessentwurf.
