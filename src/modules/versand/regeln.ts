@@ -123,7 +123,10 @@ export async function vorschlaegeFuerPickings(
   >`
     select p.id,
            coalesce(so.ship_country_code, part.country_code, 'DE') as country,
-           coalesce(sales_order_total(so.id), 0)::float as order_value
+           -- sales_order_total liefert eine ZEILE (net/tax/gross) — skalar
+           -- verwendet ergäbe das einen Record und coalesce bricht. Der
+           -- Versicherungswert ist der Bruttowert des Auftrags.
+           coalesce((select gross from sales_order_total(so.id)), 0)::float as order_value
     from stock_pickings p
     left join sales_orders so on so.id = p.origin_id and p.origin_model = 'sales_order'
     left join partners part on part.id = p.partner_id

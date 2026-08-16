@@ -247,14 +247,45 @@ samt Commit am Ticket.**
   ticket-abschliessen.ts einmal komplett gegen die Harness-Datenbank
   laufen (test_ok + Commit am Ticket).
 
-Noch offen in Phase 5: **P4 shopify_bestellung_versand** als Prozess mit
-ereignis-/dienst-/matching-Schritten (braucht die Registry-Migration der
-Versand-Aktionen und die Schrittart-Ausführung im Harness).
+## Phase 5b — Externe Schritte: P4 Shop-Bestellung → Versand (umgesetzt)
+
+**Der erste Prozess mit Außenwelt** (`shopify_bestellung_versand`,
+Migration 0041; Beleg = die Lieferung/stock_picking):
+
+```
+start → ereignis „Bestellung eingegangen" (shop:bestellung_eingegangen, confirmed)
+      → aktion  „Verfügbarkeit prüfen"    (assigned; mit Bestand reserviert
+                                           schon die Bestätigung — der Beleg
+                                           steht dann direkt HIER)
+      → aktion  „DHL-Label erstellen"     (versand.label_erstellen)
+      → aktion  „Warenausgang buchen"     (lager.transfer_buchen, done)
+      → dienst  „Shop-Rückmeldung"        (Outbox-Job shopify_fulfillment_create)
+      → ende
+```
+
+- **Versand in der Registry** (`versand.*`): label_erstellen (im Prozess),
+  massendruck/label_stornieren/tracking_aktualisieren/retourenlabel als
+  prozessfreie Werkzeuge; versand/actions.ts sind Dreizeiler um
+  serverAktion(), die Restliste ist um den Versand kürzer.
+- **Interpreter kann jetzt alle Schrittarten**: `ereignis`-Schritte speist
+  die Fixture ein (Webhook-Zeile + hinterlegte Bestellung im Shopify-Fake —
+  der Import verwirft den Payload und holt die Wahrheit per fetchOrder,
+  genau wie im Betrieb), `dienst`-Schritte arbeiten die Outbox mit Fakes ab
+  und prüfen den Job. Der Harness erzwingt die Fakes (Tests sprechen NIE
+  echte Dienste an).
+- **Der P4-Lauf beweist die ganze Kette**: künstlicher orders/paid →
+  processPendingWebhooks → Auftrag (sale) + Lieferung → Label (Fake-DHL,
+  20-stellige Sendungsnummer) → Warenausgang (Ledger-Invariante) →
+  Fulfillment gemeldet (shopify_fulfillment_id) → Auftrag voll geliefert.
+- **Zwei echte Fänge des Prozesstests** in dieser Phase: nachträglich
+  erfasste Reparaturteile ohne Lagerbewegung (0038) und
+  `sales_order_total()` skalar verwendet (liefert aber eine Zeile) — damit
+  brach JEDE Einzellabel-Erstellung für Auftrags-Lieferungen
+  (regeln.ts, Versicherungswert jetzt über `select gross from …`).
+- Noch offen für später: der matching-Schritt (Klärliste als Prozessschritt,
+  sobald die Auflöse-Aktion registriert ist) und ein Storno-Zweig.
 
 ## Kommende Phasen (Kurzfassung)
-
-5. **Externe Schritte** (Rest): P4 Shopify-Bestellung → Versand mit
-   ereignis/dienst/matching im Harness.
 6. **Breitenmigration + Laufzeit-Overrides** (Schritte an/aus je Firma).
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
    Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer

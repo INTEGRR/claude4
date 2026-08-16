@@ -43,6 +43,12 @@ export interface ProzessLauf {
   pfad: string[]
   /** Eingaben je Schritt-Code; Schritt-params aus der Prozessdefinition werden vorgelegt. */
   eingaben?: Record<string, Eingabe>
+  /**
+   * Auslöser für 'ereignis'-Schritte im Pfad: speist das Ereignis ein
+   * (z. B. einen künstlichen Shop-Webhook samt Verarbeitung) und liefert
+   * die Beleg-ID, wenn das Ereignis den Beleg erst erzeugt.
+   */
+  ereignisse?: Record<string, (ctx: FixtureKontext, sql: Sql) => Promise<string | void>>
   /** Nach dem letzten Schritt darf der Prozess nichts mehr anbieten (Endzustand). */
   danachKeineSchritte?: boolean
   /** Zusätzliche fachliche Prüfungen nach dem Durchlauf. */

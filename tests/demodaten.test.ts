@@ -121,7 +121,8 @@ describe('Neustart: demodaten_loeschen', () => {
     assert.ok(modelle > 0, 'Modell-Whitelist muss erhalten bleiben')
     const prozesse = await sql<{ code: string }[]>`
       select code from prozesse order by code`
-    assert.deepEqual(prozesse.map((p) => p.code), ['artikel_anlegen', 'bug_ticket', 'reparatur'])
+    assert.deepEqual(prozesse.map((p) => p.code),
+      ['artikel_anlegen', 'bug_ticket', 'reparatur', 'shopify_bestellung_versand'])
     const [{ schritte }] = await sql<{ schritte: number }[]>`
       select count(*)::int as schritte
       from prozess_schritte s

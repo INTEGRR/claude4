@@ -2,6 +2,7 @@ import { ARTIKEL_ANLEGEN } from './artikel-anlegen.ts'
 import { BASIS } from './basis.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
 import { REPARATUR } from './reparatur.ts'
+import { SHOPIFY_VERSAND } from './shopify-versand.ts'
 import type { ProzessFixture } from './typen.ts'
 
 export type { Eingabe, FixtureKontext, ProzessFixture, ProzessLauf } from './typen.ts'
@@ -17,6 +18,7 @@ export const FIXTURES = {
   artikel_anlegen: ARTIKEL_ANLEGEN,
   bug_ticket: BUG_TICKET,
   reparatur: REPARATUR,
+  shopify_bestellung_versand: SHOPIFY_VERSAND,
 } satisfies Record<string, ProzessFixture>
 
 export type FixtureName = keyof typeof FIXTURES

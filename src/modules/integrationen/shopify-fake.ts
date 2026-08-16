@@ -14,6 +14,17 @@ function operation(query: string): string {
   return treffer?.[1] ?? 'unbekannt'
 }
 
+/**
+ * Bestellungen, die der Fake auf fetchOrder-Anfragen liefert — hinterlegt
+ * von den Prozess-Fixtures (der echte Webhook-Payload wird beim Import
+ * verworfen, die Wahrheit kommt immer aus fetchOrder).
+ */
+const FAKE_BESTELLUNGEN = new Map<string, { id: string }>()
+
+export function fakeOrderHinterlegen(order: { id: string }): void {
+  FAKE_BESTELLUNGEN.set(order.id, order)
+}
+
 export async function fakeShopifyGraphQL<T>(
   query: string,
   variables: Record<string, unknown> = {},
@@ -21,24 +32,31 @@ export async function fakeShopifyGraphQL<T>(
   const op = operation(query)
 
   const antwort = (() => {
-    switch (op) {
+    // Beide Order-Anfragen beginnen mit `order(id:)` — unterschieden wird
+    // am angefragten Feld, nicht am Operationsnamen.
+    if (query.includes('fulfillmentOrders(')) {
       // fetchFulfillmentOrders: ein offenes Fulfillment ohne Positionsliste —
       // die Jobs werten das als Voll-Fulfillment (every() über leer = true).
-      case 'order':
-        return {
-          order: {
-            fulfillmentOrders: {
-              nodes: [
-                {
-                  id: 'gid://shopify/FulfillmentOrder/1',
-                  status: 'OPEN',
-                  supportedActions: [{ action: 'CREATE_FULFILLMENT' }],
-                  lineItems: { nodes: [] },
-                },
-              ],
-            },
+      return {
+        order: {
+          fulfillmentOrders: {
+            nodes: [
+              {
+                id: 'gid://shopify/FulfillmentOrder/1',
+                status: 'OPEN',
+                supportedActions: [{ action: 'CREATE_FULFILLMENT' }],
+                lineItems: { nodes: [] },
+              },
+            ],
           },
-        }
+        },
+      }
+    }
+    if (query.includes('displayFinancialStatus')) {
+      // fetchOrder: die von der Fixture hinterlegte Bestellung (oder null).
+      return { order: FAKE_BESTELLUNGEN.get(String(variables.id)) ?? null }
+    }
+    switch (op) {
       case 'fulfillmentCreate':
         return {
           fulfillmentCreate: {

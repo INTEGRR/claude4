@@ -24,6 +24,7 @@ interface Schritt {
   code: string
   art: string
   aktion: string | null
+  job_kind: string | null
   zustand: string | null
   params: Record<string, unknown> | null
   rollen: string[] | null
@@ -36,10 +37,34 @@ async function schrittAusDefinition(
   code: string,
 ): Promise<Schritt | undefined> {
   const [schritt] = await sql<Schritt[]>`
-    select s.code, s.art::text as art, s.aktion, s.zustand, s.params, s.rollen
+    select s.code, s.art::text as art, s.aktion, s.job_kind, s.zustand, s.params, s.rollen
     from prozess_schritte s
     where s.version_id = prozess_aktive_version(${prozess}) and s.code = ${code}`
   return schritt
+}
+
+/**
+ * 'dienst'-Schritt: die Outbox mit den Fake-Adaptern leerarbeiten und
+ * prüfen, dass der Job des Schritts durchgelaufen ist.
+ */
+async function dienstAusfuehren(sql: Sql, prozess: string, schritt: Schritt): Promise<void> {
+  assert.ok(schritt.job_kind, `${prozess}/${schritt.code}: Dienstschritt ohne Job`)
+  const { runDueJobs } = await import('../../src/modules/integrationen/jobs.ts')
+  let runde
+  do {
+    runde = await runDueJobs(20)
+  } while (runde.ran > 0)
+
+  const [job] = await sql<{ status: string; last_error: string | null }[]>`
+    select status, last_error from integration_jobs
+    where kind = ${schritt.job_kind}
+    order by created_at desc limit 1`
+  assert.ok(job, `${prozess}/${schritt.code}: kein Job „${schritt.job_kind}" in der Outbox`)
+  assert.equal(
+    job.status,
+    'done',
+    `${prozess}/${schritt.code}: Job ${schritt.job_kind} ist ${job.status}${job.last_error ? ` — ${job.last_error}` : ''}`,
+  )
 }
 
 async function standort(sql: Sql, prozess: string, recordId: string): Promise<string | null> {
@@ -82,7 +107,7 @@ export async function prozessDurchspielen(
       schritt = definiert
     } else {
       const naechste = await sql<Schritt[]>`
-        select code, art::text as art, aktion, rollen, params, null as zustand
+        select code, art::text as art, aktion, job_kind, rollen, params, null as zustand
         from prozess_naechste_schritte(${prozess}, ${recordId})`
       const angeboten = naechste.find((n) => n.code === code)
       assert.ok(
@@ -93,6 +118,27 @@ export async function prozessDurchspielen(
       // zustand liefert die Funktion nicht mit — aus der Definition ergänzen.
       const definiert = await schrittAusDefinition(sql, prozess, code)
       schritt = { ...angeboten, zustand: definiert?.zustand ?? null }
+    }
+
+    // Ereignis: die Fixture speist die Außenwelt ein (z. B. künstlicher
+    // Shop-Webhook samt Verarbeitung) und liefert ggf. die Beleg-ID.
+    if (schritt.art === 'ereignis') {
+      const ausloeser = lauf.ereignisse?.[code]
+      assert.ok(ausloeser, `${prozess}/${code}: Ereignisschritt ohne Auslöser in der Fixture`)
+      const geliefert = await ausloeser(ctx, sql)
+      if (!recordId) {
+        recordId = geliefert || undefined
+        assert.ok(recordId, `${prozess}/${code}: der Auslöser muss die Beleg-ID liefern`)
+      }
+      await assertLedgerConsistent(sql)
+      continue
+    }
+
+    // Dienst: die Outbox arbeitet (mit Fakes), der Job muss durchlaufen.
+    if (schritt.art === 'dienst') {
+      await dienstAusfuehren(sql, prozess, schritt)
+      await assertLedgerConsistent(sql)
+      continue
     }
 
     assert.equal(schritt.art, 'aktion', `${prozess}/${code}: Läufe führen nur Aktionsschritte aus`)
@@ -189,7 +235,7 @@ async function instanzDurchspielen(
     }
 
     const naechste = await sql<Schritt[]>`
-      select code, art::text as art, aktion, rollen, params, null as zustand
+      select code, art::text as art, aktion, job_kind, rollen, params, null as zustand
       from prozess_naechste_schritte(${prozess}, ${instanzId})`
     const angeboten = naechste.find((n) => n.code === code)
     assert.ok(

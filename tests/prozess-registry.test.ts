@@ -170,9 +170,6 @@ const NOCH_NICHT_MIGRIERT = new Set([
     'produktZuShopify'].map((n) => `produkte:${n}`),
   ...['confirmOrder', 'cancelOrder', 'updateOrderHeader', 'setLocked', 'resetToDraft',
     'createOrder', 'addLine', 'removeLine'].map((n) => `verkauf:${n}`),
-  ...['createLabel', 'massLabels', 'cancelLabel', 'refreshTracking', 'createReturnLabel'].map(
-    (n) => `versand:${n}`,
-  ),
 ])
 
 /**

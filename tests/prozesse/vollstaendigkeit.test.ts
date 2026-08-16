@@ -28,9 +28,7 @@ const DATENBANK = 'erp_prozess_check'
  * Prozessschritt auftaucht, muss ihr Eintrag hier verschwinden.
  */
 const NOCH_OHNE_PROZESS = new Set([
-  'lager.transfer_buchen',
   'lager.transfer_bestaetigen',
-  'lager.verfuegbarkeit_pruefen',
   'lager.transfer_stornieren',
   'lager.transfer_retoure',
   'lager.zaehlung_erfassen',
@@ -40,7 +38,11 @@ const NOCH_OHNE_PROZESS = new Set([
 ])
 
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */
-const UNABGEBILDET: Record<string, string[]> = {}
+const UNABGEBILDET: Record<string, string[]> = {
+  // draft/waiting sind Durchgangszustände vor der Bestätigung; cancel ist
+  // der Abbruch außerhalb des Happy Path (Storno-Schritt folgt mit P5–P7).
+  shopify_bestellung_versand: ['draft', 'waiting', 'cancel'],
+}
 
 let h: Harness
 
@@ -191,11 +193,18 @@ describe('Vollständigkeit: Fixtures', () => {
         for (const code of lauf.pfad) {
           const schritt = codes.get(code)
           assert.ok(schritt, `${name}/${lauf.name}: Schritt „${code}" existiert nicht`)
-          // 'ende' im Pfad schließt einen beleglosen Assistenten ab.
+          // Erlaubt im Pfad: Aktionen, Dienste (Outbox), Ereignisse (mit
+          // Auslöser aus der Fixture) und 'ende' (schließt Assistenten ab).
           assert.ok(
-            schritt!.art === 'aktion' || schritt!.art === 'ende',
-            `${name}/${lauf.name}: „${code}" ist weder Aktions- noch Endschritt`,
+            ['aktion', 'dienst', 'ereignis', 'ende'].includes(schritt!.art),
+            `${name}/${lauf.name}: „${code}" (${schritt!.art}) ist im Pfad nicht ausführbar`,
           )
+          if (schritt!.art === 'ereignis') {
+            assert.ok(
+              lauf.ereignisse?.[code],
+              `${name}/${lauf.name}: Ereignisschritt „${code}" braucht einen Auslöser (lauf.ereignisse)`,
+            )
+          }
         }
         for (const key of Object.keys(lauf.eingaben ?? {})) {
           assert.ok(

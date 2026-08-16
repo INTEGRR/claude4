@@ -4,6 +4,7 @@ import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
 import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
+import * as versand from './registry/versand-ausfuehren.ts'
 
 /**
  * Ausführung je Registry-Aktion.
@@ -44,5 +45,11 @@ export const AUSFUEHRUNG = {
   'reparatur.stornieren': reparatur.stornieren,
   'reparatur.angebot_erstellen': reparatur.angebotErstellen,
   'reparatur.details': reparatur.details,
+
+  'versand.label_erstellen': versand.labelErstellen,
+  'versand.label_stornieren': versand.labelStornieren,
+  'versand.tracking_aktualisieren': versand.trackingAktualisieren,
+  'versand.massendruck': versand.massendruck,
+  'versand.retourenlabel_erstellen': versand.retourenlabelErstellen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

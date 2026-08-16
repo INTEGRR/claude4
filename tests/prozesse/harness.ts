@@ -46,6 +46,11 @@ const NUMERIC_ALS_ZAHL = {
 }
 
 export async function harnessStart(datenbank: string): Promise<Harness> {
+  // Tests sprechen NIE echte Dienste an — die Fake-Adapter sind Pflicht
+  // (deterministische Antworten für Shopify/DHL an den Fetch-Kapselungen).
+  process.env.SHOPIFY_FAKE ??= '1'
+  process.env.DHL_FAKE ??= '1'
+
   const stagingUrl = process.env.PROZESS_DB_URL
   let ziel: string
 
