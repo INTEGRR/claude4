@@ -958,9 +958,14 @@ label.field > span {
 
 .ticket-panel {
   position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  /* Als natives Popover (Top-Layer): die UA-Vorgaben inset:0/margin:auto/
+     border ausdrücklich überschreiben, sonst klebt das Panel mittig. */
+  inset: 0 0 0 auto;
+  left: auto;
+  height: auto;
+  margin: 0;
+  border: none;
+  color: var(--text);
   width: min(92vw, 380px);
   background: var(--surface);
   border-left: 1px solid var(--border);
@@ -982,5 +987,24 @@ label.field > span {
   margin-bottom: 12px;
 }
 .ticket-panel .field { margin-bottom: 8px; }
+
+/* --- KI-Chat als Slide-out (Reiter unter dem Fehler-Reiter) ---------------- */
+
+.ki-tab { top: calc(50% + 74px); }
+
+.ki-overlay {
+  width: min(96vw, 560px);
+  display: none;
+  padding: 14px 16px 12px;
+}
+.ki-overlay:popover-open { display: flex; flex-direction: column; }
+.ki-overlay .ticket-panel-head { flex: none; }
+.ki-overlay .ki-chat {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
 
 @media print { .ticket-tab, .ticket-panel { display: none; } }

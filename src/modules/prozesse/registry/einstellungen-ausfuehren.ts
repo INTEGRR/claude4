@@ -1,5 +1,7 @@
 import { sql, tx } from '@/db/client'
 import { REGISTRY } from './index.ts'
+import { JOB_KATALOG } from '../jobs-katalog.ts'
+import { EREIGNISSE } from '../ereignisse.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
@@ -85,8 +87,10 @@ export async function paketAktivieren(
 interface EntwurfSchritt {
   code: string
   name: string
-  art: 'start' | 'aktion' | 'xor' | 'ende'
+  art: 'start' | 'aktion' | 'dienst' | 'ereignis' | 'xor' | 'ende'
   aktion?: string
+  job_kind?: string
+  ereignis?: string
   zustand?: string
   rollen?: string[]
   params?: Record<string, unknown>
@@ -128,6 +132,22 @@ export async function prozessEntwerfen(
         `Schritt „${s.code}": unbekannte Aktion „${s.aktion}" — der Katalog steht auf /prozesse.`,
       )
     }
+    if (s.art === 'dienst' && !s.job_kind) {
+      throw new Error(`Schritt „${s.code}": art=dienst braucht einen job_kind aus dem Katalog.`)
+    }
+    if (s.job_kind && !(s.job_kind in JOB_KATALOG)) {
+      throw new Error(
+        `Schritt „${s.code}": unbekannter Job „${s.job_kind}" — der Katalog steht auf /prozesse (Dienste).`,
+      )
+    }
+    if (s.art === 'ereignis' && !s.ereignis) {
+      throw new Error(`Schritt „${s.code}": art=ereignis braucht ein Topic aus dem Katalog.`)
+    }
+    if (s.ereignis && !(s.ereignis in EREIGNISSE)) {
+      throw new Error(
+        `Schritt „${s.code}": unbekanntes Ereignis „${s.ereignis}" — der Katalog steht auf /prozesse (Ereignisse).`,
+      )
+    }
   }
   for (const u of p.uebergaenge) {
     if (!codes.has(u.von) || !codes.has(u.nach)) {
@@ -140,10 +160,12 @@ export async function prozessEntwerfen(
       select id, modell from prozesse where code = ${p.code}`
     let prozessId: string
     if (vorhanden) {
-      if ((vorhanden.modell ?? null) !== (p.modell ?? null)) {
+      // Umbau eines bestehenden Prozesses (beliebiges Modell): die neue
+      // Version erbt den Beleg — ein angegebenes modell muss dazu passen.
+      if (p.modell !== undefined && (vorhanden.modell ?? null) !== p.modell) {
         throw new Error(
           `Prozess „${p.code}" existiert mit anderem Beleg (${vorhanden.modell ?? 'beleglos'}) — ` +
-            'ein Entwurf kann das Modell nicht wechseln.',
+            'ein Entwurf kann das Modell nicht wechseln (Feld modell weglassen).',
         )
       }
       prozessId = vorhanden.id
@@ -169,8 +191,9 @@ export async function prozessEntwerfen(
     for (const [i, s] of p.schritte.entries()) {
       await t`
         insert into prozess_schritte (version_id, code, name, art, sequence, aktion,
-                                      zustand, rollen, params, optional)
+                                      job_kind, ereignis, zustand, rollen, params, optional)
         values (${v.id}, ${s.code}, ${s.name}, ${s.art}, ${i * 10}, ${s.aktion ?? null},
+                ${s.job_kind ?? null}, ${s.ereignis ?? null},
                 ${s.zustand ?? null}, ${s.rollen ?? null},
                 ${JSON.stringify(s.params ?? {})}::jsonb, ${s.optional})`
     }

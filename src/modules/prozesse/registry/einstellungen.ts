@@ -82,13 +82,17 @@ export const EINSTELLUNGEN = {
     ki: true,
     beschreibung:
       'Legt eine Prozessversion als ENTWURF an — es wird nichts aktiv: der Mensch prüft das ' +
-      'Diagramm auf /prozesse/<code> und aktiviert bewusst. Erlaubt sind Laufzeit-Prozesse ' +
-      "ohne Fachtabelle: modell 'vorgang' (Belege VG/… mit frei definierten Zuständen) oder " +
-      'ohne modell (beleglose Assistenten). Schritte: genau ein start, mindestens ein ende; ' +
-      "art 'aktion' braucht eine registrierte Aktion — bei Vorgängen zuerst vorgang.anlegen " +
-      'mit params {"prozess_code": "<code>"}, danach vorgang.status_setzen mit params ' +
-      '{"state": "<zustand>"} und demselben Wert als zustand des Schritts. Übergänge ' +
-      'verbinden Schritt-Codes; Verzweigungen entstehen durch mehrere ausgehende Übergänge, ' +
+      'Diagramm auf /prozesse/<code> und aktiviert bewusst. Für einen BESTEHENDEN Prozess ' +
+      '(code existiert, egal welcher Beleg) entsteht die nächste Version — zum Umbauen erst ' +
+      'die aktuellen Schritte/Übergänge nachschlagen (sql_abfrage auf prozess_schritte/' +
+      'prozess_uebergaenge der aktiven Version) und VOLLSTÄNDIG mit Änderungen wieder ' +
+      "einreichen. NEUE Prozesse: modell 'vorgang' (Belege VG/… mit frei definierten " +
+      "Zuständen) oder ohne modell (beleglose Assistenten). Schritte: genau ein start, " +
+      "mindestens ein ende; art 'aktion' braucht eine registrierte Aktion (bei Vorgängen " +
+      'zuerst vorgang.anlegen mit params {"prozess_code": "<code>"}, danach ' +
+      'vorgang.status_setzen mit params {"state": "<zustand>"} und demselben Wert als ' +
+      "zustand), art 'dienst' einen job_kind aus dem Katalog, art 'ereignis' ein Topic. " +
+      'Übergänge verbinden Schritt-Codes; Verzweigungen sind mehrere ausgehende Übergänge, ' +
       'optional mit bedingung ({"feld","op","wert"}, Pfade wie zusatz.budget erlaubt). ' +
       'Schleifen sind verboten.',
     bindung: 'frei',
@@ -107,7 +111,10 @@ export const EINSTELLUNGEN = {
       modell: z
         .enum(['vorgang'])
         .optional()
-        .describe("'vorgang' = generische Belege VG/…; leer = belegloser Assistent"),
+        .describe(
+          "nur für NEUE Prozesse: 'vorgang' = generische Belege VG/…; leer = belegloser " +
+            'Assistent. Bestehende Prozesse behalten ihren Beleg — Feld weglassen.',
+        ),
       schritte: z
         .array(
           z.object({
@@ -117,13 +124,15 @@ export const EINSTELLUNGEN = {
               .max(40)
               .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
             name: z.string().min(1).max(80),
-            art: z.enum(['start', 'aktion', 'xor', 'ende']),
+            art: z.enum(['start', 'aktion', 'dienst', 'ereignis', 'xor', 'ende']),
             aktion: z.string().optional().describe('Registry-Name, Pflicht bei art=aktion'),
+            job_kind: z.string().optional().describe('Job aus dem Katalog, Pflicht bei art=dienst'),
+            ereignis: z.string().optional().describe('Topic aus dem Katalog, Pflicht bei art=ereignis'),
             zustand: z
               .string()
               .max(60)
               .optional()
-              .describe('Belegzustand nach dem Schritt (nur modell vorgang)'),
+              .describe('Belegzustand nach dem Schritt (je Version eindeutig)'),
             rollen: z.array(z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung'])).optional(),
             params: z
               .record(z.unknown())

@@ -402,11 +402,15 @@ Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
   (werkstatt → fertigung aus, anfrage an, bug_ticket an → restauriert).
 - **KI-Prozessentwurf** (`einstellungen.prozess_entwerfen`, ki: true):
   der Agent entwirft eine Prozessversion — aber immer nur als ENTWURF,
-  und für neue Codes entsteht der Prozess INAKTIV. Erlaubt sind
+  und für neue Codes entsteht der Prozess INAKTIV. Neue Prozesse sind
   Laufzeit-Prozesse ohne Fachtabelle (modell `vorgang` oder beleglos);
-  Aktionsnamen werden gegen die Registry geprüft, Übergangs-Enden gegen
-  die Schritt-Codes, genau ein Start / mindestens ein Ende schon beim
-  Entwurf. Die harte Validierung (erreichbar, azyklisch, XOR-Regeln,
+  BESTEHENDE Prozesse (beliebiger Beleg) lassen sich UMBAUEN — die
+  nächste Version erbt das Modell, der Agent schlägt sie vollständig neu
+  vor (aktuelle Schritte per sql_abfrage nachschlagen). Erlaubte Arten:
+  start/aktion/dienst/ereignis/xor/ende — Aktionsnamen werden gegen die
+  Registry geprüft, job_kind gegen den Job-Katalog, Topics gegen den
+  Ereignis-Katalog, Übergangs-Enden gegen die Schritt-Codes, genau ein
+  Start / mindestens ein Ende schon beim Entwurf. Die harte Validierung (erreichbar, azyklisch, XOR-Regeln,
   eindeutige Zustände) sitzt in `prozess_version_aktivieren` und läuft
   erst beim bewussten Klick des Menschen:
   `einstellungen.prozessversion_aktivieren` (ohne ki!) schaltet die

@@ -8,6 +8,8 @@ import { ScanBox } from '@/components/scan-box'
 import { AbmeldenKnopf } from '@/components/abmelden'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { TicketOverlay } from '@/components/ticket-overlay'
+import { KiOverlay } from '@/components/ki-overlay'
+import { kiConfigured } from '@/modules/ki/agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -235,6 +237,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       {children}
       {/* Fehler melden von jeder Seite aus — der Reiter am rechten Rand. */}
       {sees('fehler') && <TicketOverlay />}
+      {/* Der KI-Chat als zweiter Reiter: offen lassen und weiterarbeiten. */}
+      {sees('ki') && kiConfigured() && <KiOverlay />}
     </AppShell>
   )
 }

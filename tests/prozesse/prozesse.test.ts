@@ -260,4 +260,63 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
       select aktiv from prozesse where code = 'kaputt'`
     assert.equal(kaputt.aktiv, false, 'ein abgelehnter Entwurf schaltet nichts aktiv')
   })
+
+  test('bestehende Prozesse lassen sich umbauen — mit Dienst-Schritt aus dem Katalog', async () => {
+    // Nächste Version des BESTEHENDEN Prozesses (Beleg bleibt, modell
+    // weggelassen): der Umbau hängt einen dienst-Schritt hinter das Erstatten.
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_entwerfen',
+      {
+        parameter: {
+          ...ENTWURF,
+          modell: undefined,
+          schritte: [
+            ...ENTWURF.schritte,
+            {
+              code: 'melden',
+              name: 'Shop benachrichtigen',
+              art: 'dienst',
+              job_kind: 'shopify_tag_add',
+              optional: true,
+            },
+          ],
+          uebergaenge: [
+            ...ENTWURF.uebergaenge,
+            { von: 'erstatten', nach: 'melden' },
+            { von: 'melden', nach: 'ende' },
+          ],
+        },
+      },
+      admin,
+    )
+    assert.match(ergebnis.text ?? '', /Version 2/)
+    const [entwurf] = await h.sql<{ status: string; job_kind: string | null }[]>`
+      select v.status, s.job_kind
+      from prozess_versionen v
+      join prozesse p on p.id = v.prozess_id
+      left join prozess_schritte s on s.version_id = v.id and s.code = 'melden'
+      where p.code = 'ruecknahme' and v.version = 2`
+    assert.equal(entwurf.status, 'entwurf', 'der Umbau bleibt ein Entwurf')
+    assert.equal(entwurf.job_kind, 'shopify_tag_add')
+
+    // Referenzen außerhalb der Kataloge scheitern sofort und verständlich.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            modell: undefined,
+            schritte: [
+              ...ENTWURF.schritte,
+              { code: 'melden', name: 'Kaputt', art: 'dienst', job_kind: 'gibtsnicht' },
+            ],
+            uebergaenge: [...ENTWURF.uebergaenge, { von: 'erstatten', nach: 'melden' }],
+          },
+        },
+        admin,
+      ),
+      /unbekannter Job/,
+    )
+  })
 })
