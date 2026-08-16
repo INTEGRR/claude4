@@ -184,6 +184,129 @@ async function klaerfallProvozieren(ctx: FixtureKontext, sql: Sql): Promise<void
   ctx.p4KlaerOrderGid = gid
 }
 
+/**
+ * BUG/00003: bezahlte Bestellung über einen Artikel, der auf Bestellung
+ * gefertigt wird (route_manufacture + route_mto + Stückliste). Die
+ * Bestätigung legt den Fertigungsauftrag automatisch an; die Lieferung
+ * bleibt unreserviert stehen (kein Erzeugnis-Bestand) — der Beleg steht
+ * im Prozess an der Bestellung, der Fertigungszweig wartet sichtbar.
+ */
+async function mtoBestellungEinspeisen(ctx: FixtureKontext, sql: Sql): Promise<string> {
+  const [{ n }] = await sql<{ n: number }[]>`
+    select count(*)::int as n from sales_orders
+    where shopify_order_id like 'gid://shopify/Order/9300%'`
+  const nummer = 9300000 + Number(n)
+  const gid = `gid://shopify/Order/${nummer}`
+
+  // Frischer MTO-Artikel je Lauf (Staging-wiederholbar), OHNE Fertigbestand:
+  // Stückliste 1 × Ersatzteil, Backflush — gefertigt wird erst auf Bestellung.
+  const [stueck] = await sql<{ id: string }[]>`select id from uoms where name = 'Stück'`
+  const [tpl] = await sql<{ id: string }[]>`
+    insert into product_templates (name, uom_id, list_price, weight_g,
+                                   route_manufacture, route_mto)
+    values (${`Prozesstest MTO-Artikel ${nummer}`}, ${stueck.id}, 149, 400, true, true)
+    returning id`
+  await sql`select generate_variants(${tpl.id})`
+  const [variante] = await sql<{ id: string }[]>`
+    select id from product_variants where template_id = ${tpl.id} and active limit 1`
+  await sql`update product_variants set sku = ${`PT-MTO-${nummer}`} where id = ${variante.id}`
+  const [bom] = await sql<{ id: string }[]>`
+    insert into boms (template_id, qty, uom_id) values (${tpl.id}, 1, ${stueck.id}) returning id`
+  await sql`
+    insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
+    select ${bom.id}, 10, ${ctx.teilId}, 1, pt.uom_id, 'backflush'
+    from product_variants pv join product_templates pt on pt.id = pv.template_id
+    where pv.id = ${ctx.teilId}`
+
+  const { fakeOrderHinterlegen } = await import('../../integrationen/shopify-fake.ts')
+  fakeOrderHinterlegen({
+    id: gid,
+    name: `#P4M-${nummer}`,
+    createdAt: '2026-01-04T10:00:00Z',
+    cancelledAt: null,
+    displayFinancialStatus: 'PAID',
+    displayFulfillmentStatus: 'UNFULFILLED',
+    email: 'prozesstest@example.com',
+    tags: [],
+    totalPriceSet: { shopMoney: { amount: '149.00', currencyCode: 'EUR' } },
+    customer: {
+      id: 'gid://shopify/Customer/424242',
+      firstName: 'Paula',
+      lastName: 'Prozess',
+      defaultEmailAddress: { emailAddress: 'prozesstest@example.com' },
+    },
+    shippingAddress: {
+      name: 'Paula Prozess',
+      address1: 'Teststraße 1',
+      address2: null,
+      zip: '10115',
+      city: 'Berlin',
+      countryCodeV2: 'DE',
+      phone: null,
+    },
+    lineItems: {
+      nodes: [
+        {
+          title: `Prozesstest MTO-Artikel ${nummer}`,
+          sku: `PT-MTO-${nummer}`,
+          quantity: 1,
+          currentQuantity: 1,
+          variant: { id: `gid://shopify/ProductVariant/${nummer}` },
+          originalUnitPriceSet: { shopMoney: { amount: '149.00' } },
+        },
+      ],
+    },
+  } as never)
+
+  await sql`
+    insert into shopify_webhook_events (webhook_id, topic, shopify_order_id, payload)
+    values (${`prozesstest-m-${nummer}`}, 'orders/paid', ${gid}, ${sql.json({ id: gid })})
+    on conflict (webhook_id) do nothing`
+  const { processPendingWebhooks } = await import('../../integrationen/import.ts')
+  await processPendingWebhooks(10)
+
+  const [auftrag] = await sql<{ id: string }[]>`
+    select id from sales_orders where shopify_order_id = ${gid} and state = 'sale'`
+  assert.ok(auftrag, 'die bezahlte MTO-Bestellung muss bestätigt sein')
+  ctx.p4MtoAuftragId = auftrag.id
+
+  // Die Bestätigung hat den Fertigungsauftrag angelegt (MTO-Automatik) …
+  const [mo] = await sql<{ id: string; state: string }[]>`
+    select id, state from manufacturing_orders where sales_order_id = ${auftrag.id}`
+  assert.ok(mo, 'MTO muss den Fertigungsauftrag anlegen')
+  assert.equal(mo.state, 'confirmed')
+  ctx.p4MtoMoId = mo.id
+
+  // … und die Lieferung wartet unreserviert (kein Erzeugnis auf Lager).
+  const [picking] = await sql<{ id: string; state: string }[]>`
+    select id, state from stock_pickings
+    where origin_model = 'sales_order' and origin_id = ${auftrag.id}`
+  assert.ok(picking, 'die Lieferung muss existieren')
+  assert.equal(picking.state, 'confirmed', 'ohne Erzeugnis-Bestand keine Reservierung')
+  return picking.id
+}
+
+/** Der Fertigungszweig: der Auftrag wird fertig gemeldet, das Erzeugnis liegt bereit. */
+async function fertigungBereitstellen(ctx: FixtureKontext, sql: Sql): Promise<void> {
+  const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+  await aktionAusfuehrenGeprueft(
+    'fertigung.fertig_melden',
+    { parameter: { mengen: {}, backorder: true }, recordId: ctx.p4MtoMoId },
+    { name: 'prozesstest', role: 'admin' },
+  )
+  const [mo] = await sql<{ state: string }[]>`
+    select state from manufacturing_orders where id = ${ctx.p4MtoMoId}`
+  assert.equal(mo.state, 'done', 'der Fertigungsauftrag muss fertig sein')
+
+  // Die Fertigmeldung reserviert die wartende Lieferung des Auftrags VON
+  // SELBST (mo_produce) — der Beleg rückt im Prozess auf die Verfügbarkeit,
+  // angeboten wird direkt das Label.
+  const [picking] = await sql<{ state: string }[]>`
+    select state from stock_pickings
+    where origin_model = 'sales_order' and origin_id = ${ctx.p4MtoAuftragId}`
+  assert.equal(picking.state, 'assigned', 'die Fertigmeldung muss die Lieferung reservieren')
+}
+
 /** Nach der Auflösung: die Heilung hat bestätigt — die Lieferung ist der Beleg. */
 async function belegNachKlaerung(ctx: FixtureKontext, sql: Sql): Promise<string> {
   const [auftrag] = await sql<{ id: string; state: string }[]>`
@@ -281,6 +404,40 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
           where id = ${ctx.klaerArtikelId}`
         assert.ok(variante.sku?.startsWith('PT-KLAER-'), 'SKU muss übernommen sein')
         assert.ok(variante.shopify_variant_id, 'Shop-Verknüpfung muss übernommen sein')
+      },
+    },
+    {
+      // BUG/00003: fertigen auf Bestellung — der sichtbare Fertigungszweig.
+      // 'verfuegbarkeit' fehlt im Pfad: die Fertigmeldung reserviert die
+      // Lieferung selbst (mo_produce), der Beleg steht danach schon dort.
+      name: 'Produktionsartikel: Fertigungsauftrag entsteht, dann Versand',
+      pfad: ['bestellung', 'fertigen', 'label', 'buchen', 'fulfillment'],
+      ereignisse: {
+        bestellung: mtoBestellungEinspeisen,
+        fertigen: fertigungBereitstellen,
+      },
+      eingaben: {
+        buchen: { mengen: {}, lose: {}, backorder: false },
+      },
+      pruefen: async (sql, ctx, pickingId) => {
+        const [picking] = await sql<{ state: string }[]>`
+          select state from stock_pickings where id = ${pickingId}`
+        assert.equal(picking.state, 'done')
+
+        // Komponenten sind per Backflush verbraucht, der Auftrag ist geliefert.
+        const verbraucht = await sql<{ qty_done: number }[]>`
+          select qty_done from stock_moves
+          where production_id = ${ctx.p4MtoMoId} and variant_id = ${ctx.teilId}
+            and state = 'done'`
+        assert.ok(verbraucht.length > 0, 'die Komponente muss verbraucht sein')
+        const [auftrag] = await sql<{ delivery_status: string | null }[]>`
+          select delivery_status from sales_orders where id = ${ctx.p4MtoAuftragId}`
+        assert.equal(auftrag.delivery_status, 'full')
+
+        // Und die Shop-Rückmeldung ist durch.
+        const [sendung] = await sql<{ shopify_fulfillment_id: string | null }[]>`
+          select shopify_fulfillment_id from shipments where picking_id = ${pickingId}`
+        assert.ok(sendung?.shopify_fulfillment_id, 'das Fulfillment muss gemeldet sein')
       },
     },
   ],

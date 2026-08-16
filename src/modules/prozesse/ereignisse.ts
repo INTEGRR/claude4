@@ -39,6 +39,13 @@ export const EREIGNISSE = {
     beschreibung: 'Der Paketdienst meldet die Zustellung; die Sendung ist damit abgeschlossen.',
     quelle: 'dhl tracking-sync (statusCode delivered)',
   },
+  'fertigung:bereitgestellt': {
+    label: 'Erzeugnis bereitgestellt',
+    beschreibung:
+      'Der Fertigungsauftrag zur Bestellung (fertigen auf Bestellung) ist fertig gemeldet — ' +
+      'das Erzeugnis liegt im Lager, die Lieferung kann reservieren.',
+    quelle: 'intern: fertigung.fertig_melden (MTO-Auftrag aus der Bestätigung)',
+  },
 } satisfies Record<string, EreignisEintrag>
 
 export type EreignisTopic = keyof typeof EREIGNISSE
