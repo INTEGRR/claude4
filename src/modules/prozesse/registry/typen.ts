@@ -63,6 +63,8 @@ export interface AktionsKontext {
   actor: string
   role: Role
   recordId?: string
+  /** Benutzer-ID des Ausführenden — für Aktionen, die den Datensatz zuweisen. */
+  userId?: string
 }
 
 /**

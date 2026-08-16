@@ -48,6 +48,15 @@ const NOCH_OHNE_PROZESS = new Set([
   'einkauf.rechnung_buchen',
   'einkauf.rechnung_zahlen',
   'einkauf.rechnung_stornieren',
+  // Der Fertigungsprozess folgt als P5.
+  'fertigung.auftrag_anlegen',
+  'fertigung.bestaetigen',
+  'fertigung.beginnen',
+  'fertigung.verfuegbarkeit_pruefen',
+  'fertigung.fertig_melden',
+  'fertigung.stornieren',
+  'fertigung.arbeitsgang_starten',
+  'fertigung.arbeitsgang_beenden',
 ])
 
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */

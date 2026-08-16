@@ -3,6 +3,7 @@ import type { AktionsName } from './registry/index.ts'
 import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
+import * as fertigung from './registry/fertigung-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
 import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
@@ -40,6 +41,27 @@ export const AUSFUEHRUNG = {
 
   'fehler.ticket_melden': fehler.ticketMelden,
   'fehler.ticket_status': fehler.ticketStatus,
+
+  'fertigung.auftrag_anlegen': fertigung.auftragAnlegen,
+  'fertigung.bestaetigen': fertigung.bestaetigen,
+  'fertigung.beginnen': fertigung.beginnen,
+  'fertigung.verfuegbarkeit_pruefen': fertigung.verfuegbarkeitPruefen,
+  'fertigung.fertig_melden': fertigung.fertigMelden,
+  'fertigung.stornieren': fertigung.stornieren,
+  'fertigung.arbeitsgang_starten': fertigung.arbeitsgangStarten,
+  'fertigung.arbeitsgang_beenden': fertigung.arbeitsgangBeenden,
+  'fertigung.demontage_anlegen': fertigung.demontageAnlegen,
+  'fertigung.demontage_buchen': fertigung.demontageBuchen,
+  'fertigung.stueckliste_anlegen': fertigung.stuecklisteAnlegen,
+  'fertigung.stueckliste_position_hinzufuegen': fertigung.stuecklistePositionHinzufuegen,
+  'fertigung.stueckliste_position_entfernen': fertigung.stuecklistePositionEntfernen,
+  'fertigung.stueckliste_verbrauch': fertigung.stuecklisteVerbrauch,
+  'fertigung.stueckliste_verbrauchsart': fertigung.stuecklisteVerbrauchsart,
+  'fertigung.auftrag_details': fertigung.auftragDetails,
+  'fertigung.arbeitsplatz_anlegen': fertigung.arbeitsplatzAnlegen,
+  'fertigung.arbeitsplatz_aendern': fertigung.arbeitsplatzAendern,
+  'fertigung.arbeitsgang_hinzufuegen': fertigung.arbeitsgangHinzufuegen,
+  'fertigung.arbeitsgang_entfernen': fertigung.arbeitsgangEntfernen,
 
   'lager.transfer_buchen': lager.transferBuchen,
   'lager.transfer_bestaetigen': lager.transferBestaetigen,

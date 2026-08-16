@@ -153,11 +153,6 @@ function modulVon(datei: string): string {
 const NOCH_NICHT_MIGRIERT = new Set([
   'auswertungen:refreshAnalytics',
   ...['createUser', 'setRole', 'setActive', 'resetPassword'].map((n) => `einstellungen/benutzer:${n}`),
-  ...['createMo', 'confirmMo', 'startMo', 'checkAvailability', 'produceMo', 'cancelMo',
-    'createUnbuild', 'applyUnbuild', 'createBom', 'addBomLine', 'removeBomLine',
-    'setBomConsumption', 'updateMoDetails', 'setBomLineIssueMethod', 'createWorkCenter',
-    'updateWorkCenter', 'addBomOperation', 'removeBomOperation', 'startOperation',
-    'finishOperation'].map((n) => `fertigung:${n}`),
   ...['updatePartner', 'createChildContact'].map((n) => `kontakte:${n}`),
   ...['createEmployee', 'updateEmployee', 'clockToggle', 'clockByBarcode', 'stopEntry',
     'addTimeEntry', 'deleteTimeEntry', 'createShift', 'deleteShift', 'requestAbsence',

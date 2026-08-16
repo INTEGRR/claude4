@@ -1,325 +1,147 @@
 'use server'
-import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { sql } from '@/db/client'
-import { requireWrite } from '@/modules/auth'
-import { parseQtyMap } from '@/modules/shared/form'
-import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
+import { serverAktion } from '@/modules/prozesse/server-aktion'
+import { type ActionResult, isActionError, isActionInfo } from '@/modules/shared/action'
 
-export async function createMo(formData: FormData) {
-  const user = await requireWrite('fertigung')
-  const variantId = String(formData.get('variant_id') ?? '')
-  const qty = Number(formData.get('qty') ?? 0)
-  if (!variantId) return actionError('Bitte ein Produkt auswählen')
-  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
+/**
+ * Dreizeiler um serverAktion(): geprüft, berechtigt und ausgeführt wird in
+ * der Aktions-Registry (prozesse/registry/fertigung.ts) — hier lebt nur noch
+ * der Server-Action-Transport samt revalidatePath und redirect.
+ */
 
-  let id: string
-  try {
-    const [row] = await sql<{ create_manufacturing_order: string }[]>`
-      select create_manufacturing_order(${variantId}, ${qty}, null, null, ${user.name})`
-    id = row.create_manufacturing_order
-  } catch (err) {
-    return actionFail(err)
-  }
-  redirect(`/fertigung/${id}`)
+export async function createMo(formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('fertigung.auftrag_anlegen', { formData })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
-export async function confirmMo(moId: string) {
-  const user = await requireWrite('fertigung')
-  try {
-    await sql`select mo_confirm(${moId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/fertigung/${moId}`)
+export async function confirmMo(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.bestaetigen', { recordId: moId })
 }
 
-export async function startMo(moId: string) {
-  const user = await requireWrite('fertigung')
-  await sql`select mo_start(${moId}, ${user.name})`
-  revalidatePath(`/fertigung/${moId}`)
+export async function startMo(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.beginnen', { recordId: moId })
 }
 
-export async function checkAvailability(moId: string) {
-  await requireWrite('fertigung')
-  await sql`select mo_check_availability(${moId})`
-  revalidatePath(`/fertigung/${moId}`)
-
-  // Ohne Rückmeldung wäre das ein Knopf, der scheinbar nichts tut, wenn kein
-  // Bestand zum Reservieren da ist — genau die Sorte Stille, die Misstrauen sät.
-  const [stand] = await sql<{ offen: number; gesamt: number }[]>`
-    select count(*) filter (where state in ('confirmed', 'waiting'))::int as offen,
-           count(*)::int as gesamt
-    from stock_moves
-    where production_id = ${moId} and state not in ('done', 'cancel')`
-  if (!stand || stand.gesamt === 0) return
-  return stand.offen === 0
-    ? actionInfo('Alle Komponenten sind reserviert.')
-    : actionInfo(
-        `${stand.gesamt - stand.offen} von ${stand.gesamt} Positionen reserviert — für den Rest fehlt Bestand.`,
-      )
+export async function checkAvailability(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.verfuegbarkeit_pruefen', { recordId: moId })
 }
 
-/** Fertigmeldung inkl. abweichender Ist-Mengen aus dem Formular. */
-export async function produceMo(moId: string, formData: FormData) {
-  const user = await requireWrite('fertigung')
-  const qtyRaw = formData.get('qty')
-  const qty = qtyRaw ? Number(qtyRaw) : null
-  const backorder = formData.get('backorder') !== 'no'
-
-  const consumed = parseQtyMap(formData, 'consumed_')
-  const lot = String(formData.get('lot') ?? '').trim() || null
-
-  try {
-    await sql`select mo_produce(${moId}, ${qty}, ${sql.json(consumed)}, ${backorder}, ${user.name}, ${lot})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/fertigung/${moId}`)
-  revalidatePath('/fertigung')
-  revalidatePath('/versand')
+export async function produceMo(moId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.fertig_melden', { recordId: moId, formData })
 }
 
-export async function cancelMo(moId: string) {
-  const user = await requireWrite('fertigung')
-  try {
-    await sql`select mo_cancel(${moId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/fertigung/${moId}`)
+export async function cancelMo(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.stornieren', { recordId: moId })
 }
 
 // --- Demontage -------------------------------------------------------------
 
-export async function createUnbuild(formData: FormData) {
-  const user = await requireWrite('fertigung')
-  const variantId = String(formData.get('variant_id') ?? '')
-  const qty = Number(formData.get('qty') ?? 0)
-  if (!variantId) return actionError('Bitte ein Produkt auswählen')
-  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
-
-  const [bom] = await sql<{ resolve_bom: string | null }[]>`select resolve_bom(${variantId})`
-  if (!bom.resolve_bom) return actionError('Für dieses Produkt existiert keine Stückliste')
-
-  const [stock] = await sql<{ id: string }[]>`
-    select id from stock_locations where full_path = 'WH/Stock'`
-
-  const [row] = await sql<{ id: string }[]>`
-    insert into unbuild_orders (number, variant_id, bom_id, qty, src_location_id, dest_location_id)
-    values (next_sequence('unbuild'), ${variantId}, ${bom.resolve_bom}, ${qty},
-            ${stock.id}, ${stock.id})
-    returning id`
-
-  await sql`select log_event('unbuild_order', ${row.id}, 'state', 'Demontageauftrag angelegt', ${user.name})`
-  revalidatePath('/fertigung/demontage')
+export async function createUnbuild(formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.demontage_anlegen', { formData })
 }
 
-export async function applyUnbuild(unbuildId: string, force: boolean) {
-  const user = await requireWrite('fertigung')
-  try {
-    await sql`select unbuild_apply(${unbuildId}, ${force}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/fertigung/demontage')
+export async function applyUnbuild(unbuildId: string, force: boolean): Promise<ActionResult> {
+  return serverAktion('fertigung.demontage_buchen', {
+    recordId: unbuildId,
+    parameter: { force },
+  })
 }
 
 // --- Stücklisten -----------------------------------------------------------
 
-export async function createBom(formData: FormData) {
-  await requireWrite('fertigung')
-  const templateId = String(formData.get('template_id') ?? '')
-  const qty = Number(formData.get('qty') ?? 1)
-  if (!templateId) return actionError('Bitte ein Produkt auswählen')
-
-  const [tpl] = await sql<{ uom_id: string }[]>`
-    select uom_id from product_templates where id = ${templateId}`
-  if (!tpl) return actionError('Produkt nicht gefunden')
-
-  const [bom] = await sql<{ id: string }[]>`
-    insert into boms (template_id, qty, uom_id) values (${templateId}, ${qty}, ${tpl.uom_id})
-    returning id`
-  redirect(`/fertigung/stuecklisten/${bom.id}`)
+export async function createBom(formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('fertigung.stueckliste_anlegen', { formData })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
-export async function addBomLine(bomId: string, formData: FormData) {
-  await requireWrite('fertigung')
-  const variantId = String(formData.get('component_variant_id') ?? '')
-  const qty = Number(formData.get('qty') ?? 0)
-  const issueMethod = formData.get('issue_method') === 'manual' ? 'manual' : 'backflush'
-  if (!variantId) return actionError('Bitte eine Komponente auswählen')
-  if (!(qty > 0)) return actionError('Die Menge muss größer als 0 sein')
-
-  const [info] = await sql<{ uom_id: string }[]>`
-    select pt.uom_id from product_variants pv
-    join product_templates pt on pt.id = pv.template_id where pv.id = ${variantId}`
-
-  const [line] = await sql<{ id: string }[]>`
-    insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
-    values (${bomId},
-            coalesce((select max(sequence) + 10 from bom_lines where bom_id = ${bomId}), 10),
-            ${variantId}, ${qty}, ${info.uom_id}, ${issueMethod}::component_issue_method)
-    returning id`
-
-  // "Auf Varianten anwenden": ausgewählte Attributwerte übernehmen.
-  const ptavIds = formData.getAll('ptav_ids').map(String).filter(Boolean)
-  for (const ptavId of ptavIds) {
-    await sql`insert into bom_line_variant_filters (bom_line_id, ptav_id)
-              values (${line.id}, ${ptavId}) on conflict do nothing`
-  }
-
-  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+export async function addBomLine(bomId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.stueckliste_position_hinzufuegen', { recordId: bomId, formData })
 }
 
-export async function removeBomLine(bomId: string, lineId: string) {
-  await requireWrite('fertigung')
-  await sql`delete from bom_lines where id = ${lineId} and bom_id = ${bomId}`
-  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+export async function removeBomLine(bomId: string, lineId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.stueckliste_position_entfernen', {
+    recordId: bomId,
+    parameter: { line_id: lineId },
+  })
 }
 
-export async function setBomConsumption(bomId: string, formData: FormData) {
-  await requireWrite('fertigung')
-  const value = String(formData.get('consumption') ?? 'warning')
-  await sql`update boms set consumption = ${value}::consumption_rule where id = ${bomId}`
-  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+export async function setBomConsumption(bomId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.stueckliste_verbrauch', { recordId: bomId, formData })
 }
 
-/** Verantwortlichen und Priorität des Fertigungsauftrags setzen. */
-export async function updateMoDetails(moId: string, formData: FormData) {
-  await requireWrite('fertigung')
-  await sql`
-    update manufacturing_orders set
-      user_id = ${String(formData.get('user_id') ?? '') || null},
-      priority = ${formData.get('priority') === 'on' ? '1' : '0'}
-    where id = ${moId}`
-  revalidatePath(`/fertigung/${moId}`)
+export async function updateMoDetails(moId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.auftrag_details', { recordId: moId, formData })
 }
 
-/** Verbrauchsart einer Stücklistenposition umstellen (Backflush ⇄ manuell). */
-export async function setBomLineIssueMethod(bomId: string, lineId: string, method: string) {
-  await requireWrite('fertigung')
-  const value = method === 'manual' ? 'manual' : 'backflush'
-  await sql`
-    update bom_lines
-       set issue_method = ${value}::component_issue_method,
-           manual_consumption = ${value === 'manual'}
-     where id = ${lineId} and bom_id = ${bomId}`
-  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+export async function setBomLineIssueMethod(
+  bomId: string,
+  lineId: string,
+  method: string,
+): Promise<ActionResult> {
+  return serverAktion('fertigung.stueckliste_verbrauchsart', {
+    recordId: bomId,
+    parameter: { line_id: lineId, method: method === 'manual' ? 'manual' : 'backflush' },
+  })
 }
 
 // --- Arbeitsplätze ---------------------------------------------------------
 
-export async function createWorkCenter(formData: FormData) {
-  await requireWrite('fertigung')
-  const code = String(formData.get('code') ?? '').trim().toUpperCase()
-  const name = String(formData.get('name') ?? '').trim()
-  if (!code) return actionError('Bitte ein Kürzel vergeben')
-  if (!name) return actionError('Bitte einen Namen vergeben')
-
-  try {
-    await sql`
-      insert into work_centers (code, name, cost_per_hour, capacity, time_efficiency, note)
-      values (${code}, ${name},
-              ${Number(formData.get('cost_per_hour') ?? 0) || 0},
-              ${Number(formData.get('capacity') ?? 1) || 1},
-              ${Number(formData.get('time_efficiency') ?? 100) || 100},
-              ${String(formData.get('note') ?? '').trim() || null})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/fertigung/arbeitsplaetze')
+export async function createWorkCenter(formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.arbeitsplatz_anlegen', { formData })
 }
 
-export async function updateWorkCenter(workCenterId: string, formData: FormData) {
-  await requireWrite('fertigung')
-  try {
-    await sql`
-      update work_centers set
-        name = ${String(formData.get('name') ?? '').trim()},
-        cost_per_hour = ${Number(formData.get('cost_per_hour') ?? 0) || 0},
-        capacity = ${Number(formData.get('capacity') ?? 1) || 1},
-        time_efficiency = ${Number(formData.get('time_efficiency') ?? 100) || 100},
-        active = ${formData.get('active') === 'on'},
-        note = ${String(formData.get('note') ?? '').trim() || null}
-      where id = ${workCenterId}`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/fertigung/arbeitsplaetze')
+export async function updateWorkCenter(
+  workCenterId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  return serverAktion('fertigung.arbeitsplatz_aendern', { recordId: workCenterId, formData })
 }
 
 // --- Arbeitsgänge an der Stückliste ---------------------------------------
 
-export async function addBomOperation(bomId: string, formData: FormData) {
-  await requireWrite('fertigung')
-  const name = String(formData.get('name') ?? '').trim()
-  const workCenter = String(formData.get('work_center_id') ?? '')
-  if (!name) return actionError('Bitte den Arbeitsgang benennen')
-  if (!workCenter) return actionError('Bitte einen Arbeitsplatz auswählen')
-
-  try {
-    await sql`
-      insert into bom_operations (bom_id, sequence, name, work_center_id,
-                                  duration_minutes, setup_minutes)
-      values (${bomId},
-              coalesce((select max(sequence) + 10 from bom_operations where bom_id = ${bomId}), 10),
-              ${name}, ${workCenter},
-              ${Number(formData.get('duration_minutes') ?? 0) || 0},
-              ${Number(formData.get('setup_minutes') ?? 0) || 0})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+export async function addBomOperation(bomId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.arbeitsgang_hinzufuegen', { recordId: bomId, formData })
 }
 
-export async function removeBomOperation(bomId: string, operationId: string) {
-  await requireWrite('fertigung')
-  await sql`delete from bom_operations where id = ${operationId} and bom_id = ${bomId}`
-  revalidatePath(`/fertigung/stuecklisten/${bomId}`)
+export async function removeBomOperation(
+  bomId: string,
+  operationId: string,
+): Promise<ActionResult> {
+  return serverAktion('fertigung.arbeitsgang_entfernen', {
+    recordId: bomId,
+    parameter: { operation_id: operationId },
+  })
 }
 
 // --- Arbeitsgänge am Auftrag ----------------------------------------------
 
-export async function startOperation(moId: string, operationId: string, formData?: FormData) {
-  const user = await requireWrite('fertigung')
-  const employeeId = String(formData?.get('employee_id') ?? '').trim() || null
-  try {
-    await sql`select mo_operation_start(${operationId}, ${user.name})`
-    await sql`update mo_operations set user_id = ${user.id} where id = ${operationId}`
-    await sql`select mo_start(${moId}, ${user.name})`
-    // Mit Mitarbeiter läuft zusätzlich die Zeiterfassung — dann zählt beim
-    // Abschluss der Personalkostensatz statt des Arbeitsplatzsatzes.
-    if (employeeId) {
-      await sql`select time_entry_start(${employeeId}, 'production', ${operationId}, ${user.name})`
-    }
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/fertigung/${moId}`)
-  revalidatePath('/zeiterfassung')
+export async function startOperation(
+  moId: string,
+  operationId: string,
+  formData?: FormData,
+): Promise<ActionResult> {
+  return serverAktion('fertigung.arbeitsgang_starten', {
+    recordId: moId,
+    parameter: {
+      operation_id: operationId,
+      employee_id: String(formData?.get('employee_id') ?? '').trim() || undefined,
+    },
+  })
 }
 
-/** Arbeitsgang beenden — ohne Minutenangabe zählt die Zeit seit dem Start. */
-export async function finishOperation(moId: string, operationId: string, formData: FormData) {
-  const user = await requireWrite('fertigung')
+export async function finishOperation(
+  moId: string,
+  operationId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const raw = String(formData.get('minutes') ?? '').trim()
-  const minutes = raw === '' ? null : Number(raw)
-  if (minutes !== null && (!Number.isFinite(minutes) || minutes < 0)) {
-    return actionError('Bitte eine gültige Dauer in Minuten erfassen')
-  }
-  // Ein zweiter Klick auf einen erledigten Arbeitsgang soll nicht stumm
-  // verpuffen — sagen, dass es nichts zu tun gibt.
-  const [vorher] = await sql<{ state: string }[]>`
-    select state from mo_operations where id = ${operationId}`
-  if (vorher?.state === 'done') {
-    return actionInfo('Dieser Arbeitsgang war bereits abgeschlossen.')
-  }
-  try {
-    await sql`select mo_operation_finish(${operationId}, ${minutes}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/fertigung/${moId}`)
-  revalidatePath('/zeiterfassung')
+  return serverAktion('fertigung.arbeitsgang_beenden', {
+    recordId: moId,
+    parameter: {
+      operation_id: operationId,
+      minutes: raw === '' ? undefined : Number(raw),
+    },
+  })
 }

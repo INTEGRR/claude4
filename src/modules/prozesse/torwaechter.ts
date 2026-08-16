@@ -81,7 +81,7 @@ export function aktionErlaubt(aktion: RegistrierteAktion, role: Role): boolean {
 export async function aktionAusfuehrenGeprueft(
   name: string,
   aufruf: AktionsAufruf,
-  nutzer: { name: string; role: Role },
+  nutzer: { name: string; role: Role; id?: string },
 ): Promise<AktionsErgebnis> {
   const { aktion, werte, recordId } = aktionPruefen(name, aufruf)
 
@@ -101,7 +101,12 @@ export async function aktionAusfuehrenGeprueft(
   try {
     const fn = AUSFUEHRUNG[name as keyof typeof AUSFUEHRUNG]
     ergebnis =
-      (await fn(werte as never, { actor: nutzer.name, role: nutzer.role, recordId })) ?? {}
+      (await fn(werte as never, {
+        actor: nutzer.name,
+        role: nutzer.role,
+        recordId,
+        userId: nutzer.id,
+      })) ?? {}
   } catch (err) {
     // Fachliche Fehler aus den SQL-Funktionen (raise exception) verständlich
     // weiterreichen — das Präfix des Treibers interessiert niemanden.
