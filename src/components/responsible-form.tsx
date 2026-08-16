@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
+import type { ActionResult } from '@/modules/shared/action'
 
 /**
  * Kompakte Zeile "Verantwortlich + Dringend" für Beleg-Detailseiten
@@ -10,7 +11,7 @@ export async function ResponsibleForm({
   userId,
   priority,
 }: {
-  action: (formData: FormData) => Promise<void>
+  action: (formData: FormData) => Promise<ActionResult>
   userId: string | null
   priority: string
 }) {

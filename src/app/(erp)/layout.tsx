@@ -168,6 +168,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ...(sees('integrationen')
           ? [{ href: '/integrationen', label: 'Integrationen', count: counts.fehler }]
           : []),
+        ...(sees('einstellungen') ? [{ href: '/prozesse', label: 'Prozesse' }] : []),
         ...(sees('einstellungen') ? [{ href: '/einstellungen', label: 'Einstellungen' }] : []),
         ...(sees('fehler')
           ? [{ href: '/tickets', label: 'Tickets', count: counts.offene_bugs }]

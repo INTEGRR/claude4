@@ -1,0 +1,62 @@
+import { z } from 'zod'
+import type { RegistrierteAktion } from './registry/typen.ts'
+import { REGISTRY, alleAktionen } from './registry/index.ts'
+import { JOB_KATALOG } from './jobs-katalog.ts'
+import { EREIGNISSE } from './ereignisse.ts'
+
+/**
+ * Selbstauskunft der Registry — speist die Repository-Seite (/prozesse) und
+ * GET /api/aktion. Bewusst datenbankfrei; die Feldableitung ist hier nur so
+ * tief, wie es die Übersicht braucht (die vollwertige, formulartaugliche
+ * Ableitung kommt mit der Maskengenerierung in Phase 4).
+ */
+
+export interface FeldInfo {
+  name: string
+  pflicht: boolean
+  beschreibung?: string
+}
+
+/** Innerste Typ-Schale eines zod-Feldes freilegen (Optional/Default/Effects). */
+function kern(schema: z.ZodTypeAny): z.ZodTypeAny {
+  let s = schema
+  for (;;) {
+    if (s instanceof z.ZodOptional || s instanceof z.ZodDefault || s instanceof z.ZodNullable) {
+      s = s._def.innerType as z.ZodTypeAny
+    } else if (s instanceof z.ZodEffects) {
+      s = s._def.schema as z.ZodTypeAny
+    } else {
+      return s
+    }
+  }
+}
+
+export function aktionsFelder(aktion: RegistrierteAktion): FeldInfo[] {
+  const objekt = kern(aktion.schema)
+  if (!(objekt instanceof z.ZodObject)) return []
+  return Object.entries(objekt.shape as Record<string, z.ZodTypeAny>).map(([name, feld]) => ({
+    name,
+    pflicht: !(feld instanceof z.ZodOptional) && !(feld instanceof z.ZodDefault),
+    beschreibung: feld.description,
+  }))
+}
+
+/** Der komplette Katalog als schlichte Datenstruktur (für Seite und API). */
+export function repository() {
+  return {
+    aktionen: alleAktionen().map(([name, a]) => ({
+      name,
+      label: a.label,
+      bereich: a.bereich,
+      beschreibung: a.beschreibung,
+      bindung: a.bindung,
+      modell: a.modell ?? null,
+      uebergang: a.uebergang ?? null,
+      nurAdmin: a.nurAdmin ?? false,
+      prozessfrei: a.prozessfrei ?? false,
+      felder: aktionsFelder(a),
+    })),
+    jobs: Object.entries(JOB_KATALOG).map(([kind, j]) => ({ kind, ...j })),
+    ereignisse: Object.entries(EREIGNISSE).map(([topic, e]) => ({ topic, ...e })),
+  }
+}

@@ -8,6 +8,12 @@ import {
   updateTrackingInfo,
 } from './shopify'
 import { sendMail } from './mail'
+import type { JobKind } from '@/modules/prozesse/jobs-katalog'
+
+/** Nachschlag über den (aus der DB stammenden) Job-Typ als String. */
+function handlerFuer(kind: string): Handler | undefined {
+  return (handlers as Record<string, Handler>)[kind]
+}
 
 /**
  * Outbox-Runner: alle ausgehenden Aufrufe (Shopify, E-Mail) laufen als Job mit
@@ -18,7 +24,13 @@ type Handler = (payload: Record<string, unknown>) => Promise<string>
 
 const BACKOFF_MINUTES = [1, 5, 15, 60, 180]
 
-const handlers: Record<string, Handler> = {
+/**
+ * `satisfies Record<JobKind, …>`: jeder Job aus dem Katalog
+ * (prozesse/jobs-katalog.ts) muss einen Handler haben und umgekehrt —
+ * ein neuer Job ohne Katalogeintrag bricht den Typecheck, nicht erst
+ * die Outbox um drei Uhr nachts.
+ */
+const handlers = {
   /** Meldet die Sendung an Shopify: Fulfillment mit Tracking + Kundenmail. */
   async shopify_fulfillment_create(payload) {
     const shipmentId = String(payload.shipment_id)
@@ -241,7 +253,7 @@ const handlers: Record<string, Handler> = {
     await sql`update return_labels set emailed_at = now() where id = ${labelId}`
     return `Retourenlabel an ${label.email} gesendet`
   },
-}
+} satisfies Record<JobKind, Handler>
 
 export interface RunResult {
   ran: number
@@ -295,7 +307,7 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
   let failed = 0
 
   for (const job of jobs) {
-    const handler = handlers[job.kind]
+    const handler = handlerFuer(job.kind)
     if (!handler) {
       await sql`update integration_jobs
                 set status = 'failed', last_error = ${`Unbekannter Job-Typ: ${job.kind}`}
