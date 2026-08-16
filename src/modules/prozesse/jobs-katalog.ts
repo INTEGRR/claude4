@@ -27,6 +27,13 @@ export const JOB_KATALOG = {
     beschreibung: 'Hängt einen Status-Tag an die Shop-Bestellung (optional, Default aus).',
     faehigkeit: 'shop:tag_setzen',
   },
+  shopify_order_cancel: {
+    label: 'Storno an den Shop melden',
+    beschreibung:
+      'Storniert die Shop-Bestellung nach einem ERP-Storno (Bestand zurück ins Shop-Inventar); ' +
+      'die Rückerstattung bleibt ein manueller Schritt im Shop.',
+    faehigkeit: 'shop:bestellung_stornieren',
+  },
   shopify_inventory_push: {
     label: 'Bestand an den Shop melden',
     beschreibung: 'Überträgt geänderte verfügbare Mengen (Dedupe „inventar-abgleich").',

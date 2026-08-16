@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import type { ProzessFixture } from './typen.ts'
+import { bestellungEinspeisen } from './shopify-versand.ts'
 
 /**
  * P: Manueller Verkauf — Angebot, wiederholbarer Positionsschritt,
@@ -41,6 +42,47 @@ export const VERKAUF_FIXTURE: ProzessFixture = {
         const [auftrag] = await sql<{ state: string }[]>`
           select state from sales_orders where id = ${orderId}`
         assert.equal(auftrag.state, 'cancel')
+      },
+    },
+    {
+      // BUG/00001: der ERP-Storno eines Shop-Auftrags zieht den Shop nach
+      // (orderCancel mit Restock; Rückerstattung bleibt manuell) — als
+      // sichtbarer dienst-Schritt, den es nur für Shop-Aufträge gibt.
+      name: 'Shop-Auftrag stornieren meldet den Storno an den Shop',
+      beleg: async (ctx, sql) => {
+        await bestellungEinspeisen(ctx, sql)
+        return ctx.p4AuftragId
+      },
+      pfad: ['stornieren', 'shop_storno'],
+      pruefen: async (sql, ctx) => {
+        const [auftrag] = await sql<{ state: string }[]>`
+          select state from sales_orders where id = ${ctx.p4AuftragId}`
+        assert.equal(auftrag.state, 'cancel')
+
+        const [job] = await sql<{ status: string }[]>`
+          select status from integration_jobs
+          where kind = 'shopify_order_cancel'
+            and payload ->> 'sales_order_id' = ${ctx.p4AuftragId}`
+        assert.equal(job?.status, 'done', 'der Shop-Storno-Job muss durchgelaufen sein')
+
+        // Der Storno-Hinweis (inkl. „Rückerstattung manuell") steht am Auftrag.
+        const [hinweis] = await sql<{ message: string }[]>`
+          select message from audit_log
+          where model = 'sales_order' and record_id = ${ctx.p4AuftragId}::uuid
+            and message like '%Shop-Bestellung storniert%'`
+        assert.ok(hinweis, 'der Storno-Hinweis muss am Auftrag stehen')
+
+        // Der Riegel: ein bereits versandter Shop-Auftrag (aus dem
+        // Klärfall-Lauf) lässt sich NICHT stornieren — der Weg ist die Retoure.
+        const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+        await assert.rejects(
+          aktionAusfuehrenGeprueft(
+            'verkauf.stornieren',
+            { recordId: ctx.p4KlaerAuftragId },
+            { name: 'prozesstest', role: 'admin' },
+          ),
+          /Retoure/,
+        )
       },
     },
   ],

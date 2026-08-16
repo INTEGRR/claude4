@@ -116,7 +116,10 @@ export async function importShopifyOrder(
         await t`select log_event('sales_order', ${existing.id}, 'note',
           'In Shopify erstattet — Auftrag storniert.', 'shopify')`
       }
-      if (existing.delivery_status !== 'none') {
+      // partial/full = Ware (teilweise) beim Kunden. Der frühere Vergleich
+      // mit 'none' (kein Enum-Wert) war immer wahr und warnte bei jedem
+      // Shop-Storno; 'started' heißt nur reserviert und ist unkritisch.
+      if (['partial', 'full'].includes(existing.delivery_status)) {
         await t`select log_event('sales_order', ${existing.id}, 'error',
           'Ware war bereits (teilweise) versandt — für die Rückabwicklung eine Retoure bzw. Reparatur/RMA anlegen.',
           'shopify')`

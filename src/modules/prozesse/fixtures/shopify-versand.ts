@@ -16,7 +16,7 @@ import type { FixtureKontext, ProzessFixture } from './typen.ts'
  * Auslöser laufen aber nur im Harness, wo der Loader server-only stubt.
  */
 
-async function bestellungEinspeisen(ctx: FixtureKontext, sql: Sql): Promise<string> {
+export async function bestellungEinspeisen(ctx: FixtureKontext, sql: Sql): Promise<string> {
   // Wiederholbar (Staging!): jede Einspeisung bekommt die nächste freie Nummer.
   const [{ n }] = await sql<{ n: number }[]>`
     select count(*)::int as n from sales_orders

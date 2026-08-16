@@ -30,7 +30,35 @@ export async function bestaetigen(_p: object, ctx: AktionsKontext): Promise<Akti
 }
 
 export async function stornieren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [auftrag] = await sql<
+    { source: string; shopify_order_id: string | null; delivery_status: string }[]
+  >`
+    select source, shopify_order_id, delivery_status
+    from sales_orders where id = ${ctx.recordId!}`
+
+  // Versandte Shop-Aufträge lassen sich nicht mehr stornieren — Shopify kann
+  // versendete Bestellungen nicht sauber stornieren; der Weg ist die Retoure.
+  // ('pending'/'started' = nichts beim Kunden, nur reserviert — stornierbar.)
+  if (auftrag?.source === 'shopify' && ['partial', 'full'].includes(auftrag.delivery_status)) {
+    throw new Error(
+      'Die Ware ist (teilweise) versandt — der Shop-Auftrag lässt sich nicht mehr ' +
+        'stornieren. Bitte eine Retoure anlegen (Versand → Retouren).',
+    )
+  }
+
   await sql`select cancel_sales_order(${ctx.recordId!}, ${ctx.actor})`
+
+  // ERP-Storno eines Shop-Auftrags → Storno im Shop nachziehen (Outbox):
+  // Restock ja, Rückerstattung bleibt bewusst manuell im Shopify-Backend.
+  if (auftrag?.source === 'shopify' && auftrag.shopify_order_id) {
+    await sql`select enqueue_job('shopify_order_cancel',
+      ${sql.json({ sales_order_id: ctx.recordId })},
+      ${`shop-storno-${ctx.recordId}`})`
+    return {
+      recordId: ctx.recordId,
+      text: 'Storniert — der Shop-Storno (mit Restock) läuft; Rückerstattung bitte manuell im Shop.',
+    }
+  }
   return { recordId: ctx.recordId }
 }
 

@@ -467,6 +467,38 @@ export async function createFulfillment(
   return result.fulfillment.id
 }
 
+/**
+ * Storniert eine Shop-Bestellung nach einem ERP-Storno: Bestand wandert
+ * zurück ins Shop-Inventar (restock), die RÜCKERSTATTUNG bleibt bewusst ein
+ * manueller Schritt im Shopify-Backend — Geldbewegungen automatisiert das
+ * ERP nicht.
+ */
+export async function cancelOrder(orderId: string): Promise<void> {
+  const data = await shopifyGraphQL<{
+    orderCancel: {
+      job: { id: string } | null
+      orderCancelUserErrors: { field: string[] | null; message: string }[]
+    }
+  }>(
+    `mutation($orderId: ID!, $restock: Boolean!, $refund: Boolean!, $notifyCustomer: Boolean, $reason: OrderCancelReason!) {
+       orderCancel(orderId: $orderId, restock: $restock, refund: $refund,
+                   notifyCustomer: $notifyCustomer, reason: $reason) {
+         job { id }
+         orderCancelUserErrors { field message }
+       }
+     }`,
+    { orderId, restock: true, refund: false, notifyCustomer: true, reason: 'OTHER' },
+  )
+
+  const errors = data.orderCancel.orderCancelUserErrors
+  if (errors.length) {
+    const msg = errors.map((e) => e.message).join('; ')
+    // Bereits versandte/stornierte Bestellungen heilen sich nicht durch Wiederholung.
+    const permanent = /fulfilled|already|cannot be cancel/i.test(msg)
+    throw new ShopifyError(`Shop-Storno abgelehnt: ${msg}`, !permanent)
+  }
+}
+
 export async function updateTrackingInfo(
   fulfillmentId: string,
   tracking: TrackingInfo,

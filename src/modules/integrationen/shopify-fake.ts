@@ -68,6 +68,21 @@ export async function fakeShopifyGraphQL<T>(
         return { fulfillmentTrackingInfoUpdate: { userErrors: [] } }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }
+      case 'orderCancel': {
+        // Wie im echten Shop: die Bestellung gilt danach als storniert.
+        const bestellung = FAKE_BESTELLUNGEN.get(String(variables.orderId)) as
+          | { cancelledAt?: string | null }
+          | undefined
+        if (bestellung) bestellung.cancelledAt = '2026-01-03T12:00:00Z'
+        return {
+          orderCancel: {
+            job: { id: 'gid://shopify/Job/1' },
+            orderCancelUserErrors: bestellung
+              ? []
+              : [{ field: null, message: 'Order not found' }],
+          },
+        }
+      }
       default:
         return null
     }

@@ -3,6 +3,7 @@ import { sql } from '@/db/client'
 import {
   ShopifyError,
   addOrderTags,
+  cancelOrder,
   createFulfillment,
   fetchFulfillmentOrders,
   updateTrackingInfo,
@@ -124,6 +125,22 @@ const handlers = {
       set shopify_tags_pushed = array(select distinct unnest(shopify_tags_pushed || ${tags}))
       where id = ${orderId}`
     return `Tags gesetzt: ${tags.join(', ')}`
+  },
+
+  /** Meldet einen ERP-Storno an den Shop: Bestellung stornieren + Restock. */
+  async shopify_order_cancel(payload) {
+    const orderId = String(payload.sales_order_id)
+    const [order] = await sql<{ shopify_order_id: string | null; state: string }[]>`
+      select shopify_order_id, state from sales_orders where id = ${orderId}`
+    if (!order?.shopify_order_id) return 'Kein Shopify-Auftrag — nichts zu stornieren'
+    // Zwischenzeitlich reaktiviert (zurück auf Angebot): den Shop in Ruhe lassen.
+    if (order.state !== 'cancel') return 'Auftrag ist nicht mehr storniert — übersprungen'
+
+    await cancelOrder(order.shopify_order_id)
+    await sql`select log_event('sales_order', ${orderId}, 'note',
+      'Shop-Bestellung storniert (Bestand zurückgebucht) — Rückerstattung bitte manuell im Shop.',
+      'shopify')`
+    return 'Shop-Bestellung storniert; Rückerstattung bleibt manuell'
   },
 
   /** Bestellung als PDF-Anhang an den Lieferanten. */
@@ -270,6 +287,9 @@ async function originForJob(
   payload: Record<string, unknown>,
 ): Promise<{ model: string; id: string } | null> {
   if (kind === 'shopify_tag_add' && payload.sales_order_id) {
+    return { model: 'sales_order', id: String(payload.sales_order_id) }
+  }
+  if (kind === 'shopify_order_cancel' && payload.sales_order_id) {
     return { model: 'sales_order', id: String(payload.sales_order_id) }
   }
   if (kind === 'send_po_email' && payload.purchase_order_id) {
