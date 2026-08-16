@@ -189,6 +189,28 @@ describe('Prozessmodell: Versionspflege', () => {
   })
 })
 
+describe('Bug-Loop: prozess_fuer_pfad', () => {
+  test('löst Seitenpfade auf Prozesse auf — längster Treffer gewinnt', async () => {
+    await withRollback(async (t) => {
+      const fuer = async (pfad: string) =>
+        (await t<{ prozess_code: string }[]>`
+          select prozess_code from prozess_fuer_pfad(${pfad})`)[0]?.prozess_code ?? null
+
+      // prozess_routen (Seiten ohne Beleg-ID) …
+      assert.equal(await fuer('/reparatur'), 'reparatur')
+      assert.equal(await fuer('/tickets'), 'bug_ticket')
+      assert.equal(await fuer('/p/artikel_anlegen'), 'artikel_anlegen')
+      // … und routen_muster der Modelle (':id' = ein Pfadsegment).
+      assert.equal(await fuer('/reparatur/0e8f6c2a-1111-2222-3333-444455556666'), 'reparatur')
+      assert.equal(await fuer('/tickets/irgendeine-id'), 'bug_ticket')
+      // Kein aktiver Prozess fürs Modell / unbekannte Seite → keine Zuordnung.
+      assert.equal(await fuer('/verkauf/123'), null)
+      assert.equal(await fuer('/auswertungen'), null)
+      assert.equal(await fuer(''), null)
+    })
+  })
+})
+
 describe('Prozessmodell: beleglose Instanzen', () => {
   test('starten, weiterschalten, fertig — beleggebundene Prozesse lehnen ab', async () => {
     await withRollback(async (t) => {

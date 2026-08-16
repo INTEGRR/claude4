@@ -216,9 +216,45 @@ src/components/prozess-aktionen.tsx     Client: Schritte als Tasten, dahinter da
   dass KEIN Registry-Schema in einem Feldtyp landet, den das generierte
   Formular nicht darstellen kann.
 
+## Phase 5a — Bug-Loop + Staging-Automation (umgesetzt)
+
+**Jeder gemeldete Fehler kennt seinen Prozess, und jeder Fix wird im
+Staging automatisiert durch die Prozesse gespielt — das Ergebnis hängt
+samt Commit am Ticket.**
+
+- **Zuordnung beim Melden** (`prozess_fuer_pfad`, Migration 0040): die
+  Seite, von der das Slide-out meldet, bestimmt den betroffenen Prozess —
+  über `prozess_routen` (Seiten ohne Beleg-ID) und die `routen_muster`
+  der Modelle (`:id` = ein Pfadsegment), längster Treffer gewinnt.
+  `fehler.ticket_melden` schreibt `prozess_code`/`schritt_code` ans Ticket.
+- **Ticketseite**: Karte „Betroffener Prozess" mit Prozess, Schritt und
+  dem Testlauf-Stand — grün/rot/nie gelaufen, Commit-Link, Zeitpunkt,
+  Befund. Die Testfelder stammen aus 0036 (`test_ok`, `test_befund`,
+  `test_commit_sha`, `test_gelaufen_am`).
+- **`scripts/ticket-abschliessen.ts BUG/… <sha> [--rot] [--befund]`**
+  schreibt das Ergebnis eines Prozesstest-Laufs ans Ticket und in die
+  Ereignisleiste. Es setzt NUR die Testfelder — den Status „behoben"
+  setzt weiterhin ein Mensch oder Claude auf Zuruf: der Test beweist,
+  er entscheidet nicht.
+- **GitHub-Action `.github/workflows/prozesse-staging.yml`**
+  (workflow_dispatch mit Ticket/„nur"-Filter, Push auf `staging`):
+  Migrationsstand → Reset mit Umgebungs-Riegel → Fixture-Grundbestand →
+  alle Prozessläufe mit Fakes → Ergebnis ans Ticket (grün wie rot).
+  Voraussetzung: Secret `STAGING_DATABASE_URL` + Staging-Merker
+  `settings.umgebung = {"name":"staging"}` in der Zieldatenbank.
+- **Der Loop ist getestet**: der bug_ticket-Prozesslauf meldet von
+  `/reparatur`, prüft die automatische Zuordnung und lässt
+  ticket-abschliessen.ts einmal komplett gegen die Harness-Datenbank
+  laufen (test_ok + Commit am Ticket).
+
+Noch offen in Phase 5: **P4 shopify_bestellung_versand** als Prozess mit
+ereignis-/dienst-/matching-Schritten (braucht die Registry-Migration der
+Versand-Aktionen und die Schrittart-Ausführung im Harness).
+
 ## Kommende Phasen (Kurzfassung)
 
-5. **Externe Schritte + Bug-Loop + Staging-Automation** (Ticket ↔ Prozesstest ↔ Commit).
+5. **Externe Schritte** (Rest): P4 Shopify-Bestellung → Versand mit
+   ereignis/dienst/matching im Harness.
 6. **Breitenmigration + Laufzeit-Overrides** (Schritte an/aus je Firma).
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
    Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer

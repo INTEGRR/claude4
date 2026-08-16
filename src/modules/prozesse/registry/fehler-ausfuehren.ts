@@ -7,10 +7,19 @@ export async function ticketMelden(
   p: { titel: string; beschreibung?: string; seite?: string; schwere: string },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Bug-Loop: aus der meldenden Seite den betroffenen Prozess auflösen —
+  // der Prozesstest weiß dann, was er durchspielen muss.
+  const [zuordnung] = p.seite
+    ? await sql<{ prozess_code: string; schritt_code: string | null }[]>`
+        select prozess_code, schritt_code from prozess_fuer_pfad(${p.seite})`
+    : []
+
   const [row] = await sql<{ id: string; number: string }[]>`
-    insert into bug_reports (number, titel, beschreibung, seite, schwere, gemeldet_von)
+    insert into bug_reports (number, titel, beschreibung, seite, schwere, gemeldet_von,
+                             prozess_code, schritt_code)
     values (next_sequence('bug'), ${p.titel}, ${p.beschreibung ?? null}, ${p.seite ?? null},
-            ${p.schwere}::bug_schwere, ${ctx.actor})
+            ${p.schwere}::bug_schwere, ${ctx.actor},
+            ${zuordnung?.prozess_code ?? null}, ${zuordnung?.schritt_code ?? null})
     returning id, number`
   return {
     text: `Ticket ${row.number} angelegt — danke!`,

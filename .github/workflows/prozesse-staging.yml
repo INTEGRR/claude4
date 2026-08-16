@@ -1,0 +1,80 @@
+# Prozesstests im Staging: jeder Bugfix wird automatisiert durch die
+# Prozesse gespielt, bevor ein Mensch das Ticket schließt.
+#
+# Ablauf je Lauf: Migrationsstand herstellen → Staging zurücksetzen
+# (demodaten_loeschen, nur mit settings.umgebung = {"name":"staging"} —
+# der Riegel in scripts/prozessdaten.ts) → Fixture-Grundbestand aufbauen →
+# alle Prozessläufe mit Fake-Adaptern (SHOPIFY_FAKE/DHL_FAKE) → bei Angabe
+# eines Tickets das Ergebnis samt Commit ans Ticket schreiben.
+#
+# Voraussetzung: Repository-Secret STAGING_DATABASE_URL zeigt auf die
+# Staging-Datenbank, und dort ist der Staging-Merker gesetzt:
+#   insert into settings (key, value) values ('umgebung', '{"name":"staging"}')
+#   on conflict (key) do update set value = excluded.value;
+
+name: Prozesse (Staging)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket:
+        description: 'Ticketnummer (BUG/…), an die das Ergebnis geschrieben wird'
+        required: false
+        type: string
+      nur:
+        description: 'Nur einen Prozess testen (--test-name-pattern, z. B. reparatur)'
+        required: false
+        type: string
+  push:
+    branches: [staging]
+
+concurrency:
+  group: prozesse-staging
+  cancel-in-progress: false
+
+jobs:
+  prozesse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      PROZESS_DB_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten
+        run: npm ci
+
+      - name: Migrationsstand herstellen
+        run: npm run db:migrate
+
+      - name: Staging zurücksetzen und Grundbestand aufbauen
+        run: npm run prozessdaten -- --reset
+
+      - name: Prozessläufe (mit Fake-Adaptern)
+        run: |
+          if [ -n "${{ inputs.nur }}" ]; then
+            SHOPIFY_FAKE=1 DHL_FAKE=1 node --experimental-strip-types \
+              --import ./scripts/prozess-loader.mjs --test \
+              --test-name-pattern "${{ inputs.nur }}" tests/prozesse/*.test.ts
+          else
+            npm run prozesse:staging
+          fi
+
+      - name: Ergebnis ans Ticket schreiben
+        if: ${{ always() && inputs.ticket != '' }}
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            node --experimental-strip-types scripts/ticket-abschliessen.ts \
+              "${{ inputs.ticket }}" "$GITHUB_SHA" \
+              --befund "Prozesstests im Staging grün (Lauf ${{ github.run_id }})"
+          else
+            node --experimental-strip-types scripts/ticket-abschliessen.ts \
+              "${{ inputs.ticket }}" "$GITHUB_SHA" --rot \
+              --befund "Prozesstests im Staging fehlgeschlagen (Lauf ${{ github.run_id }})"
+          fi

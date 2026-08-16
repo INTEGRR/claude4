@@ -37,9 +37,20 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
       commit_sha: string | null
       behoben_am: string | null
       created_at: string
+      prozess_code: string | null
+      schritt_code: string | null
+      test_ok: boolean | null
+      test_befund: string | null
+      test_commit_sha: string | null
+      test_gelaufen_am: string | null
     }[]
   >`select * from bug_reports where id = ${id}`
   if (!m) notFound()
+
+  const [betroffen] = m.prozess_code
+    ? await sql<{ name: string; modell: string | null }[]>`
+        select name, modell from prozesse where code = ${m.prozess_code}`
+    : []
 
   const offen = m.status === 'offen' || m.status === 'in_arbeit'
 
@@ -52,6 +63,55 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
       />
 
       <ProzessPanel prozessCode="bug_ticket" recordId={m.id} rolle={user.role} />
+
+      {/* Bug-Loop: welcher Prozess ist betroffen, und was sagt der Test? */}
+      {betroffen && m.prozess_code && (
+        <Card title="Betroffener Prozess">
+          <p style={{ marginTop: 0 }}>
+            <span className="mono">{m.prozess_code}</span> — {betroffen.name}
+            {m.schritt_code && (
+              <>
+                {' '}· Schritt <span className="mono">{m.schritt_code}</span>
+              </>
+            )}
+            {betroffen.modell === null && (
+              <>
+                {' '}· <Link href={`/p/${m.prozess_code}`}>Assistent öffnen</Link>
+              </>
+            )}
+          </p>
+          <p style={{ margin: 0 }}>
+            <span className="mono-label" style={{ marginRight: 8 }}>Prozesstest</span>
+            {m.test_ok === null ? (
+              <span className="badge neutral">nie gelaufen</span>
+            ) : m.test_ok ? (
+              <>
+                <span className="badge success">grün</span>{' '}
+                {m.test_commit_sha && (
+                  <a className="mono" href={commitUrl(m.test_commit_sha)} target="_blank" rel="noreferrer">
+                    {kurzerSha(m.test_commit_sha)}
+                  </a>
+                )}{' '}
+                {m.test_gelaufen_am && (
+                  <span className="muted small">am {dateTime(m.test_gelaufen_am)}</span>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="badge danger">rot</span>{' '}
+                {m.test_gelaufen_am && (
+                  <span className="muted small">am {dateTime(m.test_gelaufen_am)}</span>
+                )}
+              </>
+            )}
+          </p>
+          {m.test_befund && (
+            <p className="muted small" style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>
+              {m.test_befund}
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card title="Meldung">
         {m.seite && (
