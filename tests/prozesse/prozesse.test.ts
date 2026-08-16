@@ -319,4 +319,81 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
       /unbekannter Job/,
     )
   })
+
+  test('KI-Chat-Befunde: Modell-Echo, DB-Spaltennamen und Teilprozess-Schritte gehen durch', async () => {
+    // Exakt die Eingabeform, an der der Agent im Betrieb gescheitert war:
+    // modell des BESTEHENDEN Prozesses mitgeschickt, Übergänge mit den
+    // DB-Spaltennamen aus sql_abfrage, Teilprozess-Schritt als art=prozess.
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_entwerfen',
+      {
+        parameter: {
+          code: 'einkauf_wareneingang_rechnung',
+          name: 'Einkauf (Umbau-Entwurf)',
+          bereich: 'einkauf',
+          modell: 'purchase_order',
+          schritte: [
+            { code: 'start', name: 'Bedarf erkannt', art: 'start' },
+            {
+              code: 'anlegen', name: 'Bestellung anlegen', art: 'aktion',
+              aktion: 'einkauf.bestellung_anlegen', zustand: 'draft',
+            },
+            {
+              code: 'bestaetigen', name: 'Bestellen', art: 'aktion',
+              aktion: 'einkauf.bestaetigen', zustand: 'purchase',
+            },
+            { code: 'wareneingang', name: 'Wareneingang', art: 'prozess', teilprozess: 'wareneingang' },
+            { code: 'ende', name: 'Fertig', art: 'ende' },
+          ],
+          uebergaenge: [
+            { von_code: 'start', nach_code: 'anlegen' },
+            { von_code: 'anlegen', nach_code: 'bestaetigen' },
+            { von_code: 'bestaetigen', nach_code: 'wareneingang' },
+            { von_code: 'wareneingang', nach_code: 'ende' },
+          ],
+        },
+      },
+      admin,
+    )
+    assert.match(ergebnis.text ?? '', /Entwurf/)
+
+    const [entwurf] = await h.sql<{ id: string; teilprozess: string | null }[]>`
+      select v.id, s.teilprozess
+      from prozess_versionen v
+      join prozesse p on p.id = v.prozess_id
+      left join prozess_schritte s on s.version_id = v.id and s.code = 'wareneingang'
+      where p.code = 'einkauf_wareneingang_rechnung' and v.status = 'entwurf'
+      order by v.version desc limit 1`
+    assert.equal(entwurf.teilprozess, 'wareneingang', 'der Teilprozess-Schritt muss im Entwurf stehen')
+    // Aufräumen — im Staging-Modus teilt sich alles die Datenbank.
+    await h.sql`delete from prozess_versionen where id = ${entwurf.id}`
+
+    // Selbstverweis bleibt verboten.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            code: 'einkauf_wareneingang_rechnung',
+            name: 'Einkauf rekursiv',
+            bereich: 'einkauf',
+            schritte: [
+              { code: 'start', name: 'Start', art: 'start' },
+              {
+                code: 'selbst', name: 'Selbst', art: 'prozess',
+                teilprozess: 'einkauf_wareneingang_rechnung',
+              },
+              { code: 'ende', name: 'Ende', art: 'ende' },
+            ],
+            uebergaenge: [
+              { von: 'start', nach: 'selbst' },
+              { von: 'selbst', nach: 'ende' },
+            ],
+          },
+        },
+        admin,
+      ),
+      /eigener Teilprozess/,
+    )
+  })
 })

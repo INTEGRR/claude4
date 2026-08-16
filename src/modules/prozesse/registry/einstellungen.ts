@@ -91,10 +91,12 @@ export const EINSTELLUNGEN = {
       "mindestens ein ende; art 'aktion' braucht eine registrierte Aktion (bei Vorgängen " +
       'zuerst vorgang.anlegen mit params {"prozess_code": "<code>"}, danach ' +
       'vorgang.status_setzen mit params {"state": "<zustand>"} und demselben Wert als ' +
-      "zustand), art 'dienst' einen job_kind aus dem Katalog, art 'ereignis' ein Topic. " +
-      'Übergänge verbinden Schritt-Codes; Verzweigungen sind mehrere ausgehende Übergänge, ' +
-      'optional mit bedingung ({"feld","op","wert"}, Pfade wie zusatz.budget erlaubt). ' +
-      'Schleifen sind verboten.',
+      "zustand), art 'dienst' einen job_kind aus dem Katalog, art 'ereignis' ein Topic, " +
+      "art 'prozess' einen teilprozess (Kindprozess-Code; teilprozess_link nur wenn der " +
+      'Kindbeleg über eine Fremdschlüsselspalte statt über origin hängt). Übergänge ' +
+      'verbinden Schritt-Codes (von/nach); Verzweigungen sind mehrere ausgehende ' +
+      'Übergänge, optional mit bedingung ({"feld","op","wert"}, Pfade wie zusatz.budget ' +
+      'erlaubt). Schleifen sind verboten.',
     bindung: 'frei',
     schema: z.object({
       code: z
@@ -109,11 +111,13 @@ export const EINSTELLUNGEN = {
         'produkte', 'kontakte', 'personal', 'fehler',
       ]),
       modell: z
-        .enum(['vorgang'])
+        .string()
+        .max(40)
         .optional()
         .describe(
-          "nur für NEUE Prozesse: 'vorgang' = generische Belege VG/…; leer = belegloser " +
-            'Assistent. Bestehende Prozesse behalten ihren Beleg — Feld weglassen.',
+          "NEUE Prozesse: 'vorgang' (generische Belege VG/…) oder leer (belegloser " +
+            'Assistent). Bestehende Prozesse dürfen ihr vorhandenes Modell nennen — ' +
+            'wechseln lässt es sich nicht.',
         ),
       schritte: z
         .array(
@@ -124,10 +128,21 @@ export const EINSTELLUNGEN = {
               .max(40)
               .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
             name: z.string().min(1).max(80),
-            art: z.enum(['start', 'aktion', 'dienst', 'ereignis', 'xor', 'ende']),
+            art: z.enum(['start', 'aktion', 'dienst', 'ereignis', 'prozess', 'xor', 'ende']),
             aktion: z.string().optional().describe('Registry-Name, Pflicht bei art=aktion'),
             job_kind: z.string().optional().describe('Job aus dem Katalog, Pflicht bei art=dienst'),
             ereignis: z.string().optional().describe('Topic aus dem Katalog, Pflicht bei art=ereignis'),
+            teilprozess: z
+              .string()
+              .optional()
+              .describe('Kindprozess-Code, Pflicht bei art=prozess (Teilprozess/Call Activity)'),
+            teilprozess_link: z
+              .record(z.unknown())
+              .optional()
+              .describe(
+                'Kindbeleg-Verknüpfung: leer = origin zeigt auf den Elternbeleg, ' +
+                  '{"spalte": "purchase_order_id"} = Fremdschlüsselspalte',
+              ),
             zustand: z
               .string()
               .max(60)
@@ -145,15 +160,27 @@ export const EINSTELLUNGEN = {
         .max(30),
       uebergaenge: z
         .array(
-          z.object({
-            von: z.string().min(1),
-            nach: z.string().min(1),
-            bedingung: z
-              .unknown()
-              .optional()
-              .describe('{"feld","op","wert"} oder {"alle"/"eine"/"nicht": …}'),
-            beschriftung: z.string().max(80).optional(),
-          }),
+          // Nachsichtig gegenüber den DB-Spaltennamen: wer die Übergänge per
+          // sql_abfrage nachgeschlagen hat, schickt von_code/nach_code — das
+          // wird hier stillschweigend auf von/nach abgebildet.
+          z.preprocess(
+            (u) => {
+              if (u && typeof u === 'object') {
+                const o = u as Record<string, unknown>
+                return { ...o, von: o.von ?? o.von_code, nach: o.nach ?? o.nach_code }
+              }
+              return u
+            },
+            z.object({
+              von: z.string().min(1),
+              nach: z.string().min(1),
+              bedingung: z
+                .unknown()
+                .optional()
+                .describe('{"feld","op","wert"} oder {"alle"/"eine"/"nicht": …}'),
+              beschriftung: z.string().max(80).optional(),
+            }),
+          ),
         )
         .min(1)
         .max(60),

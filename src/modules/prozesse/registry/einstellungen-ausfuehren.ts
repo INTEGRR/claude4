@@ -87,10 +87,12 @@ export async function paketAktivieren(
 interface EntwurfSchritt {
   code: string
   name: string
-  art: 'start' | 'aktion' | 'dienst' | 'ereignis' | 'xor' | 'ende'
+  art: 'start' | 'aktion' | 'dienst' | 'ereignis' | 'prozess' | 'xor' | 'ende'
   aktion?: string
   job_kind?: string
   ereignis?: string
+  teilprozess?: string
+  teilprozess_link?: Record<string, unknown>
   zustand?: string
   rollen?: string[]
   params?: Record<string, unknown>
@@ -103,7 +105,7 @@ export async function prozessEntwerfen(
     name: string
     beschreibung?: string
     bereich: string
-    modell?: 'vorgang'
+    modell?: string
     schritte: EntwurfSchritt[]
     uebergaenge: { von: string; nach: string; bedingung?: unknown; beschriftung?: string }[]
   },
@@ -148,6 +150,26 @@ export async function prozessEntwerfen(
         `Schritt „${s.code}": unbekanntes Ereignis „${s.ereignis}" — der Katalog steht auf /prozesse (Ereignisse).`,
       )
     }
+    if (s.art === 'prozess') {
+      if (!s.teilprozess) {
+        throw new Error(`Schritt „${s.code}": art=prozess braucht einen teilprozess (Kindprozess-Code).`)
+      }
+      if (s.teilprozess === p.code) {
+        throw new Error(`Schritt „${s.code}": ein Prozess kann nicht sein eigener Teilprozess sein.`)
+      }
+    }
+  }
+  // Teilprozess-Verweise gegen die Datenbank prüfen — verständlich hier,
+  // hart noch einmal in prozess_version_aktivieren.
+  for (const s of p.schritte) {
+    if (s.art !== 'prozess' || !s.teilprozess) continue
+    const [kind] = await sql<{ code: string }[]>`
+      select code from prozesse where code = ${s.teilprozess}`
+    if (!kind) {
+      throw new Error(
+        `Schritt „${s.code}": Teilprozess „${s.teilprozess}" existiert nicht — die Liste steht auf /prozesse.`,
+      )
+    }
   }
   for (const u of p.uebergaenge) {
     if (!codes.has(u.von) || !codes.has(u.nach)) {
@@ -170,6 +192,14 @@ export async function prozessEntwerfen(
       }
       prozessId = vorhanden.id
     } else {
+      // Neue Prozesse: nur Laufzeit-Belege (vorgang) oder beleglos — an
+      // Fachtabellen gebundene Prozesse entstehen nicht per Entwurf.
+      if (p.modell && p.modell !== 'vorgang') {
+        throw new Error(
+          `Neue Prozesse entstehen nur mit modell 'vorgang' oder ohne Modell — ` +
+            `„${p.modell}" ist eine Fachtabelle.`,
+        )
+      }
       // Neue Prozesse entstehen INAKTIV — sichtbar werden sie erst, wenn ein
       // Mensch eine Version aktiviert (das setzt auch prozesse.aktiv).
       const [neu] = await t<{ id: string }[]>`
@@ -191,9 +221,12 @@ export async function prozessEntwerfen(
     for (const [i, s] of p.schritte.entries()) {
       await t`
         insert into prozess_schritte (version_id, code, name, art, sequence, aktion,
-                                      job_kind, ereignis, zustand, rollen, params, optional)
+                                      job_kind, ereignis, teilprozess, teilprozess_link,
+                                      zustand, rollen, params, optional)
         values (${v.id}, ${s.code}, ${s.name}, ${s.art}, ${i * 10}, ${s.aktion ?? null},
                 ${s.job_kind ?? null}, ${s.ereignis ?? null},
+                ${s.teilprozess ?? null},
+                ${s.teilprozess_link ? JSON.stringify(s.teilprozess_link) : null}::jsonb,
                 ${s.zustand ?? null}, ${s.rollen ?? null},
                 ${JSON.stringify(s.params ?? {})}::jsonb, ${s.optional})`
     }
