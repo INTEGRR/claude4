@@ -1,294 +1,103 @@
 'use server'
-import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { sql } from '@/db/client'
-import { requireWrite } from '@/modules/auth'
-import { money, qty } from '@/modules/shared/format'
-import { actionError, actionFail } from '@/modules/shared/action'
+import { revalidatePath } from 'next/cache'
+import { serverAktion } from '@/modules/prozesse/server-aktion'
+import { type ActionResult, isActionError, isActionInfo } from '@/modules/shared/action'
 
-export async function createPurchaseOrder(formData: FormData) {
-  await requireWrite('einkauf')
-  const vendorId = String(formData.get('vendor_id') ?? '')
-  if (!vendorId) return actionError('Bitte einen Lieferanten auswählen')
+/**
+ * Dreizeiler um serverAktion(): geprüft, berechtigt und ausgeführt wird in
+ * der Aktions-Registry (prozesse/registry/einkauf.ts) — hier lebt nur noch
+ * der Server-Action-Transport samt revalidatePath und redirect.
+ */
 
-  const [order] = await sql<{ id: string }[]>`
-    insert into purchase_orders (number, vendor_id)
-    values (next_sequence('purchase'), ${vendorId}) returning id`
-  redirect(`/einkauf/${order.id}`)
+export async function createPurchaseOrder(formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('einkauf.bestellung_anlegen', { formData })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
-export async function addPoLine(orderId: string, formData: FormData) {
-  await requireWrite('einkauf')
-  await sql`select purchase_order_guard_editable(${orderId})`
-
-  const variantId = String(formData.get('variant_id') ?? '')
-  const quantity = Number(formData.get('qty') ?? 0)
-  if (!variantId) return actionError('Bitte ein Produkt auswählen')
-  if (!(quantity > 0)) return actionError('Die Menge muss größer als 0 sein')
-
-  const [order] = await sql<{ vendor_id: string }[]>`
-    select vendor_id from purchase_orders where id = ${orderId}`
-
-  const [info] = await sql<{ purchase_uom: string; name: string; cost: number }[]>`
-    select coalesce(pt.purchase_uom_id, pt.uom_id) as purchase_uom,
-           variant_display_name(pv.id) as name, pt.standard_cost as cost
-    from product_variants pv join product_templates pt on pt.id = pv.template_id
-    where pv.id = ${variantId}`
-  if (!info) return actionError('Produkt nicht gefunden')
-
-  // Preis + Rabatt aus der Lieferantenpreisliste, sonst Standardkosten.
-  const [vendorPrice] = await sql<{ price: number | null; discount: number | null }[]>`
-    select (best_vendor_price(${variantId}, ${order.vendor_id}, ${quantity})).price as price,
-           (best_vendor_price(${variantId}, ${order.vendor_id}, ${quantity})).discount as discount`
-
-  const priceInput = formData.get('price_unit')
-  const price =
-    priceInput !== null && priceInput !== ''
-      ? Number(priceInput)
-      : Number(vendorPrice?.price ?? info.cost ?? 0)
-  const discountInput = formData.get('discount')
-  const discount =
-    discountInput !== null && discountInput !== ''
-      ? Number(discountInput)
-      : Number(vendorPrice?.discount ?? 0)
-
-  await sql`
-    insert into purchase_order_lines
-      (order_id, sequence, variant_id, name, qty, uom_id, price_unit, discount, tax_id, tax_rate)
-    select ${orderId},
-           coalesce((select max(sequence) + 10 from purchase_order_lines where order_id = ${orderId}), 10),
-           ${variantId}, ${info.name}, ${quantity}, ${info.purchase_uom}, ${price}, ${discount},
-           pt.purchase_tax_id,
-           coalesce((select amount from taxes where id = pt.purchase_tax_id), 19)
-    from product_variants pv join product_templates pt on pt.id = pv.template_id
-    where pv.id = ${variantId}`
-
-  revalidatePath(`/einkauf/${orderId}`)
+export async function addPoLine(orderId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('einkauf.position_hinzufuegen', { recordId: orderId, formData })
 }
 
-/** Kopffelder: Einkäufer, Zahlungsbedingung, Incoterm, Priorität, Erinnerung. */
-export async function updatePoHeader(orderId: string, formData: FormData) {
-  await requireWrite('einkauf')
-  await sql`
-    update purchase_orders set
-      user_id = ${String(formData.get('user_id') ?? '') || null},
-      payment_term_id = ${String(formData.get('payment_term_id') ?? '') || null},
-      incoterm_code = ${String(formData.get('incoterm_code') ?? '') || null},
-      priority = ${formData.get('priority') === 'on' ? '1' : '0'},
-      receipt_reminder_email = ${formData.get('receipt_reminder_email') === 'on'},
-      reminder_date_before_receipt = ${Number(formData.get('reminder_date_before_receipt') ?? 1)}
-    where id = ${orderId} and state <> 'cancel'`
-  revalidatePath(`/einkauf/${orderId}`)
+export async function updatePoHeader(orderId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('einkauf.kopf_aendern', { recordId: orderId, formData })
 }
 
-export async function removePoLine(orderId: string, lineId: string) {
-  await requireWrite('einkauf')
-  await sql`select purchase_order_guard_editable(${orderId})`
-  await sql`delete from purchase_order_lines where id = ${lineId} and order_id = ${orderId}`
-  revalidatePath(`/einkauf/${orderId}`)
+export async function removePoLine(orderId: string, lineId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.position_entfernen', {
+    recordId: orderId,
+    parameter: { line_id: lineId },
+  })
 }
 
-export async function confirmPo(orderId: string) {
-  const user = await requireWrite('einkauf')
-  try {
-    await sql`select confirm_purchase_order(${orderId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/einkauf/${orderId}`)
-  revalidatePath('/einkauf')
-  revalidatePath('/lager')
+export async function confirmPo(orderId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.bestaetigen', { recordId: orderId })
 }
 
-export async function cancelPo(orderId: string) {
-  const user = await requireWrite('einkauf')
-  try {
-    await sql`select cancel_purchase_order(${orderId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/einkauf/${orderId}`)
+export async function cancelPo(orderId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.stornieren', { recordId: orderId })
 }
 
-export async function lockPo(orderId: string, locked: boolean) {
-  const user = await requireWrite('einkauf')
-  await sql`select ${locked ? sql`purchase_order_lock` : sql`purchase_order_unlock`}(${orderId}, ${user.name})`
-  revalidatePath(`/einkauf/${orderId}`)
+export async function lockPo(orderId: string, locked: boolean): Promise<ActionResult> {
+  return serverAktion('einkauf.sperren', { recordId: orderId, parameter: { locked } })
 }
 
-/** Stellt die Bestellung als E-Mail mit PDF-Anhang in die Outbox. */
-export async function sendPoEmail(orderId: string) {
-  const user = await requireWrite('einkauf')
-
-  const [order] = await sql<
-    { number: string; vendor: string; email: string | null; expected_arrival: string | null }[]
-  >`
-    select po.number, p.name as vendor, p.email, po.expected_arrival
-    from purchase_orders po join partners p on p.id = po.vendor_id where po.id = ${orderId}`
-  if (!order) return actionError('Bestellung nicht gefunden')
-  if (!order.email) return actionError(`Für ${order.vendor} ist keine E-Mail-Adresse hinterlegt`)
-
-  const lines = await sql<{ name: string; qty: number; uom: string; price_unit: number }[]>`
-    select l.name, l.qty, u.name as uom, l.price_unit
-    from purchase_order_lines l join uoms u on u.id = l.uom_id
-    where l.order_id = ${orderId} order by l.sequence`
-
-  const [company] = await sql<{ name: string }[]>`
-    select value ->> 'name' as name from settings where key = 'company'`
-
-  const rows = lines
-    .map(
-      (l) =>
-        `<tr><td>${l.name}</td><td align="right">${qty(l.qty)} ${l.uom}</td>` +
-        `<td align="right">${money(l.price_unit)}</td></tr>`,
-    )
-    .join('')
-
-  const html =
-    `<p>Guten Tag,</p><p>anbei unsere Bestellung <strong>${order.number}</strong>.</p>` +
-    `<table cellpadding="6" border="1" style="border-collapse:collapse">` +
-    `<tr><th align="left">Position</th><th align="right">Menge</th><th align="right">Preis</th></tr>` +
-    `${rows}</table>` +
-    `<p>Mit freundlichen Grüßen<br>${company?.name ?? ''}</p>`
-
-  await sql`select enqueue_job('send_po_email',
-    ${sql.json({ purchase_order_id: orderId, html })}, ${`po-email:${orderId}:${Date.now()}`})`
-  await sql`select log_event('purchase_order', ${orderId}, 'email',
-    ${`E-Mail an ${order.email} eingereiht`}, ${user.name})`
-
-  revalidatePath(`/einkauf/${orderId}`)
+export async function sendPoEmail(orderId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.email_senden', { recordId: orderId })
 }
 
 // --- Rechnungen ------------------------------------------------------------
 
-export async function createBill(orderId: string) {
-  const user = await requireWrite('einkauf')
-  let billId: string
-  try {
-    const [row] = await sql<{ create_vendor_bill: string }[]>`
-      select create_vendor_bill(${orderId}, ${user.name})`
-    billId = row.create_vendor_bill
-  } catch (err) {
-    return actionFail(err)
-  }
-  redirect(`/einkauf/rechnungen/${billId}`)
+export async function createBill(orderId: string): Promise<ActionResult> {
+  const ergebnis = await serverAktion('einkauf.rechnung_erstellen', { recordId: orderId })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
-export async function setBillDate(billId: string, formData: FormData) {
-  await requireWrite('einkauf')
-  const billDate = String(formData.get('bill_date') ?? '')
-  const reference = String(formData.get('vendor_bill_reference') ?? '')
-  await sql`
-    update vendor_bills set
-      bill_date = ${billDate || null}::date,
-      vendor_bill_reference = ${reference || null},
-      payment_term_id = ${String(formData.get('payment_term_id') ?? '') || null},
-      payment_reference = ${String(formData.get('payment_reference') ?? '').trim() || null}
-    where id = ${billId} and state = 'draft'`
-  revalidatePath(`/einkauf/rechnungen/${billId}`)
+export async function setBillDate(billId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('einkauf.rechnung_details', { recordId: billId, formData })
 }
 
-/** Prüf-Flag der Rechnung (Odoo: account.move.checked). */
-export async function setBillChecked(billId: string, checked: boolean) {
-  const user = await requireWrite('einkauf')
-  await sql`update vendor_bills set checked = ${checked} where id = ${billId}`
-  await sql`select log_event('vendor_bill', ${billId}, 'note',
-    ${checked ? 'Als geprüft markiert' : 'Prüfmarkierung entfernt'}, ${user.name})`
-  revalidatePath(`/einkauf/rechnungen/${billId}`)
+export async function setBillChecked(billId: string, checked: boolean): Promise<ActionResult> {
+  return serverAktion('einkauf.rechnung_pruefen', { recordId: billId, parameter: { checked } })
 }
 
-export async function postBill(billId: string) {
-  const user = await requireWrite('einkauf')
-  try {
-    await sql`select post_vendor_bill(${billId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/einkauf/rechnungen/${billId}`)
+export async function postBill(billId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.rechnung_buchen', { recordId: billId })
 }
 
-export async function payBill(billId: string) {
-  const user = await requireWrite('einkauf')
-  await sql`select pay_vendor_bill(${billId}, ${user.name})`
-  revalidatePath(`/einkauf/rechnungen/${billId}`)
+export async function payBill(billId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.rechnung_zahlen', { recordId: billId })
 }
 
-export async function cancelBill(billId: string) {
-  const user = await requireWrite('einkauf')
-  let creditId: string | null = null
-  try {
-    const [row] = await sql<{ cancel_vendor_bill: string | null }[]>`
-      select cancel_vendor_bill(${billId}, ${user.name})`
-    creditId = row.cancel_vendor_bill
-  } catch (err) {
-    return actionFail(err)
-  }
-  if (creditId) redirect(`/einkauf/rechnungen/${creditId}`)
-  revalidatePath(`/einkauf/rechnungen/${billId}`)
+export async function cancelBill(billId: string): Promise<ActionResult> {
+  const ergebnis = await serverAktion('einkauf.rechnung_stornieren', { recordId: billId })
+  if (isActionError(ergebnis)) return ergebnis
+  // Gebuchte Rechnung → zur neuen Stornorechnung springen.
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
-// --- Einstandsnebenkosten (Landed Costs) -----------------------------------
+// --- Einstandsnebenkosten + Kurse ------------------------------------------
 
-export async function createLandedCost(pickingId: string, formData: FormData) {
-  await requireWrite('einkauf')
-  const amount = Number(formData.get('amount') ?? 0)
-  if (!(amount > 0)) return actionError('Bitte einen Betrag größer als 0 angeben')
+export async function createLandedCost(pickingId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('einkauf.nebenkosten_erfassen', { recordId: pickingId, formData })
+}
 
-  const currency = String(formData.get('currency') ?? 'EUR')
-  try {
-    await sql`
-      insert into landed_costs
-        (number, picking_id, cost_type, basis, amount, currency, exchange_rate,
-         is_estimate, vendor_id, note)
-      values (
-        next_sequence('landed'), ${pickingId},
-        ${String(formData.get('cost_type') ?? 'freight')}::landed_cost_type,
-        ${String(formData.get('basis') ?? 'weight')}::landed_cost_basis,
-        ${amount}, ${currency},
-        exchange_rate_at(${currency}, current_date),
-        ${formData.get('is_estimate') === 'on'},
-        ${String(formData.get('vendor_id') ?? '') || null},
-        ${String(formData.get('note') ?? '').trim() || null})`
-  } catch (err) {
-    return actionFail(err)
-  }
+export async function postLandedCost(costId: string, pickingId: string): Promise<ActionResult> {
+  const ergebnis = await serverAktion('einkauf.nebenkosten_buchen', { recordId: costId })
+  // Der Beleg der Aktion ist der Kostensatz — die Wareneingangs-Seite
+  // muss trotzdem frisch werden.
   revalidatePath(`/lager/${pickingId}`)
+  return ergebnis
 }
 
-export async function postLandedCost(costId: string, pickingId: string) {
-  const user = await requireWrite('einkauf')
-  try {
-    await sql`select landed_cost_post(${costId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
+export async function cancelLandedCost(costId: string, pickingId: string): Promise<ActionResult> {
+  const ergebnis = await serverAktion('einkauf.nebenkosten_stornieren', { recordId: costId })
   revalidatePath(`/lager/${pickingId}`)
-  revalidatePath('/lager/bewertung')
+  return ergebnis
 }
 
-export async function cancelLandedCost(costId: string, pickingId: string) {
-  const user = await requireWrite('einkauf')
-  try {
-    await sql`select landed_cost_cancel(${costId}, ${user.name})`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath(`/lager/${pickingId}`)
-  revalidatePath('/lager/bewertung')
-}
-
-/** Wechselkurs erfassen (1 Fremdwährung = rate Hauswährung). */
-export async function setExchangeRate(formData: FormData) {
-  await requireWrite('einkauf')
-  const currency = String(formData.get('currency') ?? '')
-  const rate = Number(formData.get('rate') ?? 0)
-  const validFrom = String(formData.get('valid_from') ?? '')
-  if (!currency || !(rate > 0)) return actionError('Bitte Währung und Kurs angeben')
-
-  await sql`
-    insert into exchange_rates (currency, rate, valid_from, source)
-    values (${currency}, ${rate}, ${validFrom || null}::date, 'manuell')
-    on conflict (currency, valid_from) do update
-      set rate = excluded.rate, source = 'manuell'`
-  revalidatePath('/einkauf/kurse')
+export async function setExchangeRate(formData: FormData): Promise<ActionResult> {
+  return serverAktion('einkauf.wechselkurs_erfassen', { formData })
 }

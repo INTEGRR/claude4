@@ -40,6 +40,14 @@ const NOCH_OHNE_PROZESS = new Set([
   'verkauf.bestaetigen',
   'verkauf.stornieren',
   'verkauf.zurueck_auf_angebot',
+  // Der Einkaufsprozess (Bestellung → Wareneingang → Rechnung) folgt als P6.
+  'einkauf.bestellung_anlegen',
+  'einkauf.bestaetigen',
+  'einkauf.stornieren',
+  'einkauf.rechnung_erstellen',
+  'einkauf.rechnung_buchen',
+  'einkauf.rechnung_zahlen',
+  'einkauf.rechnung_stornieren',
 ])
 
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */

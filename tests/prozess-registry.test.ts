@@ -152,10 +152,6 @@ function modulVon(datei: string): string {
  */
 const NOCH_NICHT_MIGRIERT = new Set([
   'auswertungen:refreshAnalytics',
-  ...['createPurchaseOrder', 'addPoLine', 'updatePoHeader', 'removePoLine', 'confirmPo',
-    'cancelPo', 'lockPo', 'sendPoEmail', 'createBill', 'setBillDate', 'setBillChecked',
-    'postBill', 'payBill', 'cancelBill', 'createLandedCost', 'postLandedCost',
-    'cancelLandedCost', 'setExchangeRate'].map((n) => `einkauf:${n}`),
   ...['createUser', 'setRole', 'setActive', 'resetPassword'].map((n) => `einstellungen/benutzer:${n}`),
   ...['createMo', 'confirmMo', 'startMo', 'checkAvailability', 'produceMo', 'cancelMo',
     'createUnbuild', 'applyUnbuild', 'createBom', 'addBomLine', 'removeBomLine',

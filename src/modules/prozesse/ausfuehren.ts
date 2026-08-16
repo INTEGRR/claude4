@@ -1,5 +1,6 @@
 import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
+import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
@@ -16,6 +17,25 @@ import * as versand from './registry/versand-ausfuehren.ts'
  * den Typecheck — nicht erst den Klick.
  */
 export const AUSFUEHRUNG = {
+  'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
+  'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,
+  'einkauf.position_entfernen': einkauf.positionEntfernen,
+  'einkauf.kopf_aendern': einkauf.kopfAendern,
+  'einkauf.bestaetigen': einkauf.bestaetigen,
+  'einkauf.stornieren': einkauf.stornieren,
+  'einkauf.sperren': einkauf.sperren,
+  'einkauf.email_senden': einkauf.emailSenden,
+  'einkauf.rechnung_erstellen': einkauf.rechnungErstellen,
+  'einkauf.rechnung_details': einkauf.rechnungDetails,
+  'einkauf.rechnung_pruefen': einkauf.rechnungPruefen,
+  'einkauf.rechnung_buchen': einkauf.rechnungBuchen,
+  'einkauf.rechnung_zahlen': einkauf.rechnungZahlen,
+  'einkauf.rechnung_stornieren': einkauf.rechnungStornieren,
+  'einkauf.nebenkosten_erfassen': einkauf.nebenkostenErfassen,
+  'einkauf.nebenkosten_buchen': einkauf.nebenkostenBuchen,
+  'einkauf.nebenkosten_stornieren': einkauf.nebenkostenStornieren,
+  'einkauf.wechselkurs_erfassen': einkauf.wechselkursErfassen,
+
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
 
   'fehler.ticket_melden': fehler.ticketMelden,
