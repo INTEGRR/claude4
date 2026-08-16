@@ -172,9 +172,52 @@ die Reparaturmaske erlaubt das Nachtragen bis zum Abschluss.
 `npm run check` fährt seitdem beides: die klassische Suite und die
 Prozessläufe.
 
+## Phase 4 — Maskengenerierung (umgesetzt)
+
+**Eine Aktion beschreibt ihre Eingaben genau einmal (im zod-Schema der
+Registry) — die Maske fällt daraus ab.**
+
+```
+src/modules/prozesse/schema-felder.ts   formulartaugliche Ableitung: Typ
+                                        (text/mehrzeilig/nummer/schalter/auswahl/
+                                        verweis/json), Pflicht, Vorgabe, Enum-Werte;
+                                        *_id-Felder werden Verweise mit Quelle
+src/modules/prozesse/angebote.ts        prozess_naechste_schritte → Schrittangebote:
+                                        Felder, fixierte Schritt-params, Auswahllisten
+                                        (Partner/Varianten/Benutzer), Rollen-Freigabe
+src/components/prozess-aktionen.tsx     Client: Schritte als Tasten, dahinter das
+                                        GENERIERTE Formular; Absenden an /api/aktion
+                                        (Torwächter), dann router.refresh()
+```
+
+- **Das Panel ist jetzt aktiv**: auf `/tickets/[id]` und `/reparatur/[id]`
+  führen die angebotenen Schritte wirklich aus. Felder, die der Schritt per
+  `params` festlegt (etwa `status=behoben` am Schritt „Beheben"), erscheinen
+  nicht als Eingabe — der Schritt definiert sie, das Formular zeigt nur die
+  offenen Angaben. Schritte ohne offene Felder laufen nach Rückfrage direkt.
+- **Beleglose Assistenten unter `/p/[prozess]`** (generisch, kennt keinen
+  Prozess beim Namen): Läufe-Übersicht + Start; `/p/[prozess]/[instanz]`
+  zeigt Diagramm, die möglichen Schritte als generierte Formulare und die
+  gesammelten Ergebnisse. Nach jedem Aktionsschritt schaltet `/api/aktion`
+  die Instanz weiter (`instanz_id` + `schritt` im Aufruf; vorher wird
+  geprüft, dass der Schritt gerade angeboten wird und zur Aktion gehört).
+  Führt vom Stand eine Kante zum Ende, gibt es „Assistent abschließen".
+- **Pilot `artikel_anlegen`** (Migration 0039): Produkt mit Variantenmatrix
+  anlegen (Schema und Fachlogik geteilt mit der KI-Aktion `produkt_anlegen` —
+  eine Definition, drei Transporte: KI-Chat, generierte Maske, Prozesstest),
+  optional gleich den Meldebestand einrichten. Verlinkt von /produkte
+  („Anlage-Assistent"). Der XOR-Beschaffungsweg und der Shopify-Push als
+  Dienstschritt folgen, sobald Einkaufs-/Fertigungs-Aktionen registriert
+  bzw. Dienstschritte für Instanzen ausführbar sind (Phase 5/6).
+- **Prozesstest deckt Instanzen ab**: der Interpreter erkennt beleglose
+  Prozesse (modell null), startet eine Instanz, führt Schritte über den
+  Torwächter aus und schaltet weiter — die Fixture `artikel_anlegen` prüft
+  Variantenmatrix und Meldebestand. `tests/schema-felder.test.ts` sichert,
+  dass KEIN Registry-Schema in einem Feldtyp landet, den das generierte
+  Formular nicht darstellen kann.
+
 ## Kommende Phasen (Kurzfassung)
 
-4. **Maskengenerierung** aus zod-Schemas (`/p/[prozess]`), Pilot „Artikel anlegen".
 5. **Externe Schritte + Bug-Loop + Staging-Automation** (Ticket ↔ Prozesstest ↔ Commit).
 6. **Breitenmigration + Laufzeit-Overrides** (Schritte an/aus je Firma).
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,

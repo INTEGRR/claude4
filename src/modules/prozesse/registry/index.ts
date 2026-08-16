@@ -1,6 +1,7 @@
 import type { RegistrierteAktion } from './typen.ts'
 import { FEHLER } from './fehler.ts'
 import { LAGER } from './lager.ts'
+import { PRODUKTE } from './produkte.ts'
 import { REPARATUR } from './reparatur.ts'
 
 /**
@@ -14,6 +15,7 @@ import { REPARATUR } from './reparatur.ts'
 export const REGISTRY = {
   ...FEHLER,
   ...LAGER,
+  ...PRODUKTE,
   ...REPARATUR,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

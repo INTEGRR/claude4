@@ -36,7 +36,6 @@ const NOCH_OHNE_PROZESS = new Set([
   'lager.zaehlung_erfassen',
   'lager.zaehlung_buchen',
   'lager.ausschuss_buchen',
-  'lager.meldebestand_anlegen',
   'lager.beschaffung_ausfuehren',
 ])
 
@@ -192,7 +191,11 @@ describe('Vollständigkeit: Fixtures', () => {
         for (const code of lauf.pfad) {
           const schritt = codes.get(code)
           assert.ok(schritt, `${name}/${lauf.name}: Schritt „${code}" existiert nicht`)
-          assert.equal(schritt!.art, 'aktion', `${name}/${lauf.name}: „${code}" ist kein Aktionsschritt`)
+          // 'ende' im Pfad schließt einen beleglosen Assistenten ab.
+          assert.ok(
+            schritt!.art === 'aktion' || schritt!.art === 'ende',
+            `${name}/${lauf.name}: „${code}" ist weder Aktions- noch Endschritt`,
+          )
         }
         for (const key of Object.keys(lauf.eingaben ?? {})) {
           assert.ok(

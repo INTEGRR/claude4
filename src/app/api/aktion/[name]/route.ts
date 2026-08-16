@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/modules/auth'
+import { sql } from '@/db/client'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { aktionsFelder } from '@/modules/prozesse/introspektion'
 import {
@@ -27,13 +28,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ nam
   const { name } = await params
 
   let aufruf: { parameter?: unknown; formData?: FormData; recordId?: string }
+  let instanz: { id: string; schritt: string } | undefined
   try {
     const contentType = request.headers.get('content-type') ?? ''
     if (contentType.includes('application/json')) {
-      const body = (await request.json()) as { parameter?: unknown; record_id?: unknown }
+      const body = (await request.json()) as {
+        parameter?: unknown
+        record_id?: unknown
+        instanz_id?: unknown
+        schritt?: unknown
+      }
       aufruf = {
         parameter: body.parameter,
         recordId: typeof body.record_id === 'string' ? body.record_id : undefined,
+      }
+      if (typeof body.instanz_id === 'string' && typeof body.schritt === 'string') {
+        instanz = { id: body.instanz_id, schritt: body.schritt }
       }
     } else {
       const formData = await request.formData()
@@ -45,7 +55,48 @@ export async function POST(request: Request, { params }: { params: Promise<{ nam
   }
 
   try {
+    // Belegloser Assistent: der Aufruf gehört zu einer laufenden Instanz.
+    // Vor der Ausführung prüfen, dass der Schritt gerade ANGEBOTEN wird und
+    // wirklich zu dieser Aktion gehört — danach schaltet die Instanz weiter.
+    let prozessCode: string | undefined
+    if (instanz) {
+      const [kopf] = await sql<{ code: string }[]>`
+        select p.code from prozess_instanzen i
+        join prozesse p on p.id = i.prozess_id
+        where i.id = ${instanz.id} and i.status = 'laufend'`
+      if (!kopf) {
+        return NextResponse.json(
+          { error: 'Der Assistent läuft nicht mehr.' },
+          { status: 400 },
+        )
+      }
+      prozessCode = kopf.code
+      const angeboten = await sql<{ code: string; aktion: string | null }[]>`
+        select code, aktion from prozess_naechste_schritte(${prozessCode}, ${instanz.id})`
+      const schritt = angeboten.find((s) => s.code === instanz!.schritt)
+      if (!schritt) {
+        return NextResponse.json(
+          { error: `Schritt „${instanz.schritt}" wird gerade nicht angeboten.` },
+          { status: 400 },
+        )
+      }
+      if (schritt.aktion !== name) {
+        return NextResponse.json(
+          { error: 'Der Schritt gehört zu einer anderen Aktion.' },
+          { status: 400 },
+        )
+      }
+    }
+
     const ergebnis = await aktionAusfuehrenGeprueft(name, aufruf, user)
+
+    if (instanz) {
+      await sql`select prozess_instanz_weiter(
+        ${instanz.id}, ${instanz.schritt},
+        ${sql.json({ [`${instanz.schritt}_record_id`]: ergebnis.recordId ?? null })},
+        ${user.name})`
+    }
+
     return NextResponse.json({
       ...(ergebnis.text ? { info: ergebnis.text } : {}),
       ...(ergebnis.link ? { link: ergebnis.link } : {}),

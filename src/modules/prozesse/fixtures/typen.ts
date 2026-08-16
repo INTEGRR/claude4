@@ -22,10 +22,17 @@ import type { Role } from '../../auth/permissions.ts'
 /** Vom Aufbau gefüllte IDs (kundeId, geraetId, …), von den Läufen verwendet. */
 export type FixtureKontext = Record<string, string>
 
-/** Eingabe eines Schritts: fertige Parameter oder eine Funktion über den Kontext. */
+/**
+ * Eingabe eines Schritts: fertige Parameter oder eine Funktion über Kontext
+ * und Datenbank — Letzteres für Werte, die erst im Lauf entstehen (z. B. die
+ * Variante des gerade angelegten Produkts).
+ */
 export type Eingabe =
   | Record<string, unknown>
-  | ((ctx: FixtureKontext) => Record<string, unknown>)
+  | ((
+      ctx: FixtureKontext,
+      sql: Sql,
+    ) => Record<string, unknown> | Promise<Record<string, unknown>>)
 
 export interface ProzessLauf {
   /** Was dieser Durchlauf zeigt (wird Testname). */

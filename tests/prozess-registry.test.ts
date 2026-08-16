@@ -175,6 +175,14 @@ const NOCH_NICHT_MIGRIERT = new Set([
   ),
 ])
 
+/**
+ * Rahmenaktionen ohne Registry-Gegenstück — bewusst DAUERHAFT, kein
+ * Migrationsrest: sie schalten die Prozessinstanz-Maschine selbst
+ * (Assistent starten/abschließen), dahinter steht keine Fachaktion.
+ * Geschlossene Liste wie die fünf UI-Umgehungen.
+ */
+const RAHMEN_AKTIONEN = new Set(['p:instanzStarten', 'p:instanzAbschliessen'])
+
 describe('Registry-Abdeckung (statisch)', () => {
   const dateien = dateienUnter(WURZEL)
 
@@ -185,7 +193,7 @@ describe('Registry-Abdeckung (statisch)', () => {
       if (!inhalt.includes("'use server'")) continue
       for (const treffer of inhalt.matchAll(/export async function (\w+)/g)) {
         const schluessel = `${modulVon(datei)}:${treffer[1]}`
-        if (NOCH_NICHT_MIGRIERT.has(schluessel)) continue
+        if (NOCH_NICHT_MIGRIERT.has(schluessel) || RAHMEN_AKTIONEN.has(schluessel)) continue
         // Migriert heißt: der Funktionsrumpf ruft serverAktion(…).
         const rumpf = inhalt.slice(treffer.index)
         const ende = rumpf.indexOf('\nexport ', 1)

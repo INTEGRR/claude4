@@ -2,18 +2,19 @@ import { sql } from '@/db/client'
 import { Card } from '@/components/ui'
 import { ProzessDiagramm } from '@/components/prozess-diagramm'
 import { type LayoutKante, type LayoutSchritt, layout } from '@/modules/prozesse/diagramm-layout'
-import { registrierteAktion } from '@/modules/prozesse/registry'
+import { naechsteAngebote } from '@/modules/prozesse/angebote'
 import type { Role } from '@/modules/auth/permissions'
-import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
+import { ProzessAktionen } from '@/components/prozess-aktionen'
 
 /**
  * Prozess-Panel einer Belegseite: wo steht der Beleg (Diagramm), und welche
  * Schritte sind JETZT möglich — aus der Prozessdefinition, den Overrides und
  * der Rolle des Betrachters, nicht aus verstreuten if-Bedingungen der Seite.
  *
- * Erste Ausbaustufe bewusst lesend: die vorhandenen Knöpfe bleiben die
- * Ausführung; das Panel macht den Prozess sichtbar. Die generierten
- * Schrittformulare übernehmen in der nächsten Stufe.
+ * Seit Phase 4 aktiv: die möglichen Schritte sind Tasten mit GENERIERTEN
+ * Formularen aus den Registry-Schemas; ausgeführt wird über /api/aktion —
+ * denselben Torwächter wie Server Actions und Prozesstest. Die vorhandenen
+ * Fachmasken bleiben daneben bestehen, bis der Prozess sie ablöst.
  */
 export async function ProzessPanel({
   prozessCode,
@@ -49,44 +50,30 @@ export async function ProzessPanel({
   const [standort] = await sql<{ schritt: string | null }[]>`
     select prozess_aktueller_schritt(${prozessCode}, ${recordId}) as schritt`
 
-  const naechste = await sql<
-    { code: string; name: string; art: string; aktion: string | null; rollen: string[] | null }[]
-  >`
-    select code, name, art::text as art, aktion, rollen
-    from prozess_naechste_schritte(${prozessCode}, ${recordId})`
-
   const diagramm = layout(schritte, kanten, standort?.schritt)
+  const { angebote, passiv } = await naechsteAngebote(prozessCode, recordId, rolle)
 
   return (
     <Card title={`Prozess: ${prozess.name}`}>
       <ProzessDiagramm d={diagramm} />
       <div style={{ marginTop: 10 }}>
         <span className="mono-label">Als Nächstes möglich</span>
-        <div className="actions" style={{ marginTop: 6, flexWrap: 'wrap', gap: 6 }}>
-          {naechste.length === 0 ? (
+        <div style={{ marginTop: 6 }}>
+          {angebote.length === 0 && passiv.length === 0 ? (
             <span className="muted small">Nichts — der Prozess ist am Ende oder wartet.</span>
           ) : (
-            naechste.map((s) => {
-              const eintrag = s.aktion ? registrierteAktion(s.aktion) : undefined
-              // Schritt-Rollen UND Aktionsrechte entscheiden, ob die Rolle
-              // des Betrachters dran darf.
-              const rolleErlaubt =
-                (!s.rollen || s.rollen.length === 0 || s.rollen.includes(rolle)) &&
-                (!eintrag || aktionErlaubt(eintrag, rolle))
-              return (
-                <span
-                  key={s.code}
-                  className={`badge ${rolleErlaubt ? 'info' : 'neutral'}`}
-                  title={
-                    (eintrag ? `${s.aktion}` : s.art) +
-                    (rolleErlaubt ? '' : ' — für Ihre Rolle nicht freigegeben')
-                  }
-                >
-                  {s.name}
-                  {!rolleErlaubt && ' 🔒'}
-                </span>
-              )
-            })
+            <>
+              {angebote.length > 0 && <ProzessAktionen schritte={angebote} recordId={recordId} />}
+              {passiv.length > 0 && (
+                <div className="actions" style={{ marginTop: 6, flexWrap: 'wrap', gap: 6 }}>
+                  {passiv.map((s) => (
+                    <span key={s.code} className="badge neutral" title={s.art}>
+                      {s.name} — wartet
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

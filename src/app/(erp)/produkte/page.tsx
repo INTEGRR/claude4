@@ -53,6 +53,7 @@ export default async function ProduktePage({
         subtitle="Produktvorlagen mit Attributen und Varianten"
         actions={
           <>
+            <Link className="btn" href="/p/artikel_anlegen">Anlage-Assistent</Link>
             <Link className="btn" href="/produkte/attribute">Attribute</Link>
             <Link className="btn" href="/produkte/konfiguration">Konfiguration</Link>
           </>

@@ -2,6 +2,7 @@ import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
+import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
 
 /**
@@ -31,6 +32,8 @@ export const AUSFUEHRUNG = {
   'lager.meldebestand_wecken': lager.meldebestandWecken,
   'lager.beschaffung_ausfuehren': lager.beschaffungAusfuehren,
   'lager.eroeffnungsbewertung': lager.eroeffnungsbewertung,
+
+  'produkte.produkt_anlegen': produkte.produktAnlegenAktion,
 
   'reparatur.auftrag_anlegen': reparatur.auftragAnlegen,
   'reparatur.teil_hinzufuegen': reparatur.teilHinzufuegen,

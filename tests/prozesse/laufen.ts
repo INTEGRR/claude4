@@ -57,6 +57,13 @@ export async function prozessDurchspielen(
   const prozess = fixture.prozess
   assert.ok(prozess, 'Daten-Fixtures ohne Prozess haben keine Läufe')
   const nutzer = lauf.nutzer ?? { name: 'prozesstest', role: 'admin' as const }
+
+  // Beleglose Assistenten (modell null) laufen über eine Instanz.
+  const [art] = await sql<{ modell: string | null }[]>`
+    select modell from prozesse where code = ${prozess}`
+  assert.ok(art, `Prozess ${prozess} existiert nicht`)
+  if (art.modell === null) return instanzDurchspielen(sql, prozess, lauf, ctx, nutzer)
+
   let recordId: string | undefined
 
   for (const code of lauf.pfad) {
@@ -98,7 +105,7 @@ export async function prozessDurchspielen(
     }
 
     const eingabe = lauf.eingaben?.[code]
-    const werte = typeof eingabe === 'function' ? eingabe(ctx) : (eingabe ?? {})
+    const werte = typeof eingabe === 'function' ? await eingabe(ctx, sql) : (eingabe ?? {})
     // Die Prozessdefinition legt vor (params), der Lauf ergänzt/übersteuert.
     const parameter = { ...(schritt.params ?? {}), ...werte }
 
@@ -147,4 +154,79 @@ export async function prozessDurchspielen(
 
   await lauf.pruefen?.(sql, ctx, recordId)
   return recordId
+}
+
+/**
+ * Belegloser Assistent: Instanz starten, Schritte über den Torwächter
+ * ausführen und die Instanz weiterschalten — genau der Weg, den auch
+ * /api/aktion mit instanz_id nimmt. 'ende'-Schritte im Pfad schließen den
+ * Assistenten ab (die Kante dorthin muss existieren, weiter prüft das).
+ */
+async function instanzDurchspielen(
+  sql: Sql,
+  prozess: string,
+  lauf: ProzessLauf,
+  ctx: FixtureKontext,
+  nutzer: NonNullable<ProzessLauf['nutzer']>,
+): Promise<string> {
+  const [{ id: instanzId }] = await sql<{ id: string }[]>`
+    select prozess_instanz_starten(${prozess}, ${nutzer.name}) as id`
+
+  for (const code of lauf.pfad) {
+    const definiert = await schrittAusDefinition(sql, prozess, code)
+    assert.ok(definiert, `${prozess}: Schritt „${code}" existiert nicht in der aktiven Version`)
+
+    if (definiert.art === 'ende') {
+      // Führte vom letzten Schritt ohnehin nur noch der Weg zum Ende, hat
+      // prozess_instanz_weiter schon auf „fertig" geschaltet — dann ist das
+      // explizite Ende im Pfad nur noch die Bestätigung.
+      const [zustand] = await sql<{ status: string }[]>`
+        select status from prozess_instanzen where id = ${instanzId}`
+      if (zustand.status !== 'fertig') {
+        await sql`select prozess_instanz_weiter(${instanzId}, ${code}, '{}'::jsonb, ${nutzer.name})`
+      }
+      continue
+    }
+
+    const naechste = await sql<Schritt[]>`
+      select code, art::text as art, aktion, rollen, params, null as zustand
+      from prozess_naechste_schritte(${prozess}, ${instanzId})`
+    const angeboten = naechste.find((n) => n.code === code)
+    assert.ok(
+      angeboten,
+      `${prozess}: „${code}" wird nicht angeboten ` +
+        `(möglich: ${naechste.map((n) => n.code).join(', ') || '—'})`,
+    )
+    assert.equal(angeboten.art, 'aktion', `${prozess}/${code}: Läufe führen nur Aktionsschritte aus`)
+    assert.ok(angeboten.aktion, `${prozess}/${code}: Aktionsschritt ohne Aktion`)
+    if (angeboten.rollen?.length) {
+      assert.ok(angeboten.rollen.includes(nutzer.role), `${prozess}/${code}: Rolle nicht zugelassen`)
+    }
+
+    const eingabe = lauf.eingaben?.[code]
+    const werte = typeof eingabe === 'function' ? await eingabe(ctx, sql) : (eingabe ?? {})
+    const parameter = { ...(angeboten.params ?? {}), ...werte }
+
+    const ergebnis = await aktionAusfuehrenGeprueft(angeboten.aktion, { parameter }, nutzer)
+    const recordId = (ergebnis ?? {}).recordId ?? null
+    await sql`select prozess_instanz_weiter(${instanzId}, ${code},
+      ${sql.json({ [`${code}_record_id`]: recordId })}, ${nutzer.name})`
+    if (recordId) ctx[`${prozess}_${code}_id`] = recordId
+
+    assert.equal(
+      await standort(sql, prozess, instanzId),
+      code,
+      `${prozess}: nach „${code}" müsste die Instanz dort stehen`,
+    )
+    await assertLedgerConsistent(sql)
+  }
+
+  if (lauf.danachKeineSchritte) {
+    const [zustand] = await sql<{ status: string }[]>`
+      select status from prozess_instanzen where id = ${instanzId}`
+    assert.equal(zustand.status, 'fertig', `${prozess}: „${lauf.name}" müsste fertig sein`)
+  }
+
+  await lauf.pruefen?.(sql, ctx, instanzId)
+  return instanzId
 }

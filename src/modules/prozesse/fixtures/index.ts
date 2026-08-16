@@ -1,3 +1,4 @@
+import { ARTIKEL_ANLEGEN } from './artikel-anlegen.ts'
 import { BASIS } from './basis.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
 import { REPARATUR } from './reparatur.ts'
@@ -13,6 +14,7 @@ export type { Eingabe, FixtureKontext, ProzessFixture, ProzessLauf } from './typ
  */
 export const FIXTURES = {
   basis: BASIS,
+  artikel_anlegen: ARTIKEL_ANLEGEN,
   bug_ticket: BUG_TICKET,
   reparatur: REPARATUR,
 } satisfies Record<string, ProzessFixture>
