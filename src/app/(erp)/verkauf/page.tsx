@@ -12,7 +12,6 @@ interface Row {
   state: string
   locked: boolean
   delivery_status: string
-  invoice_status: string
   source: string
   shopify_order_name: string | null
   partner_name: string
@@ -30,7 +29,7 @@ export default async function VerkaufPage({
   const { status, q } = await searchParams
 
   const rows = await sql<Row[]>`
-    select so.id, so.number, so.state, so.locked, so.delivery_status, so.invoice_status,
+    select so.id, so.number, so.state, so.locked, so.delivery_status,
            so.source, so.shopify_order_name, p.name as partner_name, so.order_date,
            (select gross from sales_order_total(so.id)) as gross,
            (select count(*) from manufacturing_orders mo

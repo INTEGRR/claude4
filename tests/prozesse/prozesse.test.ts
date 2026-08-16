@@ -107,6 +107,94 @@ describe('Chamäleon: Paketwechsel', () => {
   })
 })
 
+// Konsistenz-Wächter: Teilprozess-Kanten sind harte Abhängigkeiten — wer
+// schaltet, darf keinen aktiven Elternprozess zerreißen, und wer ein Paket
+// aktiviert, bekommt die Abhängigkeiten automatisch dazu.
+describe('Chamäleon: Konsistenz-Wächter für Teilprozesse', () => {
+  const admin = { name: 'prozesstest', role: 'admin' as const }
+
+  after(async () => {
+    await h.sql`update prozesse set aktiv = true`
+    await h.sql`delete from prozess_pakete where code = 'test_nur_einkauf'`
+  })
+
+  test('Teilprozess eines aktiven Elternprozesses lässt sich nicht abschalten', async () => {
+    // wareneingang ist Teilprozess von einkauf_wareneingang_rechnung (aktiv).
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_schalten',
+        { parameter: { prozess_code: 'wareneingang', aktiv: false } },
+        admin,
+      ),
+      (err: unknown) =>
+        err instanceof AktionsFehler && /Teilprozess von.*einkauf_wareneingang_rechnung/.test(String(err)),
+    )
+    const [{ aktiv }] = await h.sql<{ aktiv: boolean }[]>`
+      select aktiv from prozesse where code = 'wareneingang'`
+    assert.equal(aktiv, true, 'der Wächter darf nichts verändert haben')
+  })
+
+  test('ohne aktiven Eltern geht es — und Wieder-Einschalten zieht die Kinder mit', async () => {
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_schalten',
+      { parameter: { prozess_code: 'einkauf_wareneingang_rechnung', aktiv: false } },
+      admin,
+    )
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_schalten',
+      { parameter: { prozess_code: 'wareneingang', aktiv: false } },
+      admin,
+    )
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_schalten',
+      { parameter: { prozess_code: 'lieferantenrechnung', aktiv: false } },
+      admin,
+    )
+
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_schalten',
+      { parameter: { prozess_code: 'einkauf_wareneingang_rechnung', aktiv: true } },
+      admin,
+    )
+    assert.match(ergebnis.text ?? '', /Teilprozesse mit aktiviert/)
+
+    const aktiv = new Map(
+      (await h.sql<{ code: string; aktiv: boolean }[]>`select code, aktiv from prozesse`).map(
+        (p) => [p.code, p.aktiv],
+      ),
+    )
+    assert.equal(aktiv.get('wareneingang'), true)
+    assert.equal(aktiv.get('lieferantenrechnung'), true)
+  })
+
+  test('Paketwechsel zieht Teilprozess-Abhängigkeiten transitiv mit', async () => {
+    // Ein Paket, das nur den Einkauf nennt — Wareneingang und
+    // Lieferantenrechnung fehlen absichtlich.
+    await h.sql`
+      insert into prozess_pakete (code, name, beschreibung, prozess_codes)
+      values ('test_nur_einkauf', 'Test: nur Einkauf', 'Wächter-Test',
+              array['einkauf_wareneingang_rechnung'])`
+
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      'einstellungen.paket_aktivieren',
+      { parameter: { paket_code: 'test_nur_einkauf' } },
+      admin,
+    )
+    assert.match(ergebnis.text ?? '', /automatisch mit aktiviert/)
+
+    const aktiv = new Map(
+      (await h.sql<{ code: string; aktiv: boolean }[]>`select code, aktiv from prozesse`).map(
+        (p) => [p.code, p.aktiv],
+      ),
+    )
+    assert.equal(aktiv.get('einkauf_wareneingang_rechnung'), true)
+    assert.equal(aktiv.get('wareneingang'), true, 'Teilprozess muss mitkommen')
+    assert.equal(aktiv.get('lieferantenrechnung'), true, 'Teilprozess muss mitkommen')
+    assert.equal(aktiv.get('bug_ticket'), true, 'Infrastruktur bleibt an')
+    assert.equal(aktiv.get('verkauf'), false, 'nicht genannte Prozesse gehen aus')
+  })
+})
+
 // Der ganze Chamäleon-Bogen: die KI entwirft einen Prozess (nur als Entwurf),
 // der Mensch aktiviert nach Prüfung — und der designte Prozess läuft sofort
 // auf generischen Vorgängen, ohne eine Zeile neuen Codes.

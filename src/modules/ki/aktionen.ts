@@ -289,8 +289,11 @@ export function aktionenTool(zusatz: ZusatzAktion[] = []) {
       'Schlägt eine schreibende Aktion vor. Der Vorschlag wird dem Benutzer zur Bestätigung ' +
       'angezeigt und erst nach seinem Klick ausgeführt — du führst nichts selbst aus und ' +
       'behauptest auch nicht, etwas sei bereits angelegt. Schlage nur vor, was ausdrücklich ' +
-      'gewünscht ist, und immer nur eine Aktion je Antwort. Verlässliche Bezeichner (SKU, ' +
-      'Kundenname, IDs) vorher per sql_abfrage nachschlagen.\n\nVerfügbare Aktionen:\n' +
+      'gewünscht ist. Mehrere Datensätze derselben Art (etwa ein Meldebestand je Produkt) ' +
+      'schlägst du in EINER Antwort vor: das Werkzeug mehrfach aufrufen, ein Aufruf je ' +
+      'Datensatz — der Benutzer sieht sie als Sammelliste und bestätigt gemeinsam oder ' +
+      'einzeln. Verlässliche Bezeichner (SKU, Kundenname, IDs) vorher per sql_abfrage ' +
+      'nachschlagen.\n\nVerfügbare Aktionen:\n' +
       katalog,
     input_schema: {
       type: 'object' as const,

@@ -3,7 +3,8 @@ import { Fragment, useRef, useState } from 'react'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
 import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
-import { VorschlagEditor } from './vorschlag-editor'
+import { gruppenSpalten, gruppiereVorschlaege } from '@/modules/ki/vorschlag-gruppen'
+import { VorschlagEditor, Zelle } from './vorschlag-editor'
 
 /**
  * Chat-Oberfläche des KI-Agenten. Antworten kommen als NDJSON-Stream von
@@ -199,14 +200,34 @@ function ChartCard({ d }: { d: Diagramm }) {
 
 // --- Aktionsvorschlag ------------------------------------------------------
 
+/** Ein Klick auf „Anlegen" — Server prüft Rechte und Felder erneut. */
+async function vorschlagAusfuehren(
+  v: Vorschlag,
+): Promise<NonNullable<Exclude<Vorschlag['ergebnis'], 'verworfen'>>> {
+  try {
+    const res = await fetch('/api/ki/aktion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktion: v.aktion, parameter: v.parameter }),
+    })
+    const data = (await res.json()) as { text?: string; link?: string; error?: string }
+    return res.ok
+      ? { ok: true, text: data.text ?? 'Ausgeführt.', link: data.link }
+      : { ok: false, text: data.error ?? `Fehlgeschlagen (${res.status})` }
+  } catch (err) {
+    return { ok: false, text: err instanceof Error ? err.message : 'Verbindungsfehler' }
+  }
+}
+
 /**
  * Vorschlag zum Anlegen. Der Agent hat hier nichts ausgeführt — erst der
  * Klick auf "Anlegen" schickt die Aktion an den Server, der Rechte und Felder
  * erneut prüft.
  *
- * Vorher lässt sich der Vorschlag auf zwei Wegen korrigieren: Felder direkt
- * in der Tabelle ändern, oder per Zuruf („die Kürzel für Grün auf GN") — dann
- * schreibt die KI den Feldsatz neu, ohne dass die Frage von vorn beginnt.
+ * Die Felder stehen direkt als editierbares Formular in der Karte (Listen als
+ * Tabellen mit editierbaren Zellen) — kein rohes JSON. Alternativ korrigiert
+ * die KI per Zuruf („die Kürzel für Grün auf GN"), ohne dass die Frage von
+ * vorn beginnt.
  */
 function AktionCard({
   v,
@@ -218,7 +239,6 @@ function AktionCard({
   onParameter: (id: string, parameter: Record<string, unknown>, zusammenfassung?: string) => void
 }) {
   const [busy, setBusy] = useState(false)
-  const [bearbeiten, setBearbeiten] = useState(false)
   const [anweisung, setAnweisung] = useState('')
   const [kiBusy, setKiBusy] = useState(false)
   const [kiHinweis, setKiHinweis] = useState<{ ok: boolean; text: string } | null>(null)
@@ -226,23 +246,7 @@ function AktionCard({
   async function ausfuehren() {
     setBusy(true)
     try {
-      const res = await fetch('/api/ki/aktion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aktion: v.aktion, parameter: v.parameter }),
-      })
-      const data = (await res.json()) as { text?: string; link?: string; error?: string }
-      onEntscheidung(
-        v.id,
-        res.ok
-          ? { ok: true, text: data.text ?? 'Ausgeführt.', link: data.link }
-          : { ok: false, text: data.error ?? `Fehlgeschlagen (${res.status})` },
-      )
-    } catch (err) {
-      onEntscheidung(v.id, {
-        ok: false,
-        text: err instanceof Error ? err.message : 'Verbindungsfehler',
-      })
+      onEntscheidung(v.id, await vorschlagAusfuehren(v))
     } finally {
       setBusy(false)
     }
@@ -297,24 +301,13 @@ function AktionCard({
         <p style={{ margin: '0 0 8px' }}>{v.zusammenfassung}</p>
         {v.begruendung && <p className="muted small" style={{ margin: '0 0 8px' }}>{v.begruendung}</p>}
 
-        {!erledigt && bearbeiten ? (
+        {/* Die Felder stehen offen und editierbar da — wer den Vorschlag
+            prüft, soll ihn im selben Zug korrigieren können. */}
+        {!erledigt && (
           <VorschlagEditor
             parameter={v.parameter}
             onChange={(neu) => onParameter(v.id, neu)}
           />
-        ) : (
-          <details style={{ marginBottom: 10 }}>
-            <summary className="mono-label" style={{ cursor: 'pointer' }}>Felder im Detail</summary>
-            <div className="display-panel" style={{ margin: '6px 0 0' }}>
-              <div className="display-head">
-                <span>{v.aktion}</span>
-                <span>wird geprüft</span>
-              </div>
-              <pre style={{ background: 'transparent', border: 0, padding: 0, margin: 0 }}>
-                {JSON.stringify(v.parameter, null, 2)}
-              </pre>
-            </div>
-          </details>
         )}
 
         {!erledigt && (
@@ -356,9 +349,6 @@ function AktionCard({
               {busy && <span className="led" style={{ background: 'currentColor' }} />}
               Anlegen
             </button>
-            <button type="button" disabled={busy} onClick={() => setBearbeiten((b) => !b)}>
-              {bearbeiten ? 'Bearbeiten beenden' : 'Vor dem Anlegen bearbeiten'}
-            </button>
             <button
               type="button"
               disabled={busy}
@@ -380,6 +370,151 @@ function AktionCard({
         ) : (
           <div className="notice danger" style={{ marginBottom: 0 }}>
             <span className="led warn" /> {v.ergebnis.text}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Sammelkarte: viele gleichartige Vorschläge aus EINER Antwort (etwa ein
+ * Meldebestand je Produkt) als eine Tabelle — je Vorschlag eine Zeile, Zellen
+ * editierbar, einzelne Zeilen verwerfbar, ein Knopf legt alle offenen an.
+ * Ausgeführt wird trotzdem je Zeile einzeln über /api/ki/aktion, damit jede
+ * Zeile ihr eigenes Ergebnis (Erfolg, Fehler, Link) bekommt.
+ */
+function SammelCard({
+  vorschlaege,
+  onEntscheidung,
+  onParameter,
+}: {
+  vorschlaege: Vorschlag[]
+  onEntscheidung: (id: string, ergebnis: NonNullable<Vorschlag['ergebnis']>) => void
+  onParameter: (id: string, parameter: Record<string, unknown>) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const spalten = gruppenSpalten(vorschlaege)
+  const offen = vorschlaege.filter((v) => v.ergebnis === undefined)
+  const angelegt = vorschlaege.filter((v) => v.ergebnis !== undefined && v.ergebnis !== 'verworfen' && v.ergebnis.ok)
+  const fehler = vorschlaege.filter((v) => v.ergebnis !== undefined && v.ergebnis !== 'verworfen' && !v.ergebnis.ok)
+  const begruendung = vorschlaege.find((v) => v.begruendung)?.begruendung
+
+  async function alleAusfuehren() {
+    setBusy(true)
+    try {
+      // Nacheinander, nicht parallel: jede Zeile bucht für sich, und ein
+      // Fehler in Zeile 3 hält Zeile 4 nicht auf.
+      for (const v of offen) {
+        onEntscheidung(v.id, await vorschlagAusfuehren(v))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 8 }}>
+      <header>
+        <span>
+          <span className={`led ${offen.length > 0 ? 'on' : fehler.length > 0 ? 'warn' : 'ok'}`} />{' '}
+          {vorschlaege[0].label} — {vorschlaege.length} Vorschläge
+        </span>
+        <span className="actions"><span className="mono-label">{vorschlaege[0].bereich}</span></span>
+      </header>
+      <div className="body">
+        {begruendung && <p className="muted small" style={{ margin: '0 0 8px' }}>{begruendung}</p>}
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {spalten.map((s) => <th key={s}>{s}</th>)}
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vorschlaege.map((v) => {
+                const zeileOffen = v.ergebnis === undefined
+                return (
+                  <tr key={v.id}>
+                    {spalten.map((s) => {
+                      const wert = v.parameter[s]
+                      // Beleg-IDs hat der Agent nachgeschlagen — von Hand
+                      // editiert wären sie nur falsch. Anzeigen, nicht ändern.
+                      if (s === 'record_id') {
+                        return (
+                          <td key={s} className="mono small" title={String(wert ?? '')}>
+                            {typeof wert === 'string' ? wert.slice(0, 8) + '…' : '—'}
+                          </td>
+                        )
+                      }
+                      return (
+                        <td key={s}>
+                          {zeileOffen ? (
+                            <Zelle
+                              wert={wert}
+                              onChange={(neu) => onParameter(v.id, { ...v.parameter, [s]: neu })}
+                            />
+                          ) : (
+                            <span>{wert === undefined || wert === null ? '—' : String(wert)}</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                    <td className="nowrap">
+                      {zeileOffen ? (
+                        <button
+                          type="button"
+                          className="small danger"
+                          title="Diese Zeile verwerfen"
+                          disabled={busy}
+                          onClick={() => onEntscheidung(v.id, 'verworfen')}
+                        >
+                          ×
+                        </button>
+                      ) : v.ergebnis === 'verworfen' ? (
+                        <span className="muted small"><span className="led off" /> verworfen</span>
+                      ) : v.ergebnis!.ok ? (
+                        <span className="small">
+                          <span className="led ok" />{' '}
+                          {v.ergebnis!.link ? <a href={v.ergebnis!.link}>angelegt</a> : 'angelegt'}
+                        </span>
+                      ) : (
+                        <span className="small" title={v.ergebnis!.text}>
+                          <span className="led warn" /> {v.ergebnis!.text}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {offen.length > 0 ? (
+          <div className="actions" style={{ marginTop: 8 }}>
+            <button className="primary" type="button" disabled={busy} onClick={() => void alleAusfuehren()}>
+              {busy && <span className="led" style={{ background: 'currentColor' }} />}
+              Alle anlegen ({offen.length})
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => offen.forEach((v) => onEntscheidung(v.id, 'verworfen'))}
+            >
+              Alle verwerfen
+            </button>
+            <span className="muted small">Zellen sind editierbar. Nichts ist bisher gespeichert.</span>
+          </div>
+        ) : (
+          <div className="muted small" style={{ marginTop: 8 }}>
+            {angelegt.length} angelegt
+            {fehler.length > 0 && `, ${fehler.length} fehlgeschlagen`}
+            {vorschlaege.length - angelegt.length - fehler.length > 0 &&
+              `, ${vorschlaege.length - angelegt.length - fehler.length} verworfen`}
+            .
           </div>
         )}
       </div>
@@ -511,40 +646,58 @@ export function KiChat() {
             {m.charts.map((d, j) => (
               <ChartCard key={j} d={d} />
             ))}
-            {m.aktionen.map((v) => (
-              <AktionCard
-                key={v.id}
-                v={v}
-                onEntscheidung={(id, ergebnis) =>
-                  setMsgs((cur) =>
-                    cur.map((msg) => ({
-                      ...msg,
-                      aktionen: msg.aktionen.map((a) => (a.id === id ? { ...a, ergebnis } : a)),
-                    })),
-                  )
-                }
-                onParameter={(id, parameter, zusammenfassung) =>
-                  setMsgs((cur) =>
-                    cur.map((msg) => ({
-                      ...msg,
-                      aktionen: msg.aktionen.map((a) =>
-                        a.id === id
-                          ? {
-                              ...a,
-                              parameter,
-                              zusammenfassung: zusammenfassung ?? a.zusammenfassung,
-                              // Von Hand geändert heißt: nicht mehr der
-                              // Vorschlag der KI, also auch nicht mehr deren
-                              // Begründung.
-                              begruendung: zusammenfassung ? a.begruendung : undefined,
-                            }
-                          : a,
-                      ),
-                    })),
-                  )
-                }
-              />
-            ))}
+            {gruppiereVorschlaege(m.aktionen).map((gruppe) => {
+              const onEntscheidung = (
+                id: string,
+                ergebnis: NonNullable<Vorschlag['ergebnis']>,
+              ) =>
+                setMsgs((cur) =>
+                  cur.map((msg) => ({
+                    ...msg,
+                    aktionen: msg.aktionen.map((a) => (a.id === id ? { ...a, ergebnis } : a)),
+                  })),
+                )
+              const onParameter = (
+                id: string,
+                parameter: Record<string, unknown>,
+                zusammenfassung?: string,
+              ) =>
+                setMsgs((cur) =>
+                  cur.map((msg) => ({
+                    ...msg,
+                    aktionen: msg.aktionen.map((a) =>
+                      a.id === id
+                        ? {
+                            ...a,
+                            parameter,
+                            zusammenfassung: zusammenfassung ?? a.zusammenfassung,
+                            // Von Hand geändert heißt: nicht mehr der
+                            // Vorschlag der KI, also auch nicht mehr deren
+                            // Begründung.
+                            begruendung: zusammenfassung ? a.begruendung : undefined,
+                          }
+                        : a,
+                    ),
+                  })),
+                )
+              // Viele gleichartige Vorschläge einer Antwort: EINE Tabelle
+              // statt einer Kartenwand (siehe vorschlag-gruppen.ts).
+              return gruppe.length > 1 ? (
+                <SammelCard
+                  key={gruppe[0].id}
+                  vorschlaege={gruppe}
+                  onEntscheidung={onEntscheidung}
+                  onParameter={onParameter}
+                />
+              ) : (
+                <AktionCard
+                  key={gruppe[0].id}
+                  v={gruppe[0]}
+                  onEntscheidung={onEntscheidung}
+                  onParameter={onParameter}
+                />
+              )
+            })}
             {m.role === 'assistant' && m.text === '' && m.charts.length === 0 &&
               m.aktionen.length === 0 && !status && (
               <span className="mono-label">

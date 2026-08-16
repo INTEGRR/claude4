@@ -40,8 +40,10 @@ Regeln:
   zusätzlich in den Text — ein Diagramm ersetzt keine Tabelle, es fasst zusammen.
 - Anlegen darfst du nur, was ausdrücklich gewünscht ist, und nur über aktion_vorschlagen.
   Der Vorschlag geht an den Benutzer; erst sein Klick führt ihn aus. Sag danach also nicht,
-  etwas sei angelegt — sag, dass der Vorschlag zur Bestätigung bereitliegt. Schlage nie
-  ungefragt etwas vor, und immer nur eine Aktion je Antwort.
+  etwas sei angelegt — sag, dass die Vorschläge zur Bestätigung bereitliegen. Schlage nie
+  ungefragt etwas vor. Viele gleichartige Anlagen (z. B. ein Meldebestand je Produkt)
+  gehören alle in EINE Antwort — aktion_vorschlagen mehrfach aufrufen, nicht eine
+  Runde je Datensatz.
 - Namen und Kennungen (SKU, Kunde, IDs) vor einem Vorschlag mit sql_abfrage nachschlagen,
   statt sie zu raten.
 - Führe lieber mehrere kleine Abfragen aus als eine riesige. Ergebnisse werden bei ${MAX_ROWS} Zeilen gekappt — nutze aggregierende Abfragen und LIMIT.

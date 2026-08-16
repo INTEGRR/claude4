@@ -99,15 +99,26 @@ Drei Werkzeuge:
 **3. `aktion_vorschlagen` — anlegen, aber nur mit Bestätigung.** Der Agent
   schreibt **kein** SQL. Er wählt eine Aktion aus einem festen Katalog
   (`src/modules/ki/aktionen.ts`) und füllt deren Felder; der Vorschlag
-  erscheint im Chat als Karte mit Zusammenfassung, Begründung und allen
-  Feldern im Klartext. Vor dem Anlegen lässt sich der Vorschlag korrigieren —
-  auf zwei Wegen: „Vor dem Anlegen bearbeiten" macht jedes Feld editierbar
-  (Objektlisten wie Attributwerte als Tabelle mit editierbaren Zellen), und
-  die Zuruf-Zeile („Kürzel für Grün auf GN") lässt die KI den Feldsatz über
+  erscheint im Chat als Karte mit Zusammenfassung, Begründung — und den
+  Feldern direkt als **editierbares Formular** (kein rohes JSON; Objektlisten
+  wie Attributwerte als Tabelle mit editierbaren Zellen). Zusätzlich lässt
+  die Zuruf-Zeile („Kürzel für Grün auf GN") die KI den Feldsatz über
   `/api/ki/aktion/aendern` neu schreiben — eine kurze, isolierte Runde ohne
   Datenbankzugriff, deren Ergebnis wieder gegen das Aktionsschema geprüft
-  wird. Erst der Klick auf „Anlegen" schickt den Vorschlag an
-  `/api/ki/aktion`, wo **erneut** geprüft wird:
+  wird.
+
+  Viele gleichartige Datensätze (etwa ein Meldebestand je Produkt) schlägt
+  der Agent in **einer** Antwort vor — je Datensatz ein Werkzeugaufruf. Der
+  Chat gruppiert aufeinanderfolgende Vorschläge derselben Aktion mit flachem
+  Feldsatz zu einer **Sammelkarte** (`src/modules/ki/vorschlag-gruppen.ts`):
+  eine Tabelle, je Vorschlag eine Zeile, Zellen editierbar, einzelne Zeilen
+  verwerfbar, „Alle anlegen" bestätigt den Rest gemeinsam. Ausgeführt wird
+  trotzdem je Zeile einzeln über `/api/ki/aktion`, damit jede Zeile ihr
+  eigenes Ergebnis bekommt — ein Fehler in Zeile 3 hält Zeile 4 nicht auf.
+  Beleg-IDs (`record_id`) zeigt die Tabelle nur an, editierbar sind sie
+  nicht — die hat der Agent nachgeschlagen. Erst der Klick auf „Anlegen"
+  (bzw. „Alle anlegen") schickt den Vorschlag an `/api/ki/aktion`, wo
+  **erneut** geprüft wird:
 
   - Ist die Aktion im Katalog? (sonst 400 mit der Liste der erlaubten)
   - Sind die Felder gültig? (Zod-Schema, Meldung im Klartext)

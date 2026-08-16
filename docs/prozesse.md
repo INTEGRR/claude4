@@ -538,10 +538,56 @@ Sperr-Zustand (kein Automatik-Mapping); direkte Teilprozess-Rekursion
 ist verboten, tiefere Zyklen zwischen Prozessen prüft die Aktivierung
 noch nicht.
 
+## Belegsignale folgen dem Prozessschritt (Migration 0052, umgesetzt)
+
+Felder wie `billing_status` bleiben als **Fakten** am Beleg (Historie,
+Wieder-Einschalten findet alles wieder), aber ihre **Signalwirkung** —
+„hier fehlt noch etwas" — gilt nur, solange der zugehörige Schritt Teil
+des Ablaufs ist. `prozessschritt_aktiv(prozess, schritt)` ist die eine
+Frage, die Oberflächen dafür stellen (Schritt in der aktiven Version
+vorhanden und nicht per Override abgeschaltet). Gekoppelt sind bisher:
+
+- Einkaufsliste + Bestelldetail: Spalte „Abrechnung", Karte „Rechnungen"
+  und „Rechnung erstellen" hängen an
+  `prozessschritt_aktiv('einkauf_wareneingang_rechnung','rechnung')`.
+- Navigation: der Punkt **Beschaffung** (samt Zähler) erscheint nur mit
+  aktivem Einkaufs- oder Fertigungsprozess — Vorschläge, die nirgendwo
+  münden können, sind kein Signal. Meldebestände bleiben Daten.
+- Verkaufsdetail: die Abrechnungs-Kachel (`invoice_status`) ist raus —
+  es gibt kein Kundenrechnungs-Modul, das Signal zeigte ins Leere. Das
+  Feld bleibt am Beleg; kommt ein AR-Modul, kommt die Kachel mit
+  `prozessschritt_aktiv()` zurück.
+
+## Konsistenz-Wächter beim Schalten (umgesetzt)
+
+Teilprozess-Kanten sind harte Abhängigkeiten. Zwei Wächter in
+`einstellungen.prozess_schalten` / `einstellungen.paket_aktivieren`:
+
+- **Abschalten blockt**: ein Prozess, den ein aktiver Elternprozess als
+  Teilprozess einbindet, lässt sich nicht abschalten — die Meldung nennt
+  Elternprozess und Schritt. Erst den Eltern abschalten (oder den Schritt
+  aus der Version nehmen).
+- **Einschalten und Paketwechsel ziehen mit**: das Aktivieren eines
+  Prozesses (und jedes Paket) aktiviert seine Teilprozesse transitiv
+  mit — ein Paket, das den Einkauf nennt, bekommt Wareneingang und
+  Lieferantenrechnung automatisch dazu; das Ergebnis nennt die
+  mitgezogenen Prozesse. Zusätzlich weist der Paketwechsel (weich, kein
+  Fehler) auf Schritte hin, deren Aktion in einen Bereich ohne aktiven
+  Prozess zeigt — Belege daraus laufen ohne Prozessbegleitung.
+
+Der statische Vollständigkeitstest prüft dieselbe Invariante am
+Auslieferungszustand; die Wächter halten sie unter Laufzeit-Schaltungen.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),
   nach dem Muster des Einkaufs-Piloten.
+- **Signal-Kopplung deklarativ machen**, sobald ~5 Stellen von Hand
+  verdrahtet sind: Signale als Schritt-Metadaten deklarieren (welcher
+  Schritt trägt welches Beleg-Signal), Oberflächen fragen generisch, ein
+  Vollständigkeitstest findet vergessene Kopplungen. Heute sind es drei
+  Stellen (Einkaufs-Abrechnung, Beschaffungs-Navigation, Verkaufs-
+  Abrechnung entfernt) — Handverdrahtung ist noch billiger.
 - Fähigkeits-Umbenennung der Job-Kinds — bewusst zurückgestellt: die
   Fähigkeits-Schicht liegt bereits im JOB_KATALOG (anbieterneutral,
   getestet), ein Umbenennen der persistierten Kinds (integration_jobs,

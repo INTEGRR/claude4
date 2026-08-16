@@ -30,7 +30,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       state: string
       locked: boolean
       delivery_status: string
-      invoice_status: string
       source: string
       shopify_order_id: string | null
       shopify_order_name: string | null
@@ -198,14 +197,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
         </div>
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="stat">
-            <div className="label">Abrechnung</div>
-            <div style={{ marginTop: 6 }}>
-              <Badge state={order.invoice_status} kind="invoice" />
-            </div>
-          </div>
-        </div>
+        {/* Bewusst keine Abrechnungs-Kachel: ein Kundenrechnungs-Modul gibt es
+            (noch) nicht — invoice_status bleibt als Faktum am Beleg, aber ohne
+            Modul dahinter wäre die Anzeige ein Signal ins Leere. Kommt ein
+            AR-Modul, kommt die Kachel mit prozessschritt_aktiv() zurück. */}
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="stat">
             <div className="label">Lieferadresse</div>

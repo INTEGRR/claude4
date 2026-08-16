@@ -42,16 +42,61 @@ export async function prozessSchalten(
   if (p.prozess_code === 'bug_ticket' && !p.aktiv) {
     throw new Error('Der Bug-Loop ist Infrastruktur und lässt sich nicht abschalten.')
   }
+  // Konsistenz-Wächter: solange ein aktiver Elternprozess diesen Prozess als
+  // Teilprozess einbindet, würde das Abschalten dessen Ablauf mitten
+  // durchtrennen — der Elternschritt würde nie fertig.
+  if (!p.aktiv) {
+    const eltern = await sql<{ code: string; schritt: string }[]>`
+      select e.code, s.code as schritt
+      from prozesse e
+      join prozess_schritte s on s.version_id = prozess_aktive_version(e.code)
+      where e.aktiv and s.art = 'prozess' and s.teilprozess = ${p.prozess_code}
+      order by e.code`
+    if (eltern.length > 0) {
+      throw new Error(
+        `„${p.prozess_code}" ist Teilprozess von ` +
+          eltern.map((e) => `${e.code} (Schritt „${e.schritt}")`).join(', ') +
+          ' — erst den Elternprozess abschalten oder den Schritt aus dessen Version nehmen.',
+      )
+    }
+  }
   const [prozess] = await sql<{ name: string }[]>`
     update prozesse set aktiv = ${p.aktiv}
     where code = ${p.prozess_code}
     returning name`
   if (!prozess) throw new Error(`Prozess „${p.prozess_code}" existiert nicht.`)
 
+  // Einschalten zieht die eigenen Teilprozesse (transitiv) mit — ein aktiver
+  // Prozess referenziert nie einen abgeschalteten.
+  let mitgezogen: string[] = []
+  if (p.aktiv) {
+    mitgezogen = (
+      await sql<{ code: string }[]>`
+        with recursive kinder(code) as (
+          select s.teilprozess from prozess_schritte s
+          where s.version_id = prozess_aktive_version(${p.prozess_code})
+            and s.art = 'prozess' and s.teilprozess is not null
+          union
+          select s2.teilprozess
+          from kinder k
+          join prozess_schritte s2 on s2.version_id = prozess_aktive_version(k.code)
+          where s2.art = 'prozess' and s2.teilprozess is not null
+        )
+        update prozesse set aktiv = true
+        where code in (select code from kinder) and not aktiv
+        returning code`
+    ).map((r) => r.code)
+  }
+
   await sql`select log_event('prozess', gen_random_uuid(), 'state',
-    ${`Prozess ${p.prozess_code} ${p.aktiv ? 'aktiviert' : 'abgeschaltet'}`}, ${ctx.actor})`
+    ${`Prozess ${p.prozess_code} ${p.aktiv ? 'aktiviert' : 'abgeschaltet'}` +
+      (mitgezogen.length > 0 ? ` (Teilprozesse mit: ${mitgezogen.join(', ')})` : '')}, ${ctx.actor})`
   return {
-    text: `„${prozess.name}" ist jetzt ${p.aktiv ? 'aktiv' : 'abgeschaltet'}.`,
+    text:
+      `„${prozess.name}" ist jetzt ${p.aktiv ? 'aktiv' : 'abgeschaltet'}.` +
+      (mitgezogen.length > 0
+        ? ` Teilprozesse mit aktiviert: ${mitgezogen.join(', ')}.`
+        : ''),
     recordId: p.prozess_code,
   }
 }
@@ -64,20 +109,66 @@ export async function paketAktivieren(
     select name, prozess_codes from prozess_pakete where code = ${p.paket_code}`
   if (!paket) throw new Error(`Paket „${p.paket_code}" existiert nicht.`)
 
-  // Pivot = Paketwechsel: exakt die Paket-Prozesse an, der Rest aus.
-  // bug_ticket ist Infrastruktur und bleibt in jedem Geschäftsmodell an.
+  // Konsistenz-Wächter: Teilprozess-Kanten transitiv mitziehen — ein Paket,
+  // das den Einkauf nennt, bekommt Wareneingang und Lieferantenrechnung
+  // automatisch dazu, statt sie stumm abzuschalten.
+  const geschlossen = (
+    await sql<{ code: string }[]>`
+      with recursive ziel(code) as (
+        select unnest(${paket.prozess_codes}::text[])
+        union
+        select s.teilprozess
+        from ziel z
+        join prozess_schritte s on s.version_id = prozess_aktive_version(z.code)
+        where s.art = 'prozess' and s.teilprozess is not null
+      )
+      select code from ziel`
+  ).map((r) => r.code)
+  const mitgezogen = geschlossen.filter((c) => !paket.prozess_codes.includes(c))
+
+  // Pivot = Paketwechsel: exakt die Paket-Prozesse (plus Abhängigkeiten) an,
+  // der Rest aus. bug_ticket ist Infrastruktur und bleibt in jedem
+  // Geschäftsmodell an.
   await sql`
     update prozesse
-    set aktiv = (code = any(${paket.prozess_codes}) or code = 'bug_ticket')`
+    set aktiv = (code = any(${geschlossen}) or code = 'bug_ticket')`
+
+  // Weicher Blick auf Querbezüge: nutzt ein aktiver Prozessschritt eine
+  // Aktion aus einem Bereich ohne aktiven Prozess, laufen die dort erzeugten
+  // Belege ohne Prozessbegleitung. Kein Fehler — aber es steht im Ergebnis.
+  const schritte = await sql<{ prozess: string; schritt: string; aktion: string }[]>`
+    select pr.code as prozess, s.code as schritt, s.aktion
+    from prozesse pr
+    join prozess_schritte s on s.version_id = prozess_aktive_version(pr.code)
+    where pr.aktiv and s.aktion is not null`
+  const aktiveBereiche = new Set(
+    (await sql<{ bereich: string }[]>`
+      select distinct bereich from prozesse where aktiv`).map((b) => b.bereich),
+  )
+  const querbezuege = schritte.filter((s) => {
+    const eintrag = (REGISTRY as Record<string, { bereich?: string }>)[s.aktion]
+    return eintrag?.bereich !== undefined && !aktiveBereiche.has(eintrag.bereich)
+  })
 
   const aktive = await sql<{ code: string }[]>`
     select code from prozesse where aktiv order by code`
   await sql`select log_event('prozess', gen_random_uuid(), 'state',
-    ${`Paket ${p.paket_code} aktiviert: ${aktive.map((a) => a.code).join(', ')}`}, ${ctx.actor})`
+    ${`Paket ${p.paket_code} aktiviert: ${aktive.map((a) => a.code).join(', ')}` +
+      (mitgezogen.length > 0 ? ` (Teilprozesse mit: ${mitgezogen.join(', ')})` : '')}, ${ctx.actor})`
   return {
-    text: `Paket „${paket.name}" aktiviert — aktive Prozesse: ${aktive
-      .map((a) => a.code)
-      .join(', ')}.`,
+    text:
+      `Paket „${paket.name}" aktiviert — aktive Prozesse: ${aktive
+        .map((a) => a.code)
+        .join(', ')}.` +
+      (mitgezogen.length > 0
+        ? ` Teilprozesse automatisch mit aktiviert: ${mitgezogen.join(', ')}.`
+        : '') +
+      (querbezuege.length > 0
+        ? ` Hinweis: ${querbezuege
+            .slice(0, 5)
+            .map((q) => `${q.prozess}/${q.schritt} nutzt ${q.aktion}`)
+            .join('; ')} — der Zielbereich hat keinen aktiven Prozess, Belege daraus laufen ohne Prozessbegleitung.`
+        : ''),
     recordId: p.paket_code,
   }
 }

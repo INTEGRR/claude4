@@ -50,7 +50,7 @@ function leereZeile(vorlage: Record<string, Wert> | undefined): Record<string, W
 const istObjektliste = (v: Wert): v is Record<string, Wert>[] =>
   Array.isArray(v) && v.length > 0 && v.every((e) => e !== null && typeof e === 'object' && !Array.isArray(e))
 
-function Zelle({
+export function Zelle({
   wert,
   onChange,
   breit,
