@@ -40,21 +40,8 @@ const NOCH_OHNE_PROZESS = new Set([
   'verkauf.bestaetigen',
   'verkauf.stornieren',
   'verkauf.zurueck_auf_angebot',
-  // Der Einkaufsprozess (Bestellung → Wareneingang → Rechnung) folgt als P6.
-  'einkauf.bestellung_anlegen',
-  'einkauf.bestaetigen',
-  'einkauf.stornieren',
-  'einkauf.rechnung_erstellen',
-  'einkauf.rechnung_buchen',
-  'einkauf.rechnung_zahlen',
-  'einkauf.rechnung_stornieren',
-  // Der Fertigungsprozess folgt als P5.
-  'fertigung.auftrag_anlegen',
-  'fertigung.bestaetigen',
-  'fertigung.beginnen',
-  'fertigung.verfuegbarkeit_pruefen',
-  'fertigung.fertig_melden',
-  'fertigung.stornieren',
+  // Arbeitsgang-Schritte folgen mit einer Arbeitsplan-Prozessvariante
+  // (brauchen die operation_id des konkreten Auftrags).
   'fertigung.arbeitsgang_starten',
   'fertigung.arbeitsgang_beenden',
 ])
@@ -62,8 +49,12 @@ const NOCH_OHNE_PROZESS = new Set([
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */
 const UNABGEBILDET: Record<string, string[]> = {
   // draft/waiting sind Durchgangszustände vor der Bestätigung; cancel ist
-  // der Abbruch außerhalb des Happy Path (Storno-Schritt folgt mit P5–P7).
+  // der Abbruch außerhalb des Happy Path (Storno läuft über die Lager-Aktionen).
   shopify_bestellung_versand: ['draft', 'waiting', 'cancel'],
+  // to_close ist ein toter Zustand (kein Erzeuger — siehe Inventar-Befund).
+  fertigung: ['to_close'],
+  // sent hat keinen Erzeuger; done setzt der Wareneingang außerhalb des Prozesses.
+  einkauf_wareneingang_rechnung: ['sent', 'done'],
 }
 
 let h: Harness

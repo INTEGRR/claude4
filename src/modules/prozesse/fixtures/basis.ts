@@ -8,12 +8,17 @@ import type { FixtureKontext, ProzessFixture } from './typen.ts'
  * in Quants geschrieben — der Ledger bleibt konsistent.
  */
 
-async function findeOderKunde(sql: Sql, name: string): Promise<string> {
+async function findeOderPartner(
+  sql: Sql,
+  name: string,
+  rolle: 'kunde' | 'lieferant',
+): Promise<string> {
   const [vorhanden] = await sql<{ id: string }[]>`
     select id from partners where name = ${name} limit 1`
   if (vorhanden) return vorhanden.id
   const [neu] = await sql<{ id: string }[]>`
-    insert into partners (name, is_customer) values (${name}, true) returning id`
+    insert into partners (name, is_customer, is_vendor)
+    values (${name}, ${rolle === 'kunde'}, ${rolle === 'lieferant'}) returning id`
   return neu.id
 }
 
@@ -54,7 +59,8 @@ async function bestandAuffuellen(sql: Sql, variantId: string, mindest: number): 
 export const BASIS: ProzessFixture = {
   prozess: null,
   aufbauen: async (sql: Sql, ctx: FixtureKontext) => {
-    ctx.kundeId = await findeOderKunde(sql, 'Prozesstest Kunde')
+    ctx.kundeId = await findeOderPartner(sql, 'Prozesstest Kunde', 'kunde')
+    ctx.lieferantId = await findeOderPartner(sql, 'Prozesstest Lieferant', 'lieferant')
     ctx.geraetId = await findeOderProdukt(sql, 'Prozesstest Gerät', 'PT-GERAET')
     ctx.teilId = await findeOderProdukt(sql, 'Prozesstest Ersatzteil', 'PT-TEIL')
     await bestandAuffuellen(sql, ctx.teilId, 10)

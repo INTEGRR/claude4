@@ -1,6 +1,8 @@
 import { ARTIKEL_ANLEGEN } from './artikel-anlegen.ts'
 import { BASIS } from './basis.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
+import { EINKAUF_FIXTURE, LIEFERANTENRECHNUNG_FIXTURE } from './einkauf.ts'
+import { FERTIGUNG_FIXTURE } from './fertigung.ts'
 import { REPARATUR } from './reparatur.ts'
 import { SHOPIFY_VERSAND } from './shopify-versand.ts'
 import type { ProzessFixture } from './typen.ts'
@@ -17,6 +19,9 @@ export const FIXTURES = {
   basis: BASIS,
   artikel_anlegen: ARTIKEL_ANLEGEN,
   bug_ticket: BUG_TICKET,
+  einkauf_wareneingang_rechnung: EINKAUF_FIXTURE,
+  fertigung: FERTIGUNG_FIXTURE,
+  lieferantenrechnung: LIEFERANTENRECHNUNG_FIXTURE,
   reparatur: REPARATUR,
   shopify_bestellung_versand: SHOPIFY_VERSAND,
 } satisfies Record<string, ProzessFixture>

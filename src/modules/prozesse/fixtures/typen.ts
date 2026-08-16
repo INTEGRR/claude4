@@ -39,6 +39,12 @@ export interface ProzessLauf {
   name: string
   /** Wer klickt — Standard: ein Administrator. */
   nutzer?: { name: string; role: Role }
+  /**
+   * Beleg vorab bereitstellen (über die Buchungswege), wenn der Pfad
+   * MITTEN im Prozess einsteigt — z. B. eine schon erzeugte Rechnung.
+   * Ohne beleg liefert der erste Pfadschritt (Anlage/Ereignis) die ID.
+   */
+  beleg?: (ctx: FixtureKontext, sql: Sql) => Promise<string>
   /** Die Schritt-Codes in Ausführungsreihenfolge (nur art='aktion'). */
   pfad: string[]
   /** Eingaben je Schritt-Code; Schritt-params aus der Prozessdefinition werden vorgelegt. */

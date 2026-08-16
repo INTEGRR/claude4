@@ -89,7 +89,8 @@ export async function prozessDurchspielen(
   assert.ok(art, `Prozess ${prozess} existiert nicht`)
   if (art.modell === null) return instanzDurchspielen(sql, prozess, lauf, ctx, nutzer)
 
-  let recordId: string | undefined
+  let recordId: string | undefined = lauf.beleg ? await lauf.beleg(ctx, sql) : undefined
+  if (recordId) ctx[`${prozess}_beleg_id`] = recordId
 
   for (const code of lauf.pfad) {
     let schritt: Schritt
@@ -129,6 +130,7 @@ export async function prozessDurchspielen(
       if (!recordId) {
         recordId = geliefert || undefined
         assert.ok(recordId, `${prozess}/${code}: der Auslöser muss die Beleg-ID liefern`)
+        ctx[`${prozess}_beleg_id`] = recordId
       }
       await assertLedgerConsistent(sql)
       continue
@@ -167,6 +169,8 @@ export async function prozessDurchspielen(
     if (!recordId) {
       recordId = (ergebnis ?? {}).recordId
       assert.ok(recordId, `${prozess}/${code}: der Anlage-Schritt muss eine recordId liefern`)
+      // Für spätere Eingabe-Funktionen (z. B. Wareneingang vor der Rechnung).
+      ctx[`${prozess}_beleg_id`] = recordId
     }
 
     if (schritt.zustand) {

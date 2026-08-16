@@ -304,7 +304,7 @@ Registry — verkauf (8), einkauf (18), fertigung (20), personal +
 zeiterfassung (11), kontakte (2), produkte (7), einstellungen/benutzer
 (4, nur Admin), auswertungen (1). Zusammen mit fehler, lager, reparatur,
 versand, produkte.produkt_anlegen und den Prozess-Verwaltungsaktionen
-sind das **99 registrierte Aktionen** — jede mit Schema, Bereich,
+sind das **104 registrierte Aktionen** — jede mit Schema, Bereich,
 Formdata-Adapter und API-Adresse, jede über `/api/aktion/<name>`
 aufrufbar. Die statische Abdeckungsanalyse erzwingt: neue Server Actions
 nutzen serverAktion() oder stehen auf der geschlossenen
@@ -315,10 +315,36 @@ Fertigung P5, Inventur P7) stehen auf der schrumpfenden
 `NOCH_OHNE_PROZESS`-Liste des Vollständigkeitstests — sobald der Seed
 kommt, zwingt der Test die Einträge von der Liste.
 
+## Phase 6f — P5/P6-Seeds: Fertigung, Einkauf, Lieferantenrechnung (umgesetzt)
+
+**Sieben Prozesse laufen end-to-end im Prozesstest** (Migration 0042):
+
+- **`fertigung`** (manufacturing_order): anlegen → bestätigen → optional
+  Verfügbarkeit → starten → fertig melden (Backflush, Ledger geprüft);
+  „direkt fertig melden" aus der Bestätigung; Storno überall erreichbar.
+  `to_close` steht als toter Zustand auf der Unabgebildet-Liste.
+- **`einkauf_wareneingang_rechnung`** (purchase_order): anlegen → optional
+  Positionen (wie „Teile" bei der Reparatur — der Standort bleibt stehen,
+  der Schritt bleibt anbietbar) → bestellen (Wareneingang entsteht) →
+  Rechnung erstellen. Der Wareneingang selbst wird über picking_validate
+  gebucht — im Fixture-Lauf genau vor dem Rechnungs-Schritt
+  (bill_policy 'received').
+- **`lieferantenrechnung`** (vendor_bill): erfassen (draft) → buchen →
+  bezahlen; Storno mit Gegenrechnung. Die Fixture steigt mit
+  `lauf.beleg` MITTEN im Prozess ein (Rechnung entsteht vorab über die
+  Buchungswege) — der Interpreter kann das jetzt.
+- Die Inventur (P7) bleibt bewusst offen: inventory_counts hat keine
+  Statusmaschine — sie wird ein belegloser Assistent, sobald die
+  Instanz-Ausführung beleggebundene Folgeschritte beherrscht.
+- Basis-Fixture erweitert um den Lieferanten; der Interpreter legt die
+  Beleg-ID jedes Laufs im Kontext ab (`<prozess>_beleg_id`) — Eingabe-
+  Funktionen späterer Schritte erreichen damit den Beleg (Wareneingang
+  vor der Rechnung).
+
 ## Kommende Phasen (Kurzfassung)
-6. **Rest**: P5–P7-Seeds (fertigung, einkauf_wareneingang_rechnung,
-   inventur) mit Fixtures; KI-Katalog aus der Registry (`ki: true`);
-   Inline-Seiten-Actions (Kartonagen, Versandregeln, Integrationen).
+6. **Rest**: KI-Katalog aus der Registry (`ki: true`);
+   Inline-Seiten-Actions (Kartonagen, Versandregeln, Integrationen);
+   Inventur-Assistent.
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
    Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer
    Vorgang, Fähigkeits-Adapter, KI-Prozessentwurf.
