@@ -32,6 +32,9 @@ export function shopifyConfig(): ShopifyConfig {
 }
 
 export function shopifyConfigured(): boolean {
+  // Im Fake-Betrieb (Prozesstests, Staging) gilt Shopify als konfiguriert —
+  // sonst würden die Ketten (Fulfillment melden usw.) nie bis zum Fake kommen.
+  if (process.env.SHOPIFY_FAKE === '1') return true
   const c = shopifyConfig()
   return Boolean(c.shop && (c.token || (c.clientId && c.clientSecret)))
 }
@@ -103,12 +106,14 @@ async function protokollToken(ok: boolean, statusCode: number | null, error: str
 }
 
 export class ShopifyError extends Error {
-  constructor(
-    message: string,
-    readonly retryable: boolean,
-  ) {
+  // Keine Parameter-Properties: die Prozesstests laden dieses Modul unter
+  // node --experimental-strip-types, und der kann nur löschbare Syntax.
+  readonly retryable: boolean
+
+  constructor(message: string, retryable: boolean) {
     super(message)
     this.name = 'ShopifyError'
+    this.retryable = retryable
   }
 }
 
@@ -126,6 +131,13 @@ export async function shopifyGraphQL<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
+  // Prozesstests und Staging ohne echten Shop: deterministische Antworten an
+  // derselben Naht — alles oberhalb (Jobs, Handler, Belege) läuft unverändert.
+  if (process.env.SHOPIFY_FAKE === '1') {
+    const { fakeShopifyGraphQL } = await import('./shopify-fake')
+    return fakeShopifyGraphQL<T>(query, variables)
+  }
+
   const c = shopifyConfig()
   if (!shopifyConfigured()) throw new ShopifyError('Shopify ist nicht konfiguriert', false)
 

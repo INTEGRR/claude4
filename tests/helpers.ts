@@ -151,8 +151,10 @@ export async function freeToUse(t: TransactionSql, variantId: string): Promise<n
 /**
  * Die zentrale Invariante: der Bestand jeder Variante an jedem Ort muss exakt
  * der Summe aller erledigten Bewegungen dorthin/von dort entsprechen.
+ * Nimmt bewusst `Sql` (Basistyp): auch der Prozesstest-Harness prüft sie —
+ * dort ohne Transaktion, weil die Läufe echte Commits brauchen.
  */
-export async function assertLedgerConsistent(t: TransactionSql): Promise<void> {
+export async function assertLedgerConsistent(t: Sql | TransactionSql): Promise<void> {
   const rows = await t<{ location_id: string; variant_id: string; quant: number; ledger: number }[]>`
     with ledger as (
       select dest_location_id as location_id, variant_id, sum(qty_done) as qty

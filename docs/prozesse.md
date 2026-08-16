@@ -114,11 +114,66 @@ Reparatur-Durchlauf, Overrides, Versionskopie + Aktivierungs-Validierung,
 Instanzen), `tests/prozess-diagramm.test.ts` (Layout, DB-frei),
 `tests/demodaten.test.ts` (Prozessdefinitionen überleben den Neustart).
 
+## Phase 3 — Prozesstest-Harness + Testdatensatz (umgesetzt)
+
+**Ein Befehl spielt jeden Kernprozess nachweisbar durch:** `npm run
+test:prozesse`. Knöpfe drückt dabei niemand — jeder Schritt ist ein
+Aktionsaufruf über den Torwächter, also exakt der Weg, den auch Server
+Actions und `/api/aktion` nehmen.
+
+```
+src/modules/prozesse/fixtures/    der mit den Prozessen VERSIONIERTE Testdatensatz
+  typen.ts                        ProzessFixture: prozess, benoetigt, aufbauen,
+                                  laeufe [{pfad, eingaben, pruefen, …}]
+  basis.ts                        Kunde, Gerät, Ersatzteil mit Bestand (find-or-create,
+                                  Aufbau nur über die Buchungswege)
+  bug-ticket.ts / reparatur.ts    Läufe: Happy Path, Verwerfen, Garantie-XOR, Storno
+  index.ts                        FIXTURES satisfies Record + topologische Reihenfolge
+tests/prozesse/
+  harness.ts                      Wegwerf-DB je Testdatei (echte Commits — die Outbox
+                                  braucht `for update skip locked`); PROZESS_DB_URL
+                                  gesetzt ⇒ Staging-Modus, nichts wird angelegt/gelöscht
+  laufen.ts                       der Interpreter: liest die AKTIVE Version aus der DB,
+                                  prüft je Schritt Angebot (prozess_naechste_schritte),
+                                  Rollen, Statusübergang (zustand) und die Ledger-Invariante
+  prozesse.test.ts                alle Fixture-Läufe
+  vollstaendigkeit.test.ts        die Reißleinen (s. u.)
+  fakes.test.ts                   Fake-Weichen gegen die echten Client-Typen
+scripts/prozessdaten.ts           baut den Fixture-Grundbestand in einer Ziel-DB auf;
+                                  --reset NUR wenn settings.umgebung = {"name":"staging"}
+scripts/prozess-loader.mjs        Node-Loader: löst '@/…' auf, stubbt server-only,
+                                  probiert bei endungslosen relativen Importen .ts nach
+```
+
+**Vollständigkeits-Reißleinen** (tests/prozesse/vollstaendigkeit.test.ts):
+jede Registry-Aktion sitzt in einem Schritt, ist `prozessfrei` oder steht
+auf der SCHRUMPFENDEN Restliste `NOCH_OHNE_PROZESS` (ein Eintrag, dessen
+Aktion inzwischen einen Schritt hat, macht die Suite rot); jeder
+Schrittverweis (Aktion/Dienst/Ereignis/Rolle) existiert; jeder Enum-Wert
+der Belegstatusmaschine ist einem Schritt zugeordnet oder ausdrücklich als
+tot gelistet; jeder aktive Prozess hat eine Fixture mit gültigen Pfaden —
+**ein neuer Prozess ohne Fixture bricht die Suite, der Testdatensatz wächst
+also zwangsläufig mit.**
+
+**Fake-Adapter** für Betrieb ohne echte Konten (Prozesstests, Staging):
+`SHOPIFY_FAKE=1` beantwortet die GraphQL-Kapselung deterministisch
+(unbekannte Operation wirft laut), `DHL_FAKE=1` liefert deterministische
+Labels/Tracking/Retouren, getypt gegen die echten Client-Schnittstellen.
+Mail braucht keine Weiche — ohne RESEND_API_KEY wird ohnehin nur
+protokolliert. `npm run prozesse:staging` = Prozesstests mit Fakes gegen
+`PROZESS_DB_URL`.
+
+**Erster Fang des Harness** (Migration 0038): Teile, die nach dem
+Bestätigen erfasst wurden, bekamen nie eine Lagerbewegung — repair_confirm
+legte Moves nur beim Bestätigen an, repair_end buchte nur Teile mit Move.
+`repair_add_part` zieht die Bewegung jetzt sofort nach (samt Reservierung);
+die Reparaturmaske erlaubt das Nachtragen bis zum Abschluss.
+
+`npm run check` fährt seitdem beides: die klassische Suite und die
+Prozessläufe.
+
 ## Kommende Phasen (Kurzfassung)
 
-3. **Prozesstest-Harness + Testdatensatz**: Fixtures je Prozess
-   (mitversioniert, Vollständigkeits-Check), Wegwerf-DB lokal, per
-   DATABASE_URL gegen Staging; Fake-Adapter für Shopify/DHL/Mail.
 4. **Maskengenerierung** aus zod-Schemas (`/p/[prozess]`), Pilot „Artikel anlegen".
 5. **Externe Schritte + Bug-Loop + Staging-Automation** (Ticket ↔ Prozesstest ↔ Commit).
 6. **Breitenmigration + Laufzeit-Overrides** (Schritte an/aus je Firma).

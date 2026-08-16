@@ -23,17 +23,11 @@ export async function teilHinzufuegen(
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const repairId = ctx.recordId!
-  const [info] = await sql<{ uom_id: string; price: number }[]>`
-    select pt.uom_id, pt.list_price as price
-    from product_variants pv join product_templates pt on pt.id = pv.template_id
-    where pv.id = ${p.variant_id}`
-  if (!info) throw new Error('Teil nicht gefunden')
-
-  await sql`
-    insert into repair_parts (repair_id, sequence, part_type, variant_id, qty, uom_id, price_unit)
-    values (${repairId},
-            coalesce((select max(sequence) + 10 from repair_parts where repair_id = ${repairId}), 10),
-            ${p.part_type}::repair_part_type, ${p.variant_id}, ${p.qty}, ${info.uom_id}, ${info.price})`
+  // repair_add_part zieht bei bereits bestätigten Aufträgen die Bewegung
+  // sofort nach (samt Reservierung) — Teile lassen sich also auch noch
+  // während der laufenden Reparatur erfassen (Migration 0038).
+  await sql`select repair_add_part(${repairId}, ${p.variant_id}, ${p.qty},
+    ${p.part_type}::repair_part_type, ${ctx.actor})`
   return { recordId: repairId }
 }
 

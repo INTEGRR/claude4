@@ -34,18 +34,24 @@ export function dhlConfig(): DhlConfig {
 }
 
 export function dhlConfigured(): boolean {
+  // Im Fake-Betrieb (Prozesstests, Staging) gilt DHL als konfiguriert —
+  // Labelerstellung und Tracking laufen dann deterministisch (dhl-fake.ts).
+  if (process.env.DHL_FAKE === '1') return true
   const c = dhlConfig()
   return Boolean(c.apiKey && c.user && c.password && c.billingNumber)
 }
 
 export class DhlError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-    readonly detail?: unknown,
-  ) {
+  // Keine Parameter-Properties: die Prozesstests laden dieses Modul unter
+  // node --experimental-strip-types, und der kann nur löschbare Syntax.
+  readonly status?: number
+  readonly detail?: unknown
+
+  constructor(message: string, status?: number, detail?: unknown) {
     super(message)
     this.name = 'DhlError'
+    this.status = status
+    this.detail = detail
   }
 }
 
@@ -174,6 +180,9 @@ export interface CreatedShipment {
 }
 
 export async function createShipment(input: CreateShipmentInput): Promise<CreatedShipment> {
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeCreateShipment(input)
+  }
   const c = dhlConfig()
   const printFormat = input.printFormat ?? '910-300-700'
 
@@ -274,6 +283,9 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
 
 /** Storniert eine Sendung. Möglich nur bis zum Tagesabschluss (Manifest). */
 export async function cancelShipment(shipmentNumber: string): Promise<void> {
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeCancelShipment(shipmentNumber)
+  }
   const start = Date.now()
   const res = await dhlFetch(
     `/parcel/de/shipping/v2/orders?shipment=${encodeURIComponent(shipmentNumber)}`,
@@ -308,6 +320,9 @@ export interface TrackingResult {
  * pro Tag und max. 1 Abfrage alle 5 Sekunden.
  */
 export async function trackShipment(shipmentNumber: string): Promise<TrackingResult | null> {
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeTrackShipment(shipmentNumber)
+  }
   const c = dhlConfig()
   const start = Date.now()
   const res = await fetch(
@@ -364,6 +379,9 @@ export async function createReturnLabel(
   customer: DhlAddress,
   reference: string,
 ): Promise<ReturnLabelResult> {
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeCreateReturnLabel(customer, reference)
+  }
   const c = dhlConfig()
   const start = Date.now()
   const res = await dhlFetch(`/parcel/de/shipping/returns/v1/orders?labelType=BOTH`, {

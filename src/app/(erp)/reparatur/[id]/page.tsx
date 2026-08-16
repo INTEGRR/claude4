@@ -88,6 +88,9 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
     where pv.active and pt.active order by label limit 500`
 
   const editable = repair.state === 'new'
+  // Teile lassen sich auch während der Reparatur nachtragen — erst am
+  // offenen Gerät zeigt sich der Bedarf (repair_add_part bucht sofort nach).
+  const teileErfassbar = ['new', 'confirmed', 'under_repair'].includes(repair.state)
   const open = repair.state !== 'repaired' && repair.state !== 'cancel'
 
   return (
@@ -255,7 +258,7 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
           </TableWrap>
         )}
 
-        {editable && (
+        {teileErfassbar && (
           <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
             <ActionForm action={addPart.bind(null, id)}>
               <div className="row">

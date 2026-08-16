@@ -12,7 +12,10 @@
     "db:seed": "node --experimental-strip-types scripts/seed.ts",
     "db:reset": "node --experimental-strip-types scripts/reset.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "check": "npm run typecheck && npm run test",
+    "test:prozesse": "node --experimental-strip-types --import ./scripts/prozess-loader.mjs --test tests/prozesse/*.test.ts",
+    "prozessdaten": "node --experimental-strip-types scripts/prozessdaten.ts",
+    "prozesse:staging": "SHOPIFY_FAKE=1 DHL_FAKE=1 node --experimental-strip-types --import ./scripts/prozess-loader.mjs --test tests/prozesse/*.test.ts",
+    "check": "npm run typecheck && npm run test && npm run test:prozesse",
     "vercel-build": "node --experimental-strip-types scripts/vorbereiten.ts && next build"
   },
   "dependencies": {
