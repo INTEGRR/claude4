@@ -5,6 +5,7 @@ import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
 import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
+import * as verkauf from './registry/verkauf-ausfuehren.ts'
 import * as versand from './registry/versand-ausfuehren.ts'
 
 /**
@@ -48,6 +49,15 @@ export const AUSFUEHRUNG = {
   'reparatur.stornieren': reparatur.stornieren,
   'reparatur.angebot_erstellen': reparatur.angebotErstellen,
   'reparatur.details': reparatur.details,
+
+  'verkauf.auftrag_anlegen': verkauf.auftragAnlegen,
+  'verkauf.bestaetigen': verkauf.bestaetigen,
+  'verkauf.stornieren': verkauf.stornieren,
+  'verkauf.zurueck_auf_angebot': verkauf.zurueckAufAngebot,
+  'verkauf.kopf_aendern': verkauf.kopfAendern,
+  'verkauf.sperren': verkauf.sperren,
+  'verkauf.position_hinzufuegen': verkauf.positionHinzufuegen,
+  'verkauf.position_entfernen': verkauf.positionEntfernen,
 
   'versand.label_erstellen': versand.labelErstellen,
   'versand.label_stornieren': versand.labelStornieren,

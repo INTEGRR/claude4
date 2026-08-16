@@ -168,8 +168,6 @@ const NOCH_NICHT_MIGRIERT = new Set([
     'decideAbsence'].map((n) => `personal:${n}`),
   ...['createProduct', 'updateProduct', 'addAttribute', 'setVariantCodes', 'createAttribute',
     'produktZuShopify'].map((n) => `produkte:${n}`),
-  ...['confirmOrder', 'cancelOrder', 'updateOrderHeader', 'setLocked', 'resetToDraft',
-    'createOrder', 'addLine', 'removeLine'].map((n) => `verkauf:${n}`),
 ])
 
 /**

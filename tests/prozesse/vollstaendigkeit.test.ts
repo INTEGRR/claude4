@@ -35,6 +35,11 @@ const NOCH_OHNE_PROZESS = new Set([
   'lager.zaehlung_buchen',
   'lager.ausschuss_buchen',
   'lager.beschaffung_ausfuehren',
+  // Der MANUELLE Verkaufsprozess ist noch nicht gesät (der Shop-Weg ist P4).
+  'verkauf.auftrag_anlegen',
+  'verkauf.bestaetigen',
+  'verkauf.stornieren',
+  'verkauf.zurueck_auf_angebot',
 ])
 
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */
