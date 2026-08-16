@@ -12,6 +12,7 @@
  */
 import assert from 'node:assert/strict'
 import type { Sql } from 'postgres'
+import { registrierteAktion } from '../../src/modules/prozesse/registry/index.ts'
 import { aktionAusfuehrenGeprueft } from '../../src/modules/prozesse/torwaechter.ts'
 import type {
   FixtureKontext,
@@ -222,6 +223,12 @@ async function instanzDurchspielen(
   const [{ id: instanzId }] = await sql<{ id: string }[]>`
     select prozess_instanz_starten(${prozess}, ${nutzer.name}) as id`
 
+  // Beleggebundene FOLGESCHRITTE im Assistenten: der jüngste von einem
+  // Schritt erzeugte Beleg (z. B. die Inventurzählung) wird die recordId
+  // der nächsten beleggebundenen Aktion — derselbe Mechanismus wie in
+  // /api/aktion (daten->>'beleg_id').
+  let belegId: string | undefined
+
   for (const code of lauf.pfad) {
     const definiert = await schrittAusDefinition(sql, prozess, code)
     assert.ok(definiert, `${prozess}: Schritt „${code}" existiert nicht in der aktiven Version`)
@@ -257,10 +264,25 @@ async function instanzDurchspielen(
     const werte = typeof eingabe === 'function' ? await eingabe(ctx, sql) : (eingabe ?? {})
     const parameter = { ...(angeboten.params ?? {}), ...werte }
 
-    const ergebnis = await aktionAusfuehrenGeprueft(angeboten.aktion, { parameter }, nutzer)
+    // Beleggebundene Aktion mitten im Assistenten: der Beleg des vorigen
+    // Schritts ist der Bezug (z. B. Zählung erfassen → Differenz buchen).
+    const meta = registrierteAktion(angeboten.aktion)
+    if (meta?.bindung === 'beleg') {
+      assert.ok(belegId, `${prozess}/${code}: beleggebundener Folgeschritt ohne vorher erzeugten Beleg`)
+    }
+
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      angeboten.aktion,
+      { parameter, recordId: meta?.bindung === 'beleg' ? belegId : undefined },
+      nutzer,
+    )
     const recordId = (ergebnis ?? {}).recordId ?? null
+    if (recordId) belegId = recordId
     await sql`select prozess_instanz_weiter(${instanzId}, ${code},
-      ${sql.json({ [`${code}_record_id`]: recordId })}, ${nutzer.name})`
+      ${sql.json({
+        [`${code}_record_id`]: recordId,
+        ...(recordId ? { beleg_id: recordId } : {}),
+      })}, ${nutzer.name})`
     if (recordId) ctx[`${prozess}_${code}_id`] = recordId
 
     assert.equal(

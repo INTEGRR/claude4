@@ -456,10 +456,23 @@ drei sind über POST /api/aktion erreichbar. Die übrigen Inline-Actions
 der Integrationen-Seite (Queue-Wartung: runJobs, retry, …) bleiben
 bewusst außerhalb — sie schalten die Infrastruktur, keine Fachlichkeit.
 
+## Inventur-Assistent + beleggebundene Folgeschritte (Migration 0045, umgesetzt)
+
+Assistenten (beleglose Prozesse) können jetzt MITTEN im Ablauf auf einem
+im Vorschritt erzeugten Beleg weiterarbeiten: das Ergebnis jedes Schritts
+wandert in die Instanz (`daten->>'beleg_id'`), und eine beleggebundene
+Aktion ohne explizite record_id nimmt diesen Beleg als Bezug — in
+/api/aktion (instanz_id) genauso wie im Prozesstest-Interpreter. Erster
+Kunde ist der **Inventur-Assistent** (`/p/inventur`, Bereich lager, in
+allen Paketen): Zählung erfassen (erzeugt inventory_count) → Differenz
+buchen (arbeitet auf genau dieser Zählung) → fertig; den
+Shop-Inventarabgleich stößt der Quants-Trigger als Infrastruktur selbst
+an. Die Fixture beweist, dass der Bestand exakt der Zählung folgt.
+NOCH_OHNE_PROZESS: nur noch Transfers, Ausschuss, Beschaffung.
+
 ## Noch offen (Kurzfassung)
 
 - Dashboard-KPIs als Projektion der aktiven Prozesse (die Navigation ist
   es schon).
-- Inventur-Assistent (braucht beleggebundene Folgeschritte in der
-  Instanz-Ausführung; deckt die restlichen Lager-Aktionen ab);
-  Fähigkeits-Umbenennung der Job-Kinds.
+- Restliche Lager-Aktionen (Transfers/Ausschuss/Beschaffung als
+  Prozessschritte); Fähigkeits-Umbenennung der Job-Kinds.

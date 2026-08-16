@@ -86,6 +86,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ nam
           { status: 400 },
         )
       }
+
+      // Beleggebundener FOLGESCHRITT im Assistenten: ohne explizite record_id
+      // ist der jüngste von einem Vorschritt erzeugte Beleg der Bezug
+      // (daten->>'beleg_id' — z. B. Zählung erfassen → Differenz buchen).
+      if (!aufruf.recordId && registrierteAktion(name)?.bindung === 'beleg') {
+        const [daten] = await sql<{ beleg_id: string | null }[]>`
+          select daten->>'beleg_id' as beleg_id from prozess_instanzen where id = ${instanz.id}`
+        if (daten?.beleg_id) aufruf.recordId = daten.beleg_id
+      }
     }
 
     const ergebnis = await aktionAusfuehrenGeprueft(name, aufruf, user)
@@ -93,7 +102,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ nam
     if (instanz) {
       await sql`select prozess_instanz_weiter(
         ${instanz.id}, ${instanz.schritt},
-        ${sql.json({ [`${instanz.schritt}_record_id`]: ergebnis.recordId ?? null })},
+        ${sql.json({
+          [`${instanz.schritt}_record_id`]: ergebnis.recordId ?? null,
+          ...(ergebnis.recordId ? { beleg_id: ergebnis.recordId } : {}),
+        })},
         ${user.name})`
     }
 

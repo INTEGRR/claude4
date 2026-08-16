@@ -31,10 +31,6 @@ const NOCH_OHNE_PROZESS = new Set([
   'lager.transfer_bestaetigen',
   'lager.transfer_stornieren',
   'lager.transfer_retoure',
-  // Die Zählungs-Aktionen warten auf den Inventur-Assistenten (braucht
-  // beleggebundene Folgeschritte in der Instanz-Ausführung).
-  'lager.zaehlung_erfassen',
-  'lager.zaehlung_buchen',
   'lager.ausschuss_buchen',
   'lager.beschaffung_ausfuehren',
 ])
