@@ -189,6 +189,36 @@ describe('Prozessmodell: Versionspflege', () => {
   })
 })
 
+describe('Belegsignale: prozessschritt_aktiv', () => {
+  test('Schritt im aktiven Ablauf, per Override abgeschaltet, unbekannt', async () => {
+    await withRollback(async (t) => {
+      const aktiv = async (prozess: string, schritt: string) =>
+        (await t<{ ok: boolean }[]>`
+          select prozessschritt_aktiv(${prozess}, ${schritt}) as ok`)[0].ok
+
+      // Teil der aktiven Version → Signal an.
+      assert.equal(await aktiv('einkauf_wareneingang_rechnung', 'rechnung'), true)
+
+      // Per Override abgeschaltet → Signal aus (die Kopplung, an der die
+      // Oberflächen hängen: Spalte „Abrechnung", Rechnung-erstellen-Knopf).
+      await t`
+        insert into prozess_overrides (prozess_code, schritt_code, aktiv, geaendert_von)
+        values ('einkauf_wareneingang_rechnung', 'rechnung', false, 'test')`
+      assert.equal(await aktiv('einkauf_wareneingang_rechnung', 'rechnung'), false)
+
+      // Wieder eingeschaltet → Signal zurück, ohne dass Daten angefasst wurden.
+      await t`
+        update prozess_overrides set aktiv = true
+        where prozess_code = 'einkauf_wareneingang_rechnung' and schritt_code = 'rechnung'`
+      assert.equal(await aktiv('einkauf_wareneingang_rechnung', 'rechnung'), true)
+
+      // Nicht (mehr) in der aktiven Version → Signal aus.
+      assert.equal(await aktiv('einkauf_wareneingang_rechnung', 'gibtsnicht'), false)
+      assert.equal(await aktiv('gibtsnicht', 'rechnung'), false)
+    })
+  })
+})
+
 describe('Bug-Loop: prozess_fuer_pfad', () => {
   test('löst Seitenpfade auf Prozesse auf — längster Treffer gewinnt', async () => {
     await withRollback(async (t) => {

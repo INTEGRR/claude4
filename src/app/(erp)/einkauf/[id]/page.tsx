@@ -48,6 +48,12 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
   if (!order) notFound()
 
+  // Belegsignal folgt dem Prozessschritt: abgeschalteter Rechnungsschritt
+  // (Abrechnung extern) blendet Knopf und leere Rechnungs-Karte aus —
+  // vorhandene Rechnungen aus früherer Zeit bleiben sichtbar.
+  const [{ rechnung_aktiv: rechnungAktiv }] = await sql<{ rechnung_aktiv: boolean }[]>`
+    select prozessschritt_aktiv('einkauf_wareneingang_rechnung', 'rechnung') as rechnung_aktiv`
+
   const lines = await sql<
     {
       id: string
@@ -133,7 +139,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             {order.state === 'done' && (
               <ActionButton action={lockPo.bind(null, id, false)}>Entsperren</ActionButton>
             )}
-            {(order.state === 'purchase' || order.state === 'done') && (
+            {(order.state === 'purchase' || order.state === 'done') && rechnungAktiv && (
               <ActionButton action={createBill.bind(null, id)}>Rechnung erstellen</ActionButton>
             )}
             {order.state !== 'cancel' && (
@@ -343,6 +349,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           )}
         </Card>
 
+        {(rechnungAktiv || bills.length > 0) && (
         <Card title={`Rechnungen (${bills.length})`} tight>
           {bills.length === 0 ? (
             <Empty>Noch keine Rechnung.</Empty>
@@ -364,6 +371,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </TableWrap>
           )}
         </Card>
+        )}
       </div>
 
       <RecordComments model="purchase_order" recordId={id} path={`/einkauf/${id}`} />

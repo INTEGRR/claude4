@@ -51,6 +51,13 @@ export default async function EinkaufPage({
   const vendors = await sql<{ id: string; name: string }[]>`
     select id, name from partners where is_vendor and active order by name limit 500`
 
+  // Belegsignal folgt dem Prozessschritt: ist der Rechnungsschritt für diese
+  // Firma abgeschaltet (Abrechnung läuft extern), verschwindet die Spalte
+  // „Rechnung erwartet" — die Daten bleiben und kämen beim Wieder-Einschalten
+  // sofort zurück.
+  const [{ rechnung_aktiv: rechnungAktiv }] = await sql<{ rechnung_aktiv: boolean }[]>`
+    select prozessschritt_aktiv('einkauf_wareneingang_rechnung', 'rechnung') as rechnung_aktiv`
+
   // Zähler getrennt vom Text, damit die Zahl in Mono gesetzt werden kann.
   const filters: { key?: string; label: string; count?: number }[] = [
     { key: undefined, label: 'Alle' },
@@ -130,7 +137,7 @@ export default async function EinkaufPage({
                   <th>Nummer</th>
                   <th>Lieferant</th>
                   <th>Status</th>
-                  <th>Abrechnung</th>
+                  {rechnungAktiv && <th>Abrechnung</th>}
                   <th>Erwartet</th>
                   <th className="num">Summe</th>
                 </tr>
@@ -152,7 +159,7 @@ export default async function EinkaufPage({
                     </td>
                     <td>{r.vendor}</td>
                     <td><Badge state={r.state} kind="purchase" /></td>
-                    <td><Badge state={r.billing_status} kind="billing" /></td>
+                    {rechnungAktiv && <td><Badge state={r.billing_status} kind="billing" /></td>}
                     <td className="mono nowrap">{date(r.expected_arrival)}</td>
                     <td className="num nowrap">{money(r.gross)}</td>
                   </tr>
