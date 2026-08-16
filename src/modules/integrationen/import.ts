@@ -130,11 +130,78 @@ export async function importShopifyOrder(
     }
 
     if (existing) {
+      // Nachzügler-Heilung für noch unbestätigte Shop-Aufträge: inzwischen
+      // aufgelöste Klärzeilen als Positionen nachziehen (echter Preis aus
+      // der Bestellung) und — wenn nichts mehr offen ist und bezahlt wurde —
+      // bestätigen. Deckt auch „erst importiert, später bezahlt" ab.
+      if (existing.state !== 'draft') {
+        return {
+          salesOrderId: existing.id,
+          created: false,
+          unmatched: 0,
+          message: `${order.name} war bereits importiert`,
+        }
+      }
+
+      const aufgeloest = await t<
+        { id: string; sku: string | null; variant_gid: string | null; qty: number;
+          resolved_variant: string }[]
+      >`
+        select id, sku, variant_gid, qty, resolved_variant
+        from shopify_unmatched_lines
+        where shopify_order_id = ${order.id}
+          and resolved_at is not null and attached_at is null
+          and resolved_variant is not null`
+
+      let nachgezogen = 0
+      for (const zeile of aufgeloest) {
+        const item = order.lineItems.nodes.find(
+          (i) =>
+            (zeile.variant_gid && i.variant?.id === zeile.variant_gid) ||
+            (zeile.sku && i.sku === zeile.sku),
+        )
+        if (!item) continue // Zeile gehört zu einer älteren Fassung der Bestellung
+
+        const [uomRow] = await t<{ uom_id: string }[]>`
+          select pt.uom_id from product_variants pv
+          join product_templates pt on pt.id = pv.template_id
+          where pv.id = ${zeile.resolved_variant}`
+        await t`
+          insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit)
+          values (
+            ${existing.id},
+            coalesce((select max(sequence) + 10 from sales_order_lines
+                      where order_id = ${existing.id}), 10),
+            ${zeile.resolved_variant}, ${item.title}, ${zeile.qty},
+            ${uomRow.uom_id}, ${Number(item.originalUnitPriceSet.shopMoney.amount)})`
+        await t`update shopify_unmatched_lines set attached_at = now() where id = ${zeile.id}`
+        nachgezogen++
+      }
+      if (nachgezogen > 0) {
+        await t`select log_event('sales_order', ${existing.id}, 'note',
+          ${`${nachgezogen} geklärte Position(en) aus der Klärliste nachgezogen.`}, 'shopify')`
+      }
+
+      const [{ offen }] = await t<{ offen: number }[]>`
+        select count(*)::int as offen from shopify_unmatched_lines
+        where shopify_order_id = ${order.id} and resolved_at is null`
+      const [{ zeilen }] = await t<{ zeilen: number }[]>`
+        select count(*)::int as zeilen from sales_order_lines where order_id = ${existing.id}`
+
+      let bestaetigt = false
+      if (order.displayFinancialStatus === 'PAID' && Number(offen) === 0 && Number(zeilen) > 0) {
+        await t`select confirm_sales_order(${existing.id}, 'shopify')`
+        bestaetigt = true
+      }
+
       return {
         salesOrderId: existing.id,
         created: false,
-        unmatched: 0,
-        message: `${order.name} war bereits importiert`,
+        unmatched: Number(offen),
+        message:
+          nachgezogen > 0 || bestaetigt
+            ? `${order.name}: ${nachgezogen} Position(en) nachgezogen${bestaetigt ? ', Auftrag bestätigt' : ''}`
+            : `${order.name} war bereits importiert`,
       }
     }
 

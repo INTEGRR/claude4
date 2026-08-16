@@ -27,12 +27,11 @@ const DATENBANK = 'erp_prozess_check'
  * Die Liste darf nur SCHRUMPFEN: sobald eine Aktion in einem aktiven
  * Prozessschritt auftaucht, muss ihr Eintrag hier verschwinden.
  */
-const NOCH_OHNE_PROZESS = new Set([
-  'lager.transfer_bestaetigen',
-  'lager.transfer_stornieren',
-  'lager.transfer_retoure',
-  'lager.ausschuss_buchen',
-  'lager.beschaffung_ausfuehren',
+const NOCH_OHNE_PROZESS = new Set<string>([
+  // LEER — jede Aktion hat einen Prozessschritt oder ist BEGRÜNDET
+  // prozessfrei (Korrekturen, Verwaltung, alternative Einstiege; die
+  // Begründung steht als Kommentar am jeweiligen Katalogeintrag). Die
+  // Liste bleibt nur für künftige Übergänge stehen.
 ])
 
 /** Tote Statuswerte je Prozess: vorhanden im Enum, bewusst ohne Schritt. */
@@ -198,9 +197,10 @@ describe('Vollständigkeit: Fixtures', () => {
           const schritt = codes.get(code)
           assert.ok(schritt, `${name}/${lauf.name}: Schritt „${code}" existiert nicht`)
           // Erlaubt im Pfad: Aktionen, Dienste (Outbox), Ereignisse (mit
-          // Auslöser aus der Fixture) und 'ende' (schließt Assistenten ab).
+          // Auslöser aus der Fixture), Klärungen (matching mit Auflöse-Aktion)
+          // und 'ende' (schließt Assistenten ab).
           assert.ok(
-            ['aktion', 'dienst', 'ereignis', 'ende'].includes(schritt!.art),
+            ['aktion', 'dienst', 'ereignis', 'matching', 'ende'].includes(schritt!.art),
             `${name}/${lauf.name}: „${code}" (${schritt!.art}) ist im Pfad nicht ausführbar`,
           )
           if (schritt!.art === 'ereignis') {

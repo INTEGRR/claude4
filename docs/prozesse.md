@@ -475,7 +475,32 @@ Prozesse (Fertigung/Versand/Reparatur verschwinden mit ihrem Prozess;
 Verkauf und Lager bleiben als Grundfunktionen) — Navigation und
 Startseite folgen demselben Muster.
 
+## Klärliste als Prozessschritt + Nachzügler-Heilung (Migration 0046, umgesetzt)
+
+Der Shopify-Prozess hat als Version 2 (wieder über die Versionsmaschine)
+seinen **matching-Schritt**: „Klärliste auflösen" zwischen Bestellung und
+Verfügbarkeit, Klärtabelle `shopify_unmatched_lines`, Auflöse-Aktion
+`integrationen.klaerfall_aufloesen`. Dazu die fehlende **Heilung**: ein
+Auftrag, der wegen unbekannter SKU unbestätigt liegen blieb, bekommt beim
+erneuten Import (Auflösung ruft ihn sofort an; sonst der nächste
+Abgleich) die geklärten Positionen mit dem ECHTEN Shop-Preis nachgezogen
+(`attached_at` hält die Übernahme idempotent fest) und wird bei Bezahlung
+bestätigt — das deckt auch „erst importiert, später bezahlt" ab, was
+vorher schlicht liegen blieb. Der Interpreter spielt matching-Schritte
+durch (offene Zeile muss provoziert sein, Auflösung über den Torwächter,
+Liste danach leer; ein Folge-Auslöser liefert den geheilten Beleg), und
+die Fixture beweist den ganzen Weg: unbekannte SKU → Klärfall → Auflösung
+→ Auftrag bestätigt → Label → Warenausgang → Shop-Rückmeldung, inklusive
+gemerkter Zuordnung an der Variante.
+
+**Die Restliste ist leer**: `NOCH_OHNE_PROZESS` enthält nichts mehr —
+jede der Aktionen hat einen Prozessschritt oder ist BEGRÜNDET prozessfrei
+(Korrekturen wie Transfer-Storno/-Retoure, Verwaltung, alternative
+Einstiege wie die Beschaffung; Begründung als Kommentar am Katalogeintrag).
+
 ## Noch offen (Kurzfassung)
 
-- Restliche Lager-Aktionen (Transfers/Ausschuss/Beschaffung als
-  Prozessschritte); Fähigkeits-Umbenennung der Job-Kinds.
+- Fähigkeits-Umbenennung der Job-Kinds — bewusst zurückgestellt: die
+  Fähigkeits-Schicht liegt bereits im JOB_KATALOG (anbieterneutral,
+  getestet), ein Umbenennen der persistierten Kinds (integration_jobs,
+  Dedupe-Schlüssel) brächte Datenmigration ohne Verhaltensgewinn.

@@ -29,6 +29,7 @@ interface Schritt {
   zustand: string | null
   params: Record<string, unknown> | null
   rollen: string[] | null
+  matching_tabelle?: string | null
 }
 
 /** Schritt aus der aktiven Version lesen (für Start-Schritte und zustand). */
@@ -38,10 +39,41 @@ async function schrittAusDefinition(
   code: string,
 ): Promise<Schritt | undefined> {
   const [schritt] = await sql<Schritt[]>`
-    select s.code, s.art::text as art, s.aktion, s.job_kind, s.zustand, s.params, s.rollen
+    select s.code, s.art::text as art, s.aktion, s.job_kind, s.zustand, s.params, s.rollen,
+           s.matching_tabelle
     from prozess_schritte s
     where s.version_id = prozess_aktive_version(${prozess}) and s.code = ${code}`
   return schritt
+}
+
+/**
+ * 'matching'-Schritt: eine offene Zeile der Klärtabelle muss existieren
+ * (die Fixture hat sie provoziert), wird über die Auflöse-Aktion des
+ * Schritts geklärt — danach ist die Liste leer.
+ */
+async function matchingAusfuehren(
+  sql: Sql,
+  prozess: string,
+  schritt: Schritt,
+  parameter: Record<string, unknown>,
+  nutzer: NonNullable<ProzessLauf['nutzer']>,
+): Promise<void> {
+  assert.ok(schritt.matching_tabelle, `${prozess}/${schritt.code}: matching ohne Tabelle`)
+  assert.ok(schritt.aktion, `${prozess}/${schritt.code}: matching ohne Auflöse-Aktion`)
+
+  const offene = await sql<{ id: string }[]>`
+    select id from ${sql(schritt.matching_tabelle!)}
+    where resolved_at is null order by created_at`
+  assert.ok(offene.length > 0, `${prozess}/${schritt.code}: kein offener Klärfall provoziert`)
+
+  for (const zeile of offene) {
+    await aktionAusfuehrenGeprueft(schritt.aktion!, { parameter, recordId: zeile.id }, nutzer)
+  }
+
+  const [{ offen }] = await sql<{ offen: number }[]>`
+    select count(*)::int as offen from ${sql(schritt.matching_tabelle!)}
+    where resolved_at is null`
+  assert.equal(Number(offen), 0, `${prozess}/${schritt.code}: Klärliste muss danach leer sein`)
 }
 
 /**
@@ -97,15 +129,19 @@ export async function prozessDurchspielen(
     let schritt: Schritt
     if (!recordId) {
       // Noch kein Beleg: der erste Schritt muss direkt am Startknoten hängen.
+      // Ausnahme matching: Klärfälle existieren gerade WEIL der Beleg noch
+      // nicht entstehen konnte — die Klärliste hängt nicht am Belegzustand.
       const definiert = await schrittAusDefinition(sql, prozess, code)
       assert.ok(definiert, `${prozess}: Schritt „${code}" existiert nicht in der aktiven Version`)
-      const [amStart] = await sql<{ ok: boolean }[]>`
-        select exists(
-          select 1 from prozess_uebergaenge u
-          where u.version_id = prozess_aktive_version(${prozess})
-            and u.von_code = 'start' and u.nach_code = ${code}
-        ) as ok`
-      assert.ok(amStart.ok, `${prozess}: „${code}" hängt nicht am Start`)
+      if (definiert.art !== 'matching') {
+        const [amStart] = await sql<{ ok: boolean }[]>`
+          select exists(
+            select 1 from prozess_uebergaenge u
+            where u.version_id = prozess_aktive_version(${prozess})
+              and u.von_code = 'start' and u.nach_code = ${code}
+          ) as ok`
+        assert.ok(amStart.ok, `${prozess}: „${code}" hängt nicht am Start`)
+      }
       schritt = definiert
     } else {
       const naechste = await sql<Schritt[]>`
@@ -117,21 +153,45 @@ export async function prozessDurchspielen(
         `${prozess}: „${code}" wird nicht angeboten ` +
           `(möglich: ${naechste.map((n) => n.code).join(', ') || '—'})`,
       )
-      // zustand liefert die Funktion nicht mit — aus der Definition ergänzen.
+      // zustand/matching_tabelle liefert die Funktion nicht mit — ergänzen.
       const definiert = await schrittAusDefinition(sql, prozess, code)
-      schritt = { ...angeboten, zustand: definiert?.zustand ?? null }
+      schritt = {
+        ...angeboten,
+        zustand: definiert?.zustand ?? null,
+        matching_tabelle: definiert?.matching_tabelle ?? null,
+      }
     }
 
     // Ereignis: die Fixture speist die Außenwelt ein (z. B. künstlicher
-    // Shop-Webhook samt Verarbeitung) und liefert ggf. die Beleg-ID.
+    // Shop-Webhook samt Verarbeitung) und liefert ggf. die Beleg-ID —
+    // oder bewusst KEINE, wenn ein Klärfall den Beleg noch verhindert.
     if (schritt.art === 'ereignis') {
       const ausloeser = lauf.ereignisse?.[code]
       assert.ok(ausloeser, `${prozess}/${code}: Ereignisschritt ohne Auslöser in der Fixture`)
       const geliefert = await ausloeser(ctx, sql)
-      if (!recordId) {
-        recordId = geliefert || undefined
-        assert.ok(recordId, `${prozess}/${code}: der Auslöser muss die Beleg-ID liefern`)
+      if (!recordId && geliefert) {
+        recordId = geliefert
         ctx[`${prozess}_beleg_id`] = recordId
+      }
+      await assertLedgerConsistent(sql)
+      continue
+    }
+
+    // Matching: die Klärliste als Prozessschritt — auflösen über die
+    // Auflöse-Aktion; ein Folge-Auslöser (lauf.ereignisse[code]) kann den
+    // dann erst entstehenden Beleg liefern (z. B. nach der Heilung).
+    if (schritt.art === 'matching') {
+      const eingabe = lauf.eingaben?.[code]
+      const werte = typeof eingabe === 'function' ? await eingabe(ctx, sql) : (eingabe ?? {})
+      await matchingAusfuehren(sql, prozess, schritt, werte, nutzer)
+
+      const folge = lauf.ereignisse?.[code]
+      if (folge) {
+        const geliefert = await folge(ctx, sql)
+        if (!recordId && geliefert) {
+          recordId = geliefert
+          ctx[`${prozess}_beleg_id`] = recordId
+        }
       }
       await assertLedgerConsistent(sql)
       continue

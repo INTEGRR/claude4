@@ -48,6 +48,8 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung: 'Bestätigt einen Transfer-Entwurf und reserviert je Vorgangsart.',
     bindung: 'beleg',
+    // Verwaltung: Entwurfs-Transfers entstehen manuell außerhalb der Belegprozesse.
+    prozessfrei: true,
     modell: 'stock_picking',
     uebergang: { von: ['draft'], nach: ['confirmed', 'assigned'] },
     schema: z.object({}),
@@ -70,6 +72,8 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung: 'Storniert einen nicht erledigten Transfer samt Bewegungen.',
     bindung: 'beleg',
+    // Korrektur: der Abbruch außerhalb des Happy Path (siehe UNABGEBILDET cancel).
+    prozessfrei: true,
     modell: 'stock_picking',
     uebergang: { von: ['draft', 'waiting', 'confirmed', 'assigned'], nach: ['cancel'] },
     schema: z.object({}),
@@ -81,6 +85,8 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung: 'Legt zu einem erledigten Transfer die Rückführung an (Orte getauscht).',
     bindung: 'beleg',
+    // Korrektur/RMA: Rückführung eines erledigten Transfers, kein Vorwärts-Schritt.
+    prozessfrei: true,
     modell: 'stock_picking',
     uebergang: { von: ['done'], nach: ['done'] },
     schema: z.object({}),
@@ -149,6 +155,8 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung: 'Bucht Ausschuss vom Hauptlager auf den Ausschuss-Ort.',
     bindung: 'frei',
+    // Bestandskorrektur in einem Zug — für einen Assistenten zu klein.
+    prozessfrei: true,
     schema: z.object({
       variant_id: z.string().min(1, 'Bitte ein Produkt auswählen'),
       qty: z.number().positive('Die Menge muss größer als 0 sein'),
@@ -232,6 +240,8 @@ export const LAGER = {
       'Führt einen Beschaffungsvorschlag aus: Position in eine Entwurfs-Bestellung ' +
       'aufnehmen oder einen Fertigungsauftrag anlegen und bestätigen.',
     bindung: 'beleg',
+    // Alternativer EINSTIEG in Einkauf/Fertigung: erzeugt deren Startbelege.
+    prozessfrei: true,
     modell: 'stock_orderpoint',
     schema: z.object({}),
     revalidate: ['/lager/beschaffung', '/einkauf', '/fertigung'],

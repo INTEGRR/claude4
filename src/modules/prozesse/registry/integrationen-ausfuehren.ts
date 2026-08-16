@@ -8,8 +8,10 @@ export async function klaerfallAufloesen(
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const lineId = ctx.recordId!
-  const [line] = await sql<{ sku: string | null; variant_gid: string | null }[]>`
-    select sku, variant_gid from shopify_unmatched_lines where id = ${lineId}`
+  const [line] = await sql<
+    { sku: string | null; variant_gid: string | null; shopify_order_id: string | null }[]
+  >`
+    select sku, variant_gid, shopify_order_id from shopify_unmatched_lines where id = ${lineId}`
   if (!line) throw new Error('Klärfall nicht gefunden.')
 
   // Zuordnung dauerhaft an der Variante speichern, damit der nächste Import passt.
@@ -27,5 +29,25 @@ export async function klaerfallAufloesen(
             where id = ${lineId}`
   await sql`select log_event('shopify_unmatched', ${lineId}::uuid, 'state',
     'Klärfall aufgelöst', ${ctx.actor})`
-  return { text: 'Klärfall aufgelöst — die Zuordnung merkt sich die Variante.' }
+
+  // Sofort heilen: Bestellung frisch holen und den Import erneut anwerfen —
+  // der zieht die geklärte Position nach (echter Preis) und bestätigt bei
+  // Bezahlung. Schlägt der Abruf fehl, holt der nächste Abgleich das nach.
+  if (line.shopify_order_id) {
+    try {
+      const { fetchOrder } = await import('@/modules/integrationen/shopify')
+      const { importShopifyOrder } = await import('@/modules/integrationen/import')
+      const order = await fetchOrder(line.shopify_order_id)
+      if (order) {
+        const ergebnis = await importShopifyOrder(order)
+        return {
+          text: `Klärfall aufgelöst — ${ergebnis.message}.`,
+          recordId: ergebnis.salesOrderId ?? undefined,
+        }
+      }
+    } catch {
+      // bewusst still: die Auflösung steht, der Abgleich heilt später.
+    }
+  }
+  return { text: 'Klärfall aufgelöst — der nächste Abgleich zieht die Position nach.' }
 }
