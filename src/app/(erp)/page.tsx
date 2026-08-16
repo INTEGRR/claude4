@@ -17,6 +17,15 @@ export default async function Dashboard({
   const { verweigert } = await searchParams
   const sees = (area: Area) => canAccess(user.role, area)
 
+  // Chamäleon: wie die Navigation sind auch die Kennzahlen-Kacheln eine
+  // PROJEKTION der aktiven Prozesse — kein Fertigungsprozess, keine
+  // Fertigungskachel. Grundfunktionen (Verkauf, Lager) bleiben immer.
+  const prozessBereiche = new Set(
+    (await sql<{ bereich: string }[]>`
+      select distinct bereich from prozesse where aktiv`).map((b) => b.bereich),
+  )
+  const prozessAktiv = (bereich: string) => prozessBereiche.has(bereich)
+
   const [stats] = await sql<
     {
       open_orders: number
@@ -116,8 +125,10 @@ export default async function Dashboard({
         {sees('verkauf') && (
           <Stat label="Offene Aufträge" value={stats.open_orders} href="/verkauf?status=sale" />
         )}
-        {sees('fertigung') && <Stat label="Offene Fertigung" value={stats.open_mos} href="/fertigung" />}
-        {sees('versand') && (
+        {sees('fertigung') && prozessAktiv('fertigung') && (
+          <Stat label="Offene Fertigung" value={stats.open_mos} href="/fertigung" />
+        )}
+        {sees('versand') && prozessAktiv('versand') && (
           <Stat
             label="Versandbereit"
             value={stats.ready_to_ship}
@@ -128,7 +139,7 @@ export default async function Dashboard({
         {sees('lager') && (
           <Stat label="Erwartete Eingänge" value={stats.open_receipts} href="/lager?art=receipt" />
         )}
-        {sees('reparatur') && (
+        {sees('reparatur') && prozessAktiv('reparatur') && (
           <Stat label="Offene Reparaturen" value={stats.open_repairs} href="/reparatur" />
         )}
         {sees('scanner') && (

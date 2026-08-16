@@ -470,9 +470,12 @@ Shop-Inventarabgleich stößt der Quants-Trigger als Infrastruktur selbst
 an. Die Fixture beweist, dass der Bestand exakt der Zählung folgt.
 NOCH_OHNE_PROZESS: nur noch Transfers, Ausschuss, Beschaffung.
 
+Auch die Dashboard-Kacheln sind seither eine Projektion der aktiven
+Prozesse (Fertigung/Versand/Reparatur verschwinden mit ihrem Prozess;
+Verkauf und Lager bleiben als Grundfunktionen) — Navigation und
+Startseite folgen demselben Muster.
+
 ## Noch offen (Kurzfassung)
 
-- Dashboard-KPIs als Projektion der aktiven Prozesse (die Navigation ist
-  es schon).
 - Restliche Lager-Aktionen (Transfers/Ausschuss/Beschaffung als
   Prozessschritte); Fähigkeits-Umbenennung der Job-Kinds.
