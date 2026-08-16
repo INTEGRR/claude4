@@ -259,10 +259,29 @@ export const AKTIONEN = {
 export type AktionName = keyof typeof AKTIONEN
 
 /** Werkzeugbeschreibung für das Modell — Katalog inklusive Kurzbeschreibung. */
-export function aktionenTool() {
-  const katalog = Object.entries(AKTIONEN)
-    .map(([name, a]) => `- ${name} (${a.label}): ${a.beschreibung}`)
-    .join('\n')
+/**
+ * Registry-Aktion im Werkzeugkatalog (geliefert von
+ * prozesse/introspektion.kiKatalog() — hier nur der Typ, kein Import, weil
+ * die Registry ihrerseits die Produktanlage von hier importiert).
+ */
+export interface ZusatzAktion {
+  name: string
+  label: string
+  beschreibung: string
+  beleg: boolean
+  felder: string
+}
+
+export function aktionenTool(zusatz: ZusatzAktion[] = []) {
+  const katalog = [
+    ...Object.entries(AKTIONEN).map(([name, a]) => `- ${name} (${a.label}): ${a.beschreibung}`),
+    ...zusatz.map(
+      (z) =>
+        `- ${z.name} (${z.label}): ${z.beschreibung}` +
+        (z.beleg ? ' [beleggebunden — record_id angeben]' : '') +
+        (z.felder ? ` — Felder: ${z.felder}` : ''),
+    ),
+  ].join('\n')
 
   return {
     name: 'aktion_vorschlagen',
@@ -276,10 +295,15 @@ export function aktionenTool() {
     input_schema: {
       type: 'object' as const,
       properties: {
-        aktion: { type: 'string', enum: Object.keys(AKTIONEN) },
+        aktion: { type: 'string', enum: [...Object.keys(AKTIONEN), ...zusatz.map((z) => z.name)] },
         parameter: {
           type: 'object',
           description: 'Die Felder der Aktion. Bei Fehlern nennt die Antwort die genaue Ursache.',
+        },
+        record_id: {
+          type: 'string',
+          description:
+            'Beleg-ID (UUID) für beleggebundene Registry-Aktionen — vorher per sql_abfrage ermitteln.',
         },
         begruendung: {
           type: 'string',

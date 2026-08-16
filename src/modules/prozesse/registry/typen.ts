@@ -43,6 +43,12 @@ export interface RegistrierteAktion<S extends z.ZodTypeAny = z.ZodTypeAny> {
   prozessfrei?: true
   /** Verwaltungsaktion: nur Administratoren (statt canWrite auf den Bereich). */
   nurAdmin?: true
+  /**
+   * Der KI-Agent darf diese Aktion VORSCHLAGEN (ausgeführt wird weiterhin
+   * erst nach Bestätigung im Chat, über den Torwächter). IDs schlägt der
+   * Agent vorher per sql_abfrage nach.
+   */
+  ki?: true
 
   // --- Brücken zum Altbestand und zur Oberfläche ---------------------------
   /**

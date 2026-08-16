@@ -6,6 +6,8 @@ import { SCHEMA_DOKU } from './schema-doku'
 import { MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
 import { aktionPruefen, aktionenTool } from './aktionen'
+import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
+import { kiKatalog } from '@/modules/prozesse/introspektion'
 
 /**
  * KI-Agent für Ad-hoc-Auswertungen: Claude mit genau einem Werkzeug —
@@ -50,7 +52,9 @@ ${SCHEMA_DOKU}`
 
 const TOOLS: Anthropic.Messages.Tool[] = [
   DIAGRAMM_TOOL,
-  aktionenTool(),
+  // Eigener KI-Katalog (namensbasierte Anlage-Aktionen) plus alle
+  // Registry-Aktionen mit ki-Flag — eine Definition, alle Transporte.
+  aktionenTool(kiKatalog()),
   {
     name: 'sql_abfrage',
     description:
@@ -169,20 +173,46 @@ export async function runAgent(
         const eingabe = block.input as {
           aktion?: string
           parameter?: unknown
+          record_id?: string
           begruendung?: string
         }
         try {
-          const { aktion, werte } = aktionPruefen(String(eingabe.aktion ?? ''), eingabe.parameter)
+          const name = String(eingabe.aktion ?? '')
+          let label: string
+          let bereich: string
+          let zusammenfassung: string
+          let werte: Record<string, unknown>
+          if (name.includes('.')) {
+            // Registry-Aktion: derselbe DB-freie Prüfweg wie der Torwächter;
+            // die record_id wandert IM Parameter mit, damit die Bestätigung
+            // im Chat sie unverändert an /api/ki/aktion zurückgeben kann.
+            const recordId =
+              typeof eingabe.record_id === 'string' && eingabe.record_id
+                ? eingabe.record_id
+                : undefined
+            const geprueft = registryPruefen(name, { parameter: eingabe.parameter, recordId })
+            label = geprueft.aktion.label
+            bereich = geprueft.aktion.bereich
+            zusammenfassung =
+              geprueft.aktion.zusammenfassung?.(geprueft.werte as never) ?? geprueft.aktion.label
+            werte = { ...geprueft.werte, ...(recordId ? { record_id: recordId } : {}) }
+          } else {
+            const geprueft = aktionPruefen(name, eingabe.parameter)
+            label = geprueft.aktion.label
+            bereich = geprueft.aktion.bereich
+            zusammenfassung = geprueft.aktion.zusammenfassung(geprueft.werte)
+            werte = geprueft.werte as Record<string, unknown>
+          }
           const id = randomUUID()
           await onEvent({
             type: 'aktion',
             id,
-            aktion: String(eingabe.aktion),
-            label: aktion.label,
-            bereich: aktion.bereich,
-            zusammenfassung: aktion.zusammenfassung(werte),
+            aktion: name,
+            label,
+            bereich,
+            zusammenfassung,
             begruendung: eingabe.begruendung,
-            parameter: werte as Record<string, unknown>,
+            parameter: werte,
           })
           await sql`select log_event('ki', ${requestId}, 'note',
             ${'Aktion vorgeschlagen: ' + String(eingabe.aktion)}, ${actor})`

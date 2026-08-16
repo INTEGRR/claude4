@@ -41,6 +41,32 @@ export function aktionsFelder(aktion: RegistrierteAktion): FeldInfo[] {
   }))
 }
 
+/**
+ * Registry-Aktionen, die der KI-Agent vorschlagen darf (`ki: true`) — in der
+ * Form, die `aktionenTool()` in den Werkzeugkatalog mischt. Lebt hier (nicht
+ * in ki/aktionen.ts), weil die Registry die KI-Produktanlage importiert —
+ * andersherum entstünde ein Importkreis.
+ */
+export function kiKatalog(): {
+  name: string
+  label: string
+  beschreibung: string
+  beleg: boolean
+  felder: string
+}[] {
+  return alleAktionen()
+    .filter(([, a]) => a.ki)
+    .map(([name, a]) => ({
+      name,
+      label: a.label,
+      beschreibung: a.beschreibung,
+      beleg: a.bindung === 'beleg',
+      felder: aktionsFelder(a)
+        .map((f) => (f.pflicht ? f.name : `${f.name}?`))
+        .join(', '),
+    }))
+}
+
 /** Der komplette Katalog als schlichte Datenstruktur (für Seite und API). */
 export function repository() {
   return {

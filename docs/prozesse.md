@@ -341,10 +341,25 @@ kommt, zwingt der Test die Einträge von der Liste.
   Funktionen späterer Schritte erreichen damit den Beleg (Wareneingang
   vor der Rechnung).
 
+## Phase 6g — KI-Katalog aus der Registry (umgesetzt)
+
+Registry-Aktionen mit **`ki: true`** (18 Stück: Statusübergänge in
+Verkauf, Einkauf, Rechnung, Fertigung, Reparatur; Meldebestand, Tracking,
+Kennzahlen) erscheinen im Werkzeugkatalog des KI-Agenten — zusätzlich zum
+namensbasierten Anlage-Katalog (`produkt_anlegen`, `bestellung_anlegen`,
+…). Beleg-IDs schlägt der Agent per sql_abfrage nach und übergibt sie als
+`record_id`; ausgeführt wird **erst nach Bestätigung im Chat**, und zwar
+über den Torwächter (Schema, Rechte inkl. nurAdmin, Audit) — derselbe Weg
+wie Knöpfe, generierte Masken und Prozesstest. Auch das KI-Umschreiben
+von Vorschlägen („die Menge auf 5") funktioniert für Registry-Aktionen
+(record_id bleibt dabei unangetastet). Der Katalog-Helfer lebt in
+`prozesse/introspektion.kiKatalog()` — nicht im KI-Modul, weil die
+Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
+
 ## Kommende Phasen (Kurzfassung)
-6. **Rest**: KI-Katalog aus der Registry (`ki: true`);
-   Inline-Seiten-Actions (Kartonagen, Versandregeln, Integrationen);
-   Inventur-Assistent.
+6. **Rest**: Inline-Seiten-Actions (Kartonagen, Versandregeln,
+   Integrationen-Klärliste); Inventur-Assistent (braucht beleggebundene
+   Folgeschritte in der Instanz-Ausführung).
 7. **Chamäleon**: Navigation/KPIs als Projektion aktiver Prozesse,
    Geschäftsmodell-Vorlagen, eigene Felder ohne Migration, generischer
    Vorgang, Fähigkeits-Adapter, KI-Prozessentwurf.

@@ -91,6 +91,7 @@ export const EINKAUF = {
   'einkauf.bestaetigen': {
     label: 'Bestellung bestätigen',
     bereich: 'einkauf',
+    ki: true,
     beschreibung: 'Bestätigt die Bestellung — der Wareneingang entsteht.',
     bindung: 'beleg',
     modell: 'purchase_order',
@@ -102,6 +103,7 @@ export const EINKAUF = {
   'einkauf.stornieren': {
     label: 'Bestellung stornieren',
     bereich: 'einkauf',
+    ki: true,
     beschreibung: 'Storniert die Bestellung samt offener Wareneingänge.',
     bindung: 'beleg',
     modell: 'purchase_order',
@@ -139,6 +141,7 @@ export const EINKAUF = {
   'einkauf.rechnung_erstellen': {
     label: 'Rechnung erstellen',
     bereich: 'einkauf',
+    ki: true,
     beschreibung: 'Erzeugt die Lieferantenrechnung aus der Bestellung (Entwurf).',
     bindung: 'beleg',
     modell: 'purchase_order',
@@ -182,6 +185,7 @@ export const EINKAUF = {
   'einkauf.rechnung_buchen': {
     label: 'Rechnung buchen',
     bereich: 'einkauf',
+    ki: true,
     beschreibung: 'Bucht die Rechnung (Abgleich gegen Wareneingang nach Einstellung).',
     bindung: 'beleg',
     modell: 'vendor_bill',
@@ -193,6 +197,7 @@ export const EINKAUF = {
   'einkauf.rechnung_zahlen': {
     label: 'Als bezahlt markieren',
     bereich: 'einkauf',
+    ki: true,
     beschreibung: 'Markiert die gebuchte Rechnung als bezahlt.',
     bindung: 'beleg',
     modell: 'vendor_bill',

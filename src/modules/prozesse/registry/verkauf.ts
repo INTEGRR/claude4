@@ -26,6 +26,7 @@ export const VERKAUF = {
   'verkauf.bestaetigen': {
     label: 'Auftrag bestätigen',
     bereich: 'verkauf',
+    ki: true,
     beschreibung:
       'Bestätigt das Angebot: Steuer-Schnappschuss, Lieferung entsteht (Kits werden aufgelöst), MTO legt Fertigungsaufträge an.',
     bindung: 'beleg',
@@ -38,6 +39,7 @@ export const VERKAUF = {
   'verkauf.stornieren': {
     label: 'Auftrag stornieren',
     bereich: 'verkauf',
+    ki: true,
     beschreibung: 'Storniert den Auftrag samt offener Lieferungen (nach den Storno-Regeln).',
     bindung: 'beleg',
     modell: 'sales_order',

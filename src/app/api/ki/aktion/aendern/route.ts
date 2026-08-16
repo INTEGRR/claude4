@@ -42,14 +42,62 @@ export async function POST(request: Request) {
   }
   if (!anweisung) return NextResponse.json({ error: 'Keine Änderung angegeben' }, { status: 400 })
 
-  const aktion = (AKTIONEN as Record<string, (typeof AKTIONEN)[AktionName]>)[name]
-  if (!aktion) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
-  // Wer die Aktion nicht ausführen darf, soll sie auch nicht umschreiben.
-  if (!canWrite(user.role, aktion.bereich)) {
-    return NextResponse.json(
-      { error: `Ihrer Rolle fehlt die Berechtigung für „${aktion.label}"` },
-      { status: 403 },
+  // Registry-Aktionen (namespaced) und der eigene KI-Katalog teilen sich den
+  // Ablauf — nur Nachschlag, Rechteprüfung und Validierung unterscheiden sich.
+  // Die record_id einer Registry-Aktion wird vor dem Umschreiben abgetrennt
+  // und danach unverändert wieder angehängt.
+  const registry = name.includes('.')
+  let label: string
+  let beschreibung: string
+  let recordId: string | undefined
+  let pruefen: (werte: unknown) => { werte: Record<string, unknown>; zusammenfassung: string }
+
+  if (registry) {
+    const { registrierteAktion } = await import('@/modules/prozesse/registry')
+    const { aktionErlaubt, aktionPruefen: torPruefen } = await import(
+      '@/modules/prozesse/torwaechter'
     )
+    const eintrag = registrierteAktion(name)
+    if (!eintrag) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
+    if (!aktionErlaubt(eintrag, user.role)) {
+      return NextResponse.json(
+        { error: `Ihrer Rolle fehlt die Berechtigung für „${eintrag.label}"` },
+        { status: 403 },
+      )
+    }
+    label = eintrag.label
+    beschreibung = eintrag.beschreibung
+    const p = (parameter && typeof parameter === 'object' ? parameter : {}) as Record<
+      string,
+      unknown
+    >
+    recordId = typeof p.record_id === 'string' ? p.record_id : undefined
+    const { record_id: _weg, ...felder } = p
+    parameter = felder
+    pruefen = (werte) => {
+      const geprueft = torPruefen(name, { parameter: werte, recordId })
+      return {
+        werte: geprueft.werte,
+        zusammenfassung:
+          eintrag.zusammenfassung?.(geprueft.werte as never) ?? eintrag.label,
+      }
+    }
+  } else {
+    const aktion = (AKTIONEN as Record<string, (typeof AKTIONEN)[AktionName]>)[name]
+    if (!aktion) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
+    // Wer die Aktion nicht ausführen darf, soll sie auch nicht umschreiben.
+    if (!canWrite(user.role, aktion.bereich)) {
+      return NextResponse.json(
+        { error: `Ihrer Rolle fehlt die Berechtigung für „${aktion.label}"` },
+        { status: 403 },
+      )
+    }
+    label = aktion.label
+    beschreibung = aktion.beschreibung
+    pruefen = (werte) => {
+      const { werte: geprueft } = aktionPruefen(name, werte)
+      return { werte: geprueft, zusammenfassung: aktion.zusammenfassung(geprueft) }
+    }
   }
 
   const client = new Anthropic()
@@ -63,7 +111,7 @@ export async function POST(request: Request) {
         '`felder_ersetzen` den **vollständigen** neuen Feldsatz zurück — nicht nur das ' +
         'Geänderte. Ändere ausschließlich, was die Anweisung verlangt, und erfinde keine ' +
         'Werte dazu.\n\n' +
-        `Aktion: ${name} (${aktion.label})\n${aktion.beschreibung}`,
+        `Aktion: ${name} (${label})\n${beschreibung}`,
       tools: [
         {
           name: 'felder_ersetzen',
@@ -116,10 +164,10 @@ export async function POST(request: Request) {
     const eingabe = block.input as { parameter?: unknown; hinweis?: string }
 
     try {
-      const { werte } = aktionPruefen(name, eingabe.parameter)
+      const { werte, zusammenfassung } = pruefen(eingabe.parameter)
       return NextResponse.json({
-        parameter: werte,
-        zusammenfassung: aktion.zusammenfassung(werte),
+        parameter: { ...werte, ...(recordId ? { record_id: recordId } : {}) },
+        zusammenfassung,
         hinweis: eingabe.hinweis ?? null,
       })
     } catch (err) {

@@ -6,6 +6,7 @@ export const AUSWERTUNGEN = {
   'auswertungen.kennzahlen_aktualisieren': {
     label: 'Kennzahlen aktualisieren',
     bereich: 'auswertungen',
+    ki: true,
     beschreibung:
       'Berechnet die Kennzahlen sofort neu — der Cron macht das ohnehin nachts.',
     bindung: 'frei',

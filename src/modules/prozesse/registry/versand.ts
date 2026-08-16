@@ -41,6 +41,7 @@ export const VERSAND = {
   'versand.tracking_aktualisieren': {
     label: 'Tracking aktualisieren',
     bereich: 'versand',
+    ki: true,
     beschreibung: 'Fragt den Sendungsstatus offener Sendungen bei DHL ab (Rate-Limit beachtet).',
     bindung: 'frei',
     prozessfrei: true,

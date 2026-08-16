@@ -167,6 +167,7 @@ export const LAGER = {
   'lager.meldebestand_anlegen': {
     label: 'Meldebestand anlegen',
     bereich: 'lager',
+    ki: true,
     beschreibung: 'Legt eine Nachbestellregel an (min/max, Losgröße, Route).',
     bindung: 'frei',
     schema: z

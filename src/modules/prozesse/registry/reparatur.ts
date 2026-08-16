@@ -64,6 +64,7 @@ export const REPARATUR = {
   'reparatur.bestaetigen': {
     label: 'Bestätigen',
     bereich: 'reparatur',
+    ki: true,
     beschreibung: 'Bestätigt den Auftrag: Teilebewegungen entstehen, Einbauteile werden reserviert.',
     bindung: 'beleg',
     modell: 'repair_order',
@@ -75,6 +76,7 @@ export const REPARATUR = {
   'reparatur.beginnen': {
     label: 'Reparatur beginnen',
     bereich: 'reparatur',
+    ki: true,
     beschreibung: 'Setzt den Auftrag in Arbeit.',
     bindung: 'beleg',
     modell: 'repair_order',
@@ -109,6 +111,7 @@ export const REPARATUR = {
   'reparatur.stornieren': {
     label: 'Stornieren',
     bereich: 'reparatur',
+    ki: true,
     beschreibung: 'Storniert den Auftrag samt offener Teilebewegungen.',
     bindung: 'beleg',
     modell: 'repair_order',

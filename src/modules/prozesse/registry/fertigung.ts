@@ -31,6 +31,7 @@ export const FERTIGUNG = {
   'fertigung.bestaetigen': {
     label: 'Auftrag bestätigen',
     bereich: 'fertigung',
+    ki: true,
     beschreibung: 'Bestätigt den Fertigungsauftrag — die Komponentenbewegungen entstehen.',
     bindung: 'beleg',
     modell: 'manufacturing_order',
@@ -42,6 +43,7 @@ export const FERTIGUNG = {
   'fertigung.beginnen': {
     label: 'Fertigung starten',
     bereich: 'fertigung',
+    ki: true,
     beschreibung: 'Setzt den Auftrag auf „in Arbeit".',
     bindung: 'beleg',
     modell: 'manufacturing_order',
@@ -53,6 +55,7 @@ export const FERTIGUNG = {
   'fertigung.verfuegbarkeit_pruefen': {
     label: 'Verfügbarkeit prüfen',
     bereich: 'fertigung',
+    ki: true,
     beschreibung: 'Reserviert Komponenten erneut — holt inzwischen eingetroffenen Bestand in den Auftrag.',
     bindung: 'beleg',
     modell: 'manufacturing_order',
@@ -64,6 +67,7 @@ export const FERTIGUNG = {
   'fertigung.fertig_melden': {
     label: 'Fertig melden',
     bereich: 'fertigung',
+    ki: true,
     beschreibung:
       'Meldet die Produktion fertig: Komponenten werden verbraucht (Backflush oder Ist-Mengen), das Erzeugnis geht ins Lager.',
     bindung: 'beleg',
@@ -87,6 +91,7 @@ export const FERTIGUNG = {
   'fertigung.stornieren': {
     label: 'Auftrag stornieren',
     bereich: 'fertigung',
+    ki: true,
     beschreibung: 'Storniert den Fertigungsauftrag und gibt Reservierungen frei.',
     bindung: 'beleg',
     modell: 'manufacturing_order',

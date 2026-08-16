@@ -6,6 +6,7 @@
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { formularFelder } from '../src/modules/prozesse/schema-felder.ts'
+import { kiKatalog } from '../src/modules/prozesse/introspektion.ts'
 import { alleAktionen, registrierteAktion } from '../src/modules/prozesse/registry/index.ts'
 
 const TYPEN = ['text', 'mehrzeilig', 'nummer', 'schalter', 'auswahl', 'verweis', 'json']
@@ -49,5 +50,17 @@ describe('Maskengenerierung: schema-felder', () => {
 
     const abschliessen = formularFelder(registrierteAktion('reparatur.abschliessen')!)
     assert.equal(abschliessen.find((f) => f.name === 'mengen')!.typ, 'json')
+  })
+
+  test('der KI-Katalog aus der Registry ist konsistent', () => {
+    const katalog = kiKatalog()
+    assert.ok(katalog.length >= 10, 'es müssen KI-freigegebene Aktionen existieren')
+    for (const eintrag of katalog) {
+      const aktion = registrierteAktion(eintrag.name)
+      assert.ok(aktion?.ki, `${eintrag.name}: nicht (mehr) ki-geflaggt`)
+      assert.equal(eintrag.beleg, aktion!.bindung === 'beleg')
+    }
+    // Stichprobe: Statusübergänge des Verkaufs sind für den Agenten sichtbar.
+    assert.ok(katalog.some((e) => e.name === 'verkauf.bestaetigen'))
   })
 })
