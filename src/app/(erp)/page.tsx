@@ -75,9 +75,11 @@ export default async function Dashboard({
                 where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)
         as umsatz_monat`
 
-  const aufgaben: { label: string; wert: number; href: string; warn?: boolean }[] = [
+  // wichtig = Entscheidungssignal (Violett): hier wartet eine Freigabe auf
+  // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
+  const aufgaben: { label: string; wert: number; href: string; warn?: boolean; wichtig?: boolean }[] = [
     ...(sees('einkauf') && s.freigaben > 0
-      ? [{ label: 'Bestellungen warten auf Freigabe', wert: s.freigaben, href: '/einkauf', warn: true }]
+      ? [{ label: 'Bestellungen warten auf Freigabe', wert: s.freigaben, href: '/einkauf', wichtig: true }]
       : []),
     ...(sees('lager') && s.zulauf_ueberfaellig > 0
       ? [{ label: 'Wareneingänge überfällig', wert: s.zulauf_ueberfaellig, href: '/lager/zulauf', warn: true }]
@@ -92,7 +94,7 @@ export default async function Dashboard({
       ? [{ label: 'Beschaffungsvorschläge', wert: s.beschaffung, href: '/lager/beschaffung' }]
       : []),
     ...(sees('personal') && s.abwesenheiten > 0
-      ? [{ label: 'Abwesenheitsanträge', wert: s.abwesenheiten, href: '/personal/abwesenheiten' }]
+      ? [{ label: 'Abwesenheitsanträge', wert: s.abwesenheiten, href: '/personal/abwesenheiten', wichtig: true }]
       : []),
     ...(sees('fehler') && s.tickets > 0
       ? [{ label: 'Offene Tickets', wert: s.tickets, href: '/tickets' }]
@@ -171,7 +173,7 @@ export default async function Dashboard({
                 >
                   <div className="stat">
                     <div className="label">
-                      <span className={`led ${a.warn ? 'warn' : 'on'}`} /> {a.label}
+                      <span className={`led ${a.wichtig ? 'wichtig' : a.warn ? 'warn' : 'on'}`} /> {a.label}
                     </div>
                     <div className="value">{a.wert}</div>
                   </div>

@@ -504,7 +504,8 @@ function AktionCard({
 
         {v.ergebnis === undefined ? (
           <div className="actions">
-            <button className="primary" type="button" disabled={busy} onClick={() => void ausfuehren()}>
+            {/* Violett: dieser Klick schreibt in die Daten — eine Entscheidung. */}
+            <button className="wichtig" type="button" disabled={busy} onClick={() => void ausfuehren()}>
               {busy && <span className="led" style={{ background: 'currentColor' }} />}
               Anlegen
             </button>
@@ -654,7 +655,7 @@ function SammelCard({
 
         {offen.length > 0 ? (
           <div className="actions" style={{ marginTop: 8 }}>
-            <button className="primary" type="button" disabled={busy} onClick={() => void alleAusfuehren()}>
+            <button className="wichtig" type="button" disabled={busy} onClick={() => void alleAusfuehren()}>
               {busy && <span className="led" style={{ background: 'currentColor' }} />}
               Alle anlegen ({offen.length})
             </button>

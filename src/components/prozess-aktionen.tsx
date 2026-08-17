@@ -24,6 +24,9 @@ export interface SchrittAngebot {
   optionen: Record<string, { id: string; label: string }[]>
   erlaubt: boolean
   hinweis?: string
+  /** Verlangte Befugnis (z. B. einkauf:freigabe) — der Schritt ist eine
+      Entscheidung und trägt den violetten Akzent. */
+  befugnis?: string
 }
 
 function eingabeWert(feld: FormularFeld, roh: FormDataEntryValue | null): unknown {
@@ -224,11 +227,12 @@ export function ProzessAktionen({
           <button
             key={s.code}
             type="button"
-            className={`small ${offen === s.code ? 'primary' : ''}`}
+            className={`small ${offen === s.code ? (s.befugnis ? 'wichtig' : 'primary') : ''}`}
             disabled={!s.erlaubt || pending}
             title={s.hinweis ?? s.aktionsName}
             onClick={() => klick(s)}
           >
+            {s.befugnis && offen !== s.code && <span className="led wichtig" />}
             {s.name}
             {!s.erlaubt && ' 🔒'}
           </button>
@@ -249,7 +253,9 @@ export function ProzessAktionen({
                 ))}
             </div>
             <div className="actions" style={{ marginTop: 8 }}>
-              <button className="primary small" type="submit">{geoeffnet.name}</button>
+              <button className={`${geoeffnet.befugnis ? 'wichtig' : 'primary'} small`} type="submit">
+                {geoeffnet.name}
+              </button>
               <button className="small" type="button" onClick={() => setOffen(null)}>Abbrechen</button>
             </div>
           </fieldset>

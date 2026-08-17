@@ -181,17 +181,17 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           Torwächter über die Schritt-Befugnis; der Bestell-Riegel sitzt in
           der Datenbank — dieser Block macht beides nur sichtbar. */}
       {editable && freigabe?.noetig && (
-        <div className="notice warn">
+        <div className="notice wichtig">
           <div className="row" style={{ alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
-              <span className="led warn" />{' '}
+              <span className="led wichtig" />{' '}
               <strong>Freigabe erforderlich:</strong> Die Bestellsumme{' '}
               <span className="mono">{money(order.net)}</span> netto liegt über dem Limit von{' '}
               <span className="mono">{money(freigabe.limit ?? 0)}</span> — ohne Freigabe lässt
               sich nicht bestellen. Positionsänderungen lassen eine Freigabe erlöschen.
             </div>
             <div className="shrink">
-              <ActionButton className="primary" action={approvePo.bind(null, id)}>
+              <ActionButton className="wichtig" action={approvePo.bind(null, id)}>
                 Freigeben
               </ActionButton>
             </div>

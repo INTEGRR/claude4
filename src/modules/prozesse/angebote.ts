@@ -163,6 +163,9 @@ export async function naechsteAngebote(
       vorbelegung,
       optionen: {},
       erlaubt,
+      // Der Schritt verlangt eine persönliche Befugnis — die Oberfläche
+      // zeigt ihn als Entscheidung (violett), nicht als Handgriff.
+      ...(befugnis ? { befugnis } : {}),
       hinweis: erlaubt
         ? s.aktion
         : befugnis && !befugnisse.includes(befugnis)
