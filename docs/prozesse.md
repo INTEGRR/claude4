@@ -630,6 +630,17 @@ machen:
   (Freigaben, überfälliger Zulauf, Integrationsfehler, Versandbereit,
   Beschaffung, Abwesenheitsanträge, Tickets) — rollen- und
   prozessgefiltert. Keine Signale: eine grüne Zeile, sonst nichts.
+- **Strg/Cmd+K überall**: dasselbe Befehlsfeld als Overlay auf jeder
+  Seite (Knopf ⌘K in der Kopfleiste), gemeinsamer Katalog in
+  `modules/befehle.ts`.
+- **Beleg + Aktion in einem Zug**: „P01670 freigeben" matcht die JETZT
+  möglichen Prozessschritte des Belegs (`prozess_naechste_schritte`,
+  rollengefiltert). Parameterlose Schritte laufen nach Rückfrage direkt
+  (Torwächter prüft), mit Feldern geht es zur Belegseite.
+- **KI-Zuruf an der Ad-hoc-Maske**: „ist aber Lieferant" →
+  `/api/ki/aktion/aendern` schreibt den Feldsatz um (gegen dasselbe
+  Schema geprüft), die Maske baut sich in Echtzeit um — ausgeführt wird
+  weiterhin nur über den Absende-Knopf.
 
 ## Noch offen (Kurzfassung)
 

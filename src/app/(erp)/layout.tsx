@@ -9,6 +9,8 @@ import { AbmeldenKnopf } from '@/components/abmelden'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { TicketOverlay } from '@/components/ticket-overlay'
 import { KiOverlay } from '@/components/ki-overlay'
+import { BefehlsOverlay } from '@/components/befehls-overlay'
+import { befehlsKatalog } from '@/modules/befehle'
 import { kiConfigured } from '@/modules/ki/agent'
 
 export const dynamic = 'force-dynamic'
@@ -82,6 +84,14 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     counts.fehler > 0
       ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
       : 'Alle Systeme im Normalbetrieb'
+
+  // Befehlsfeld überall (Strg/Cmd+K): derselbe Katalog wie auf der Übersicht,
+  // plus das Lern-Gedächtnis dieses Benutzers fürs Ranking.
+  const befehle = befehlsKatalog(user.role, prozessAktiv)
+  const nutzung = await sql<{ schluessel: string; anzahl: number }[]>`
+    select schluessel, anzahl from nutzungs_zaehler
+    where user_id = ${user.id} order by anzahl desc limit 40`
+  const gewichte = Object.fromEntries(nutzung.map((n) => [n.schluessel, Number(n.anzahl)]))
 
   // Navigation als Datenstruktur: rollengefiltert hier, Aufklapp-Logik im Client.
   const groups: NavGroup[] = [
@@ -234,6 +244,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             <span className="systemtext">{systemzustand}</span>
           </div>
           <div className="actions">
+            <BefehlsOverlay
+              aktionen={befehle.aktionen}
+              seiten={befehle.seiten}
+              gewichte={gewichte}
+            />
             <ScanBox />
             <ThemeToggle />
           </div>

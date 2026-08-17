@@ -29,6 +29,8 @@ interface Treffer {
   ziel: string
   /** Nutzungszählung beim Öffnen (nur Seiten — Aktionen zählt der Torwächter). */
   zaehlen?: string
+  /** Aktion am Beleg („P01670 freigeben"): ohne Felder direkt ausführbar. */
+  aktion?: { name: string; recordId: string; felderNoetig: boolean }
 }
 
 function rang(text: string, q: string): number {
@@ -44,19 +46,29 @@ export function Befehlsfeld({
   seiten,
   gewichte,
   gross = false,
+  autoFokus = false,
+  onNavigiert,
 }: {
   aktionen: BefehlsAktion[]
   seiten: BefehlsSeite[]
   /** Nutzungshäufigkeit je Schlüssel (Aktion-Name bzw. Seiten-Pfad). */
   gewichte: Record<string, number>
   gross?: boolean
+  autoFokus?: boolean
+  /** Im Overlay: schließt den Dialog, sobald ein Treffer geöffnet wurde. */
+  onNavigiert?: () => void
 }) {
   const router = useRouter()
   const [q, setQ] = useState('')
   const [belege, setBelege] = useState<Treffer[]>([])
   const [aktiv, setAktiv] = useState(0)
   const [fokus, setFokus] = useState(false)
+  const [meldung, setMeldung] = useState<string | null>(null)
   const feld = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (autoFokus) feld.current?.focus()
+  }, [autoFokus])
 
   // Belegsuche nachgelagert und entprellt — die lokalen Treffer stehen sofort.
   useEffect(() => {
@@ -69,7 +81,12 @@ export function Befehlsfeld({
       try {
         const res = await fetch(`/api/suche?q=${encodeURIComponent(text)}`)
         const daten = (await res.json()) as {
-          treffer?: { label: string; hinweis: string; link: string }[]
+          treffer?: {
+            label: string
+            hinweis: string
+            link: string
+            aktion?: { name: string; record_id: string; felder_noetig: boolean }
+          }[]
         }
         setBelege(
           (daten.treffer ?? []).map((t) => ({
@@ -77,6 +94,15 @@ export function Befehlsfeld({
             label: t.label,
             hinweis: t.hinweis,
             ziel: t.link,
+            ...(t.aktion
+              ? {
+                  aktion: {
+                    name: t.aktion.name,
+                    recordId: t.aktion.record_id,
+                    felderNoetig: t.aktion.felder_noetig,
+                  },
+                }
+              : {}),
           })),
         )
       } catch {
@@ -164,9 +190,38 @@ export function Befehlsfeld({
         body: JSON.stringify({ schluessel: t.zaehlen }),
       }).catch(() => undefined)
     }
+    // Beleg + Aktion in einem Zug: parameterlose Schritte laufen nach
+    // Rückfrage direkt (Torwächter prüft ohnehin); mit Feldern geht es zur
+    // Belegseite, wo das Formular wartet.
+    if (t.aktion && !t.aktion.felderNoetig) {
+      if (!window.confirm(`${t.label} — jetzt ausführen?`)) return
+      void (async () => {
+        try {
+          const res = await fetch(`/api/aktion/${encodeURIComponent(t.aktion!.name)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ record_id: t.aktion!.recordId }),
+          })
+          const daten = (await res.json().catch(() => ({}))) as { error?: string; info?: string }
+          if (!res.ok || daten.error) {
+            setMeldung(daten.error ?? `Aktion fehlgeschlagen (${res.status})`)
+            return
+          }
+          setQ('')
+          setFokus(false)
+          onNavigiert?.()
+          router.push(t.ziel)
+          router.refresh()
+        } catch {
+          setMeldung('Verbindungsfehler')
+        }
+      })()
+      return
+    }
     setQ('')
     setFokus(false)
     feld.current?.blur()
+    onNavigiert?.()
     router.push(t.ziel)
   }
 
@@ -180,6 +235,7 @@ export function Befehlsfeld({
         onChange={(e) => {
           setQ(e.target.value)
           setAktiv(0)
+          setMeldung(null)
         }}
         onFocus={() => setFokus(true)}
         onBlur={() => setTimeout(() => setFokus(false), 150)}
@@ -201,6 +257,12 @@ export function Befehlsfeld({
         placeholder={'Was möchtest du tun? — z. B. „Bestellung anlegen", „P01670", „Umsatz je Monat"'}
         aria-label="Befehl oder Suche"
       />
+      {meldung && (
+        <div className="notice danger" role="alert" style={{ marginTop: 8, marginBottom: 0 }}>
+          <span className="led warn" style={{ marginRight: 6 }} />
+          {meldung}
+        </div>
+      )}
       {offen && (
         <div className="befehls-liste" role="listbox">
           {treffer.map((t, i) => (

@@ -76,7 +76,11 @@ function Feld({ feld, optionen }: { feld: FormularFeld; optionen?: { id: string;
       return (
         <label className="field" style={{ minWidth: 220 }}>
           <span>{feld.label}</span>
-          <select name={name} required={feld.pflicht} defaultValue="">
+          <select
+            name={name}
+            required={feld.pflicht}
+            defaultValue={typeof vorgabe === 'string' ? vorgabe : ''}
+          >
             <option value="" disabled={feld.pflicht}>— auswählen —</option>
             {(optionen ?? []).map((o) => (
               <option key={o.id} value={o.id}>{o.label}</option>
@@ -88,14 +92,24 @@ function Feld({ feld, optionen }: { feld: FormularFeld; optionen?: { id: string;
       return (
         <label className="field shrink">
           <span>{feld.label}</span>
-          <input type="date" name={name} required={feld.pflicht} />
+          <input
+            type="date"
+            name={name}
+            required={feld.pflicht}
+            defaultValue={typeof vorgabe === 'string' ? vorgabe.slice(0, 10) : undefined}
+          />
         </label>
       )
     case 'mehrzeilig':
       return (
         <label className="field" style={{ flex: '1 1 100%' }}>
           <span>{feld.label}</span>
-          <textarea name={name} rows={3} required={feld.pflicht} />
+          <textarea
+            name={name}
+            rows={3}
+            required={feld.pflicht}
+            defaultValue={typeof vorgabe === 'string' ? vorgabe : undefined}
+          />
         </label>
       )
     case 'json':

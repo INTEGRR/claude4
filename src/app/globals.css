@@ -1057,6 +1057,18 @@ label.field > span {
 .befehls-treffer:last-child { border-bottom: 0; }
 .befehls-treffer.aktiv { background: var(--surface-2); }
 
+/* Strg/Cmd+K-Overlay: das Befehlsfeld schwebt oben mittig über der Seite. */
+.befehls-dialog {
+  width: min(94vw, 680px);
+  margin: 10vh auto 0;
+  border: 0;
+  border-radius: 12px;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+.befehls-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+
 /* Großansicht der KI-Diagramme (BUG/00008): natives <dialog>, Karte in groß. */
 .chart-dialog {
   width: min(96vw, 1100px);

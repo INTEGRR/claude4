@@ -4,7 +4,8 @@ import { requireUser } from '@/modules/auth'
 import { aktionsAngebot } from '@/modules/prozesse/angebote'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
-import { ProzessAktionen } from '@/components/prozess-aktionen'
+import { kiConfigured } from '@/modules/ki/agent'
+import { AdhocMaske } from '@/components/adhoc-maske'
 import { Card, PageHeader } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
@@ -40,7 +41,7 @@ export default async function AktionsSeite({
         actions={<Link className="btn" href="/">Zur Übersicht</Link>}
       />
       <Card title="Angaben">
-        <ProzessAktionen schritte={[angebot]} sofortOffen={angebot.code} />
+        <AdhocMaske angebot={angebot} kiVerfuegbar={kiConfigured()} />
       </Card>
     </>
   )

@@ -2,9 +2,8 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireUser } from '@/modules/auth'
 import { type Area, canAccess } from '@/modules/auth/permissions'
-import { REGISTRY } from '@/modules/prozesse/registry'
-import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
-import { type BefehlsAktion, type BefehlsSeite, Befehlsfeld } from '@/components/befehlsfeld'
+import { befehlsKatalog } from '@/modules/befehle'
+import { Befehlsfeld } from '@/components/befehlsfeld'
 import { money } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
@@ -16,41 +15,6 @@ export const dynamic = 'force-dynamic'
  * System HEUTE von einem braucht (Signalkarten, nur mit Handlungsbedarf),
  * und was dieser Benutzer oft nutzt (lernend, nutzungs_zaehler je Benutzer).
  */
-
-/** Seitenkatalog fürs Befehlsfeld — Spiegel der Navigation (layout.tsx). */
-const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] = [
-  { href: '/verkauf', label: 'Verkaufsaufträge', area: 'verkauf' },
-  { href: '/verkauf/neu', label: 'Neuer Verkaufsauftrag', area: 'verkauf' },
-  { href: '/vorgaenge', label: 'Vorgänge', area: 'verkauf' },
-  { href: '/versand', label: 'Versand', area: 'versand', prozess: ['versand'] },
-  { href: '/fertigung', label: 'Fertigungsaufträge', area: 'fertigung', prozess: ['fertigung'] },
-  { href: '/fertigung/stuecklisten', label: 'Stücklisten', area: 'fertigung', prozess: ['fertigung'] },
-  { href: '/einkauf', label: 'Bestellungen', area: 'einkauf', prozess: ['einkauf'] },
-  { href: '/einkauf/rechnungen', label: 'Lieferantenrechnungen', area: 'einkauf', prozess: ['einkauf'] },
-  { href: '/lager', label: 'Transfers', area: 'lager' },
-  { href: '/lager/zulauf', label: 'Zulauf (Wareneingangskalender)', area: 'lager' },
-  { href: '/lager/bestand', label: 'Bestand', area: 'lager' },
-  { href: '/lager/bewertung', label: 'Bewertung', area: 'lager' },
-  { href: '/lager/beschaffung', label: 'Beschaffung', area: 'lager', prozess: ['einkauf', 'fertigung'] },
-  { href: '/lager/lose', label: 'Lose & Serien', area: 'lager' },
-  { href: '/lager/inventur', label: 'Inventur', area: 'lager' },
-  { href: '/reparatur', label: 'Reparaturen', area: 'reparatur', prozess: ['reparatur'] },
-  { href: '/zeiterfassung', label: 'Zeiterfassung', area: 'zeiterfassung' },
-  { href: '/personal', label: 'Mitarbeiter', area: 'personal' },
-  { href: '/personal/schichtplan', label: 'Schichtplan', area: 'personal' },
-  { href: '/personal/abwesenheiten', label: 'Abwesenheiten', area: 'personal' },
-  { href: '/auswertungen', label: 'Auswertungen: Mengen & Abverkauf', area: 'auswertungen' },
-  { href: '/auswertungen/kennzahlen', label: 'Kennzahlen', area: 'auswertungen' },
-  { href: '/ki', label: 'KI-Analyse', area: 'ki' },
-  { href: '/produkte', label: 'Produkte', area: 'produkte' },
-  { href: '/kontakte', label: 'Kontakte', area: 'kontakte' },
-  { href: '/scanner', label: 'Scanner', area: 'scanner' },
-  { href: '/integrationen', label: 'Integrationen', area: 'integrationen' },
-  { href: '/prozesse', label: 'Prozesse', area: 'einstellungen' },
-  { href: '/einstellungen', label: 'Einstellungen', area: 'einstellungen' },
-  { href: '/einstellungen/benutzer', label: 'Benutzer verwalten', area: 'einstellungen' },
-  { href: '/tickets', label: 'Tickets', area: 'fehler' },
-]
 
 function gruss(): string {
   const stunde = new Date().getHours()
@@ -135,14 +99,8 @@ export default async function Dashboard({
       : []),
   ]
 
-  // --- Befehlsfeld-Katalog: Aktionen + Seiten, rollengefiltert -------------
-  const aktionen: BefehlsAktion[] = Object.entries(REGISTRY)
-    .filter(([, a]) => a.bindung === 'frei' && aktionErlaubt(a, user.role))
-    .map(([name, a]) => ({ name, label: a.label, bereich: a.bereich }))
-  const seiten: BefehlsSeite[] = SEITEN.filter(
-    (p) =>
-      sees(p.area) && (!p.prozess || p.prozess.some((b) => prozessAktiv(b))),
-  ).map(({ href, label }) => ({ href, label }))
+  // --- Befehlsfeld-Katalog: dieselbe Quelle wie das Strg+K-Overlay ---------
+  const { aktionen, seiten } = befehlsKatalog(user.role, prozessAktiv)
 
   // --- Lern-Gedächtnis: was DIESER Benutzer oft nutzt ----------------------
   const nutzung = await sql<{ art: string; schluessel: string; anzahl: number }[]>`

@@ -2,11 +2,85 @@ import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
 import { canAccess } from '@/modules/auth/permissions'
+import { registrierteAktion } from '@/modules/prozesse/registry'
+import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
+import { formularFelder } from '@/modules/prozesse/schema-felder'
+
+interface SuchTreffer {
+  label: string
+  hinweis: string
+  link: string
+  /** „P01670 freigeben": ausführbarer Prozessschritt am gefundenen Beleg. */
+  aktion?: { name: string; record_id: string; felder_noetig: boolean }
+}
+
+/** Beleg + Aktion in einem Zug: „<nummer> <schritt>" matcht die JETZT
+ *  möglichen Prozessschritte des Belegs. */
+async function belegAktionen(
+  q: string,
+  role: Parameters<typeof canAccess>[0],
+): Promise<SuchTreffer[]> {
+  const teile = q.split(/\s+/)
+  if (teile.length < 2) return []
+  const belegQ = `%${teile[0]}%`
+  const rest = teile.slice(1).join(' ').toLowerCase()
+
+  // Nur beleggebundene Modelle mit Prozess; je Art höchstens ein Treffer,
+  // damit die Liste eine Antwort bleibt und kein zweites Suchergebnis.
+  const belege = await sql<{ id: string; nummer: string; modell: string; link: string }[]>`
+    (select id, number as nummer, 'sales_order' as modell, '/verkauf/' || id as link
+       from sales_orders where number ilike ${belegQ} or shopify_order_name ilike ${belegQ}
+       order by created_at desc limit 1)
+    union all
+    (select id, number, 'purchase_order', '/einkauf/' || id
+       from purchase_orders where number ilike ${belegQ} order by created_at desc limit 1)
+    union all
+    (select id, number, 'manufacturing_order', '/fertigung/' || id
+       from manufacturing_orders where number ilike ${belegQ} order by created_at desc limit 1)
+    union all
+    (select id, number, 'stock_picking', '/lager/' || id
+       from stock_pickings where number ilike ${belegQ} order by created_at desc limit 1)`
+
+  const ergebnis: SuchTreffer[] = []
+  for (const beleg of belege) {
+    const [wahl] = await sql<{ code: string | null }[]>`
+      select prozess_fuer_beleg(${beleg.modell}, ${beleg.id}) as code`
+    if (!wahl?.code) continue
+    const schritte = await sql<
+      { code: string; name: string; art: string; aktion: string | null;
+        rollen: string[] | null; params: Record<string, unknown> | null }[]
+    >`
+      select code, name, art::text as art, aktion, rollen, params
+      from prozess_naechste_schritte(${wahl.code}, ${beleg.id})`
+    for (const s of schritte) {
+      if (s.art !== 'aktion' || !s.aktion) continue
+      if (!`${s.name}`.toLowerCase().includes(rest)) continue
+      const eintrag = registrierteAktion(s.aktion)
+      if (!eintrag || !aktionErlaubt(eintrag, role)) continue
+      if (role !== 'admin' && s.rollen && s.rollen.length > 0 && !s.rollen.includes(role)) continue
+      const vorbelegt = s.params ?? {}
+      const offeneFelder = formularFelder(eintrag).filter((f) => !(f.name in vorbelegt))
+      ergebnis.push({
+        label: `${beleg.nummer} — ${s.name}`,
+        hinweis: offeneFelder.length > 0 ? 'Aktion am Beleg (mit Angaben)' : 'Aktion am Beleg',
+        link: beleg.link,
+        aktion: {
+          name: s.aktion,
+          record_id: beleg.id,
+          felder_noetig: offeneFelder.length > 0,
+        },
+      })
+    }
+  }
+  return ergebnis.slice(0, 5)
+}
 
 /**
  * Belegsuche fürs Befehlsfeld: Nummern, Kunden, Lieferanten, Produkte —
  * je Bereich nur, was die Rolle sehen darf. Bewusst klein gehalten
  * (max. 4 Treffer je Gruppe), die Vollansichten haben eigene Listen.
+ * Mit zweitem Wort („P01670 freigeben") kommen die passenden
+ * Prozessschritte des Belegs als ausführbare Treffer dazu.
  */
 export async function GET(request: Request) {
   const user = await currentUser()
@@ -16,8 +90,11 @@ export async function GET(request: Request) {
   if (q.length < 2) return NextResponse.json({ treffer: [] })
   const muster = `%${q}%`
 
-  const treffer: { label: string; hinweis: string; link: string }[] = []
+  const treffer: SuchTreffer[] = []
   const sieht = (bereich: Parameters<typeof canAccess>[1]) => canAccess(user.role, bereich)
+
+  // Beleg + Aktion zuerst — der spezifischste Treffer gehört nach oben.
+  treffer.push(...(await belegAktionen(q, user.role)))
 
   if (sieht('verkauf')) {
     for (const r of await sql<{ id: string; number: string; name: string | null; kunde: string }[]>`
