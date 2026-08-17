@@ -688,17 +688,68 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  /** Stream abgerissen (BUG/00010) — mit Merker, ob es im Hintergrund geschah. */
+  const [abbruch, setAbbruch] = useState<{ imHintergrund: boolean } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const verlauf = useRef<HTMLDivElement>(null)
   const startGesendet = useRef(false)
+  const letzteFrage = useRef('')
 
-  async function send(frage: string) {
+  /**
+   * Liest man gerade weiter oben, darf die laufende Antwort die Position
+   * nicht klauen (BUG/00009) — gescrollt wird nur, wenn man ohnehin (fast)
+   * am Ende steht. Im Slide-out scrollt .ki-messages, auf /ki die Seite.
+   */
+  function amEnde(): boolean {
+    const el = verlauf.current
+    if (el && el.scrollHeight > el.clientHeight + 8) {
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 140
+    }
+    const doc = document.documentElement
+    return window.innerHeight + window.scrollY >= doc.scrollHeight - 140
+  }
+
+  // Solange die Antwort läuft, den Bildschirm wachhalten: das Display, das
+  // sich abschaltet, ist der häufigste Grund für den Abriss (BUG/00010).
+  useEffect(() => {
+    if (!busy) return
+    type Sperre = { release(): Promise<void> }
+    const traeger = navigator as Navigator & {
+      wakeLock?: { request(art: 'screen'): Promise<Sperre> }
+    }
+    let sperre: Sperre | null = null
+    const anfordern = () => {
+      traeger.wakeLock
+        ?.request('screen')
+        .then((s) => {
+          sperre = s
+        })
+        .catch(() => undefined)
+    }
+    anfordern()
+    // Nach Rückkehr in den Vordergrund ist die Sperre weg — neu anfordern.
+    const beiSicht = () => {
+      if (document.visibilityState === 'visible') anfordern()
+    }
+    document.addEventListener('visibilitychange', beiSicht)
+    return () => {
+      document.removeEventListener('visibilitychange', beiSicht)
+      void sperre?.release().catch(() => undefined)
+    }
+  }, [busy])
+
+  async function send(frage: string, basis?: Msg[]) {
     const text = frage.trim()
     if (!text || busy) return
     setInput('')
     setBusy(true)
+    setAbbruch(null)
+    letzteFrage.current = text
     const leer = { sqls: [], charts: [], aktionen: [] }
-    const history = [...msgs, { role: 'user' as const, text, ...leer }]
+    const history = [...(basis ?? msgs), { role: 'user' as const, text, ...leer }]
     setMsgs([...history, { role: 'assistant', text: '', ...leer }])
+    // Zur eigenen Frage springen — ab da entscheidet amEnde().
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }))
 
     const patchLast = (fn: (m: Msg) => Msg) =>
       setMsgs((cur) => [...cur.slice(0, -1), fn(cur.at(-1)!)])
@@ -723,6 +774,7 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
       for (;;) {
         const { done, value } = await reader.read()
         if (done) break
+        const warAmEnde = amEnde()
         buffer += decoder.decode(value, { stream: true })
         const zeilen = buffer.split('\n')
         buffer = zeilen.pop() ?? ''
@@ -747,18 +799,43 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
           if (ev.type === 'error') patchLast((m) => ({ ...m, text: m.text + '\n\n' + ev.text }))
           if (ev.type === 'done') setStatus(null)
         }
-        bottomRef.current?.scrollIntoView({ block: 'end' })
+        if (warAmEnde) bottomRef.current?.scrollIntoView({ block: 'end' })
       }
-    } catch (err) {
-      patchLast((m) => ({
-        ...m,
-        text: m.text + '\n\nVerbindungsfehler: ' + (err instanceof Error ? err.message : String(err)),
-      }))
+    } catch {
+      // Stream abgerissen (Netz weg, PWA im Hintergrund eingefroren): die
+      // Teilantwort bleibt stehen, unten erscheint „Erneut fragen" — und
+      // geschah es im Hintergrund, fragt die Rückkehr automatisch nach.
+      patchLast((m) => (m.text === '' ? { ...m, text: '_(abgebrochen)_' } : m))
+      setAbbruch({ imHintergrund: document.visibilityState === 'hidden' })
     } finally {
       setBusy(false)
       setStatus(null)
     }
   }
+
+  /** Die abgerissene Frage neu stellen: Teilantwort + Frage raus, noch einmal. */
+  function wiederholen() {
+    const frage = letzteFrage.current
+    if (!frage || busy) return
+    setAbbruch(null)
+    const basis = [...msgs]
+    if (basis.at(-1)?.role === 'assistant') basis.pop()
+    if (basis.at(-1)?.role === 'user') basis.pop()
+    void send(frage, basis)
+  }
+
+  // Kam der Abriss, während die App im Hintergrund war, holt die Rückkehr
+  // die Antwort von selbst — niemand soll einen toten Chat vorfinden.
+  useEffect(() => {
+    if (!abbruch?.imHintergrund) return
+    const nachholen = () => {
+      if (document.visibilityState === 'visible') wiederholen()
+    }
+    document.addEventListener('visibilitychange', nachholen)
+    nachholen()
+    return () => document.removeEventListener('visibilitychange', nachholen)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abbruch])
 
   // Vom Befehlsfeld übergebene Frage (?frage=…) einmal automatisch stellen.
   useEffect(() => {
@@ -771,7 +848,7 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
 
   return (
     <div className="ki-chat">
-      <div className="ki-messages">
+      <div className="ki-messages" ref={verlauf}>
         {msgs.length === 0 && (
           <div className="ki-empty">
             <p className="muted">
@@ -878,6 +955,14 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
         {status && (
           <div className="ki-status muted small">
             <span className="led on" /> {status}
+          </div>
+        )}
+        {abbruch && !busy && (
+          <div className="notice warn" style={{ marginBottom: 0 }}>
+            Verbindung unterbrochen — die bisherige Antwort bleibt stehen.{' '}
+            <button type="button" className="small" onClick={wiederholen}>
+              Erneut fragen
+            </button>
           </div>
         )}
         <div ref={bottomRef} />

@@ -268,6 +268,11 @@ a:hover { text-decoration: underline; }
   padding: 12px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  /* Immer erreichbar, auch tief in langen Seiten (BUG/00011) — unter dem
+     Navigations-Schatten (z 30), damit die offene Sidebar drüberliegt. */
+  position: sticky;
+  top: 0;
+  z-index: 25;
 }
 
 /* Scanfeld in der Kopfzeile. Es darf schrumpfen, aber nie umbrechen —
@@ -743,7 +748,18 @@ label.field > span {
 }
 .tx-json { max-height: 260px; overflow: auto; }
 .ki-status { padding: 0 4px; font-family: var(--font-mono), monospace; letter-spacing: 0.06em; }
-.ki-input { padding: 12px; border-top: 1px solid var(--border); margin-bottom: 0; background: var(--surface-2); }
+.ki-input {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  margin-bottom: 0;
+  background: var(--surface-2);
+  /* Beim Scrollen durch lange Chats bleibt die Eingabe am Viewport-Boden
+     kleben (BUG/00009); die Safe-Area polstert die Gestenleiste der PWA. */
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
 
 /* --- Diagramme -------------------------------------------------------------- */
 /* Serienfarben: Orange führt (der Akzent des Systems), danach gedeckte
@@ -910,16 +926,17 @@ label.field > span {
      damit deren Kinder direkt im Raster liegen. */
   .topbar {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     grid-template-areas:
-      'schalter zustand thema'
-      'scan     scan    scan';
+      'schalter zustand befehle thema'
+      'scan     scan    scan    scan';
     align-items: center;
     gap: 10px;
   }
   .topbar > .actions { display: contents; }
   .nav-schalter { grid-area: schalter; }
   .systemzeile { grid-area: zustand; width: auto; }
+  .befehls-knopf { grid-area: befehle; }
   .theme-toggle { grid-area: thema; }
   .scan-form { grid-area: scan; }
   .scan-form input { flex: 1; width: auto; }

@@ -38,7 +38,7 @@ export function BefehlsOverlay({
     <>
       <button
         type="button"
-        className="small"
+        className="small befehls-knopf"
         title="Befehlsfeld öffnen (Strg+K)"
         onClick={() => dialog.current?.showModal()}
       >
