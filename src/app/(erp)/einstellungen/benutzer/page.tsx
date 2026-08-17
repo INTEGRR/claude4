@@ -1,10 +1,10 @@
 import { sql } from '@/db/client'
 import { requireArea, requireAdmin } from '@/modules/auth'
-import { ALL_ROLES, ROLE_LABELS, type Role } from '@/modules/auth/permissions'
+import { ALLE_BEFUGNISSE, ALL_ROLES, BEFUGNISSE, ROLE_LABELS, type Role } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
-import { createUser, resetPassword, setActive, setRole } from './actions'
+import { createUser, resetPassword, setActive, setBefugnisse, setRole } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,10 +18,11 @@ export default async function BenutzerPage() {
       email: string
       name: string
       role: Role
+      befugnisse: string[]
       active: boolean
       created_at: string
     }[]
-  >`select id, email, name, role, active, created_at from users order by created_at`
+  >`select id, email, name, role, befugnisse, active, created_at from users order by created_at`
 
   const activeAdmins = users.filter((u) => u.role === 'admin' && u.active).length
 
@@ -40,6 +41,7 @@ export default async function BenutzerPage() {
                 <th>Name</th>
                 <th>E-Mail</th>
                 <th>Rolle</th>
+                <th>Befugnisse</th>
                 <th>Status</th>
                 <th>Angelegt</th>
                 <th />
@@ -77,6 +79,34 @@ export default async function BenutzerPage() {
                             </select>
                             <div className="shrink">
                               <button className="small" type="submit">Ändern</button>
+                            </div>
+                          </div>
+                        </ActionForm>
+                      )}
+                    </td>
+                    <td>
+                      {/* Personengebundene Zusatzrechte — Admins besitzen
+                          jede Befugnis kraft Rolle, die Haken wären Deko. */}
+                      {u.role === 'admin' ? (
+                        <span className="muted small">alle (Administrator)</span>
+                      ) : (
+                        <ActionForm action={setBefugnisse.bind(null, u.id)}>
+                          <div className="row" style={{ alignItems: 'center' }}>
+                            <div>
+                              {ALLE_BEFUGNISSE.map((b) => (
+                                <label key={b} className="small" style={{ display: 'block' }}>
+                                  <input
+                                    type="checkbox"
+                                    name="befugnisse"
+                                    value={b}
+                                    defaultChecked={u.befugnisse.includes(b)}
+                                  />{' '}
+                                  {BEFUGNISSE[b]}
+                                </label>
+                              ))}
+                            </div>
+                            <div className="shrink">
+                              <button className="small" type="submit">Setzen</button>
                             </div>
                           </div>
                         </ActionForm>

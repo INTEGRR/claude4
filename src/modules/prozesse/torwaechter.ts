@@ -75,13 +75,68 @@ export function aktionErlaubt(aktion: RegistrierteAktion, role: Role): boolean {
 }
 
 /**
+ * Schritt-Rechte: verlangt ein Prozessschritt für diese Aktion Rollen oder
+ * eine Befugnis, gilt das auf JEDEM Transportweg — auch für den direkten
+ * Knopf auf der Belegseite, /api/aktion und den KI-Chat, nicht nur für die
+ * Angebote im Prozess-Panel. Administratoren bestehen immer; Overrides
+ * können die Anforderung je Firma ändern. Rein DB-gestützt, deshalb
+ * getrennt von der puren Prüfung oben.
+ */
+async function schrittRechtePruefen(
+  aktionsName: string,
+  label: string,
+  nutzer: { role: Role; befugnisse?: string[] },
+): Promise<void> {
+  if (nutzer.role === 'admin') return
+  const { sql } = await import('@/db/client')
+  const { BEFUGNISSE } = await import('../auth/permissions.ts')
+
+  const schritte = await sql<
+    { rollen: string[] | null; befugnis: string | null }[]
+  >`
+    select coalesce(o.rollen, s.rollen) as rollen,
+           coalesce(o.befugnis, s.befugnis) as befugnis
+    from prozesse p
+    join prozess_schritte s on s.version_id = prozess_aktive_version(p.code)
+    left join prozess_overrides o
+      on o.prozess_code = p.code and o.schritt_code = s.code
+    where p.aktiv and s.art = 'aktion' and s.aktion = ${aktionsName}
+      and coalesce(o.aktiv, true)`
+
+  // Aktion ist an keinen aktiven Schritt gebunden oder kein Schritt stellt
+  // Anforderungen → die Bereichsmatrix bleibt die einzige Hürde.
+  const mitAnforderung = schritte.filter(
+    (s) => (s.rollen && s.rollen.length > 0) || s.befugnis,
+  )
+  if (mitAnforderung.length === 0) return
+
+  const besteht = mitAnforderung.some(
+    (s) =>
+      (!s.rollen || s.rollen.length === 0 || s.rollen.includes(nutzer.role)) &&
+      (!s.befugnis || (nutzer.befugnisse ?? []).includes(s.befugnis)),
+  )
+  if (!besteht) {
+    const befugnis = mitAnforderung.find((s) => s.befugnis)?.befugnis
+    const befugnisLabel =
+      befugnis && befugnis in BEFUGNISSE
+        ? (BEFUGNISSE as Record<string, string>)[befugnis]
+        : befugnis
+    throw new RechteFehler(
+      befugnisLabel
+        ? `„${label}" verlangt die Befugnis „${befugnisLabel}" — sie wird in der Benutzerverwaltung vergeben.`
+        : `„${label}" ist im Prozess auf andere Rollen beschränkt.`,
+    )
+  }
+}
+
+/**
  * Prüfen, berechtigen, ausführen, protokollieren — der einzige Weg, auf dem
  * eine Registry-Aktion tatsächlich läuft.
  */
 export async function aktionAusfuehrenGeprueft(
   name: string,
   aufruf: AktionsAufruf,
-  nutzer: { name: string; role: Role; id?: string },
+  nutzer: { name: string; role: Role; id?: string; befugnisse?: string[] },
 ): Promise<AktionsErgebnis> {
   const { aktion, werte, recordId } = aktionPruefen(name, aufruf)
 
@@ -92,6 +147,8 @@ export async function aktionAusfuehrenGeprueft(
         : `Ihrer Rolle fehlt die Berechtigung für „${aktion.label}"`,
     )
   }
+
+  await schrittRechtePruefen(name, aktion.label, nutzer)
 
   // Erst hier kommen Datenbank-Importe ins Spiel — die Prüfung oben bleibt frei davon.
   const { AUSFUEHRUNG } = await import('./ausfuehren.ts')

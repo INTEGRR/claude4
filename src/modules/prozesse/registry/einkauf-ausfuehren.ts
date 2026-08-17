@@ -100,6 +100,14 @@ export async function kopfAendern(
   return { recordId: ctx.recordId }
 }
 
+export async function bestellungFreigeben(
+  _p: object,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`select purchase_order_approve(${ctx.recordId!}, ${ctx.actor})`
+  return { text: 'Bestellung freigegeben.', recordId: ctx.recordId }
+}
+
 export async function bestaetigen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select confirm_purchase_order(${ctx.recordId!}, ${ctx.actor})`
   return { recordId: ctx.recordId }

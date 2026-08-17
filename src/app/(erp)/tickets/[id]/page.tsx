@@ -62,7 +62,7 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
         actions={<Link className="btn" href="/tickets">Zur Liste</Link>}
       />
 
-      <ProzessPanel prozessCode="bug_ticket" recordId={m.id} rolle={user.role} />
+      <ProzessPanel prozessCode="bug_ticket" recordId={m.id} rolle={user.role} befugnisse={user.befugnisse} />
 
       {/* Bug-Loop: welcher Prozess ist betroffen, und was sagt der Test? */}
       {betroffen && m.prozess_code && (

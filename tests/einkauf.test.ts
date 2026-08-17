@@ -65,6 +65,68 @@ describe('Einkauf: Bestellablauf', () => {
     })
   })
 
+  // Bestellfreigabe: Limit aus den Einstellungen (nichts hartkodiert), der
+  // Riegel sitzt als Trigger an der Statusmaschine, Positionsänderungen
+  // lassen die Freigabe erlöschen.
+  test('Freigabepflicht ab Limit: ohne Freigabe kein Bestätigen, Positionsänderung löscht sie', async () => {
+    await withRollback(async (t) => {
+      const s = await purchaseScenario(t)
+      // Bestellsumme: 100 × 0,35 = 35 €. Limit darunter → Pflicht greift.
+      await t`update settings set value = '{"einkauf_limit": 30}'::jsonb where key = 'freigaben'`
+
+      await assert.rejects(
+        t.savepoint(async (sp) => {
+          await sp`select confirm_purchase_order(${s.orderId}, 'tester')`
+        }),
+        /Freigabe erforderlich/,
+        'über dem Limit wird ohne Freigabe nicht bestätigt',
+      )
+
+      await t`select purchase_order_approve(${s.orderId}, 'supervisor')`
+      const [po] = await t<{ freigegeben_von: string }[]>`
+        select freigegeben_von from purchase_orders where id = ${s.orderId}`
+      assert.equal(po.freigegeben_von, 'supervisor')
+
+      // Doppelte Freigabe scheitert verständlich.
+      await assert.rejects(
+        t.savepoint(async (sp) => {
+          await sp`select purchase_order_approve(${s.orderId}, 'zweiter')`
+        }),
+        /Bereits freigegeben/,
+      )
+
+      // Positionsänderung → Freigabe erlischt (freigegeben war eine Summe).
+      await t`update purchase_order_lines set qty = 200 where id = ${s.lineId}`
+      const [danach] = await t<{ freigegeben_von: string | null }[]>`
+        select freigegeben_von from purchase_orders where id = ${s.orderId}`
+      assert.equal(danach.freigegeben_von, null, 'Freigabe nach Mengenänderung erloschen')
+
+      // Erneut freigeben → Bestätigen läuft durch.
+      await t`select purchase_order_approve(${s.orderId}, 'supervisor')`
+      await t`select confirm_purchase_order(${s.orderId}, 'tester')`
+      const [zustand] = await t<{ state: string }[]>`
+        select state from purchase_orders where id = ${s.orderId}`
+      assert.equal(zustand.state, 'purchase')
+    })
+  })
+
+  test('unter dem Limit (oder ohne Limit) keine Freigabepflicht', async () => {
+    await withRollback(async (t) => {
+      const s = await purchaseScenario(t)
+      // Limit über der Summe (35 €) → keine Pflicht.
+      await t`update settings set value = '{"einkauf_limit": 1000}'::jsonb where key = 'freigaben'`
+      await t`select confirm_purchase_order(${s.orderId}, 'tester')`
+      const [po] = await t<{ state: string }[]>`
+        select state from purchase_orders where id = ${s.orderId}`
+      assert.equal(po.state, 'purchase')
+
+      // Ohne Limit ebenfalls keine Pflicht.
+      const s2 = await purchaseScenario(t)
+      await t`update settings set value = '{}'::jsonb where key = 'freigaben'`
+      await t`select confirm_purchase_order(${s2.orderId}, 'tester')`
+    })
+  })
+
   // BUG/00004: Der Liefertermin wird EINMAL an der Bestellung gepflegt
   // (bestätigte ETA vor Schätzung) und wandert an offene Eingangs-Transfers.
   test('ETA-Sync: bestätigter Termin wandert an den offenen Wareneingang', async () => {

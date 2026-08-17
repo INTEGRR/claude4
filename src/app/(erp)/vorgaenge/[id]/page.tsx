@@ -75,7 +75,7 @@ export default async function VorgangDetail({
         }
       />
 
-      <ProzessPanel prozessCode={v.prozess_code} recordId={v.id} rolle={user.role} />
+      <ProzessPanel prozessCode={v.prozess_code} recordId={v.id} rolle={user.role} befugnisse={user.befugnisse} />
 
       {zusatzEintraege.length > 0 && (
         <Card title="Eigene Felder">

@@ -75,6 +75,29 @@ async function savePolicies(formData: FormData) {
   return actionInfo('Belegverhalten gespeichert.')
 }
 
+async function saveFreigaben(formData: FormData) {
+  'use server'
+  await requireAdmin()
+  const roh = String(formData.get('einkauf_limit') ?? '').trim().replace(',', '.')
+  if (roh !== '' && (!Number.isFinite(Number(roh)) || Number(roh) < 0)) {
+    return actionError('Das Limit muss eine Zahl ≥ 0 sein — oder leer für „keine Freigabepflicht".')
+  }
+  // Leer = Freigabepflicht aus. Der Wert lebt NUR hier in den Einstellungen —
+  // Trigger und Anzeige lesen ihn, nichts ist im Code festgelegt.
+  const value = roh === '' ? {} : { einkauf_limit: Number(roh) }
+  try {
+    await sql`update settings set value = ${sql.json(value)} where key = 'freigaben'`
+  } catch (err) {
+    return actionFail(err)
+  }
+  revalidatePath('/einstellungen')
+  return actionInfo(
+    roh === ''
+      ? 'Freigabepflicht abgeschaltet — Bestellungen brauchen keine Freigabe mehr.'
+      : `Gespeichert: Bestellungen ab ${Number(roh).toFixed(2)} € netto brauchen eine Freigabe.`,
+  )
+}
+
 async function demodatenLoeschen(formData: FormData) {
   'use server'
   await requireAdmin()
@@ -116,6 +139,7 @@ export default async function EinstellungenPage() {
   const dhl = get<{ default_product?: string; print_format?: string }>('dhl')
   const sales = get<{ lock_confirmed?: boolean }>('sales')
   const purchase = get<{ lock_confirmed?: boolean }>('purchase')
+  const freigaben = get<{ einkauf_limit?: number }>('freigaben')
 
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
   // mehr in der Tabellenspalte.
@@ -236,6 +260,44 @@ export default async function EinstellungenPage() {
           </div>
           <button className="primary" type="submit">Speichern</button>
         </ActionForm>
+      </Card>
+
+      <Card title="Freigaben">
+        <ActionForm action={saveFreigaben}>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field" style={{ maxWidth: 260 }}>
+              <span>Einkauf: Freigabe ab Bestellsumme (netto, €)</span>
+              <input
+                type="number"
+                name="einkauf_limit"
+                step="0.01"
+                min="0"
+                defaultValue={freigaben.einkauf_limit ?? ''}
+                placeholder="leer = keine Freigabepflicht"
+              />
+            </label>
+            <div className="shrink field">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+            <div className="shrink field">
+              {freigaben.einkauf_limit != null ? (
+                <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="led ok" /> aktiv ab {Number(freigaben.einkauf_limit).toFixed(2)} €
+                </span>
+              ) : (
+                <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="led off" /> keine Freigabepflicht
+                </span>
+              )}
+            </div>
+          </div>
+        </ActionForm>
+        <p className="small muted" style={{ margin: '8px 0 0' }}>
+          Ab dieser Summe lässt sich eine Bestellung erst nach Freigabe bestätigen — auf jedem Weg
+          (Knopf, API, KI). Wer freigeben darf, wird über die Befugnis „Bestellungen freigeben" in
+          der <Link href="/einstellungen/benutzer">Benutzerverwaltung</Link> vergeben; Administratoren
+          dürfen immer. Positionsänderungen lassen eine erteilte Freigabe erlöschen.
+        </p>
       </Card>
 
       <Card title="Gefahrenzone: alle Daten löschen (Neustart)">

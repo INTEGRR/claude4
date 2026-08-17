@@ -73,3 +73,19 @@ export const ROLE_LABELS: Record<Role, string> = {
 }
 
 export const ALL_ROLES = Object.keys(ROLE_LABELS) as Role[]
+
+/**
+ * BEFUGNISSE: personengebundene Zusatzrechte, orthogonal zur Rollenmatrix.
+ * Die Rolle beschreibt den Bereichszuschnitt („darf im Einkauf arbeiten"),
+ * eine Befugnis eine besondere Verantwortung („darf Bestellungen freigeben").
+ * Vergeben werden sie je Benutzer in der Benutzerverwaltung; verlangt werden
+ * sie von Prozessschritten (prozess_schritte.befugnis), geprüft im
+ * Torwächter. Administratoren bestehen jede Befugnisprüfung.
+ */
+export const BEFUGNISSE = {
+  'einkauf:freigabe': 'Bestellungen freigeben',
+} as const
+
+export type Befugnis = keyof typeof BEFUGNISSE
+
+export const ALLE_BEFUGNISSE = Object.keys(BEFUGNISSE) as Befugnis[]

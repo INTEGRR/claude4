@@ -29,6 +29,7 @@ export const AUSFUEHRUNG = {
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,
   'einkauf.position_entfernen': einkauf.positionEntfernen,
   'einkauf.kopf_aendern': einkauf.kopfAendern,
+  'einkauf.bestellung_freigeben': einkauf.bestellungFreigeben,
   'einkauf.bestaetigen': einkauf.bestaetigen,
   'einkauf.stornieren': einkauf.stornieren,
   'einkauf.sperren': einkauf.sperren,
@@ -54,6 +55,7 @@ export const AUSFUEHRUNG = {
   'einstellungen.benutzer_anlegen': einstellungen.benutzerAnlegen,
   'einstellungen.benutzer_rolle': einstellungen.benutzerRolle,
   'einstellungen.benutzer_aktiv': einstellungen.benutzerAktiv,
+  'einstellungen.benutzer_befugnisse': einstellungen.benutzerBefugnisse,
   'einstellungen.benutzer_passwort': einstellungen.benutzerPasswort,
 
   'fehler.ticket_melden': fehler.ticketMelden,

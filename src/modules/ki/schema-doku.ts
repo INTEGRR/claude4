@@ -52,7 +52,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **unbuild_orders**: Demontage (variant_id, qty, state).
 
 ### Einkauf
-- **purchase_orders**: number ('P00001'), vendor_id → partners, state ('draft','sent','purchase','done','cancel'), order_deadline, confirmed_at, created_at, billing_status. billing_status = 'waiting' zählt nur als offener Posten, wenn der Rechnungsschritt Teil des Ablaufs ist — prozessschritt_aktiv('einkauf_wareneingang_rechnung','rechnung') prüft das (false = Abrechnung läuft extern, 'waiting' ist dann Normalzustand).
+- **purchase_orders**: number ('P00001'), vendor_id → partners, state ('draft','sent','purchase','done','cancel'), order_deadline, expected_arrival (ETA geschätzt), eta_confirmed (vom Lieferanten bestätigt), carrier, tracking_number, confirmed_at, created_at, billing_status, freigegeben_von/freigegeben_am (Bestellfreigabe). billing_status = 'waiting' zählt nur als offener Posten, wenn der Rechnungsschritt Teil des Ablaufs ist — prozessschritt_aktiv('einkauf_wareneingang_rechnung','rechnung') prüft das (false = Abrechnung läuft extern, 'waiting' ist dann Normalzustand). Freigabepflicht ab Limit: einkauf_freigabe_noetig(order_id); das Limit steht in settings key 'freigaben' (einkauf_limit, netto; fehlt = keine Pflicht).
 - **purchase_order_lines**: order_id, variant_id, qty, qty_received, qty_billed, uom_id, price_unit.
 - **vendor_bills**: Lieferantenrechnungen (number 'BILL/…', vendor_id, purchase_order_id, state 'draft'|'posted'|'paid'|'cancel', total).
 - **vendor_bill_lines**: Positionen.

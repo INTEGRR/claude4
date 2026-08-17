@@ -101,6 +101,19 @@ export const EINKAUF = {
     revalidate: ['/einkauf/:id', '/lager/zulauf'],
   },
 
+  'einkauf.bestellung_freigeben': {
+    label: 'Bestellung freigeben',
+    bereich: 'einkauf',
+    beschreibung:
+      'Gibt eine offene Bestellung frei. Über dem Freigabe-Limit (Einstellungen) lässt sich ' +
+      'ohne diese Freigabe nicht bestellen; Positionsänderungen lassen sie erlöschen. Wer ' +
+      'freigeben darf, bestimmt die Befugnis „Bestellungen freigeben" am Prozessschritt.',
+    bindung: 'beleg',
+    modell: 'purchase_order',
+    schema: z.object({}),
+    revalidate: ['/einkauf/:id', '/einkauf'],
+  },
+
   'einkauf.bestaetigen': {
     label: 'Bestellung bestätigen',
     bereich: 'einkauf',

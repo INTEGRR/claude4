@@ -21,6 +21,8 @@ export interface User {
   email: string
   name: string
   role: Role
+  /** Personengebundene Zusatzrechte (z. B. einkauf:freigabe), siehe permissions.ts. */
+  befugnisse: string[]
 }
 
 // --- Passwörter ------------------------------------------------------------
@@ -48,8 +50,8 @@ function hashToken(token: string): string {
 
 export async function login(email: string, password: string): Promise<User | null> {
   const [row] = await sql<
-    { id: string; email: string; name: string; role: Role; password_hash: string }[]
-  >`select id, email, name, role, password_hash from users
+    { id: string; email: string; name: string; role: Role; befugnisse: string[]; password_hash: string }[]
+  >`select id, email, name, role, befugnisse, password_hash from users
     where lower(email) = lower(${email}) and active`
   if (!row) {
     // Gleichbleibende Antwortzeit, damit unbekannte Konten nicht auffallen.
@@ -72,7 +74,7 @@ export async function login(email: string, password: string): Promise<User | nul
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   })
 
-  return { id: row.id, email: row.email, name: row.name, role: row.role }
+  return { id: row.id, email: row.email, name: row.name, role: row.role, befugnisse: row.befugnisse }
 }
 
 export async function logout(): Promise<void> {
@@ -88,8 +90,10 @@ export async function currentUser(): Promise<User | null> {
   const token = jar.get(COOKIE)?.value
   if (!token) return null
 
-  const [row] = await sql<{ id: string; email: string; name: string; role: Role }[]>`
-    select u.id, u.email, u.name, u.role
+  const [row] = await sql<
+    { id: string; email: string; name: string; role: Role; befugnisse: string[] }[]
+  >`
+    select u.id, u.email, u.name, u.role, u.befugnisse
     from sessions s join users u on u.id = s.user_id
     where s.token = ${hashToken(token)} and s.expires_at > now() and u.active`
   return row ?? null

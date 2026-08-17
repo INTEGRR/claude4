@@ -186,6 +186,7 @@ interface EntwurfSchritt {
   teilprozess_link?: Record<string, unknown>
   zustand?: string
   rollen?: string[]
+  befugnis?: string
   params?: Record<string, unknown>
   optional: boolean
 }
@@ -313,12 +314,12 @@ export async function prozessEntwerfen(
       await t`
         insert into prozess_schritte (version_id, code, name, art, sequence, aktion,
                                       job_kind, ereignis, teilprozess, teilprozess_link,
-                                      zustand, rollen, params, optional)
+                                      zustand, rollen, befugnis, params, optional)
         values (${v.id}, ${s.code}, ${s.name}, ${s.art}, ${i * 10}, ${s.aktion ?? null},
                 ${s.job_kind ?? null}, ${s.ereignis ?? null},
                 ${s.teilprozess ?? null},
                 ${s.teilprozess_link ? JSON.stringify(s.teilprozess_link) : null}::jsonb,
-                ${s.zustand ?? null}, ${s.rollen ?? null},
+                ${s.zustand ?? null}, ${s.rollen ?? null}, ${s.befugnis ?? null},
                 ${JSON.stringify(s.params ?? {})}::jsonb, ${s.optional})`
     }
     for (const [i, u] of p.uebergaenge.entries()) {
@@ -464,6 +465,19 @@ export async function benutzerAktiv(
   await sql`update users set active = ${p.active} where id = ${userId}`
   await sql`select log_event('user', ${userId}, 'state',
     ${p.active ? 'Benutzer aktiviert' : 'Benutzer deaktiviert'}, ${ctx.actor})`
+  return { recordId: userId }
+}
+
+export async function benutzerBefugnisse(
+  p: { befugnisse: string[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const userId = ctx.recordId!
+  await sql`update users set befugnisse = ${p.befugnisse} where id = ${userId}`
+  await sql`select log_event('user', ${userId}, 'state',
+    ${p.befugnisse.length > 0
+      ? 'Befugnisse gesetzt: ' + p.befugnisse.join(', ')
+      : 'Alle Befugnisse entzogen'}, ${ctx.actor})`
   return { recordId: userId }
 }
 

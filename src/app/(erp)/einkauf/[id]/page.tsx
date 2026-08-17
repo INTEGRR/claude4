@@ -8,6 +8,7 @@ import { RecordComments } from '@/components/record-comments'
 import { date, money, qty } from '@/modules/shared/format'
 import {
   addPoLine,
+  approvePo,
   cancelPo,
   confirmPo,
   createBill,
@@ -53,6 +54,21 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   // vorhandene Rechnungen aus früherer Zeit bleiben sichtbar.
   const [{ rechnung_aktiv: rechnungAktiv }] = await sql<{ rechnung_aktiv: boolean }[]>`
     select prozessschritt_aktiv('einkauf_wareneingang_rechnung', 'rechnung') as rechnung_aktiv`
+
+  // Freigabepflicht: das Limit kommt aus den Einstellungen (leer = aus).
+  // Der harte Riegel sitzt an der Statusmaschine — hier nur das Signal.
+  const [freigabe] = await sql<
+    {
+      noetig: boolean
+      limit: number | null
+      freigegeben_von: string | null
+      freigegeben_am: string | null
+    }[]
+  >`
+    select einkauf_freigabe_noetig(${id}) as noetig,
+           (select (value ->> 'einkauf_limit')::numeric from settings where key = 'freigaben') as limit,
+           po.freigegeben_von, po.freigegeben_am
+    from purchase_orders po where po.id = ${id}`
 
   const lines = await sql<
     {
@@ -159,6 +175,34 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
 
       {order.state === 'done' && (
         <div className="notice info">Die Bestellung ist gesperrt. Zum Bearbeiten bitte entsperren.</div>
+      )}
+
+      {/* Freigabe: Signal + Knopf. Wer freigeben darf, entscheidet der
+          Torwächter über die Schritt-Befugnis; der Bestell-Riegel sitzt in
+          der Datenbank — dieser Block macht beides nur sichtbar. */}
+      {editable && freigabe?.noetig && (
+        <div className="notice warn">
+          <div className="row" style={{ alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <span className="led warn" />{' '}
+              <strong>Freigabe erforderlich:</strong> Die Bestellsumme{' '}
+              <span className="mono">{money(order.net)}</span> netto liegt über dem Limit von{' '}
+              <span className="mono">{money(freigabe.limit ?? 0)}</span> — ohne Freigabe lässt
+              sich nicht bestellen. Positionsänderungen lassen eine Freigabe erlöschen.
+            </div>
+            <div className="shrink">
+              <ActionButton className="primary" action={approvePo.bind(null, id)}>
+                Freigeben
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
+      {editable && freigabe?.freigegeben_am && (
+        <div className="notice success">
+          <span className="led ok" /> Freigegeben von {freigabe.freigegeben_von} am{' '}
+          {date(freigabe.freigegeben_am)}.
+        </div>
       )}
 
       <Card title="Details">

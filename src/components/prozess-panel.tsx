@@ -21,10 +21,13 @@ export async function ProzessPanel({
   prozessCode,
   recordId,
   rolle,
+  befugnisse = [],
 }: {
   prozessCode: string
   recordId: string
   rolle: Role
+  /** Personengebundene Zusatzrechte des Betrachters (users.befugnisse). */
+  befugnisse?: string[]
 }) {
   const [prozess] = await sql<{ id: string; name: string; beschreibung: string | null }[]>`
     select id, name, beschreibung from prozesse where code = ${prozessCode} and aktiv`
@@ -64,7 +67,7 @@ export async function ProzessPanel({
   }
 
   const diagramm = await flowLayout(schritte, kanten, standort?.schritt)
-  const { angebote, passiv } = await naechsteAngebote(prozessCode, recordId, rolle)
+  const { angebote, passiv } = await naechsteAngebote(prozessCode, recordId, rolle, befugnisse)
 
   return (
     <Card title={`Prozess: ${prozess.name}`}>

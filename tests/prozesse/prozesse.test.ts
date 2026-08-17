@@ -195,6 +195,61 @@ describe('Chamäleon: Konsistenz-Wächter für Teilprozesse', () => {
   })
 })
 
+// Schritt-Befugnisse: der Freigabe-Schritt im Einkaufsprozess verlangt
+// 'einkauf:freigabe' — der Torwächter erzwingt das auf JEDEM Transportweg,
+// nicht nur im Prozess-Panel. Admin besteht immer.
+describe('Schritt-Befugnisse am Torwächter', () => {
+  let poId: string
+
+  before(async () => {
+    const [vendor] = await h.sql<{ id: string }[]>`
+      insert into partners (name, is_vendor) values ('Befugnis-Test GmbH', true) returning id`
+    const [po] = await h.sql<{ id: string }[]>`
+      insert into purchase_orders (number, vendor_id)
+      values (next_sequence('purchase'), ${vendor.id}) returning id`
+    poId = po.id
+  })
+
+  test('ohne Befugnis wird die Freigabe verweigert — mit Befugnis läuft sie', async () => {
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einkauf.bestellung_freigeben',
+        { recordId: poId },
+        { name: 'buero', role: 'mitarbeiter' },
+      ),
+      (err: unknown) => err instanceof AktionsFehler && /Befugnis/.test(String(err)),
+      'Bereichsrecht allein reicht nicht — der Schritt verlangt die Befugnis',
+    )
+
+    const ergebnis = await aktionAusfuehrenGeprueft(
+      'einkauf.bestellung_freigeben',
+      { recordId: poId },
+      { name: 'supervisor', role: 'mitarbeiter', befugnisse: ['einkauf:freigabe'] },
+    )
+    assert.match(ergebnis.text ?? '', /freigegeben/i)
+
+    const [po] = await h.sql<{ freigegeben_von: string }[]>`
+      select freigegeben_von from purchase_orders where id = ${poId}`
+    assert.equal(po.freigegeben_von, 'supervisor')
+  })
+
+  test('Admin besteht die Befugnisprüfung immer', async () => {
+    const [vendor] = await h.sql<{ id: string }[]>`
+      select id from partners where name = 'Befugnis-Test GmbH'`
+    const [po2] = await h.sql<{ id: string }[]>`
+      insert into purchase_orders (number, vendor_id)
+      values (next_sequence('purchase'), ${vendor.id}) returning id`
+    await aktionAusfuehrenGeprueft(
+      'einkauf.bestellung_freigeben',
+      { recordId: po2.id },
+      { name: 'chefin', role: 'admin' },
+    )
+    const [po] = await h.sql<{ freigegeben_von: string }[]>`
+      select freigegeben_von from purchase_orders where id = ${po2.id}`
+    assert.equal(po.freigegeben_von, 'chefin')
+  })
+})
+
 // Der ganze Chamäleon-Bogen: die KI entwirft einen Prozess (nur als Entwurf),
 // der Mensch aktiviert nach Prüfung — und der designte Prozess läuft sofort
 // auf generischen Vorgängen, ohne eine Zeile neuen Codes.

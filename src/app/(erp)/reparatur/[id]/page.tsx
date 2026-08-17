@@ -146,7 +146,7 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
         <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
       </div>
 
-      <ProzessPanel prozessCode="reparatur" recordId={id} rolle={user.role} />
+      <ProzessPanel prozessCode="reparatur" recordId={id} rolle={user.role} befugnisse={user.befugnisse} />
 
       {/* Der Rohtext des Kunden — am Arbeitsplatz gelesen, darum als Geräteanzeige. */}
       {repair.note && (

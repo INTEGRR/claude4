@@ -31,6 +31,10 @@ export async function removePoLine(orderId: string, lineId: string): Promise<Act
   })
 }
 
+export async function approvePo(orderId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.bestellung_freigeben', { recordId: orderId })
+}
+
 export async function confirmPo(orderId: string): Promise<ActionResult> {
   return serverAktion('einkauf.bestaetigen', { recordId: orderId })
 }

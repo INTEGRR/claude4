@@ -149,6 +149,11 @@ export const EINSTELLUNGEN = {
               .optional()
               .describe('Belegzustand nach dem Schritt (je Version eindeutig)'),
             rollen: z.array(z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung'])).optional(),
+            befugnis: z
+              .string()
+              .max(60)
+              .optional()
+              .describe('Verlangte Benutzer-Befugnis, z. B. einkauf:freigabe (Torwächter prüft hart)'),
             params: z
               .record(z.unknown())
               .optional()
@@ -315,6 +320,24 @@ export const EINSTELLUNGEN = {
       'Aktiviert oder deaktiviert ein Konto; beim Deaktivieren enden laufende Sitzungen sofort.',
     bindung: 'beleg',
     schema: z.object({ active: z.boolean() }),
+    revalidate: ['/einstellungen/benutzer'],
+  },
+
+  'einstellungen.benutzer_befugnisse': {
+    label: 'Befugnisse setzen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Setzt die personengebundenen Befugnisse eines Benutzers (z. B. „Bestellungen ' +
+      'freigeben") — Prozessschritte verlangen sie, der Torwächter prüft sie.',
+    bindung: 'beleg',
+    schema: z.object({
+      befugnisse: z.array(z.enum(['einkauf:freigabe'])).default([]),
+    }),
+    formdata: (fd) => ({
+      befugnisse: fd.getAll('befugnisse').map(String).filter(Boolean),
+    }),
     revalidate: ['/einstellungen/benutzer'],
   },
 

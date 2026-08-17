@@ -578,6 +578,33 @@ Teilprozess-Kanten sind harte Abhängigkeiten. Zwei Wächter in
 Der statische Vollständigkeitstest prüft dieselbe Invariante am
 Auslieferungszustand; die Wächter halten sie unter Laufzeit-Schaltungen.
 
+## Befugnisse + Bestellfreigabe (Migration 0056, umgesetzt)
+
+Rechte auf Prozessschritte, personengebunden — die Bereichsmatrix bleibt
+der Sicherheitsboden darunter:
+
+- **users.befugnisse** (z. B. `einkauf:freigabe`): Zusatzrechte je
+  Benutzer, vergeben in der Benutzerverwaltung (Katalog in
+  `permissions.ts` → BEFUGNISSE). Orthogonal zur Rolle — ein
+  Büro-Mitarbeiter kann Freigeber sein, ein anderer nicht.
+- **prozess_schritte.befugnis** (+ Override je Firma): ein Schritt kann
+  neben `rollen` eine Befugnis verlangen. Der **Torwächter erzwingt das
+  hart auf jedem Transportweg** (Knopf auf der Belegseite, /api/aktion,
+  KI-Chat) — nicht nur im Prozess-Panel. Admin besteht immer. Die
+  Versionskopie nimmt die Spalte mit; der KI-Entwurf kann sie setzen.
+- **Pilot Bestellfreigabe**: Limit als Einstellung
+  (`settings freigaben.einkauf_limit`, netto; leer = aus — nichts ist
+  hartkodiert, Pflege auf /einstellungen). Der Riegel sitzt als Trigger
+  an der Statusmaschine: draft/sent → purchase geht über dem Limit nur
+  mit vorliegender Freigabe. `purchase_order_approve()` gibt frei (einmal,
+  nur offene Bestellungen, mit Audit); Positionsänderungen lassen die
+  Freigabe erlöschen — freigegeben wurde eine Summe, kein Beleg. Der
+  Schritt „Bestellung freigeben" (Einkauf V6, optional, Befugnis
+  `einkauf:freigabe`) macht das im Diagramm sichtbar und konfigurierbar.
+
+Jede künftige Freigabe (Gutschrift, Rabatt, Fertigungsstorno) ist damit
+nur noch: Befugnis in den Katalog, Schritt mit Befugnis in den Prozess.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

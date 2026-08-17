@@ -45,6 +45,7 @@ export async function naechsteAngebote(
   prozessCode: string,
   recordId: string,
   rolle: Role,
+  befugnisse: string[] = [],
 ): Promise<NaechsteSchritte> {
   const naechste = await sql<
     {
@@ -58,6 +59,20 @@ export async function naechsteAngebote(
   >`
     select code, name, art::text as art, aktion, rollen, params
     from prozess_naechste_schritte(${prozessCode}, ${recordId})`
+
+  // Schritt-Befugnisse (Override vor Schrittdefinition) — die Traversierung
+  // liefert sie nicht mit, deshalb einmal je Prozess nachgeladen.
+  const befugnisJeSchritt = new Map(
+    (
+      await sql<{ code: string; befugnis: string | null }[]>`
+        select s.code, coalesce(o.befugnis, s.befugnis) as befugnis
+        from prozesse p
+        join prozess_schritte s on s.version_id = prozess_aktive_version(p.code)
+        left join prozess_overrides o
+          on o.prozess_code = p.code and o.schritt_code = s.code
+        where p.code = ${prozessCode}`
+    ).map((r) => [r.code, r.befugnis]),
+  )
 
   const angebote: SchrittAngebot[] = []
   const passiv: NaechsteSchritte['passiv'] = []
@@ -96,9 +111,13 @@ export async function naechsteAngebote(
         quellen.add(feld.quelle)
       }
     }
+    // Admin besteht Rollen- und Befugnisprüfung immer (wie im Torwächter).
+    const befugnis = befugnisJeSchritt.get(s.code) ?? null
     const erlaubt =
-      (!s.rollen || s.rollen.length === 0 || s.rollen.includes(rolle)) &&
-      aktionErlaubt(eintrag, rolle)
+      aktionErlaubt(eintrag, rolle) &&
+      (rolle === 'admin' ||
+        ((!s.rollen || s.rollen.length === 0 || s.rollen.includes(rolle)) &&
+          (!befugnis || befugnisse.includes(befugnis))))
     angebote.push({
       code: s.code,
       name: s.name,
@@ -107,7 +126,11 @@ export async function naechsteAngebote(
       vorbelegung,
       optionen: {},
       erlaubt,
-      hinweis: erlaubt ? s.aktion : 'Für Ihre Rolle nicht freigegeben',
+      hinweis: erlaubt
+        ? s.aktion
+        : befugnis && !befugnisse.includes(befugnis)
+          ? 'Braucht eine Befugnis aus der Benutzerverwaltung'
+          : 'Für Ihre Rolle nicht freigegeben',
     })
   }
 
