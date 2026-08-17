@@ -64,8 +64,8 @@ export async function snoozeOrderpoint(orderpointId: string, days: number) {
   })
 }
 
-export async function executeOrderpoint(orderpointId: string) {
-  return serverAktion('lager.beschaffung_ausfuehren', { recordId: orderpointId })
+export async function executeOrderpoint(orderpointId: string, formData?: FormData) {
+  return serverAktion('lager.beschaffung_ausfuehren', { recordId: orderpointId, formData })
 }
 
 export async function wakeOrderpoint(orderpointId: string) {

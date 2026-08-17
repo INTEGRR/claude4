@@ -165,9 +165,12 @@ export async function meldebestandWecken(_p: object, ctx: AktionsKontext): Promi
  * Rückmeldung muss trotzdem sagen, welcher Beleg entstanden ist, damit der
  * Weg dorthin klickbar bleibt.
  */
-export async function beschaffungAusfuehren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+export async function beschaffungAusfuehren(
+  p: { menge?: number },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
   const [row] = await sql<{ orderpoint_execute: string }[]>`
-    select orderpoint_execute(${ctx.recordId!}, ${ctx.actor})`
+    select orderpoint_execute(${ctx.recordId!}, ${ctx.actor}, ${p.menge ?? null})`
   const beleg = row.orderpoint_execute
 
   const istFertigung = beleg.startsWith('MO/')

@@ -236,10 +236,17 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung:
       'Führt einen Beschaffungsvorschlag aus: Position in eine Entwurfs-Bestellung ' +
-      'aufnehmen oder einen Fertigungsauftrag anlegen und bestätigen.',
+      'aufnehmen oder einen Fertigungsauftrag anlegen und bestätigen. Ohne menge gilt ' +
+      'die empfohlene Menge (auf die Mindestbestellmenge des Lieferanten angehoben); ' +
+      'Kaufmengen unter der MOQ werden abgelehnt.',
     bindung: 'beleg',
     modell: 'stock_orderpoint',
-    schema: z.object({}),
+    schema: z.object({
+      menge: z.number().positive().optional(),
+    }),
+    formdata: (fd) => ({
+      menge: fd.get('menge') ? Number(fd.get('menge')) : undefined,
+    }),
     revalidate: ['/lager/beschaffung', '/einkauf', '/fertigung'],
   },
 

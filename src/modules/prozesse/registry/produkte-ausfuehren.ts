@@ -197,6 +197,50 @@ export async function attributAnlegen(p: {
   return { text: `Attribut „${p.name}" mit ${p.werte.length} Wert(en) angelegt.` }
 }
 
+export async function lieferantenpreisAnlegen(
+  p: {
+    vendor_id: string
+    preis: number
+    rabatt: number
+    moq: number
+    lieferzeit_tage: number
+    gueltig_von?: string
+    gueltig_bis?: string
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [vendor] = await sql<{ name: string }[]>`
+    select name from partners where id = ${p.vendor_id} and is_vendor`
+  if (!vendor) throw new Error('Der gewählte Kontakt ist kein Lieferant.')
+
+  await sql`
+    insert into vendor_prices (vendor_id, template_id, price, discount, min_qty,
+                               lead_time_days, date_start, date_end)
+    values (${p.vendor_id}, ${ctx.recordId!}, ${p.preis}, ${p.rabatt}, ${p.moq},
+            ${p.lieferzeit_tage}, ${p.gueltig_von ?? null}, ${p.gueltig_bis ?? null})`
+  await sql`select log_event('product_template', ${ctx.recordId!}, 'note',
+    ${`Lieferantenpreis: ${vendor.name} ab ${p.moq} Stück zu ${p.preis.toFixed(2)} €` +
+      (p.rabatt > 0 ? ` (−${p.rabatt} %)` : '')}, ${ctx.actor})`
+  return {
+    text: `Staffel für ${vendor.name} angelegt${p.moq > 0 ? ` (ab ${p.moq})` : ''}.`,
+    recordId: ctx.recordId,
+  }
+}
+
+export async function lieferantenpreisLoeschen(
+  p: { preis_id: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // template_id-Scope: eine fremde Preiszeile lässt sich über diese Aktion
+  // nicht löschen, auch nicht mit geratener ID.
+  const [zeile] = await sql<{ id: string }[]>`
+    delete from vendor_prices
+    where id = ${p.preis_id} and template_id = ${ctx.recordId!}
+    returning id`
+  if (!zeile) throw new Error('Diese Preiszeile gehört nicht zu diesem Produkt.')
+  return { text: 'Preiszeile entfernt.', recordId: ctx.recordId }
+}
+
 export async function zuShopify(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   const { pushProduktZuShopify } = await import('@/modules/integrationen/produkt-push')
   const r = await pushProduktZuShopify(ctx.recordId!)

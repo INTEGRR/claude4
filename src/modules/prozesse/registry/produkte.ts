@@ -178,6 +178,51 @@ export const PRODUKTE = {
     revalidate: ['/produkte/attribute'],
   },
 
+  'produkte.lieferantenpreis_anlegen': {
+    label: 'Lieferantenpreis anlegen',
+    bereich: 'produkte',
+    beschreibung:
+      'Preisliste je Lieferant am Produkt: je Zeile eine Staffel ab Mindestmenge (MOQ), ' +
+      'mit Rabatt, Lieferzeit und Gültigkeit. Die Beschaffung empfiehlt Mengen ab der ' +
+      'MOQ und zieht den Staffelpreis der bestellten Menge.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      vendor_id: z.string().min(1, 'Bitte einen Lieferanten auswählen'),
+      preis: z.number().nonnegative(),
+      rabatt: z.number().min(0).max(100).default(0),
+      moq: z.number().nonnegative().default(0),
+      lieferzeit_tage: z.number().int().nonnegative().default(0),
+      gueltig_von: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      gueltig_bis: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }),
+    formdata: (fd) => ({
+      vendor_id: String(fd.get('vendor_id') ?? ''),
+      preis: Number(fd.get('preis') ?? 0),
+      rabatt: Number(fd.get('rabatt') ?? 0),
+      moq: Number(fd.get('moq') ?? 0),
+      lieferzeit_tage: Number(fd.get('lieferzeit_tage') ?? 0),
+      gueltig_von: String(fd.get('gueltig_von') ?? '') || undefined,
+      gueltig_bis: String(fd.get('gueltig_bis') ?? '') || undefined,
+    }),
+    revalidate: ['/produkte/:id', '/lager/beschaffung'],
+  },
+
+  'produkte.lieferantenpreis_loeschen': {
+    label: 'Lieferantenpreis löschen',
+    bereich: 'produkte',
+    beschreibung: 'Entfernt eine Staffelzeile aus der Lieferanten-Preisliste des Produkts.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      preis_id: z.string().min(1),
+    }),
+    formdata: (fd) => ({
+      preis_id: String(fd.get('preis_id') ?? ''),
+    }),
+    revalidate: ['/produkte/:id', '/lager/beschaffung'],
+  },
+
   'produkte.zu_shopify': {
     label: 'In Shopify anlegen',
     bereich: 'produkte',

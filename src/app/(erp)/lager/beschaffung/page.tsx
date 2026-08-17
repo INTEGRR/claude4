@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
+import { MengenWahl } from '@/components/mengen-wahl'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, qty, money } from '@/modules/shared/format'
 import Link from 'next/link'
@@ -35,9 +36,18 @@ export default async function BeschaffungPage() {
       qty_to_order: number
       route: string | null
       vendor_name: string | null
+      moq: number | null
+      qty_empfohlen: number
       unit_price: number | null
+      staffeln: { min_qty: number; netto: number }[]
     }[]
-  >`select * from orderpoint_suggestions()`
+  >`
+    select s.*,
+           coalesce((select json_agg(json_build_object('min_qty', st.min_qty, 'netto', st.netto)
+                                     order by st.min_qty)
+                     from vendor_staffeln(s.variant_id, s.vendor_id) st), '[]'::json)
+             as staffeln
+    from orderpoint_suggestions() s`
 
   // Was aus früheren Klicks schon offen ist. Der offene Zulauf zählt seit
   // 0053 in die Vorschlagsrechnung (ausgeführte Vorschläge verschwinden) —
@@ -130,7 +140,16 @@ export default async function BeschaffungPage() {
                     <td className="num small muted">
                       {qty(v.min_qty)} / {qty(v.max_qty)}
                     </td>
-                    <td className="num mono">{qty(v.qty_to_order)}</td>
+                    <td className="num">
+                      <span className="mono">{qty(v.qty_to_order)}</span>
+                      {/* MOQ hebt nur die EMPFEHLUNG an — der rechnerische
+                          Bedarf bleibt sichtbar, entschieden wird rechts. */}
+                      {v.moq != null && v.qty_empfohlen > v.qty_to_order && (
+                        <div className="small muted nowrap">
+                          MOQ {qty(v.moq)} → empfohlen {qty(v.qty_empfohlen)}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <span className="badge neutral">
                         {v.route === 'manufacture' ? 'Fertigen' : 'Einkaufen'}
@@ -162,13 +181,34 @@ export default async function BeschaffungPage() {
                       )}
                     </td>
                     <td className="num">
-                      <div className="actions">
-                        <ActionButton
-                          className="small primary"
-                          action={executeOrderpoint.bind(null, v.orderpoint_id)}
-                        >
-                          {v.route === 'manufacture' ? 'Fertigungsauftrag' : 'Bestellen'}
-                        </ActionButton>
+                      {/* Menge wird ABGEFRAGT, nicht stumm angehoben: das Feld
+                          trägt die Empfehlung, die Chips begründen Alternativen
+                          (günstigere Staffelgrenzen), entschieden wird hier. */}
+                      <ActionForm action={executeOrderpoint.bind(null, v.orderpoint_id)}>
+                        <div className="row" style={{ alignItems: 'flex-start', gap: 6, flexWrap: 'nowrap' }}>
+                          <MengenWahl
+                            vorgabe={Number(v.qty_empfohlen)}
+                            optionen={(v.staffeln ?? [])
+                              .filter(
+                                (st) =>
+                                  Number(st.min_qty) > Number(v.qty_empfohlen) &&
+                                  v.unit_price != null &&
+                                  Number(st.netto) < Number(v.unit_price),
+                              )
+                              .map((st) => ({
+                                menge: Number(st.min_qty),
+                                label: `ab ${qty(Number(st.min_qty))}: ${money(Number(st.netto))}`,
+                                hinweis: `Staffelpreis — spart ${Math.round((1 - Number(st.netto) / Number(v.unit_price!)) * 100)} % je Stück`,
+                              }))}
+                          />
+                          <div className="shrink">
+                            <button className="small primary" type="submit">
+                              {v.route === 'manufacture' ? 'Fertigungsauftrag' : 'Bestellen'}
+                            </button>
+                          </div>
+                        </div>
+                      </ActionForm>
+                      <div className="actions" style={{ marginTop: 6, justifyContent: 'flex-end' }}>
                         <ActionButton
                           className="small"
                           action={snoozeOrderpoint.bind(null, v.orderpoint_id, 7)}

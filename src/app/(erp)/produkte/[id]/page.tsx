@@ -5,7 +5,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
-import { addAttribute, produktZuShopify, updateProduct } from '../actions'
+import { addAttribute, addVendorPrice, deleteVendorPrice, produktZuShopify, updateProduct } from '../actions'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 import { RecordComments } from '@/components/record-comments'
@@ -100,6 +100,32 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const boms = await sql<{ id: string; lines: number }[]>`
     select b.id, (select count(*) from bom_lines l where l.bom_id = b.id)::int as lines
     from boms b where b.template_id = ${id} and b.active`
+
+  // Lieferanten-Preisliste mit Staffeln: je Zeile eine Mindestmenge (MOQ) —
+  // die Beschaffung empfiehlt Mengen ab der MOQ und zieht den Staffelpreis.
+  const lieferantenpreise = await sql<
+    {
+      id: string
+      vendor: string
+      min_qty: number
+      price: number
+      discount: number
+      netto: number
+      lead_time_days: number
+      date_start: string | null
+      date_end: string | null
+    }[]
+  >`
+    select vp.id, p.name as vendor, vp.min_qty, vp.price, vp.discount,
+           vendor_price_net(vp.price, vp.discount) as netto,
+           vp.lead_time_days, vp.date_start::text, vp.date_end::text
+    from vendor_prices vp
+    join partners p on p.id = vp.vendor_id
+    where vp.template_id = ${id}
+    order by p.name, vp.min_qty`
+
+  const lieferanten = await sql<{ id: string; name: string }[]>`
+    select id, name from partners where is_vendor and active order by name limit 500`
 
   return (
     <>
@@ -322,6 +348,103 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </Card>
+
+      {/* Preisliste je Lieferant — sichtbar, sobald das Produkt einkaufbar
+          ist oder Zeilen existieren (Daten verschwinden nicht mit dem Haken). */}
+      {(tpl.can_be_purchased || lieferantenpreise.length > 0) && (
+        <Card title="Lieferantenpreise & Staffeln">
+          {lieferantenpreise.length > 0 && (
+            <TableWrap>
+              <table style={{ marginBottom: 16 }}>
+                <thead>
+                  <tr>
+                    <th>Lieferant</th>
+                    <th className="num">ab Menge (MOQ)</th>
+                    <th className="num">Preis</th>
+                    <th className="num">Rabatt</th>
+                    <th className="num">Netto</th>
+                    <th className="num">Lieferzeit</th>
+                    <th>Gültig</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {lieferantenpreise.map((z) => (
+                    <tr key={z.id}>
+                      <td>{z.vendor}</td>
+                      <td className="num mono">{qty(z.min_qty)}</td>
+                      <td className="num mono">{Number(z.price).toFixed(2)} €</td>
+                      <td className="num">{Number(z.discount) > 0 ? `${qty(z.discount)} %` : '—'}</td>
+                      <td className="num mono">{Number(z.netto).toFixed(2)} €</td>
+                      <td className="num">{z.lead_time_days > 0 ? `${z.lead_time_days} Tage` : '—'}</td>
+                      <td className="small muted nowrap">
+                        {z.date_start || z.date_end
+                          ? `${z.date_start ?? '…'} – ${z.date_end ?? '…'}`
+                          : 'unbegrenzt'}
+                      </td>
+                      <td className="num">
+                        <ActionButton
+                          className="small danger"
+                          action={deleteVendorPrice.bind(null, id, z.id)}
+                          confirm="Diese Preiszeile löschen?"
+                        >
+                          Löschen
+                        </ActionButton>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+
+          <ActionForm action={addVendorPrice.bind(null, id)}>
+            <div className="row" style={{ alignItems: 'flex-end' }}>
+              <label className="field" style={{ flex: 2 }}>
+                <span>Lieferant</span>
+                <select name="vendor_id" required defaultValue="">
+                  <option value="" disabled>— auswählen —</option>
+                  {lieferanten.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>ab Menge (MOQ)</span>
+                <input type="number" name="moq" step="0.001" min="0" defaultValue={0} />
+              </label>
+              <label className="field">
+                <span>Preis netto</span>
+                <input type="number" name="preis" step="0.01" min="0" required />
+              </label>
+              <label className="field">
+                <span>Rabatt %</span>
+                <input type="number" name="rabatt" step="0.1" min="0" max="100" defaultValue={0} />
+              </label>
+              <label className="field">
+                <span>Lieferzeit (Tage)</span>
+                <input type="number" name="lieferzeit_tage" step="1" min="0" defaultValue={0} />
+              </label>
+              <label className="field">
+                <span>Gültig von</span>
+                <input type="date" name="gueltig_von" />
+              </label>
+              <label className="field">
+                <span>Gültig bis</span>
+                <input type="date" name="gueltig_bis" />
+              </label>
+              <div className="shrink field">
+                <button className="primary" type="submit">Staffel anlegen</button>
+              </div>
+            </div>
+          </ActionForm>
+          <p className="small muted" style={{ margin: '8px 0 0' }}>
+            Mehrere Zeilen je Lieferant bilden Preisstaffeln: die Zeile mit der höchsten
+            erreichten Mindestmenge gilt. Die Beschaffung empfiehlt Mengen ab der MOQ
+            und rechnet mit dem Staffelpreis der bestellten Menge.
+          </p>
+        </Card>
+      )}
 
       <Card title="Attribute & Varianten">
         {attributes.length > 0 && (

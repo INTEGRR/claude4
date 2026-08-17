@@ -47,3 +47,14 @@ export async function createAttribute(formData: FormData): Promise<ActionResult>
 export async function produktZuShopify(templateId: string): Promise<ActionResult> {
   return serverAktion('produkte.zu_shopify', { recordId: templateId })
 }
+
+export async function addVendorPrice(templateId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('produkte.lieferantenpreis_anlegen', { recordId: templateId, formData })
+}
+
+export async function deleteVendorPrice(templateId: string, preisId: string): Promise<ActionResult> {
+  return serverAktion('produkte.lieferantenpreis_loeschen', {
+    recordId: templateId,
+    parameter: { preis_id: preisId },
+  })
+}

@@ -150,6 +150,67 @@ describe('Meldebestände (0015)', () => {
     })
   })
 
+  // BUG/00006: MOQ und Preisstaffeln aus vendor_prices fließen in Vorschlag
+  // und Ausführung — angehoben wird die EMPFEHLUNG, entschieden der Benutzer.
+  test('MOQ: Empfehlung wird angehoben, Bestellen darunter scheitert', async () => {
+    await withRollback(async (t) => {
+      const s = await orderpointScenario(t)
+      await t`update vendor_prices set min_qty = 500 where vendor_id = ${s.vendorId}`
+
+      const [v] = await t<
+        { qty_to_order: number; moq: number; qty_empfohlen: number; unit_price: number }[]
+      >`select qty_to_order, moq, qty_empfohlen, unit_price
+        from orderpoint_suggestions() where orderpoint_id = ${s.orderpointId}`
+      assert.equal(Number(v.qty_to_order), 175, 'berechneter Bedarf bleibt sichtbar')
+      assert.equal(Number(v.moq), 500)
+      assert.equal(Number(v.qty_empfohlen), 500, 'Empfehlung auf MOQ angehoben')
+      assert.equal(Number(v.unit_price), 1.8, 'Preis der Staffel ab 500')
+
+      await assert.rejects(
+        t.savepoint(async (sp) => {
+          await sp`select orderpoint_execute(${s.orderpointId}, 'test', 175)`
+        }),
+        /Mindestbestellmenge/,
+        'unter MOQ wird nicht bestellt',
+      )
+
+      // Ohne Wunschmenge gilt die Empfehlung (500).
+      const [nummer] = await t<{ orderpoint_execute: string }[]>`
+        select orderpoint_execute(${s.orderpointId}, 'test')`
+      const [zeile] = await t<{ qty: number }[]>`
+        select l.qty from purchase_order_lines l
+        join purchase_orders po on po.id = l.order_id
+        where po.number = ${nummer.orderpoint_execute}`
+      assert.equal(Number(zeile.qty), 500)
+    })
+  })
+
+  test('Staffelpreise: Wunschmenge zieht den Preis ihrer Staffel', async () => {
+    await withRollback(async (t) => {
+      const s = await orderpointScenario(t)
+      // Zweite Staffel: ab 1000 Stück 1,50 € ohne Rabatt.
+      await t`insert into vendor_prices (vendor_id, template_id, price, min_qty)
+              select ${s.vendorId}, pv.template_id, 1.50, 1000
+              from product_variants pv where pv.id = ${s.variantId}`
+
+      const staffeln = await t<{ min_qty: number; netto: number }[]>`
+        select min_qty, netto from vendor_staffeln(${s.variantId}, ${s.vendorId})`
+      assert.deepEqual(
+        staffeln.map((r) => [Number(r.min_qty), Number(r.netto)]),
+        [[0, 1.8], [1000, 1.5]],
+      )
+
+      const [nummer] = await t<{ orderpoint_execute: string }[]>`
+        select orderpoint_execute(${s.orderpointId}, 'test', 1000)`
+      const [zeile] = await t<{ qty: number; price_unit: number }[]>`
+        select l.qty, l.price_unit from purchase_order_lines l
+        join purchase_orders po on po.id = l.order_id
+        where po.number = ${nummer.orderpoint_execute}`
+      assert.equal(Number(zeile.qty), 1000)
+      assert.equal(Number(zeile.price_unit), 1.5, 'Preis aus der 1000er-Staffel')
+    })
+  })
+
   test('Ausführung (manufacture): bestätigter Fertigungsauftrag mit Herkunft', async () => {
     await withRollback(async (t) => {
       const s = await orderpointScenario(t, { route: 'manufacture' })

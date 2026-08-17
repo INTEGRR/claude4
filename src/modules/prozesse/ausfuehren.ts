@@ -119,6 +119,8 @@ export const AUSFUEHRUNG = {
   'produkte.attribut_zuweisen': produkte.attributZuweisen,
   'produkte.variante_codes': produkte.varianteCodes,
   'produkte.attribut_anlegen': produkte.attributAnlegen,
+  'produkte.lieferantenpreis_anlegen': produkte.lieferantenpreisAnlegen,
+  'produkte.lieferantenpreis_loeschen': produkte.lieferantenpreisLoeschen,
   'produkte.zu_shopify': produkte.zuShopify,
 
   'reparatur.auftrag_anlegen': reparatur.auftragAnlegen,
