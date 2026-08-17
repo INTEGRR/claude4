@@ -365,3 +365,25 @@ export async function vertragZahlen(
       'vertrag', ${ctx.recordId!}, null, ${ctx.actor})`
   return { recordId: ctx.recordId, text: 'Vertragszahlung erfasst.' }
 }
+
+export async function planSetzen(
+  p: { monat: string; szenario: 'best' | 'base' | 'worst'; umsatz_netto: number },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`select plan_setzen(${p.monat}, ${p.szenario}, ${p.umsatz_netto}, ${ctx.actor})`
+  return {
+    text: `Planumsatz ${p.monat.slice(0, 7)} (${p.szenario}) gesetzt.`,
+    link: '/finanzen/plan',
+  }
+}
+
+export async function planVorschlagUebernehmen(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ n: number }[]>`select umsatzplan_fuellen(${ctx.actor}) as n`
+  return {
+    text: `Umsatzplan-Vorschläge für ${row.n} Monate aktualisiert.`,
+    link: '/finanzen/plan',
+  }
+}

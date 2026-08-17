@@ -406,5 +406,36 @@ export const FINANZEN = {
     }),
     revalidate: ['/finanzen/steuern', '/finanzen'],
   },
+
+  // --- Umsatzplan + Prognose (0061) ----------------------------------------
+
+  'finanzen.plan_setzen': {
+    label: 'Planumsatz setzen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Setzt den Planumsatz (netto) eines Monats und Szenarios von Hand — die Zeile wird von der Vorschlags-Automatik nie wieder überschrieben.',
+    bindung: 'frei',
+    prozessfrei: true,
+    ki: true,
+    schema: z.object({
+      monat: DATUM,
+      szenario: z.enum(['best', 'base', 'worst']).default('base'),
+      umsatz_netto: z.number().min(0, 'Der Planumsatz darf nicht negativ sein'),
+    }),
+    zusammenfassung: (p) =>
+      `Planumsatz ${p.monat.slice(0, 7)} (${p.szenario}) auf ${p.umsatz_netto} € setzen`,
+    revalidate: ['/finanzen/plan', '/finanzen'],
+  },
+
+  'finanzen.plan_vorschlag_uebernehmen': {
+    label: 'Umsatzplan-Vorschläge aktualisieren',
+    bereich: 'finanzen',
+    beschreibung:
+      'Rechnet die Vorschlagswerte (Vorjahresmonat × Trend, Band aus Best/Worst-Aufschlag) für laufenden Monat + 12 Folgemonate neu. Handeingaben bleiben stehen.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/finanzen/plan', '/finanzen'],
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

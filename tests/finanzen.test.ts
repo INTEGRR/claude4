@@ -382,3 +382,202 @@ describe('Finanzen: Zahlungsregister', () => {
     })
   })
 })
+
+/**
+ * Ausbaustufe 4 (0061): Umsatzplan + finanz_prognose. Die Prüffälle des
+ * Deckungskontos laufen auf einer NEUTRALISIERTEN Datenlage: alle laufenden
+ * Belege/Verträge/Darlehen werden in der Transaktion stillgelegt (Rollback
+ * macht alles rückgängig), damit die Fixtures die einzige Geldquelle sind.
+ */
+
+async function prognoseLeeren(t: TransactionSql) {
+  await t`update settings set value = value || ${JSON.stringify({
+    wareneinsatz_pct: 30, versand_pct: 6, fees_pct: 3,
+    ust_satz_pct: 19, ust_zahltag: 10, ust_frist_monate: 1, ust_zahllast_quote_pct: 8,
+    shopify_versatz_tage: 0, rechnung_versatz_tage: 14,
+    best_aufschlag_pct: 15, worst_abschlag_pct: 20, liquiditaets_puffer: 0,
+  })}::jsonb where key = 'finanzen'`
+  await t`update settings set value = '{}'::jsonb where key = 'freigaben'`
+  await t`delete from umsatzplan`
+  await t`delete from zahlungen`
+  await t`delete from zahlplan_raten`
+  await t`update vendor_bills set state = 'paid' where state = 'posted'`
+  await t`update purchase_orders set state = 'done' where state in ('draft', 'sent', 'purchase')`
+  await t`update vertraege set status = 'beendet'`
+  await t`update darlehen set status = 'getilgt'`
+  await t`update steuerzahlungen set bezahlt_am = current_date where bezahlt_am is null`
+  await t`update product_variants set valuation_total = 0 where valuation_total <> 0`
+}
+
+interface PrognoseZeile {
+  periode_start: string
+  periode_ende: string
+  einzahlungen: number
+  aus_bestellungen: number
+  aus_vertraegen: number
+  aus_darlehen: number
+  aus_steuern: number
+  aus_variable_quote: number
+  endsaldo: number
+}
+
+async function prognose(t: TransactionSql, raster = 'monat'): Promise<PrognoseZeile[]> {
+  return t<PrognoseZeile[]>`
+    select periode_start::text, periode_ende::text, einzahlungen, aus_bestellungen,
+           aus_vertraegen, aus_darlehen, aus_steuern, aus_variable_quote, endsaldo
+    from finanz_prognose('base', ${raster})`
+}
+
+const summe = (zeilen: PrognoseZeile[], spalte: keyof PrognoseZeile) =>
+  zeilen.reduce((s, z) => s + Number(z[spalte]), 0)
+
+function assertNah(ist: number, soll: number, was: string, toleranz = 1) {
+  assert.ok(
+    Math.abs(ist - soll) <= toleranz,
+    `${was}: erwartet ~${soll}, bekommen ${ist}`,
+  )
+}
+
+/** Planmonat M+1 (voll in der Zukunft, liegt in beiden Rastern komplett im Horizont). */
+async function folgemonat(t: TransactionSql): Promise<string> {
+  const [m] = await t<{ monat: string }[]>`
+    select ((date_trunc('month', current_date) + interval '1 month')::date)::text as monat`
+  return m.monat
+}
+
+describe('Finanzen: Cashflow-Prognose (Deckungskonto)', () => {
+  test('Prüffall 4: nichts vorhanden → volle Quote (Wochen ≙ Monate)', async () => {
+    await withRollback(async (t) => {
+      await prognoseLeeren(t)
+      const m1 = await folgemonat(t)
+      await t`select plan_setzen(${m1}, 'base', 10000, 'test')`
+
+      const monat = await prognose(t)
+      // 30 % Wareneinsatz + 6 % Versand + 3 % Fees = 3 900 € — nichts ist
+      // gedeckt, die Quote trägt alles; konkrete Bestellzahlungen gibt es keine.
+      assertNah(summe(monat, 'aus_variable_quote'), 3900, 'variable Quote (Monat)')
+      assertNah(summe(monat, 'aus_bestellungen'), 0, 'Bestellungen', 0.01)
+
+      // Dasselbe im Wochenraster: der Planmonat liegt komplett in den 13
+      // Wochen, die Summen müssen übereinstimmen (taggenaue Verteilung).
+      const woche = await prognose(t, 'woche')
+      assertNah(
+        summe(woche, 'aus_variable_quote'),
+        summe(monat, 'aus_variable_quote'),
+        'Wochen ≙ Monate (variable Quote)',
+      )
+    })
+  })
+
+  test('Prüffall 1: Ware da + Rechnung offen → nur konkret, Quote gedeckt', async () => {
+    await withRollback(async (t) => {
+      const s = await finanzSzenario(t)
+      const billId = await rechnungZu(t, s.orderId)
+      await prognoseLeeren(t)
+      // Neutralisierung hat die Testrechnung mit stillgelegt — wieder öffnen,
+      // die Bestellung bleibt bestätigt (kein Zulauf: alles empfangen).
+      await t`update vendor_bills set state = 'posted' where id = ${billId}`
+      await t`update purchase_orders set state = 'purchase' where id = ${s.orderId}`
+      await t`update purchase_order_lines set qty_received = qty where order_id = ${s.orderId}`
+      // Ware liegt bewertet im Lager: Deckung = 3 000 € = Wareneinsatz-Soll.
+      await t`update product_variants pv set valuation_total = 3000
+              from purchase_order_lines l
+              where l.order_id = ${s.orderId} and l.variant_id = pv.id`
+      const m1 = await folgemonat(t)
+      await t`select plan_setzen(${m1}, 'base', 10000, 'test')`
+
+      const zeilen = await prognose(t)
+      assertNah(summe(zeilen, 'aus_bestellungen'), 1190, 'offene Rechnung als konkrete Zahlung', 0.01)
+      // Wareneinsatz-Quote 0 (gedeckt), es bleiben Versand + Fees = 900 €.
+      assertNah(summe(zeilen, 'aus_variable_quote'), 900, 'nur umsatzsynchrone Quoten')
+    })
+  })
+
+  test('Prüffall 2: Ware da + Rechnung bezahlt → nichts', async () => {
+    await withRollback(async (t) => {
+      const s = await finanzSzenario(t)
+      await rechnungZu(t, s.orderId)
+      await prognoseLeeren(t)
+      await t`update purchase_orders set state = 'purchase' where id = ${s.orderId}`
+      await t`update purchase_order_lines set qty_received = qty where order_id = ${s.orderId}`
+      await t`update product_variants pv set valuation_total = 3000
+              from purchase_order_lines l
+              where l.order_id = ${s.orderId} and l.variant_id = pv.id`
+      const m1 = await folgemonat(t)
+      await t`select plan_setzen(${m1}, 'base', 10000, 'test')`
+
+      const zeilen = await prognose(t)
+      assertNah(summe(zeilen, 'aus_bestellungen'), 0, 'bezahlte Ware erzeugt keinen Abfluss mehr', 0.01)
+      assertNah(summe(zeilen, 'aus_variable_quote'), 900, 'Quote bleibt gedeckt')
+    })
+  })
+
+  test('Prüffall 3: Container im Zulauf, 30 % gezahlt → nur die offenen 70 % konkret', async () => {
+    await withRollback(async (t) => {
+      const s = await finanzSzenario(t)
+      await prognoseLeeren(t)
+      // Bestellung bestätigt, nichts empfangen: der Zulauf (1 000 € netto)
+      // deckt einen Teil des Solls, den Rest deckt vorhandene Ware.
+      await t`update purchase_orders set state = 'purchase', confirmed_at = now()
+              where id = ${s.orderId}`
+      await t`update product_variants pv set valuation_total = 2000
+              from purchase_order_lines l
+              where l.order_id = ${s.orderId} and l.variant_id = pv.id`
+      const m1 = await folgemonat(t)
+      await t`insert into zahlplan_raten (purchase_order_id, bezeichnung, anteil_pct, ausloeser, bezahlt_am)
+              values (${s.orderId}, 'Anzahlung', 30, 'bestellung', current_date)`
+      await t`insert into zahlplan_raten (purchase_order_id, bezeichnung, anteil_pct, ausloeser, termin)
+              values (${s.orderId}, 'Rest bei Verschiffung', 70, 'termin', ${m1})`
+      await t`select plan_setzen(${m1}, 'base', 10000, 'test')`
+
+      const zeilen = await prognose(t)
+      assertNah(summe(zeilen, 'aus_bestellungen'), 833, 'nur die offene 70-%-Rate zählt')
+      assertNah(summe(zeilen, 'aus_variable_quote'), 900, 'Zulauf + Bestand decken die Warenquote')
+    })
+  })
+
+  test('Vertrag mit Ende im Horizont: Zahlungen stoppen am effektiven Ende', async () => {
+    await withRollback(async (t) => {
+      await prognoseLeeren(t)
+      const [v] = await t<{ id: string; ende: string }[]>`
+        insert into vertraege (nummer, name, kategorie, betrag, intervall, zahltag,
+                               beginn, ende, status)
+        values (next_sequence('vertrag'), 'Testlizenz', 'lizenzen', 500, 'monatlich', 1,
+                (date_trunc('month', current_date) - interval '6 months')::date,
+                (date_trunc('month', current_date) + interval '2 months' + interval '14 days')::date,
+                'aktiv')
+        returning id, ende::text`
+
+      const zeilen = await prognose(t)
+      const horizontEnde = zeilen.at(-1)!.periode_ende
+      const [soll] = await t<{ betrag: number; letzte: string | null }[]>`
+        select coalesce(sum(betrag_eur), 0) as betrag, max(faellig_am)::text as letzte
+        from vertrag_zahlungen_bis(${v.id}, ${horizontEnde})`
+      assert.ok(Number(soll.betrag) >= 500, 'mindestens eine Vertragszahlung im Horizont')
+      assertNah(summe(zeilen, 'aus_vertraegen'), Number(soll.betrag), 'Verträge fließen vollständig ein', 0.01)
+      assert.ok(
+        soll.letzte !== null && soll.letzte <= v.ende,
+        `keine Zahlung nach dem Vertragsende (letzte: ${soll.letzte}, Ende: ${v.ende})`,
+      )
+    })
+  })
+
+  test('USt: erfasste Zeile schlägt die Quoten-Automatik ihres Monats', async () => {
+    await withRollback(async (t) => {
+      await prognoseLeeren(t)
+      const m1 = await folgemonat(t)
+      await t`select plan_setzen(${m1}, 'base', 10000, 'test')`
+
+      // Ohne Zeile: Automatik = 8 % vom Planumsatz, fällig im Folgemonat.
+      const vorher = await prognose(t)
+      assertNah(summe(vorher, 'aus_steuern'), 800, 'USt-Automatik aus der Quote', 0.01)
+
+      await t`insert into steuerzahlungen (art, zeitraum_von, zeitraum_bis, bezeichnung, betrag, faellig_am)
+              values ('ust', ${m1}, ((${m1}::date + interval '1 month')::date - 1),
+                      'USt Handwert', 123,
+                      ((${m1}::date + interval '1 month')::date + 9))`
+      const nachher = await prognose(t)
+      assertNah(summe(nachher, 'aus_steuern'), 123, 'die erfasste Zeile gilt exklusiv', 0.01)
+    })
+  })
+})

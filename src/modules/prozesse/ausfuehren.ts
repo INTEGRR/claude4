@@ -120,6 +120,8 @@ export const AUSFUEHRUNG = {
   'finanzen.steuer_erfassen': finanzen.steuerErfassen,
   'finanzen.steuer_zahlen': finanzen.steuerZahlen,
   'finanzen.ust_vorschlag_uebernehmen': finanzen.ustVorschlagUebernehmen,
+  'finanzen.plan_setzen': finanzen.planSetzen,
+  'finanzen.plan_vorschlag_uebernehmen': finanzen.planVorschlagUebernehmen,
   'kontakte.partner_aendern': kontakte.partnerAendern,
   'kontakte.unterkontakt_anlegen': kontakte.unterkontaktAnlegen,
 

@@ -53,6 +53,7 @@ export default async function Dashboard({
       umsatz_monat: number
       kuendigungen: number
       zahlungen_faellig: number
+      unterdeckung: number
     }[]
   >`
     select
@@ -77,11 +78,12 @@ export default async function Dashboard({
                 where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)
         as umsatz_monat,
       (select count(*) from vertraege v where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
-      (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig`
+      (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig,
+      coalesce((select fremdkapitalbedarf from finanz_unterdeckung('base')), 0) as unterdeckung`
 
   // wichtig = Entscheidungssignal (Violett): hier wartet eine Freigabe auf
   // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
-  const aufgaben: { label: string; wert: number; href: string; warn?: boolean; wichtig?: boolean }[] = [
+  const aufgaben: { label: string; wert: number; anzeige?: string; href: string; warn?: boolean; wichtig?: boolean }[] = [
     ...(sees('einkauf') && s.freigaben > 0
       ? [{ label: 'Bestellungen warten auf Freigabe', wert: s.freigaben, href: '/einkauf', wichtig: true }]
       : []),
@@ -105,6 +107,17 @@ export default async function Dashboard({
       : []),
     ...(sees('finanzen') && s.zahlungen_faellig > 0
       ? [{ label: 'Zahlungen fällig diese Woche', wert: s.zahlungen_faellig, href: '/finanzen', warn: true }]
+      : []),
+    // Die Entscheidung schlechthin: Fremdkapital beschaffen oder Einkauf
+    // strecken — deshalb Violett, nicht Gelb.
+    ...(sees('finanzen') && Number(s.unterdeckung) > 0
+      ? [{
+          label: 'Unterdeckung im Finanzplan',
+          wert: Number(s.unterdeckung),
+          anzeige: money(s.unterdeckung),
+          href: '/finanzen',
+          wichtig: true,
+        }]
       : []),
     ...(sees('fehler') && s.tickets > 0
       ? [{ label: 'Offene Tickets', wert: s.tickets, href: '/tickets' }]
@@ -185,7 +198,7 @@ export default async function Dashboard({
                     <div className="label">
                       <span className={`led ${a.wichtig ? 'wichtig' : a.warn ? 'warn' : 'on'}`} /> {a.label}
                     </div>
-                    <div className="value">{a.wert}</div>
+                    <div className="value">{a.anzeige ?? a.wert}</div>
                   </div>
                 </Link>
               ))}

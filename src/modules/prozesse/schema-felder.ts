@@ -106,6 +106,8 @@ function beschriftung(name: string): string {
     darlehen_id: 'Darlehen',
     steuer_id: 'Steuertermin',
     monat: 'Monat (beliebiger Tag)',
+    szenario: 'Szenario',
+    umsatz_netto: 'Planumsatz (netto)',
     zeitraum_von: 'Zeitraum von',
     zeitraum_bis: 'Zeitraum bis',
     faellig_am: 'Fällig am',

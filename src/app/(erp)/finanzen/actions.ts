@@ -55,3 +55,17 @@ export async function steuerZahlen(steuerId: string): Promise<ActionResult> {
 export async function ustVorschlagUebernehmen(monat: string): Promise<ActionResult> {
   return serverAktion('finanzen.ust_vorschlag_uebernehmen', { parameter: { monat } })
 }
+
+export async function planZeileSetzen(formData: FormData): Promise<ActionResult> {
+  return serverAktion('finanzen.plan_setzen', {
+    parameter: {
+      monat: String(formData.get('monat') ?? ''),
+      szenario: String(formData.get('szenario') ?? 'base'),
+      umsatz_netto: Number(formData.get('umsatz_netto') ?? 0),
+    },
+  })
+}
+
+export async function planVorschlaegeAktualisieren(): Promise<ActionResult> {
+  return serverAktion('finanzen.plan_vorschlag_uebernehmen', { parameter: {} })
+}

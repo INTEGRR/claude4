@@ -98,6 +98,57 @@ async function saveFreigaben(formData: FormData) {
   )
 }
 
+// Die Finanz-Stellschrauben (Quoten, Sätze, Zahltage, Band) — gemergt in den
+// settings-Schlüssel 'finanzen', damit die NICHT im Formular stehenden
+// Schlüssel (z. B. vertrag_kategorien) unangetastet bleiben.
+const FINANZ_FELDER: { name: string; label: string; min?: number; max?: number }[] = [
+  { name: 'wareneinsatz_pct', label: 'Wareneinsatz (% vom Planumsatz)', min: 0, max: 100 },
+  { name: 'versand_pct', label: 'Versand (%)', min: 0, max: 100 },
+  { name: 'fees_pct', label: 'Gebühren/Fees (%)', min: 0, max: 100 },
+  { name: 'ust_satz_pct', label: 'USt-Satz (%)', min: 0, max: 100 },
+  { name: 'ust_zahllast_quote_pct', label: 'USt-Zahllast-Quote (% vom Planumsatz)', min: 0, max: 100 },
+  { name: 'ust_zahltag', label: 'USt-Zahltag (1–28)', min: 1, max: 28 },
+  { name: 'ust_frist_monate', label: 'USt-Frist (Monate)', min: 0, max: 6 },
+  { name: 'shopify_versatz_tage', label: 'Shopify-Auszahlung (Tage)', min: 0, max: 60 },
+  { name: 'rechnung_versatz_tage', label: 'Zahlungsziel Rechnung (Tage)', min: 0, max: 120 },
+  { name: 'best_aufschlag_pct', label: 'Best-Szenario: Aufschlag (%)', min: 0, max: 100 },
+  { name: 'worst_abschlag_pct', label: 'Worst-Szenario: Abschlag (%)', min: 0, max: 100 },
+  { name: 'liquiditaets_puffer', label: 'Liquiditätspuffer (€)', min: 0 },
+  { name: 'transit_tage', label: 'Transitzeit See (Tage)', min: 0, max: 120 },
+  { name: 'kuendigungs_vorlauf_tage', label: 'Kündigungs-Vorlauf (Tage)', min: 0, max: 365 },
+]
+
+async function saveFinanzen(formData: FormData) {
+  'use server'
+  await requireAdmin()
+  const patch: Record<string, number> = {}
+  for (const feld of FINANZ_FELDER) {
+    const roh = String(formData.get(feld.name) ?? '').trim().replace(',', '.')
+    const wert = Number(roh)
+    if (roh === '' || !Number.isFinite(wert)) {
+      return actionError(`„${feld.label}" muss eine Zahl sein.`)
+    }
+    if ((feld.min != null && wert < feld.min) || (feld.max != null && wert > feld.max)) {
+      return actionError(
+        `„${feld.label}" muss zwischen ${feld.min ?? 0} und ${feld.max ?? '∞'} liegen.`,
+      )
+    }
+    patch[feld.name] = wert
+  }
+  try {
+    // Rechte Seite gewinnt: die Formularwerte überschreiben, alles andere
+    // im Schlüssel (vertrag_kategorien …) bleibt stehen.
+    await sql`
+      insert into settings (key, value) values ('finanzen', ${sql.json(patch)})
+      on conflict (key) do update set value = settings.value || excluded.value`
+  } catch (err) {
+    return actionFail(err)
+  }
+  revalidatePath('/einstellungen')
+  revalidatePath('/finanzen')
+  return actionInfo('Finanz-Einstellungen gespeichert — die Prognose rechnet ab sofort damit.')
+}
+
 async function demodatenLoeschen(formData: FormData) {
   'use server'
   await requireAdmin()
@@ -140,6 +191,7 @@ export default async function EinstellungenPage() {
   const sales = get<{ lock_confirmed?: boolean }>('sales')
   const purchase = get<{ lock_confirmed?: boolean }>('purchase')
   const freigaben = get<{ einkauf_limit?: number }>('freigaben')
+  const finanzen = get<Record<string, number>>('finanzen')
 
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
   // mehr in der Tabellenspalte.
@@ -297,6 +349,42 @@ export default async function EinstellungenPage() {
           (Knopf, API, KI). Wer freigeben darf, wird über die Befugnis „Bestellungen freigeben" in
           der <Link href="/einstellungen/benutzer">Benutzerverwaltung</Link> vergeben; Administratoren
           dürfen immer. Positionsänderungen lassen eine erteilte Freigabe erlöschen.
+        </p>
+      </Card>
+
+      <Card title="Finanzen (Prognose-Stellschrauben)">
+        <ActionForm action={saveFinanzen}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 12,
+              marginBottom: 12,
+            }}
+          >
+            {FINANZ_FELDER.map((feld) => (
+              <label className="field" key={feld.name}>
+                <span>{feld.label}</span>
+                <input
+                  className="mono"
+                  type="number"
+                  name={feld.name}
+                  step="any"
+                  min={feld.min}
+                  max={feld.max}
+                  defaultValue={finanzen[feld.name] ?? ''}
+                  required
+                />
+              </label>
+            ))}
+          </div>
+          <button className="primary" type="submit">Speichern</button>
+        </ActionForm>
+        <p className="small muted" style={{ margin: '8px 0 0' }}>
+          Diese Werte steuern die Cashflow-Prognose unter <Link href="/finanzen">Finanzen</Link>:
+          die Quoten rechnen variable Kosten vom Planumsatz, die Versätze verschieben Einzahlungen,
+          das Band spannt Best/Worst um den Basisplan, der Puffer definiert, ab wann die Prognose
+          Fremdkapitalbedarf ausweist. Nichts davon ist im Code festgelegt.
         </p>
       </Card>
 

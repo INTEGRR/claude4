@@ -204,6 +204,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ...(sees('finanzen')
           ? [
               { href: '/finanzen', label: 'Cashflow', count: counts.faellige_zahlungen },
+              { href: '/finanzen/plan', label: 'Umsatzplan' },
               { href: '/finanzen/vertraege', label: 'Verträge', count: counts.kuendigungen },
               { href: '/finanzen/darlehen', label: 'Darlehen' },
               { href: '/finanzen/steuern', label: 'Steuern' },

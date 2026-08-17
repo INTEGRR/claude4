@@ -81,7 +81,9 @@ export function ColumnChart({
   const top = ticks.at(-1)!
 
   const W = 720
-  const padL = 46
+  // Die Achsenspalte wächst mit den Zahlen — sechsstellige Werte (100.000)
+  // würden sonst links aus dem Bild laufen.
+  const padL = Math.max(46, 10 + Math.max(...ticks.map((t) => qty(t).length)) * 6.5)
   const padR = 8
   const padT = 14
   const padB = 20
@@ -164,6 +166,156 @@ export function ColumnChart({
                 </g>
               )
             })}
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+/**
+ * Linie mit Szenario-Band für den Finanzplan: Base als Linie, Best/Worst als
+ * Fläche dazwischen. Anders als ColumnChart kappt dieses Diagramm NICHT bei
+ * null — ein negativer Saldo ist hier die Kernaussage (Unterdeckung). Die
+ * Nulllinie wird betont, alles darunter läuft in --danger (Linie über
+ * clipPath, kein zweiter Datensatz).
+ */
+export function LineBandChart({
+  categories,
+  base,
+  best,
+  worst,
+  unit,
+  height = 220,
+}: {
+  categories: string[]
+  base: number[]
+  best?: number[]
+  worst?: number[]
+  unit?: string
+  height?: number
+}) {
+  if (base.length === 0) return <Empty>Keine Daten im Zeitraum.</Empty>
+  const alle = [...base, ...(best ?? []), ...(worst ?? [])]
+  const roh_min = Math.min(0, ...alle)
+  const roh_max = Math.max(0, ...alle)
+  if (roh_min === 0 && roh_max === 0) return <Empty>Keine Daten im Zeitraum.</Empty>
+
+  // Achse über den vollen Bereich (auch negativ): Schrittweite wie bei
+  // niceTicks, aber von floor(min) bis ceil(max) durchgezählt.
+  const spanne = Math.max(roh_max - roh_min, 1)
+  const raw = spanne / 4
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+  const step = [1, 2, 2.5, 5, 10].map((s) => s * mag).find((s) => s >= raw) ?? raw
+  const lo = Math.floor(roh_min / step) * step
+  const hi = Math.ceil(roh_max / step) * step
+  const ticks: number[] = []
+  for (let v = lo; v <= hi + step * 0.001; v += step) ticks.push(Number(v.toFixed(6)))
+
+  const W = 720
+  const padL = 56
+  const padR = 8
+  const padT = 14
+  const padB = 20
+  const plotW = W - padL - padR
+  const plotH = height - padT - padB
+  const band = plotW / categories.length
+  const x = (i: number) => padL + band * i + band / 2
+  const y = (v: number) => padT + ((hi - v) / (hi - lo)) * plotH
+
+  const linie = (werte: number[]) =>
+    werte.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  const flaeche =
+    best && worst && best.length === base.length && worst.length === base.length
+      ? [
+          ...best.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`),
+          ...[...worst].reverse().map((v, i) => `L ${x(worst.length - 1 - i).toFixed(1)} ${y(v).toFixed(1)}`),
+          'Z',
+        ].join(' ')
+      : null
+
+  // Beschriftet werden Tiefpunkt und Endwert — die beiden Zahlen, um die es
+  // bei einer Liquiditätskurve geht.
+  const minIdx = base.indexOf(Math.min(...base))
+  const labelIdx = new Set([minIdx, base.length - 1])
+  const clipId = `unter-null-${categories.length}-${Math.round(roh_min)}`
+
+  return (
+    <div>
+      {flaeche && (
+        <div className="chart-legend">
+          <span><span className="swatch" style={{ background: 'var(--viz-1)' }} />Basis</span>
+          <span><span className="swatch" style={{ background: 'var(--viz-1)', opacity: 0.25 }} />Band Best–Worst</span>
+          {roh_min < 0 && <span><span className="swatch" style={{ background: 'var(--danger)' }} />Unterdeckung</span>}
+        </div>
+      )}
+      <svg
+        viewBox={`0 0 ${W} ${height}`}
+        style={{ width: '100%', height: 'auto', display: 'block' }}
+        role="img"
+        aria-label={`Verlaufsdiagramm über ${categories.length} Perioden${roh_min < 0 ? ', mit Unterdeckung' : ''}`}
+      >
+        <defs>
+          <clipPath id={clipId}>
+            <rect x="0" y={y(0)} width={W} height={Math.max(0, height - y(0))} />
+          </clipPath>
+        </defs>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeWidth="1" />
+            <text x={padL - 6} y={y(t) + 3.5} textAnchor="end" {...TICK}>
+              {qty(t)}
+            </text>
+          </g>
+        ))}
+        {/* Die Nulllinie ist die Referenz — kräftiger als das Gitter. */}
+        <line x1={padL} x2={W - padR} y1={y(0)} y2={y(0)} stroke="var(--text-muted)" strokeWidth="1.5" />
+        {flaeche && <path d={flaeche} fill="var(--viz-1)" fillOpacity="0.10" />}
+        {flaeche && roh_min < 0 && (
+          <path d={flaeche} fill="var(--danger)" fillOpacity="0.10" clipPath={`url(#${clipId})`} />
+        )}
+        <path d={linie(base)} fill="none" stroke="var(--viz-1)" strokeWidth="2" strokeLinejoin="round" />
+        {roh_min < 0 && (
+          <path
+            d={linie(base)}
+            fill="none"
+            stroke="var(--danger)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            clipPath={`url(#${clipId})`}
+          />
+        )}
+        {categories.map((cat, i) => (
+          <g key={cat}>
+            {(categories.length <= 13 || i % 2 === 0) && (
+              <text x={x(i)} y={height - 6} textAnchor="middle" {...TICK} letterSpacing=".06em">
+                {cat}
+              </text>
+            )}
+            <circle
+              cx={x(i)}
+              cy={y(base[i])}
+              r="2.5"
+              fill={base[i] < 0 ? 'var(--danger)' : 'var(--viz-1)'}
+            >
+              <title>{`${cat}: ${fmt(base[i], unit)}`}</title>
+            </circle>
+            {labelIdx.has(i) && (
+              <text
+                x={x(i)}
+                // Negative Werte beschriften unterhalb des Punkts — außer der
+                // Punkt liegt schon am Plotrand, dann kollidiert das mit den
+                // Kategorien-Beschriftungen und der Wert rückt nach oben.
+                y={y(base[i]) + (base[i] < 0 && y(base[i]) + 16 < padT + plotH ? 14 : -8)}
+                textAnchor="middle"
+                className="mono"
+                fontSize="10.5"
+                fontWeight="600"
+                fill={base[i] < 0 ? 'var(--danger)' : 'var(--text)'}
+              >
+                {qty(base[i])}
+              </text>
+            )}
           </g>
         ))}
       </svg>
