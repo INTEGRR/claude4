@@ -1063,6 +1063,7 @@ label.field > span {
   color: var(--accent-text);
   animation: mikro-puls 1.4s ease infinite;
 }
+.composer-knopf.mikro-fehler { color: var(--danger); }
 @keyframes mikro-puls {
   0%, 100% { box-shadow: 0 0 0 0 rgb(255 90 31 / 0.35); }
   50% { box-shadow: 0 0 0 7px rgb(255 90 31 / 0); }

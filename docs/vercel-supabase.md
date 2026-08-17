@@ -81,6 +81,7 @@ keine Daten heraus, aber ohne Not sollte das niemand so lassen.
 
 ```
 ANTHROPIC_API_KEY        schaltet die Seite /ki frei
+OPENAI_API_KEY           schaltet die Mikrofon-Knöpfe frei (Whisper-Diktat)
 SHOPIFY_SHOP_DOMAIN      meinshop.myshopify.com
 SHOPIFY_CLIENT_ID        Dev-Dashboard-App, Settings → Credentials
 SHOPIFY_CLIENT_SECRET    dito — Token holt und erneuert das ERP selbst

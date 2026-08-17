@@ -660,11 +660,15 @@ hineinsprechen:
   Zuruf-Zeile der Ad-hoc-Masken. Auf dem Handy sitzt das
   Dashboard-Befehlsfeld fixiert unten am Daumen (Safe-Area beachtet), die
   Treffer klappen nach oben auf.
-- **Spracheingabe** (`src/components/spracheingabe.tsx`): Web Speech API
-  (de-DE), läuft komplett im Browser. Der Mikrofon-Knopf schreibt Diktat
-  in Echtzeit ins Feld (Zwischenergebnisse live), abgeschickt wird
-  bewusst per Hand — gesprochen wird in das Feld, entschieden mit Enter
-  oder dem Pfeil. Wo die API fehlt, erscheint der Knopf gar nicht.
+- **Spracheingabe über Whisper** (`src/components/spracheingabe.tsx` +
+  `/api/transkription`): der Browser nimmt nur noch AUF (MediaRecorder,
+  Auto-Stopp nach 90 s), transkribiert wird serverseitig über die
+  OpenAI-Audio-API (`modules/ki/transkription.ts`, Modell per
+  `TRANSKRIPTION_MODELL`, Standard `whisper-1`) — keine
+  Browser-Raterei, ein Modell für alle Geräte. Klick startet die
+  Aufnahme (Puls), zweiter Klick stoppt, der Text landet im Feld;
+  abgeschickt wird bewusst per Hand (Enter oder Pfeil). Ohne
+  `OPENAI_API_KEY` oder Mikrofon-API erscheint der Knopf gar nicht.
 - **Deutsche Feldbeschriftungen**: das `TEXTE`-Wörterbuch in
   `schema-felder.ts` deckt alle ~175 Formularfelder der Registry ab
   (`list_price` → „Verkaufspreis (netto)", `uom_id` → „Einheit",
