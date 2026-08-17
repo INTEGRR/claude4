@@ -28,6 +28,10 @@ async function ladeOptionen(
     if (quelle === 'partners') {
       ergebnis.partners = await sql<{ id: string; label: string }[]>`
         select id, name as label from partners order by name limit 500`
+    } else if (quelle === 'vendors') {
+      ergebnis.vendors = await sql<{ id: string; label: string }[]>`
+        select id, name as label from partners
+        where is_vendor and active order by name limit 500`
     } else if (quelle === 'product_variants') {
       ergebnis.product_variants = await sql<{ id: string; label: string }[]>`
         select pv.id, variant_display_name(pv.id) as label
@@ -39,6 +43,39 @@ async function ladeOptionen(
     }
   }
   return ergebnis
+}
+
+/**
+ * Ad-hoc-Maske: EIN Angebot für eine frei gebundene Registry-Aktion — dieselbe
+ * Feld- und Optionsmaschine wie das Prozess-Panel, nur ohne Prozesskontext.
+ * Trägt das Befehlsfeld: Aktion tippen → Maske steht (deterministisch, ohne
+ * KI-Latenz). null, wenn es die Aktion nicht gibt oder sie einen Beleg braucht.
+ */
+export async function aktionsAngebot(name: string): Promise<SchrittAngebot | null> {
+  const eintrag = registrierteAktion(name)
+  if (!eintrag || eintrag.bindung !== 'frei') return null
+
+  const felder = formularFelder(eintrag)
+  const quellen = new Set<string>()
+  for (const feld of felder) {
+    if (feld.typ === 'verweis' && feld.quelle) quellen.add(feld.quelle)
+  }
+  const geladen = await ladeOptionen(quellen)
+  const optionen: Record<string, { id: string; label: string }[]> = {}
+  for (const feld of felder) {
+    if (feld.typ === 'verweis' && feld.quelle && geladen[feld.quelle]) {
+      optionen[feld.name] = geladen[feld.quelle]
+    }
+  }
+  return {
+    code: name,
+    name: eintrag.label,
+    aktionsName: name,
+    felder,
+    vorbelegung: {},
+    optionen,
+    erlaubt: true,
+  }
 }
 
 export async function naechsteAngebote(

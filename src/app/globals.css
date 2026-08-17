@@ -1017,6 +1017,46 @@ label.field > span {
 
 @media print { .ticket-tab, .ticket-panel { display: none; } }
 
+/* Befehlsfeld der Daily Routine: ein Feld, darunter die Treffer als Liste. */
+.befehlsfeld { position: relative; }
+.befehlsfeld input {
+  width: 100%;
+  font-size: 14px;
+}
+.befehlsfeld.gross input {
+  font-size: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.befehls-liste {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.befehls-treffer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+}
+.befehls-treffer:last-child { border-bottom: 0; }
+.befehls-treffer.aktiv { background: var(--surface-2); }
+
 /* Großansicht der KI-Diagramme (BUG/00008): natives <dialog>, Karte in groß. */
 .chart-dialog {
   width: min(96vw, 1100px);

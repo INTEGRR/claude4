@@ -1,5 +1,5 @@
 'use client'
-import { Fragment, useCallback, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
 import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
@@ -682,12 +682,13 @@ function SammelCard({
 
 // --- Chat ------------------------------------------------------------------
 
-export function KiChat() {
+export function KiChat({ startFrage }: { startFrage?: string } = {}) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const startGesendet = useRef(false)
 
   async function send(frage: string) {
     const text = frage.trim()
@@ -757,6 +758,15 @@ export function KiChat() {
       setStatus(null)
     }
   }
+
+  // Vom Befehlsfeld übergebene Frage (?frage=…) einmal automatisch stellen.
+  useEffect(() => {
+    if (startFrage && !startGesendet.current) {
+      startGesendet.current = true
+      void send(startFrage)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startFrage])
 
   return (
     <div className="ki-chat">

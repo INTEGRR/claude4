@@ -50,6 +50,7 @@ function kern(schema: z.ZodTypeAny): z.ZodTypeAny {
 /** `partner_id` → `partners` usw. — die Quelle einer Verweis-Auswahl. */
 const VERWEIS_QUELLEN: Record<string, string> = {
   partner_id: 'partners',
+  vendor_id: 'vendors',
   variant_id: 'product_variants',
   user_id: 'users',
 }
@@ -57,6 +58,7 @@ const VERWEIS_QUELLEN: Record<string, string> = {
 function beschriftung(name: string): string {
   const TEXTE: Record<string, string> = {
     partner_id: 'Kunde/Partner',
+    vendor_id: 'Lieferant',
     variant_id: 'Produkt',
     user_id: 'Verantwortlich',
     qty: 'Menge',

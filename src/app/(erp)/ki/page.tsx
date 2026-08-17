@@ -5,8 +5,13 @@ import { KiChat } from './chat'
 
 export const dynamic = 'force-dynamic'
 
-export default async function KiPage() {
+export default async function KiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ frage?: string }>
+}) {
   await requireArea('ki')
+  const { frage } = await searchParams
   const aktiv = kiConfigured()
 
   return (
@@ -16,7 +21,7 @@ export default async function KiPage() {
         subtitle="Auswertungen, Listen und Diagramme auf Zuruf — lesend auf allen ERP-Daten; Anlegen nur nach Bestätigung"
       />
       {aktiv ? (
-        <KiChat />
+        <KiChat startFrage={frage} />
       ) : (
         <div className="notice info">
           Die KI-Analyse ist noch nicht konfiguriert. In der Umgebung

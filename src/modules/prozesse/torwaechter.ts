@@ -178,5 +178,11 @@ export async function aktionAusfuehrenGeprueft(
     ${`${name}${zusammenfassung ? ` — ${zusammenfassung}` : ''}${recordId ? ` [${recordId}]` : ''}`},
     ${nutzer.name})`.catch(() => undefined)
 
+  // Lern-Gedächtnis: was dieser Benutzer oft ausführt, rückt auf der
+  // Übersicht und im Befehlsfeld nach vorn. Nie blockierend.
+  if (nutzer.id) {
+    await sql`select nutzung_zaehlen(${nutzer.id}, 'aktion', ${name})`.catch(() => undefined)
+  }
+
   return ergebnis
 }

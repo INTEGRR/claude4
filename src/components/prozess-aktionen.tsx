@@ -120,15 +120,18 @@ export function ProzessAktionen({
   schritte,
   recordId,
   instanzId,
+  sofortOffen,
 }: {
   schritte: SchrittAngebot[]
   /** Beleggebundener Prozess: die Beleg-ID des Aufrufs. */
   recordId?: string
   /** Belegloser Assistent: die Instanz, die nach Erfolg weitergeschaltet wird. */
   instanzId?: string
+  /** Ad-hoc-Maske: dieses Formular steht sofort offen (Schritt-Code). */
+  sofortOffen?: string
 }) {
   const router = useRouter()
-  const [offen, setOffen] = useState<string | null>(null)
+  const [offen, setOffen] = useState<string | null>(sofortOffen ?? null)
   const [fehler, setFehler] = useState<string | null>(null)
   const [meldung, setMeldung] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()

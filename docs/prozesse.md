@@ -605,6 +605,32 @@ der Sicherheitsboden darunter:
 Jede künftige Freigabe (Gutschrift, Rabatt, Fertigungsstorno) ist damit
 nur noch: Befugnis in den Katalog, Schritt mit Befugnis in den Prozess.
 
+## Daily Routine: Befehlsfeld, Ad-hoc-Masken, Lern-Gedächtnis (0057, umgesetzt)
+
+Task-first statt Kachel-Moloch — man kommt ins System, um EINEN Task zu
+machen:
+
+- **Befehlsfeld** im Zentrum der Übersicht: Aktionen und Seiten matchen
+  sofort und lokal (kein LLM im heißen Pfad), Belege per entprellter
+  Suche (`/api/suche`, rollengefiltert), und wenn nichts passt, geht der
+  Freitext an den KI-Agenten (`/ki?frage=…`, stellt die Frage
+  automatisch).
+- **Ad-hoc-Masken** `/aktion/<name>`: jede frei gebundene Registry-Aktion
+  bekommt ihre GENERIERTE Maske (dieselbe Feldmaschine wie das
+  Prozess-Panel, `aktionsAngebot()`), sofort offen, abgeschickt über den
+  Torwächter. Deterministisch und in Millisekunden — die KI ist
+  Dolmetscher (Absicht → Aktion), nicht Maskenbauer.
+- **Lern-Gedächtnis je Benutzer** (`nutzungs_zaehler`): der Torwächter
+  zählt ausgeführte Aktionen, das Befehlsfeld gemeldete Seiten
+  (`/api/nutzung`, nur 'seite' — Aktionszähler sind nicht von außen
+  hochtreibbar). Häufiges steht als Chips unterm Feld und boostet das
+  Ranking. Überlebt den Demodaten-Neustart (BEHALTEN-Liste), fällt mit
+  dem Benutzer.
+- **Signalkarten „Heute anstehend"**: nur Karten mit Handlungsbedarf
+  (Freigaben, überfälliger Zulauf, Integrationsfehler, Versandbereit,
+  Beschaffung, Abwesenheitsanträge, Tickets) — rollen- und
+  prozessgefiltert. Keine Signale: eine grüne Zeile, sonst nichts.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

@@ -2,11 +2,62 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireUser } from '@/modules/auth'
 import { type Area, canAccess } from '@/modules/auth/permissions'
-import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { ColumnChart } from '@/components/charts'
-import { date, money, qty } from '@/modules/shared/format'
+import { REGISTRY } from '@/modules/prozesse/registry'
+import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
+import { type BefehlsAktion, type BefehlsSeite, Befehlsfeld } from '@/components/befehlsfeld'
+import { money } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Daily Routine statt Kachel-Moloch: man kommt ins System, um EINEN Task zu
+ * machen. Deshalb steht ein Befehlsfeld im Zentrum (Aktion tippen → Maske
+ * steht; Beleg tippen → Detailseite; Freitext → KI), darunter das, was das
+ * System HEUTE von einem braucht (Signalkarten, nur mit Handlungsbedarf),
+ * und was dieser Benutzer oft nutzt (lernend, nutzungs_zaehler je Benutzer).
+ */
+
+/** Seitenkatalog fürs Befehlsfeld — Spiegel der Navigation (layout.tsx). */
+const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] = [
+  { href: '/verkauf', label: 'Verkaufsaufträge', area: 'verkauf' },
+  { href: '/verkauf/neu', label: 'Neuer Verkaufsauftrag', area: 'verkauf' },
+  { href: '/vorgaenge', label: 'Vorgänge', area: 'verkauf' },
+  { href: '/versand', label: 'Versand', area: 'versand', prozess: ['versand'] },
+  { href: '/fertigung', label: 'Fertigungsaufträge', area: 'fertigung', prozess: ['fertigung'] },
+  { href: '/fertigung/stuecklisten', label: 'Stücklisten', area: 'fertigung', prozess: ['fertigung'] },
+  { href: '/einkauf', label: 'Bestellungen', area: 'einkauf', prozess: ['einkauf'] },
+  { href: '/einkauf/rechnungen', label: 'Lieferantenrechnungen', area: 'einkauf', prozess: ['einkauf'] },
+  { href: '/lager', label: 'Transfers', area: 'lager' },
+  { href: '/lager/zulauf', label: 'Zulauf (Wareneingangskalender)', area: 'lager' },
+  { href: '/lager/bestand', label: 'Bestand', area: 'lager' },
+  { href: '/lager/bewertung', label: 'Bewertung', area: 'lager' },
+  { href: '/lager/beschaffung', label: 'Beschaffung', area: 'lager', prozess: ['einkauf', 'fertigung'] },
+  { href: '/lager/lose', label: 'Lose & Serien', area: 'lager' },
+  { href: '/lager/inventur', label: 'Inventur', area: 'lager' },
+  { href: '/reparatur', label: 'Reparaturen', area: 'reparatur', prozess: ['reparatur'] },
+  { href: '/zeiterfassung', label: 'Zeiterfassung', area: 'zeiterfassung' },
+  { href: '/personal', label: 'Mitarbeiter', area: 'personal' },
+  { href: '/personal/schichtplan', label: 'Schichtplan', area: 'personal' },
+  { href: '/personal/abwesenheiten', label: 'Abwesenheiten', area: 'personal' },
+  { href: '/auswertungen', label: 'Auswertungen: Mengen & Abverkauf', area: 'auswertungen' },
+  { href: '/auswertungen/kennzahlen', label: 'Kennzahlen', area: 'auswertungen' },
+  { href: '/ki', label: 'KI-Analyse', area: 'ki' },
+  { href: '/produkte', label: 'Produkte', area: 'produkte' },
+  { href: '/kontakte', label: 'Kontakte', area: 'kontakte' },
+  { href: '/scanner', label: 'Scanner', area: 'scanner' },
+  { href: '/integrationen', label: 'Integrationen', area: 'integrationen' },
+  { href: '/prozesse', label: 'Prozesse', area: 'einstellungen' },
+  { href: '/einstellungen', label: 'Einstellungen', area: 'einstellungen' },
+  { href: '/einstellungen/benutzer', label: 'Benutzer verwalten', area: 'einstellungen' },
+  { href: '/tickets', label: 'Tickets', area: 'fehler' },
+]
+
+function gruss(): string {
+  const stunde = new Date().getHours()
+  if (stunde < 11) return 'Guten Morgen'
+  if (stunde < 18) return 'Guten Tag'
+  return 'Guten Abend'
+}
 
 export default async function Dashboard({
   searchParams,
@@ -17,243 +68,172 @@ export default async function Dashboard({
   const { verweigert } = await searchParams
   const sees = (area: Area) => canAccess(user.role, area)
 
-  // Chamäleon: wie die Navigation sind auch die Kennzahlen-Kacheln eine
-  // PROJEKTION der aktiven Prozesse — kein Fertigungsprozess, keine
-  // Fertigungskachel. Grundfunktionen (Verkauf, Lager) bleiben immer.
+  // Chamäleon: Signale und Seiten sind eine Projektion der aktiven Prozesse.
   const prozessBereiche = new Set(
     (await sql<{ bereich: string }[]>`
       select distinct bereich from prozesse where aktiv`).map((b) => b.bereich),
   )
   const prozessAktiv = (bereich: string) => prozessBereiche.has(bereich)
 
-  const [stats] = await sql<
+  // --- Was HEUTE ansteht: nur Karten mit Handlungsbedarf -------------------
+  const [s] = await sql<
     {
-      open_orders: number
-      open_mos: number
-      ready_to_ship: number
-      open_receipts: number
-      open_repairs: number
-      shortages: number
-      failed: number
-      revenue_month: number
+      freigaben: number
+      zulauf_ueberfaellig: number
+      versandbereit: number
+      beschaffung: number
+      fehler: number
+      abwesenheiten: number
+      tickets: number
+      offene_auftraege: number
+      umsatz_monat: number
     }[]
   >`
     select
-      (select count(*) from sales_orders
-        where state = 'sale' and delivery_status <> 'full')::int as open_orders,
-      (select count(*) from manufacturing_orders
-        where state not in ('done','cancel'))::int as open_mos,
-      (select count(*) from shipping_ready)::int as ready_to_ship,
+      (select count(*) from purchase_orders po
+        where po.state in ('draft','sent') and einkauf_freigabe_noetig(po.id))::int as freigaben,
       (select count(*) from stock_pickings p
-         join operation_types ot on ot.id = p.operation_type_id
-        where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int as open_receipts,
-      (select count(*) from repair_orders
-        where state not in ('repaired','cancel'))::int as open_repairs,
-      (select count(*) from product_variants pv
-         join product_templates pt on pt.id = pv.template_id
-        where pv.active and pt.type = 'goods' and forecasted_qty(pv.id) < 0)::int as shortages,
+         join operation_types ot on ot.id = p.operation_type_id and ot.kind = 'receipt'
+         left join purchase_orders po on p.origin_model = 'purchase_order' and po.id = p.origin_id
+        where p.state not in ('done','cancel')
+          and coalesce(po.eta_confirmed::timestamptz, p.scheduled_date) < now())::int
+        as zulauf_ueberfaellig,
+      (select count(*) from shipping_ready)::int as versandbereit,
+      (select count(*) from orderpoint_suggestions())::int as beschaffung,
       ((select count(*) from integration_jobs where status = 'failed')
-       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as failed,
+       + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler,
+      (select count(*) from absences where state = 'requested')::int as abwesenheiten,
+      (select count(*) from bug_reports where status in ('offen','in_arbeit'))::int as tickets,
+      (select count(*) from sales_orders
+        where state = 'sale' and delivery_status <> 'full')::int as offene_auftraege,
       coalesce((select sum((select net from sales_order_total(so.id)))
                 from sales_orders so
                 where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)
-        as revenue_month`
+        as umsatz_monat`
 
-  const recentOrders = await sql<
-    {
-      id: string
-      number: string
-      shopify_order_name: string | null
-      customer: string
-      state: string
-      delivery_status: string
-      order_date: string
-      open_mos: number
-    }[]
-  >`
-    select so.id, so.number, so.shopify_order_name, p.name as customer, so.state,
-           so.delivery_status, so.order_date,
-           (select count(*) from manufacturing_orders mo
-             where mo.sales_order_id = so.id and mo.state not in ('done','cancel'))::int as open_mos
-    from sales_orders so join partners p on p.id = so.partner_id
-    where so.state = 'sale'
-    order by so.order_date desc limit 8`
+  const aufgaben: { label: string; wert: number; href: string; warn?: boolean }[] = [
+    ...(sees('einkauf') && s.freigaben > 0
+      ? [{ label: 'Bestellungen warten auf Freigabe', wert: s.freigaben, href: '/einkauf', warn: true }]
+      : []),
+    ...(sees('lager') && s.zulauf_ueberfaellig > 0
+      ? [{ label: 'Wareneingänge überfällig', wert: s.zulauf_ueberfaellig, href: '/lager/zulauf', warn: true }]
+      : []),
+    ...(sees('integrationen') && s.fehler > 0
+      ? [{ label: 'Integrationen brauchen Aufmerksamkeit', wert: s.fehler, href: '/integrationen', warn: true }]
+      : []),
+    ...(sees('versand') && prozessAktiv('versand') && s.versandbereit > 0
+      ? [{ label: 'Versandbereit', wert: s.versandbereit, href: '/versand' }]
+      : []),
+    ...(sees('lager') && (prozessAktiv('einkauf') || prozessAktiv('fertigung')) && s.beschaffung > 0
+      ? [{ label: 'Beschaffungsvorschläge', wert: s.beschaffung, href: '/lager/beschaffung' }]
+      : []),
+    ...(sees('personal') && s.abwesenheiten > 0
+      ? [{ label: 'Abwesenheitsanträge', wert: s.abwesenheiten, href: '/personal/abwesenheiten' }]
+      : []),
+    ...(sees('fehler') && s.tickets > 0
+      ? [{ label: 'Offene Tickets', wert: s.tickets, href: '/tickets' }]
+      : []),
+  ]
 
-  // Umsatz der letzten 6 Monate (netto, bestätigte Aufträge) fürs Diagramm;
-  // Monate ohne Umsatz erscheinen als Lücke auf der Achse, nicht gar nicht.
-  const umsatzRows = await sql<{ monat: string; netto: number }[]>`
-    select to_char(date_trunc('month', so.order_date), 'YYYY-MM') as monat,
-           coalesce(sum((select net from sales_order_total(so.id))), 0) as netto
-    from sales_orders so
-    where so.state = 'sale'
-      and so.order_date >= date_trunc('month', now()) - interval '5 months'
-    group by 1 order by 1`
-  const umsatzMonate = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date()
-    d.setUTCDate(1)
-    d.setUTCMonth(d.getUTCMonth() - (5 - i))
-    const monat = d.toISOString().slice(0, 7)
-    return { monat, netto: Number(umsatzRows.find((r) => r.monat === monat)?.netto ?? 0) }
-  })
+  // --- Befehlsfeld-Katalog: Aktionen + Seiten, rollengefiltert -------------
+  const aktionen: BefehlsAktion[] = Object.entries(REGISTRY)
+    .filter(([, a]) => a.bindung === 'frei' && aktionErlaubt(a, user.role))
+    .map(([name, a]) => ({ name, label: a.label, bereich: a.bereich }))
+  const seiten: BefehlsSeite[] = SEITEN.filter(
+    (p) =>
+      sees(p.area) && (!p.prozess || p.prozess.some((b) => prozessAktiv(b))),
+  ).map(({ href, label }) => ({ href, label }))
 
-  const shortages = await sql<{ id: string; product: string; forecasted: number; on_hand: number }[]>`
-    select pv.id, coalesce(pv.display_name, pt.name) as product,
-           forecasted_qty(pv.id) as forecasted, on_hand_qty(pv.id) as on_hand
-    from product_variants pv join product_templates pt on pt.id = pv.template_id
-    where pv.active and pt.active and pt.type = 'goods' and forecasted_qty(pv.id) < 0
-    order by forecasted_qty(pv.id) limit 8`
+  // --- Lern-Gedächtnis: was DIESER Benutzer oft nutzt ----------------------
+  const nutzung = await sql<{ art: string; schluessel: string; anzahl: number }[]>`
+    select art, schluessel, anzahl from nutzungs_zaehler
+    where user_id = ${user.id} order by anzahl desc, zuletzt desc limit 40`
+  const gewichte = Object.fromEntries(nutzung.map((n) => [n.schluessel, Number(n.anzahl)]))
+  const erlaubteAktionen = new Set(aktionen.map((a) => a.name))
+  const erlaubteSeiten = new Map(seiten.map((p) => [p.href, p.label]))
+  const haeufig = nutzung
+    .map((n) =>
+      n.art === 'aktion' && erlaubteAktionen.has(n.schluessel)
+        ? {
+            label: aktionen.find((a) => a.name === n.schluessel)!.label,
+            href: `/aktion/${encodeURIComponent(n.schluessel)}`,
+          }
+        : n.art === 'seite' && erlaubteSeiten.has(n.schluessel)
+          ? { label: erlaubteSeiten.get(n.schluessel)!, href: n.schluessel }
+          : null,
+    )
+    .filter((e): e is { label: string; href: string } => e !== null)
+    .slice(0, 6)
+
+  const vorname = user.name.split(' ')[0]
 
   return (
     <>
-      <PageHeader title="Übersicht" subtitle="Was heute ansteht" />
-
       {verweigert && (
         <div className="notice danger">
           Für den Bereich „{verweigert}" fehlt Ihrer Rolle die Berechtigung.
         </div>
       )}
 
-      {sees('integrationen') && stats.failed > 0 && (
-        <div className="notice danger">
-          <span className="led on" />{' '}
-          {stats.failed} Vorgang/Vorgänge brauchen Aufmerksamkeit (fehlgeschlagene Jobs oder nicht
-          zugeordnete Shopify-Positionen). <Link href="/integrationen">Zu den Integrationen</Link>
-        </div>
-      )}
-
-      <div className="grid-3" style={{ marginBottom: 16 }}>
-        {sees('verkauf') && (
-          <Stat label="Offene Aufträge" value={stats.open_orders} href="/verkauf?status=sale" />
-        )}
-        {sees('fertigung') && prozessAktiv('fertigung') && (
-          <Stat label="Offene Fertigung" value={stats.open_mos} href="/fertigung" />
-        )}
-        {sees('versand') && prozessAktiv('versand') && (
-          <Stat
-            label="Versandbereit"
-            value={stats.ready_to_ship}
-            hint="fertig, wartet aufs Label"
-            href="/versand"
-          />
-        )}
-        {sees('lager') && (
-          <Stat label="Erwartete Eingänge" value={stats.open_receipts} href="/lager?art=receipt" />
-        )}
-        {sees('reparatur') && prozessAktiv('reparatur') && (
-          <Stat label="Offene Reparaturen" value={stats.open_repairs} href="/reparatur" />
-        )}
-        {sees('scanner') && (
-          // Kein Zahlenwert, deshalb auch nicht im 28-px-Kennzahlenslot: ein
-          // Verweis in Mono, damit der Slot den Kennzahlen vorbehalten bleibt.
-          <Stat
-            label="Scanner"
-            value={<span className="mono" style={{ fontSize: 15, fontWeight: 500 }}>öffnen →</span>}
-            hint="Belege per Barcode abarbeiten"
-            href="/scanner"
-          />
-        )}
-        {sees('verkauf') && (
-          <Stat
-            label="Umsatz laufender Monat"
-            value={money(stats.revenue_month)}
-            hint="netto, bestätigte Aufträge"
-          />
+      {/* Kopf der Daily Routine: Gruß, ein Feld, das eigene Gedächtnis. */}
+      <div style={{ maxWidth: 760, margin: '6vh auto 0' }}>
+        <h1 style={{ textAlign: 'center', fontSize: 26, letterSpacing: '-0.02em', marginBottom: 4 }}>
+          {gruss()}, {vorname}.
+        </h1>
+        <p className="muted" style={{ textAlign: 'center', marginTop: 0, marginBottom: 18 }}>
+          Sag, was du tun willst — Aktion, Beleg oder Frage.
+        </p>
+        <Befehlsfeld aktionen={aktionen} seiten={seiten} gewichte={gewichte} gross />
+        {haeufig.length > 0 && (
+          <div
+            className="actions"
+            style={{ justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}
+          >
+            {haeufig.map((h) => (
+              <Link key={h.href} className="btn small" href={h.href}>
+                {h.label}
+              </Link>
+            ))}
+          </div>
         )}
       </div>
 
-      {sees('verkauf') && umsatzMonate.some((m) => m.netto > 0) && (
-        <Card title="Umsatz je Monat" actions={<span className="muted small">netto, bestätigte Aufträge</span>}>
-          <ColumnChart
-            categories={umsatzMonate.map((m) => m.monat)}
-            series={[{ name: 'Umsatz', values: umsatzMonate.map((m) => Number(m.netto)) }]}
-            unit="€"
-            height={150}
-          />
-        </Card>
-      )}
-
-      <div className="grid-2">
-        {sees('verkauf') && (
-        <Card
-          title="Aktuelle Aufträge"
-          actions={<Link className="btn small" href="/verkauf">Alle</Link>}
-          tight
-        >
-          {recentOrders.length === 0 ? (
-            <Empty>Noch keine bestätigten Aufträge.</Empty>
-          ) : (
-            <TableWrap>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Beleg</th>
-                    <th>Kunde</th>
-                    <th>Lieferung</th>
-                    <th>Fertigung</th>
-                    <th>Datum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.map((o) => (
-                    <tr key={o.id}>
-                      <td className="mono">
-                        <Link href={`/verkauf/${o.id}`}>{o.shopify_order_name ?? o.number}</Link>
-                      </td>
-                      <td>{o.customer}</td>
-                      <td><Badge state={o.delivery_status} kind="delivery" /></td>
-                      <td className="nowrap small">
-                        {o.open_mos > 0 && (
-                          <>
-                            <span className="led on" /> <span className="mono">{o.open_mos}</span> in
-                            Fertigung
-                          </>
-                        )}
-                      </td>
-                      <td className="nowrap small muted mono">{date(o.order_date)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableWrap>
-          )}
-        </Card>
+      {/* Was das System heute von dir braucht — nur echte Aufgaben. */}
+      <div style={{ maxWidth: 760, margin: '32px auto 0' }}>
+        {aufgaben.length > 0 ? (
+          <>
+            <div className="mono-label" style={{ marginBottom: 8 }}>Heute anstehend</div>
+            <div className="grid-3">
+              {aufgaben.map((a) => (
+                <Link
+                  key={a.label}
+                  href={a.href}
+                  className="card"
+                  style={{ marginBottom: 0, textDecoration: 'none' }}
+                >
+                  <div className="stat">
+                    <div className="label">
+                      <span className={`led ${a.warn ? 'warn' : 'on'}`} /> {a.label}
+                    </div>
+                    <div className="value">{a.wert}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="muted" style={{ textAlign: 'center' }}>
+            <span className="led ok" /> Nichts liegt an — alle Signale sind grün.
+          </p>
         )}
 
-        {sees('produkte') && (
-        <Card
-          title="Unterdeckung"
-          actions={<Link className="btn small" href="/lager/bestand?filter=unterdeckung">Alle</Link>}
-          tight
-        >
-          {shortages.length === 0 ? (
-            <Empty>Alle Bestände reichen aus.</Empty>
-          ) : (
-            <TableWrap>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Produkt</th>
-                    <th className="num">Bestand</th>
-                    <th className="num">Prognose</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shortages.map((s) => (
-                    <tr key={s.id}>
-                      <td>
-                        {/* Zustand als Leuchte; das Wort dazu steht im Kartentitel. */}
-                        <span className="led warn" />{' '}
-                        <Link href={`/produkte/variante/${s.id}`}>{s.product}</Link>
-                      </td>
-                      <td className="num">{qty(s.on_hand)}</td>
-                      <td className="num mono">{qty(s.forecasted)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableWrap>
-          )}
-        </Card>
+        {/* Eine Zeile Lage, kein Kachel-Moloch: der Rest wohnt in Auswertungen. */}
+        {sees('verkauf') && (
+          <p className="muted small" style={{ textAlign: 'center', marginTop: 20 }}>
+            {s.offene_auftraege} offene Aufträge · Umsatz laufender Monat{' '}
+            <span className="mono">{money(s.umsatz_monat)}</span> netto ·{' '}
+            <Link href="/auswertungen/kennzahlen">alle Kennzahlen</Link>
+          </p>
         )}
       </div>
     </>
