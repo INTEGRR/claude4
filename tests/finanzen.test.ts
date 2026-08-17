@@ -261,6 +261,112 @@ describe('Finanzen: Zahlungsregister', () => {
     })
   })
 
+  test('Darlehen: Annuität konstant, Tilgungssumme = Darlehenssumme', async () => {
+    await withRollback(async (t) => {
+      const [d] = await t<{ id: string }[]>`
+        insert into darlehen (nummer, name, betrag, zinssatz_pct, art, auszahlung_am, laufzeit_monate)
+        values (next_sequence('darlehen'), 'Warenfinanzierung', 60000, 6, 'annuitaet', '2026-09-01', 24)
+        returning id`
+      const [{ n }] = await t<{ n: number }[]>`
+        select darlehen_raten_generieren(${d.id}, 'test') as n`
+      assert.equal(n, 24)
+
+      const raten = await t<{ zins: number; tilgung: number; restschuld: number }[]>`
+        select zins, tilgung, restschuld from darlehen_raten
+        where darlehen_id = ${d.id} order by nr`
+      const tilgungSumme = raten.reduce((s, r) => s + Number(r.tilgung), 0)
+      assert.ok(Math.abs(tilgungSumme - 60000) < 0.01, `Σ Tilgung = Summe (${tilgungSumme})`)
+      assert.equal(Number(raten.at(-1)!.restschuld), 0, 'Restschuld endet bei 0')
+      // Annuität (Zins + Tilgung) ist konstant — bis auf die Rundungs-Schlussrate.
+      const annuitaeten = raten.slice(0, -1).map((r) => Number(r.zins) + Number(r.tilgung))
+      const min = Math.min(...annuitaeten)
+      const max = Math.max(...annuitaeten)
+      assert.ok(max - min < 0.02, `Annuität konstant (${min}…${max})`)
+    })
+  })
+
+  test('Darlehen: endfällig zahlt nur Zinsen, die Schlussrate tilgt alles', async () => {
+    await withRollback(async (t) => {
+      const [d] = await t<{ id: string }[]>`
+        insert into darlehen (nummer, name, betrag, zinssatz_pct, art, auszahlung_am, laufzeit_monate)
+        values (next_sequence('darlehen'), 'Bridge', 100000, 12, 'endfaellig', '2026-09-01', 6)
+        returning id`
+      await t`select darlehen_raten_generieren(${d.id}, 'test')`
+      const raten = await t<{ nr: number; zins: number; tilgung: number }[]>`
+        select nr, zins, tilgung from darlehen_raten where darlehen_id = ${d.id} order by nr`
+      assert.ok(raten.slice(0, -1).every((r) => Number(r.tilgung) === 0))
+      assert.equal(Number(raten.at(-1)!.tilgung), 100000)
+      assert.equal(Number(raten[0].zins), 1000, '12 % p. a. auf 100k = 1000 €/Monat')
+    })
+  })
+
+  test('Darlehen: Auszahlung bucht Einzahlung, letzte Rate tilgt', async () => {
+    await withRollback(async (t) => {
+      const [d] = await t<{ id: string }[]>`
+        insert into darlehen (nummer, name, betrag, zinssatz_pct, art, auszahlung_am, laufzeit_monate)
+        values (next_sequence('darlehen'), 'Mini', 1000, 0, 'rate', '2026-09-01', 2)
+        returning id`
+      await t`select darlehen_auszahlen(${d.id}, current_date, 'test')`
+      const [ein] = await t<{ s: number }[]>`
+        select coalesce(sum(betrag_eur), 0) as s from zahlungen
+        where darlehen_id = ${d.id} and richtung = 'ein' and storniert_am is null`
+      assert.equal(Number(ein.s), 1000)
+
+      const raten = await t<{ id: string }[]>`
+        select id from darlehen_raten where darlehen_id = ${d.id} order by nr`
+      for (const r of raten) {
+        await t`select darlehen_rate_zahlen(${r.id}, current_date, null, 'test')`
+      }
+      const [status] = await t<{ status: string }[]>`
+        select status from darlehen where id = ${d.id}`
+      assert.equal(status.status, 'getilgt')
+    })
+  })
+
+  test('USt-Vorschlag: Umsatzsteuer − Vorsteuer aus den Belegen des Monats', async () => {
+    await withRollback(async (t) => {
+      const s = await finanzSzenario(t)
+      // Die Dev-DB kann bereits Juli-Belege enthalten — deshalb misst der Test
+      // die DIFFERENZ des Vorschlags vor/nach den eigenen Belegen, nicht absolut.
+      const [vorher] = await t<
+        { umsatzsteuer: number; vorsteuer: number }[]
+      >`select * from ust_zahllast_vorschlag('2026-07-01')`
+
+      // Einkauf: 1000 netto + 190 Vorsteuer im Juli 2026
+      const billId = await rechnungZu(t, s.orderId)
+      await t`update vendor_bills set bill_date = '2026-07-10' where id = ${billId}`
+      // Verkauf: 500 netto + 95 USt im Juli 2026
+      const [kunde] = await t<{ id: string }[]>`
+        insert into partners (name, is_customer) values ('USt Kunde', true) returning id`
+      const [so] = await t<{ id: string }[]>`
+        insert into sales_orders (number, partner_id, state, order_date)
+        values (next_sequence('sale'), ${kunde.id}, 'sale', '2026-07-05') returning id`
+      const [variant] = await t<{ id: string }[]>`
+        select pv.id from product_variants pv
+        join product_templates pt on pt.id = pv.template_id
+        where pt.name = 'Gehäuse CNC' limit 1`
+      await t`insert into sales_order_lines (order_id, variant_id, name, qty, uom_id, price_unit, tax_rate)
+              values (${so.id}, ${variant.id}, 'Gehäuse CNC', 5, ${s.uom}, 100, 19)`
+
+      const [v] = await t<
+        { umsatzsteuer: number; vorsteuer: number; zahllast: number; faellig_am: string }[]
+      >`select umsatzsteuer, vorsteuer, zahllast, faellig_am::text as faellig_am
+        from ust_zahllast_vorschlag('2026-07-01')`
+      assert.equal(Number(v.umsatzsteuer) - Number(vorher.umsatzsteuer), 95)
+      assert.equal(Number(v.vorsteuer) - Number(vorher.vorsteuer), 190)
+      assert.equal(Number(v.zahllast), Number(v.umsatzsteuer) - Number(v.vorsteuer))
+      assert.equal(v.faellig_am, '2026-08-10', 'Folgemonat am ust_zahltag')
+
+      // Übernehmen legt den Termin an; ein zweites Mal wird abgewiesen.
+      await t`select ust_vorschlag_uebernehmen('2026-07-01', 'test')`
+      await expectError(
+        t,
+        (sp) => sp`select ust_vorschlag_uebernehmen('2026-07-01', 'test')`,
+        /existiert bereits/,
+      )
+    })
+  })
+
   test('Zahlplan-Riegel: bezahlte Raten überleben das Neu-Aufsetzen nicht heimlich', async () => {
     await withRollback(async (t) => {
       const s = await finanzSzenario(t)

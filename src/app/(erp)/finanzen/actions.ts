@@ -39,3 +39,19 @@ export async function zahlungStornieren(zahlungId: string): Promise<ActionResult
 export async function vertragZahlen(vertragId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('finanzen.vertrag_zahlen', { recordId: vertragId, formData })
 }
+
+export async function darlehenAuszahlen(darlehenId: string): Promise<ActionResult> {
+  return serverAktion('finanzen.darlehen_auszahlen', { parameter: { darlehen_id: darlehenId } })
+}
+
+export async function darlehenRateZahlen(rateId: string): Promise<ActionResult> {
+  return serverAktion('finanzen.darlehen_rate_zahlen', { parameter: { rate_id: rateId } })
+}
+
+export async function steuerZahlen(steuerId: string): Promise<ActionResult> {
+  return serverAktion('finanzen.steuer_zahlen', { parameter: { steuer_id: steuerId } })
+}
+
+export async function ustVorschlagUebernehmen(monat: string): Promise<ActionResult> {
+  return serverAktion('finanzen.ust_vorschlag_uebernehmen', { parameter: { monat } })
+}

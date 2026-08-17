@@ -300,5 +300,111 @@ export const FINANZEN = {
     }),
     revalidate: ['/finanzen/vertraege/:id', '/finanzen'],
   },
+
+  // --- Darlehen + Steuern (0060) -------------------------------------------
+
+  'finanzen.darlehen_anlegen': {
+    label: 'Darlehen anlegen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Legt ein Darlehen mit Konditionen an und erzeugt den Tilgungsplan (Annuität, lineare Rate oder endfällig).',
+    bindung: 'frei',
+    prozessfrei: true,
+    nurAdmin: true,
+    schema: z.object({
+      name: z.string().min(1, 'Bitte einen Namen angeben').max(160),
+      partner_id: z.string().uuid().optional(),
+      betrag: z.number().positive('Der Betrag muss größer als null sein'),
+      zinssatz_pct: z.number().min(0).max(30).default(0),
+      art: z.enum(['annuitaet', 'rate', 'endfaellig']).default('annuitaet'),
+      auszahlung_am: DATUM,
+      laufzeit_monate: z.number().int().positive().max(360),
+      tilgungsfrei_monate: z.number().int().min(0).default(0),
+      zahltag: z.number().int().min(1).max(28).default(1),
+      bankkonto_id: z.string().uuid().optional(),
+      notiz: z.string().max(500).optional(),
+    }),
+    zusammenfassung: (p) =>
+      `Darlehen „${p.name}" über ${p.betrag} € (${p.zinssatz_pct} % p. a., ${p.laufzeit_monate} Monate) anlegen`,
+    revalidate: ['/finanzen/darlehen', '/finanzen'],
+  },
+
+  'finanzen.darlehen_auszahlen': {
+    label: 'Darlehen auszahlen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Bucht die Auszahlung als Einzahlung ins Register und setzt das Darlehen auf laufend; der Tilgungsplan wird bei Bedarf erzeugt.',
+    bindung: 'frei',
+    prozessfrei: true,
+    nurAdmin: true,
+    schema: z.object({
+      darlehen_id: z.string().uuid('Bitte das Darlehen angeben'),
+      datum: DATUM.optional(),
+    }),
+    revalidate: ['/finanzen/darlehen', '/finanzen'],
+  },
+
+  'finanzen.darlehen_rate_zahlen': {
+    label: 'Darlehensrate zahlen',
+    bereich: 'finanzen',
+    beschreibung: 'Erfasst Zins + Tilgung einer Rate im Register; die letzte Rate tilgt das Darlehen.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      rate_id: z.string().uuid('Bitte die Rate angeben'),
+      datum: DATUM.optional(),
+      bankkonto_id: z.string().uuid().optional(),
+    }),
+    revalidate: ['/finanzen/darlehen', '/finanzen'],
+  },
+
+  'finanzen.steuer_erfassen': {
+    label: 'Steuertermin erfassen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Erfasst einen Steuertermin manuell (USt/GewSt/KSt/sonstige) — negativer Betrag = Erstattung.',
+    bindung: 'frei',
+    prozessfrei: true,
+    ki: true,
+    schema: z.object({
+      art: z.enum(['ust', 'gewst', 'kst', 'sonstige']),
+      zeitraum_von: DATUM,
+      zeitraum_bis: DATUM,
+      bezeichnung: z.string().min(1).max(160),
+      betrag: z.number(),
+      faellig_am: DATUM,
+      notiz: z.string().max(300).optional(),
+    }),
+    zusammenfassung: (p) => `${p.bezeichnung}: ${p.betrag} € fällig am ${p.faellig_am}`,
+    revalidate: ['/finanzen/steuern', '/finanzen'],
+  },
+
+  'finanzen.steuer_zahlen': {
+    label: 'Steuertermin begleichen',
+    bereich: 'finanzen',
+    beschreibung: 'Bucht die Zahlung (bzw. Erstattung) eines Steuertermins ins Register.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      steuer_id: z.string().uuid('Bitte den Steuertermin angeben'),
+      datum: DATUM.optional(),
+      bankkonto_id: z.string().uuid().optional(),
+    }),
+    revalidate: ['/finanzen/steuern', '/finanzen'],
+  },
+
+  'finanzen.ust_vorschlag_uebernehmen': {
+    label: 'USt-Vorschlag übernehmen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Übernimmt die aus den Belegen geschätzte USt-Zahllast eines Monats als Steuertermin (Umsatzsteuer − Vorsteuer, fällig im Folgemonat).',
+    bindung: 'frei',
+    prozessfrei: true,
+    ki: true,
+    schema: z.object({
+      monat: DATUM,
+    }),
+    revalidate: ['/finanzen/steuern', '/finanzen'],
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

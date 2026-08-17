@@ -114,6 +114,12 @@ export const AUSFUEHRUNG = {
   'finanzen.vertrag_aendern': finanzen.vertragAendern,
   'finanzen.vertrag_kuendigen': finanzen.vertragKuendigen,
   'finanzen.vertrag_zahlen': finanzen.vertragZahlen,
+  'finanzen.darlehen_anlegen': finanzen.darlehenAnlegen,
+  'finanzen.darlehen_auszahlen': finanzen.darlehenAuszahlen,
+  'finanzen.darlehen_rate_zahlen': finanzen.darlehenRateZahlen,
+  'finanzen.steuer_erfassen': finanzen.steuerErfassen,
+  'finanzen.steuer_zahlen': finanzen.steuerZahlen,
+  'finanzen.ust_vorschlag_uebernehmen': finanzen.ustVorschlagUebernehmen,
   'kontakte.partner_aendern': kontakte.partnerAendern,
   'kontakte.unterkontakt_anlegen': kontakte.unterkontaktAnlegen,
 

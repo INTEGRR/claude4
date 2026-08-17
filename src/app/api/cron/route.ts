@@ -63,6 +63,13 @@ export async function GET(request: Request) {
           tracking: await pruneTrackingData(),
           monitor: await pruneMonitorData(),
         })
+      case 'finanzen': {
+        // Tageslauf: abgelaufene Verträge beenden, USt-Vorschlag für den
+        // Vormonat anlegen (idempotent, Logik in finanz_tageslauf/0060).
+        const [row] = await sql<{ finanz_tageslauf: Record<string, unknown> }[]>`
+          select finanz_tageslauf('cron')`
+        return NextResponse.json({ task, ...row.finanz_tageslauf })
+      }
       default:
         return NextResponse.json({ error: `Unbekannte Aufgabe: ${task}` }, { status: 400 })
     }

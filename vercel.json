@@ -4,6 +4,7 @@
     { "path": "/api/cron?task=jobs", "schedule": "* * * * *" },
     { "path": "/api/cron?task=reconcile", "schedule": "*/15 * * * *" },
     { "path": "/api/cron?task=tracking", "schedule": "0 * * * *" },
-    { "path": "/api/cron?task=housekeeping", "schedule": "30 3 * * *" }
+    { "path": "/api/cron?task=housekeeping", "schedule": "30 3 * * *" },
+    { "path": "/api/cron?task=finanzen", "schedule": "0 5 * * *" }
   ]
 }

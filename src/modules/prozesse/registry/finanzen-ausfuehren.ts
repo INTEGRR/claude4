@@ -258,6 +258,99 @@ export async function vertragKuendigen(
   return { recordId: ctx.recordId, text: `Gekündigt zum ${row.zum.slice(0, 10)}.` }
 }
 
+// --- Darlehen + Steuern (0060) ----------------------------------------------
+
+export async function darlehenAnlegen(
+  p: {
+    name: string
+    partner_id?: string
+    betrag: number
+    zinssatz_pct: number
+    art: 'annuitaet' | 'rate' | 'endfaellig'
+    auszahlung_am: string
+    laufzeit_monate: number
+    tilgungsfrei_monate: number
+    zahltag: number
+    bankkonto_id?: string
+    notiz?: string
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ id: string; nummer: string }[]>`
+    insert into darlehen (nummer, name, partner_id, betrag, zinssatz_pct, art,
+                          auszahlung_am, laufzeit_monate, tilgungsfrei_monate,
+                          zahltag, bankkonto_id, notiz)
+    values (next_sequence('darlehen'), ${p.name}, ${p.partner_id ?? null}, ${p.betrag},
+            ${p.zinssatz_pct}, ${p.art}, ${p.auszahlung_am}, ${p.laufzeit_monate},
+            ${p.tilgungsfrei_monate}, ${p.zahltag}, ${p.bankkonto_id ?? null}, ${p.notiz ?? null})
+    returning id, nummer`
+  await sql`select darlehen_raten_generieren(${row.id}, ${ctx.actor})`
+  return {
+    recordId: row.id,
+    text: `Darlehen ${row.nummer} angelegt, Tilgungsplan erzeugt.`,
+    link: `/finanzen/darlehen/${row.id}`,
+  }
+}
+
+export async function darlehenAuszahlen(
+  p: { darlehen_id: string; datum?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    select darlehen_auszahlen(${p.darlehen_id}, ${p.datum ?? sql`current_date`}, ${ctx.actor})`
+  return { recordId: p.darlehen_id, text: 'Darlehen ausgezahlt — läuft.' }
+}
+
+export async function darlehenRateZahlen(
+  p: { rate_id: string; datum?: string; bankkonto_id?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    select darlehen_rate_zahlen(${p.rate_id}, ${p.datum ?? sql`current_date`},
+                                ${p.bankkonto_id ?? null}, ${ctx.actor})`
+  return { text: 'Rate bezahlt.' }
+}
+
+export async function steuerErfassen(
+  p: {
+    art: 'ust' | 'gewst' | 'kst' | 'sonstige'
+    zeitraum_von: string
+    zeitraum_bis: string
+    bezeichnung: string
+    betrag: number
+    faellig_am: string
+    notiz?: string
+  },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ id: string }[]>`
+    insert into steuerzahlungen (art, zeitraum_von, zeitraum_bis, bezeichnung,
+                                 betrag, faellig_am, notiz)
+    values (${p.art}, ${p.zeitraum_von}, ${p.zeitraum_bis}, ${p.bezeichnung},
+            ${p.betrag}, ${p.faellig_am}, ${p.notiz ?? null})
+    returning id`
+  return { recordId: row.id, text: 'Steuertermin erfasst.', link: '/finanzen/steuern' }
+}
+
+export async function steuerZahlen(
+  p: { steuer_id: string; datum?: string; bankkonto_id?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    select steuer_zahlen(${p.steuer_id}, ${p.datum ?? sql`current_date`},
+                         ${p.bankkonto_id ?? null}, ${ctx.actor})`
+  return { text: 'Steuertermin beglichen.' }
+}
+
+export async function ustVorschlagUebernehmen(
+  p: { monat: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ id: string }[]>`
+    select ust_vorschlag_uebernehmen(${p.monat}, ${ctx.actor}) as id`
+  return { recordId: row.id, text: 'USt-Vorschlag als Termin übernommen.', link: '/finanzen/steuern' }
+}
+
 export async function vertragZahlen(
   p: { gezahlt_am?: string; bankkonto_id?: string },
   ctx: AktionsKontext,
