@@ -319,6 +319,85 @@ async function main() {
     // einzigen Balken. Läuft über die echten Buchungsfunktionen.
     const historie = await baueHistorie(sql)
 
+    // --- Finanzen: Konten, Verträge, Zahlplan, Darlehen, Steuern, Plan ------
+    // Alles über die echten SQL-Funktionen, damit das Cockpit ab dem ersten
+    // Login ein vollständiges Bild zeigt (Saldo, Band, Fremdkapitalbedarf).
+    const [konto] = await sql<{ id: string }[]>`
+      insert into bankkonten (name, iban, waehrung)
+      values ('Geschäftskonto Sparkasse', 'DE89 7605 0101 0000 1234 56', 'EUR') returning id`
+    const [tagesgeld] = await sql<{ id: string }[]>`
+      insert into bankkonten (name, waehrung)
+      values ('Tagesgeld-Rücklage', 'EUR') returning id`
+    await sql`insert into kontostaende (bankkonto_id, stichtag, saldo, notiz, erfasst_von)
+              values (${konto.id}, current_date - 25, 84200, 'Anker aus Kontoauszug', 'seed'),
+                     (${tagesgeld.id}, current_date - 25, 40000, 'Rücklage', 'seed')`
+
+    // Fixkosten als Verträge — Miete/Lizenzen/Personal, mit echten Fristen.
+    const vertraege: {
+      name: string; kategorie: string; betrag: number; zahltag: number
+      beginnMonate: number; laufzeit: number | null; frist: number
+    }[] = [
+      { name: 'Miete Lager & Büro Werkstraße', kategorie: 'miete', betrag: 2400, zahltag: 1, beginnMonate: 14, laufzeit: 36, frist: 3 },
+      { name: 'Sendcloud Versandlizenz', kategorie: 'lizenzen', betrag: 89, zahltag: 15, beginnMonate: 8, laufzeit: 12, frist: 1 },
+      { name: 'Replo Addon (Shopify-Storefront)', kategorie: 'lizenzen', betrag: 49, zahltag: 15, beginnMonate: 6, laufzeit: null, frist: 0 },
+      { name: 'Gehälter Team', kategorie: 'personal', betrag: 14500, zahltag: 28, beginnMonate: 14, laufzeit: null, frist: 0 },
+      { name: 'Aushilfen (Minijobs)', kategorie: 'personal', betrag: 1560, zahltag: 28, beginnMonate: 5, laufzeit: null, frist: 0 },
+    ]
+    for (const v of vertraege) {
+      await sql`
+        insert into vertraege (nummer, name, kategorie, betrag, intervall, zahltag,
+                               beginn, laufzeit_monate, kuendigungsfrist_monate, status)
+        values (next_sequence('vertrag'), ${v.name}, ${v.kategorie}, ${v.betrag}, 'monatlich',
+                ${v.zahltag}, (date_trunc('month', current_date) - (${v.beginnMonate} || ' months')::interval)::date,
+                ${v.laufzeit}, ${v.frist}, 'aktiv')`
+    }
+
+    // Offene Containerbestellung mit 30/70-Zahlplan: die Anzahlung ist raus,
+    // der Rest hängt an der Verschiffung (ETA bestätigt, Transit aus settings).
+    const [containerPo] = await sql<{ id: string }[]>`
+      insert into purchase_orders (number, vendor_id, eta_confirmed)
+      values (next_sequence('purchase'), ${vendor.id}, current_date + 40) returning id`
+    await sql`
+      insert into purchase_order_lines (order_id, variant_id, name, qty, uom_id, price_unit, tax_rate)
+      values (${containerPo.id}, ${compIds.get('Gehäuse schwarz') ?? ''}, 'Gehäuse schwarz (Container)', 400, ${stueck.id}, 16.9, 0),
+             (${containerPo.id}, ${compIds.get('Keycap-Set schwarz') ?? ''}, 'Keycap-Set schwarz (Container)', 400, ${stueck.id}, 21.5, 0)`
+    await sql`select confirm_purchase_order(${containerPo.id}, 'seed')`
+    const [anzahlung] = await sql<{ id: string }[]>`
+      insert into zahlplan_raten (purchase_order_id, sequence, bezeichnung, anteil_pct, ausloeser)
+      values (${containerPo.id}, 10, 'Anzahlung 30 %', 30, 'bestellung') returning id`
+    await sql`
+      insert into zahlplan_raten (purchase_order_id, sequence, bezeichnung, anteil_pct, ausloeser)
+      values (${containerPo.id}, 20, 'Rest bei Verschiffung', 70, 'verschiffung')`
+    await sql`
+      select zahlung_erfassen('aus', (select zahlplan_betrag(r) from zahlplan_raten r where r.id = ${anzahlung.id}),
+                              'EUR', current_date - 20, ${konto.id}, 'po_rate', ${anzahlung.id},
+                              'Anzahlung Containerbestellung', 'seed')`
+
+    // Annuitätendarlehen, seit drei Monaten laufend — die ersten Raten sind
+    // bezahlt, der Rest steht im Tilgungsplan und in der Prognose.
+    const [darlehen] = await sql<{ id: string }[]>`
+      insert into darlehen (nummer, name, betrag, zinssatz_pct, art, auszahlung_am,
+                            laufzeit_monate, zahltag, bankkonto_id)
+      values (next_sequence('darlehen'), 'Betriebsmitteldarlehen Hausbank', 90000, 6.5,
+              'annuitaet', current_date - 100, 48, 1, ${konto.id}) returning id`
+    await sql`select darlehen_auszahlen(${darlehen.id}, current_date - 100, 'seed')`
+    const faelligeRaten = await sql<{ id: string; faellig_am: string }[]>`
+      select id, faellig_am::text from darlehen_raten
+      where darlehen_id = ${darlehen.id} and faellig_am < current_date order by nr`
+    for (const rate of faelligeRaten) {
+      await sql`select darlehen_rate_zahlen(${rate.id}, ${rate.faellig_am}, ${konto.id}, 'seed')`
+    }
+
+    // Steuern: USt-Vorschlag für den Vormonat + Umsatzplan über den Tageslauf
+    // (idempotent), dazu eine manuelle GewSt-Vorauszahlung als Termin.
+    await sql`select finanz_tageslauf('seed')`
+    await sql`
+      insert into steuerzahlungen (art, zeitraum_von, zeitraum_bis, bezeichnung, betrag, faellig_am)
+      values ('gewst', date_trunc('quarter', current_date)::date,
+              (date_trunc('quarter', current_date) + interval '3 months')::date - 1,
+              'GewSt-Vorauszahlung', 1850,
+              (date_trunc('month', current_date) + interval '2 months')::date + 14)`
+
     console.log(`Beispieldaten angelegt:
   - 20 Komponenten mit Anfangsbestand, Barcodes und Lieferantenpreisen
   - Tastatur mit 3 Farbvarianten
@@ -329,6 +408,9 @@ async function main() {
   - Ein Angebot über 2 weiße Tastaturen (noch nicht bestätigt)
   - Demo-Benutzer lager@example.com und fertigung@example.com (Passwort wie Admin)
   - Anfangsbestand zum Einstandspreis bewertet
+  - Finanzen: 2 Bankkonten mit Anker, 5 Fixkosten-Verträge, Containerbestellung
+    mit 30/70-Zahlplan (Anzahlung bezahlt), Annuitätendarlehen (90.000 €, läuft),
+    USt-Vorschlag + GewSt-Termin, Umsatzplan für 13 Monate gefüllt
   - ${historie.join('\n  - ')}`)
   } finally {
     await sql.end()

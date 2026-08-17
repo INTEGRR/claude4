@@ -675,6 +675,66 @@ hineinsprechen:
   `street` → „Straße" …) — generierte Masken sprechen durchgehend
   Deutsch, nicht mehr Spaltennamen-Englisch.
 
+## Finanzen: Cashflow, Verträge, Darlehen, Steuern, Prognose (0058–0061, umgesetzt)
+
+Die Geldseite des ERP — gebaut für eine Frage: **wie viel Fremdkapital
+braucht der Wareneinkauf in den nächsten 12 Monaten?** Vier Migrationen,
+je einzeln releasebar:
+
+- **Zahlungsregister (0058)**: `zahlungen` ist das Ist — jede Bewegung mit
+  eingefrorenem Kurs und `betrag_eur` als Rechenwahrheit, Storno statt
+  Löschen. `bankkonten` + manuelle `kontostaende`-Anker (kein Bankimport);
+  `finanz_saldo()` = Anker + Zahlungen danach. Teilzahlungen auf
+  Lieferantenrechnungen mit **Anrechnungsregel**: Zahlplan-Raten derselben
+  Bestellung mindern den offenen Rechnungsbetrag (30/70-Fälle zählen nie
+  doppelt). `zahlplan_raten` je Bestellung (Anteil ODER Betrag, Auslöser
+  Bestellung/Verschiffung/Ankunft/Termin, Versatz); `pay_vendor_bill` ist
+  jetzt ein Wrapper um `zahlung_erfassen` — der Prozess „Lieferantenrechnung"
+  schreibt unverändert, aber ins Register. `finanz_faellig(bis)` sammelt
+  alles Anstehende (exists-Weiche: je Bestellung zählt ENTWEDER Zahlplan
+  ODER Rechnung).
+- **Verträge (0059)**: Fixkosten als `vertraege` (VT/, Intervall, Zahltag,
+  Mindestlaufzeit = rollierende Verlängerung, Kündigungsfrist). Die
+  Kündigungs-Mathematik (`vertrag_naechstes_kuendbar_zum`,
+  `vertrag_kuendigung_ansteht` mit Vorlauf aus settings) speist das violette
+  Signal „Kündigungsfrist läuft ab"; `vertrag_zahlungen_bis` projiziert die
+  Termine in die Prognose. Ein Prozess `vertrag_fixkosten`
+  (anlegen → kündigen) in allen Paketen; „beendet" setzt der Tageslauf.
+- **Darlehen + Steuern (0060)**: `darlehen` mit generiertem Tilgungsplan
+  (Annuität A=S·i/(1−(1+i)^−n), lineare Rate, endfällig;
+  Regenerier-Riegel sobald Raten bezahlt sind), Auszahlung bucht die
+  Einzahlung ins Register. `steuerzahlungen` (USt/GewSt/KSt, negativ =
+  Erstattung, unique je Art+Zeitraum); `ust_zahllast_vorschlag(monat)`
+  rechnet Umsatzsteuer − Vorsteuer aus den Belegen und wird per Klick (oder
+  Cron) als Termin übernommen — gebucht wird nie automatisch.
+- **Umsatzplan + Prognose (0061)**: `umsatzplan` (Monat × best/base/worst,
+  Vorschlag = Vorjahresmonat × Trend, Handeingaben gewinnen dauerhaft).
+  `finanz_prognose(szenario, raster)` über 13 Wochen oder 12 Monate:
+  Planumsatz taggenau mit Kanal-Split (historische Shopify-Quote) und
+  Zahlungsversatz; Bestellabflüsse aus drei DISJUNKTEN Quellen (offene
+  Zahlplan-Raten, offene Rechnungen ohne Zahlplan, Restobligo bestätigter
+  Bestellungen); Verträge/Darlehen/Steuern; USt-Automatik
+  (`ust_zahllast_quote_pct` × Planumsatz) nur für Monate ohne erfasste
+  Zeile. Herzstück ist das **kumulative Deckungskonto** der
+  Wareneinsatz-Quote: Soll C_t = Σ Quote × Planumsatz, Deckung D =
+  Bestandswert + Zulaufwert bestätigter Bestellungen, Abfluss = ΔR mit
+  R_t = max(0, C_t − D). Ware, die da oder konkret bestellt ist, zählt
+  nie doppelt — eine neu erfasste Bestellung wandert von der Quote zu den
+  konkreten Zahlungen. `finanz_unterdeckung()` = Fremdkapitalbedarf
+  (Tiefpunkt gegen Liquiditätspuffer) — violett im Cockpit und als
+  Dashboard-Signal. Alle Quoten/Sätze/Zahltage im settings-Schlüssel
+  `finanzen`, pflegbar unter Einstellungen → Finanzen; nichts ist im Code
+  festgelegt.
+
+Rechte: Bereich `finanzen` sehen nur Admins oder Träger der Befugnis
+`finanzen:zugriff` (`BEFUGNIS_AREAS` in `permissions.ts` — Gehälter gehen
+nicht jede Büro-Rolle an). Cron `?task=finanzen` (täglich 5 Uhr) beendet
+abgelaufene Verträge, legt den USt-Vorschlag des Vormonats an und zieht
+die Umsatzplan-Vorschläge nach — idempotent. Tests: Anrechnung,
+Fälligkeits-Auslöser, Kündigungsfristen, Tilgungs-Mathematik,
+USt-Nachrechnung und die vier Deckungskonto-Prüffälle auf neutralisierter
+Datenlage (`tests/finanzen.test.ts`).
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),
