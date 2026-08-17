@@ -1209,6 +1209,170 @@ label.field > span {
 }
 .chart-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 
+/* --- Boot-Splash (Design „KRNL": Void, Signal-Orange, Kernel-Violett) ------
+   Eigenes Farbsystem, bewusst themenunabhängig — ein Bootscreen hat genau
+   ein Gesicht. Motion: Eintritt rastet per Transform/Filter ein (NIE über
+   opacity — der Schriftzug muss auch mit stehender Animationsuhr sichtbar
+   sein), ein einziger Glitch-Burst, Balken läuft voll, alles blendet aus. */
+
+@font-face {
+  font-family: 'DSEG7';
+  src: url('/fonts/dseg7.woff2') format('woff2');
+  font-display: block;
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #08090a;
+  color: #f4f3ef;
+  animation: splash-aus 0.45s ease 1.9s forwards;
+}
+.splash-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #1e2023;
+}
+.splash-rail.oben { top: clamp(16px, 4vh, 40px); }
+.splash-rail.unten { bottom: clamp(16px, 4vh, 40px); }
+.splash-rail.oben::after,
+.splash-rail.unten::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  height: 1px;
+}
+.splash-rail.oben::after { left: clamp(24px, 6vw, 120px); width: clamp(80px, 14vw, 190px); background: #ff5a1f; }
+.splash-rail.unten::after { right: clamp(24px, 6vw, 120px); width: clamp(60px, 10vw, 140px); background: #7c5aff; }
+
+.splash-buehne {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(18px, 3.5vh, 34px);
+  padding: 0 clamp(24px, 6vw, 120px);
+}
+.splash-lockup {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2vw, 26px);
+  animation: splash-einrasten 1.5s cubic-bezier(0.2, 0.85, 0.1, 1) both;
+}
+.splash-mark { width: clamp(58px, 9vw, 130px); height: auto; flex: none; }
+.splash-wortmarke {
+  position: relative;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 900;
+  font-size: clamp(72px, 13.5vw, 196px);
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  color: #f4f3ef;
+}
+/* RGB-Split-Geister: ruhen deckungsgleich, zucken EINMAL kurz nach dem
+   Einrasten — knallen, nicht nerven. */
+.splash-geist {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.splash-geist.violett { color: #7c5aff; animation: splash-burst-a 0.4s steps(2) 1s 1; }
+.splash-geist.orange { color: #ff5a1f; animation: splash-burst-b 0.4s steps(2) 1s 1; }
+
+.splash-untertitel {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: clamp(11px, 1.4vw, 14px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #8a8c93;
+}
+.splash-untertitel .signal { color: #ff5a1f; }
+
+.splash-post {
+  display: flex;
+  border: 1px solid #1e2023;
+  background: #0e0f11;
+}
+.splash-post-zelle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(10px, 1.6vh, 16px) clamp(18px, 3vw, 34px);
+}
+.splash-post-zelle + .splash-post-zelle { border-left: 1px solid #1e2023; }
+.splash-post-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #5a5c62;
+}
+.splash-seg {
+  position: relative;
+  font-family: 'DSEG7', var(--font-geist-mono), monospace;
+  font-size: clamp(20px, 3vw, 30px);
+  line-height: 1;
+}
+.splash-seg-geist { opacity: 0.13; }
+.splash-seg-wert { position: absolute; right: 0; top: 0; }
+.splash-seg.signal .splash-seg-wert { color: #ff5a1f; text-shadow: 0 0 14px rgb(255 90 31 / 0.5); }
+.splash-seg.kernel .splash-seg-wert { color: #7c5aff; text-shadow: 0 0 14px rgb(124 90 255 / 0.5); }
+.splash-seg.signal .splash-seg-geist { color: #ff5a1f; }
+.splash-seg.kernel .splash-seg-geist { color: #7c5aff; }
+
+.splash-balken {
+  width: min(60vw, 420px);
+  height: 5px;
+  background: #1c1e21;
+  overflow: hidden;
+}
+.splash-balken-fuellung {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #7c5aff, #ff5a1f);
+  animation: splash-laden 1.5s cubic-bezier(0.3, 0.1, 0.2, 1) 0.15s forwards;
+}
+
+@keyframes splash-einrasten {
+  0% { transform: translateX(-3vw) skewX(-12deg); filter: blur(6px); }
+  60% { transform: translateX(0.4vw) skewX(2deg); filter: blur(0.5px); }
+  100% { transform: none; filter: none; }
+}
+@keyframes splash-burst-a {
+  0%, 100% { transform: none; }
+  25% { transform: translate(-7px, 2px); }
+  60% { transform: translate(5px, -2px); }
+}
+@keyframes splash-burst-b {
+  0%, 100% { transform: none; }
+  25% { transform: translate(6px, -2px); }
+  60% { transform: translate(-4px, 2px); }
+}
+@keyframes splash-laden { to { width: 100%; } }
+@keyframes splash-aus { to { opacity: 0; visibility: hidden; } }
+
+@media (max-width: 780px) {
+  .splash-lockup { flex-direction: column; gap: clamp(14px, 3vh, 24px); }
+  .splash-post { flex-direction: column; }
+  .splash-post-zelle + .splash-post-zelle { border-left: 0; border-top: 1px solid #1e2023; }
+  .splash-balken { width: min(70vw, 320px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-lockup, .splash-geist, .splash-balken-fuellung { animation: none; }
+  .splash-geist { display: none; }
+  .splash-balken-fuellung { width: 100%; }
+  /* Ausblenden bleibt — sonst stünde der Splash ewig. */
+}
+
 /* --- Prozessdiagramm (React Flow + ELK) ------------------------------------ */
 
 .flow-rahmen {

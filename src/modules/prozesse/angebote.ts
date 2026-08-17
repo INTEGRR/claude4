@@ -151,7 +151,7 @@ export async function naechsteAngebote(
     // Admin besteht Rollen- und Befugnisprüfung immer (wie im Torwächter).
     const befugnis = befugnisJeSchritt.get(s.code) ?? null
     const erlaubt =
-      aktionErlaubt(eintrag, rolle) &&
+      aktionErlaubt(eintrag, rolle, befugnisse) &&
       (rolle === 'admin' ||
         ((!s.rollen || s.rollen.length === 0 || s.rollen.includes(rolle)) &&
           (!befugnis || befugnisse.includes(befugnis))))

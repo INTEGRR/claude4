@@ -19,6 +19,7 @@ interface SuchTreffer {
 async function belegAktionen(
   q: string,
   role: Parameters<typeof canAccess>[0],
+  befugnisse: readonly string[] = [],
 ): Promise<SuchTreffer[]> {
   const teile = q.split(/\s+/)
   if (teile.length < 2) return []
@@ -56,7 +57,7 @@ async function belegAktionen(
       if (s.art !== 'aktion' || !s.aktion) continue
       if (!`${s.name}`.toLowerCase().includes(rest)) continue
       const eintrag = registrierteAktion(s.aktion)
-      if (!eintrag || !aktionErlaubt(eintrag, role)) continue
+      if (!eintrag || !aktionErlaubt(eintrag, role, befugnisse)) continue
       if (role !== 'admin' && s.rollen && s.rollen.length > 0 && !s.rollen.includes(role)) continue
       const vorbelegt = s.params ?? {}
       const offeneFelder = formularFelder(eintrag).filter((f) => !(f.name in vorbelegt))
@@ -91,10 +92,11 @@ export async function GET(request: Request) {
   const muster = `%${q}%`
 
   const treffer: SuchTreffer[] = []
-  const sieht = (bereich: Parameters<typeof canAccess>[1]) => canAccess(user.role, bereich)
+  const sieht = (bereich: Parameters<typeof canAccess>[1]) =>
+    canAccess(user.role, bereich, user.befugnisse)
 
   // Beleg + Aktion zuerst — der spezifischste Treffer gehört nach oben.
-  treffer.push(...(await belegAktionen(q, user.role)))
+  treffer.push(...(await belegAktionen(q, user.role, user.befugnisse)))
 
   if (sieht('verkauf')) {
     for (const r of await sql<{ id: string; number: string; name: string | null; kunde: string }[]>`

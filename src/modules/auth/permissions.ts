@@ -25,6 +25,7 @@ export type Area =
   | 'produkte'
   | 'kontakte'
   | 'auswertungen'
+  | 'finanzen'
   | 'ki'
   | 'scanner'
   | 'personal'
@@ -35,14 +36,16 @@ export type Area =
 
 const ALL_AREAS: Area[] = [
   'verkauf', 'einkauf', 'fertigung', 'lager', 'versand', 'reparatur',
-  'produkte', 'kontakte', 'auswertungen', 'ki', 'scanner',
+  'produkte', 'kontakte', 'auswertungen', 'finanzen', 'ki', 'scanner',
   'personal', 'zeiterfassung', 'integrationen', 'einstellungen', 'fehler',
 ]
 
 /** Bereiche, in denen die Rolle arbeiten (schreiben) darf. */
 const WRITE_AREAS: Record<Role, Area[]> = {
   admin: ALL_AREAS,
-  mitarbeiter: ALL_AREAS.filter((a) => a !== 'integrationen' && a !== 'einstellungen'),
+  mitarbeiter: ALL_AREAS.filter(
+    (a) => a !== 'integrationen' && a !== 'einstellungen' && a !== 'finanzen',
+  ),
   // 'fehler' hat jede Rolle: wer am Packtisch auf einen Fehler läuft, soll
   // ihn dort melden können, wo er auftritt — nicht per Zettel ans Büro.
   lager: ['lager', 'versand', 'reparatur', 'scanner', 'zeiterfassung', 'fehler'],
@@ -57,11 +60,24 @@ const READ_AREAS: Record<Role, Area[]> = {
   fertigung: ['produkte'],
 }
 
-export function canAccess(role: Role, area: Area): boolean {
+/**
+ * Bereiche, die eine persönliche Befugnis statt der Rollenmatrix verlangen:
+ * Finanzen (Gehälter-Summen, Kontostände) ist keine Frage der Rolle, sondern
+ * des Vertrauens — Admin immer, alle anderen nur mit vergebener Befugnis.
+ */
+const BEFUGNIS_AREAS: Partial<Record<Area, Befugnis>> = {
+  finanzen: 'finanzen:zugriff',
+}
+
+export function canAccess(role: Role, area: Area, befugnisse: readonly string[] = []): boolean {
+  const noetig = BEFUGNIS_AREAS[area]
+  if (noetig) return role === 'admin' || befugnisse.includes(noetig)
   return WRITE_AREAS[role].includes(area) || READ_AREAS[role].includes(area)
 }
 
-export function canWrite(role: Role, area: Area): boolean {
+export function canWrite(role: Role, area: Area, befugnisse: readonly string[] = []): boolean {
+  const noetig = BEFUGNIS_AREAS[area]
+  if (noetig) return role === 'admin' || befugnisse.includes(noetig)
   return WRITE_AREAS[role].includes(area)
 }
 
@@ -84,6 +100,7 @@ export const ALL_ROLES = Object.keys(ROLE_LABELS) as Role[]
  */
 export const BEFUGNISSE = {
   'einkauf:freigabe': 'Bestellungen freigeben',
+  'finanzen:zugriff': 'Finanzen einsehen und buchen (Cashflow, Verträge, Zahlungen)',
 } as const
 
 export type Befugnis = keyof typeof BEFUGNISSE

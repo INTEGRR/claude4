@@ -102,7 +102,7 @@ export default async function Dashboard({
   ]
 
   // --- Befehlsfeld-Katalog: dieselbe Quelle wie das Strg+K-Overlay ---------
-  const { aktionen, seiten } = befehlsKatalog(user.role, prozessAktiv)
+  const { aktionen, seiten } = befehlsKatalog(user.role, prozessAktiv, user.befugnisse)
 
   // --- Lern-Gedächtnis: was DIESER Benutzer oft nutzt ----------------------
   const nutzung = await sql<{ art: string; schluessel: string; anzahl: number }[]>`

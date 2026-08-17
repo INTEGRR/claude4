@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { TicketOverlay } from '@/components/ticket-overlay'
 import { KiOverlay } from '@/components/ki-overlay'
 import { BefehlsOverlay } from '@/components/befehls-overlay'
+import { Splash } from '@/components/splash'
 import { befehlsKatalog } from '@/modules/befehle'
 import { kiConfigured } from '@/modules/ki/agent'
 
@@ -87,7 +88,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   // Befehlsfeld überall (Strg/Cmd+K): derselbe Katalog wie auf der Übersicht,
   // plus das Lern-Gedächtnis dieses Benutzers fürs Ranking.
-  const befehle = befehlsKatalog(user.role, prozessAktiv)
+  const befehle = befehlsKatalog(user.role, prozessAktiv, user.befugnisse)
   const nutzung = await sql<{ schluessel: string; anzahl: number }[]>`
     select schluessel, anzahl from nutzungs_zaehler
     where user_id = ${user.id} order by anzahl desc limit 40`
@@ -211,6 +212,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   ].filter((g) => g.items.length > 0)
 
   return (
+    <>
+    {/* Boot-Splash: einmal je Sitzung, entfernt sich selbst (splash.tsx). */}
+    <Splash />
     <AppShell
       sidebar={
         <>
@@ -261,5 +265,6 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       {/* Der KI-Chat als zweiter Reiter: offen lassen und weiterarbeiten. */}
       {sees('ki') && kiConfigured() && <KiOverlay />}
     </AppShell>
+    </>
   )
 }

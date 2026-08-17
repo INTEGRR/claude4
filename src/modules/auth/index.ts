@@ -120,14 +120,14 @@ export async function requireAdmin(): Promise<User> {
  */
 export async function requireArea(area: Area): Promise<User> {
   const user = await requireUser()
-  if (!canAccess(user.role, area)) redirect('/?verweigert=' + area)
+  if (!canAccess(user.role, area, user.befugnisse)) redirect('/?verweigert=' + area)
   return user
 }
 
 /** Für Server Actions: wirft, wenn die Rolle im Bereich nicht arbeiten darf. */
 export async function requireWrite(area: Area): Promise<User> {
   const user = await requireUser()
-  if (!canWrite(user.role, area)) {
+  if (!canWrite(user.role, area, user.befugnisse)) {
     throw new Error('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
   return user

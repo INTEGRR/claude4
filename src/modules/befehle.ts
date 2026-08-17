@@ -45,6 +45,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/personal/abwesenheiten', label: 'Abwesenheiten', area: 'personal' },
   { href: '/auswertungen', label: 'Auswertungen: Mengen & Abverkauf', area: 'auswertungen' },
   { href: '/auswertungen/kennzahlen', label: 'Kennzahlen', area: 'auswertungen' },
+  { href: '/finanzen', label: 'Finanzen (Cashflow)', area: 'finanzen', prozess: ['finanzen'] },
   { href: '/ki', label: 'KI-Analyse', area: 'ki' },
   { href: '/produkte', label: 'Produkte', area: 'produkte' },
   { href: '/kontakte', label: 'Kontakte', area: 'kontakte' },
@@ -59,12 +60,15 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
 export function befehlsKatalog(
   role: Role,
   prozessAktiv: (bereich: string) => boolean,
+  befugnisse: readonly string[] = [],
 ): { aktionen: BefehlsAktion[]; seiten: BefehlsSeite[] } {
   const aktionen = Object.entries(REGISTRY)
-    .filter(([, a]) => a.bindung === 'frei' && aktionErlaubt(a, role))
+    .filter(([, a]) => a.bindung === 'frei' && aktionErlaubt(a, role, befugnisse))
     .map(([name, a]) => ({ name, label: a.label, bereich: a.bereich }))
   const seiten = SEITEN.filter(
-    (p) => canAccess(role, p.area) && (!p.prozess || p.prozess.some((b) => prozessAktiv(b))),
+    (p) =>
+      canAccess(role, p.area, befugnisse) &&
+      (!p.prozess || p.prozess.some((b) => prozessAktiv(b))),
   ).map(({ href, label }) => ({ href, label }))
   return { aktionen, seiten }
 }

@@ -69,9 +69,13 @@ export function aktionPruefen(
 }
 
 /** Rechteprüfung als eigene, pure Funktion — je Rolle testbar. */
-export function aktionErlaubt(aktion: RegistrierteAktion, role: Role): boolean {
+export function aktionErlaubt(
+  aktion: RegistrierteAktion,
+  role: Role,
+  befugnisse: readonly string[] = [],
+): boolean {
   if (aktion.nurAdmin) return role === 'admin'
-  return canWrite(role, aktion.bereich)
+  return canWrite(role, aktion.bereich, befugnisse)
 }
 
 /**
@@ -140,7 +144,7 @@ export async function aktionAusfuehrenGeprueft(
 ): Promise<AktionsErgebnis> {
   const { aktion, werte, recordId } = aktionPruefen(name, aufruf)
 
-  if (!aktionErlaubt(aktion, nutzer.role)) {
+  if (!aktionErlaubt(aktion, nutzer.role, nutzer.befugnisse)) {
     throw new RechteFehler(
       aktion.nurAdmin
         ? `„${aktion.label}" ist Administratoren vorbehalten`

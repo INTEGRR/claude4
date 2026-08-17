@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     )
     const eintrag = registrierteAktion(name)
     if (!eintrag) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
-    if (!aktionErlaubt(eintrag, user.role)) {
+    if (!aktionErlaubt(eintrag, user.role, user.befugnisse)) {
       return NextResponse.json(
         { error: `Ihrer Rolle fehlt die Berechtigung für „${eintrag.label}"` },
         { status: 403 },
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     const aktion = (AKTIONEN as Record<string, (typeof AKTIONEN)[AktionName]>)[name]
     if (!aktion) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
     // Wer die Aktion nicht ausführen darf, soll sie auch nicht umschreiben.
-    if (!canWrite(user.role, aktion.bereich)) {
+    if (!canWrite(user.role, aktion.bereich, user.befugnisse)) {
       return NextResponse.json(
         { error: `Ihrer Rolle fehlt die Berechtigung für „${aktion.label}"` },
         { status: 403 },
