@@ -1,5 +1,5 @@
 'use client'
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useCallback, useRef, useState } from 'react'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
 import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
@@ -160,40 +160,198 @@ function Markdown({ text }: { text: string }) {
 
 // --- Diagramm --------------------------------------------------------------
 
+/** Diagrammdaten als CSV — dieselben Zahlen, die auch gezeichnet werden. */
+function diagrammCsv(d: Diagramm): string {
+  const esc = (v: string | number) => {
+    const s = String(v)
+    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  if (d.art === 'saeulen') {
+    const header = ['Kategorie', ...(d.serien ?? []).map((s) => s.name)]
+    const rows = (d.kategorien ?? []).map((k, i) => [
+      k,
+      ...(d.serien ?? []).map((s) => s.werte[i] ?? 0),
+    ])
+    return [header, ...rows].map((r) => r.map(esc).join(';')).join('\n')
+  }
+  const header = ['Bezeichnung', d.einheit ? `Wert (${d.einheit})` : 'Wert']
+  return [header, ...(d.punkte ?? []).map((p) => [p.label, p.wert])]
+    .map((r) => r.map(esc).join(';'))
+    .join('\n')
+}
+
+function herunterladen(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 /**
- * Der Agent bestimmt Inhalt und Art, das Aussehen kommt aus denselben
- * Komponenten wie die festen Auswertungen — eine Antwort soll nicht anders
- * aussehen als der Rest des Hauses.
+ * SVG → PNG im Browser. Die SVGs färben über CSS-Variablen (--viz-…), die in
+ * einer freistehenden Bilddatei fehlen würden — deshalb werden die
+ * berechneten Farben vor der Serialisierung als Attribute eingebrannt.
  */
-function ChartCard({ d }: { d: Diagramm }) {
+async function svgAlsPng(svg: SVGSVGElement, name: string) {
+  const klon = svg.cloneNode(true) as SVGSVGElement
+  const originale = [svg, ...svg.querySelectorAll<SVGElement>('*')]
+  const kopien = [klon, ...klon.querySelectorAll<SVGElement>('*')]
+  originale.forEach((el, i) => {
+    const stil = getComputedStyle(el)
+    kopien[i].setAttribute('fill', stil.fill)
+    kopien[i].setAttribute('stroke', stil.stroke)
+    kopien[i].setAttribute('font-family', stil.fontFamily)
+  })
+  const breite = svg.viewBox.baseVal.width || svg.clientWidth
+  const hoehe = svg.viewBox.baseVal.height || svg.clientHeight
+  klon.setAttribute('width', String(breite))
+  klon.setAttribute('height', String(hoehe))
+
+  const img = new Image()
+  await new Promise((res, rej) => {
+    img.onload = res
+    img.onerror = rej
+    img.src =
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(new XMLSerializer().serializeToString(klon))
+  })
+  const canvas = document.createElement('canvas')
+  const skala = 2
+  canvas.width = breite * skala
+  canvas.height = hoehe * skala
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = getComputedStyle(document.body).backgroundColor
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  canvas.toBlob((b) => b && herunterladen(name, b), 'image/png')
+}
+
+/** Das eigentliche Zeichnen — geteilt zwischen Karte und Großansicht. */
+function DiagrammInhalt({ d, hoehe }: { d: Diagramm; hoehe?: number }) {
   const format = d.einheit === '€' ? money : (v: number) => menge(v)
   return (
-    <div className="card" style={{ marginBottom: 8 }}>
+    <>
+      {d.art === 'saeulen' && (
+        <ColumnChart
+          categories={d.kategorien ?? []}
+          series={(d.serien ?? []).map((r) => ({ name: r.name, values: r.werte }))}
+          unit={d.einheit}
+          height={hoehe}
+        />
+      )}
+      {d.art === 'balken' && (
+        <HBars
+          unit={d.einheit}
+          rows={(d.punkte ?? []).map((p) => ({ label: p.label, value: p.wert }))}
+        />
+      )}
+      {d.art === 'anteile' && (
+        <ShareBar
+          parts={(d.punkte ?? []).filter((p) => p.wert > 0).map((p) => ({ label: p.label, value: p.wert }))}
+          format={format}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * Der Agent bestimmt Inhalt und Art, das Aussehen kommt aus denselben
+ * Komponenten wie die festen Auswertungen. Dazu (BUG/00008): Werte beim
+ * Überfahren (native Tooltips der Charts), Großansicht mit Datentabelle im
+ * Dialog, Export als PNG (Säulen-SVG) und CSV.
+ */
+function ChartCard({ d }: { d: Diagramm }) {
+  const kartenRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  const dateiname = d.titel.toLowerCase().replace(/[^a-zä-ü0-9]+/gi, '-').replace(/^-|-$/g, '') || 'diagramm'
+
+  const alsPng = useCallback(() => {
+    const svg = kartenRef.current?.querySelector('svg')
+    if (svg) void svgAlsPng(svg, `${dateiname}.png`)
+  }, [dateiname])
+
+  const alsCsv = useCallback(() => {
+    herunterladen(
+      `${dateiname}.csv`,
+      new Blob(['﻿' + diagrammCsv(d)], { type: 'text/csv;charset=utf-8' }),
+    )
+  }, [d, dateiname])
+
+  // Tabelle der Großansicht: dieselben Zahlen wie im Bild, vollständig.
+  const zeilen: (string | number)[][] =
+    d.art === 'saeulen'
+      ? (d.kategorien ?? []).map((k, i) => [k, ...(d.serien ?? []).map((s) => s.werte[i] ?? 0)])
+      : (d.punkte ?? []).map((p) => [p.label, p.wert])
+  const kopf =
+    d.art === 'saeulen'
+      ? ['Kategorie', ...(d.serien ?? []).map((s) => s.name)]
+      : ['Bezeichnung', d.einheit ? `Wert (${d.einheit})` : 'Wert']
+
+  return (
+    <div className="card" style={{ marginBottom: 8 }} ref={kartenRef}>
       <header>
         <span>{d.titel}</span>
-        {d.einheit && <span className="actions"><span className="mono-label">{d.einheit}</span></span>}
+        <span className="actions">
+          {d.einheit && <span className="mono-label">{d.einheit}</span>}
+          {d.art === 'saeulen' && (
+            <button type="button" className="small" onClick={alsPng}>PNG</button>
+          )}
+          <button type="button" className="small" onClick={alsCsv}>CSV</button>
+          <button type="button" className="small" onClick={() => dialogRef.current?.showModal()}>
+            Vergrößern
+          </button>
+        </span>
       </header>
       <div className="body" style={{ paddingTop: 12 }}>
-        {d.art === 'saeulen' && (
-          <ColumnChart
-            categories={d.kategorien ?? []}
-            series={(d.serien ?? []).map((r) => ({ name: r.name, values: r.werte }))}
-            unit={d.einheit}
-          />
-        )}
-        {d.art === 'balken' && (
-          <HBars
-            unit={d.einheit}
-            rows={(d.punkte ?? []).map((p) => ({ label: p.label, value: p.wert }))}
-          />
-        )}
-        {d.art === 'anteile' && (
-          <ShareBar
-            parts={(d.punkte ?? []).filter((p) => p.wert > 0).map((p) => ({ label: p.label, value: p.wert }))}
-            format={format}
-          />
-        )}
+        <DiagrammInhalt d={d} />
       </div>
+
+      <dialog ref={dialogRef} className="chart-dialog">
+        <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
+          <strong style={{ flex: 1 }}>{d.titel}</strong>
+          <div className="shrink actions">
+            {d.art === 'saeulen' && (
+              <button
+                type="button"
+                className="small"
+                onClick={() => {
+                  const svg = dialogRef.current?.querySelector('svg')
+                  if (svg) void svgAlsPng(svg, `${dateiname}.png`)
+                }}
+              >
+                PNG
+              </button>
+            )}
+            <button type="button" className="small" onClick={alsCsv}>CSV</button>
+            <button type="button" className="small" onClick={() => dialogRef.current?.close()}>
+              Schließen
+            </button>
+          </div>
+        </div>
+        <DiagrammInhalt d={d} hoehe={380} />
+        <div className="table-wrap" style={{ marginTop: 14 }}>
+          <table>
+            <thead>
+              <tr>{kopf.map((h, i) => <th key={h} className={i > 0 ? 'num' : undefined}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {zeilen.map((z, i) => (
+                <tr key={i}>
+                  {z.map((wert, j) => (
+                    <td key={j} className={j > 0 ? 'num mono' : undefined}>
+                      {typeof wert === 'number' ? menge(wert) : wert}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </dialog>
     </div>
   )
 }
