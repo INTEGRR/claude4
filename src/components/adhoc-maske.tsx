@@ -1,6 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { ProzessAktionen, type SchrittAngebot } from './prozess-aktionen'
+import { MikrofonKnopf, SendenSymbol } from './spracheingabe'
 
 /**
  * Ad-hoc-Maske mit KI-Zuruf: die GENERIERTE Maske steht sofort (das Schema
@@ -93,7 +94,8 @@ export function AdhocMaske({
       />
       {kiVerfuegbar && (
         <div style={{ marginTop: 10 }}>
-          <div className="row" style={{ alignItems: 'center', gap: 6 }}>
+          {/* Composer im Claude-App-Stil: Zuruf tippen oder diktieren, Pfeil baut um. */}
+          <div className="composer">
             <input
               value={anweisung}
               onChange={(e) => setAnweisung(e.target.value)}
@@ -106,12 +108,17 @@ export function AdhocMaske({
               placeholder={'Umbau per Zuruf, z. B. „ist aber Lieferant" oder „Menge 500, Preis 1,80"'}
               disabled={busy}
             />
-            <div className="shrink">
-              <button type="button" className="small" disabled={busy || !anweisung.trim()} onClick={() => void umbauen()}>
-                {busy && <span className="led" style={{ background: 'currentColor' }} />}
-                Umbauen
-              </button>
-            </div>
+            <MikrofonKnopf onText={(text) => setAnweisung(text)} titel="Zuruf diktieren (Deutsch)" />
+            <button
+              type="button"
+              className="composer-knopf senden"
+              disabled={busy || !anweisung.trim()}
+              onClick={() => void umbauen()}
+              title="Felder umbauen"
+              aria-label="Felder umbauen"
+            >
+              {busy ? <span className="led on" /> : <SendenSymbol />}
+            </button>
           </div>
           {hinweis && (
             <div className={`notice ${hinweis.ok ? 'info' : 'danger'}`} style={{ marginTop: 8, marginBottom: 0 }}>

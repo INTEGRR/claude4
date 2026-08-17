@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { MikrofonKnopf, SendenSymbol } from './spracheingabe'
 
 /**
  * Das Befehlsfeld der Daily Routine: EIN Feld, in dem man sagt, was man tun
@@ -229,34 +230,59 @@ export function Befehlsfeld({
 
   return (
     <div className={`befehlsfeld${gross ? ' gross' : ''}`}>
-      <input
-        ref={feld}
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value)
-          setAktiv(0)
-          setMeldung(null)
-        }}
-        onFocus={() => setFokus(true)}
-        onBlur={() => setTimeout(() => setFokus(false), 150)}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') {
+      {/* Composer im Claude-App-Stil: runde Kapsel, Mikro + Senden im Feld. */}
+      <div className="composer">
+        <input
+          ref={feld}
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setAktiv(0)
+            setMeldung(null)
+          }}
+          onFocus={() => setFokus(true)}
+          onBlur={() => setTimeout(() => setFokus(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              setAktiv((i) => Math.min(i + 1, treffer.length - 1))
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              setAktiv((i) => Math.max(i - 1, 0))
+            } else if (e.key === 'Enter' && treffer[aktiv]) {
+              e.preventDefault()
+              oeffnen(treffer[aktiv])
+            } else if (e.key === 'Escape') {
+              setQ('')
+              feld.current?.blur()
+            }
+          }}
+          placeholder={'Was möchtest du tun? — z. B. „Bestellung anlegen", „P01670", „Umsatz je Monat"'}
+          aria-label="Befehl oder Suche"
+        />
+        {/* Reinquatschen: Diktat läuft live ins Feld, die Treffer folgen sofort. */}
+        <MikrofonKnopf
+          onText={(text) => {
+            setQ(text)
+            setAktiv(0)
+            setFokus(true)
+            feld.current?.focus()
+          }}
+        />
+        <button
+          type="button"
+          className="composer-knopf senden"
+          disabled={!q.trim() || treffer.length === 0}
+          title="Besten Treffer öffnen"
+          aria-label="Besten Treffer öffnen"
+          onMouseDown={(e) => {
             e.preventDefault()
-            setAktiv((i) => Math.min(i + 1, treffer.length - 1))
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault()
-            setAktiv((i) => Math.max(i - 1, 0))
-          } else if (e.key === 'Enter' && treffer[aktiv]) {
-            e.preventDefault()
-            oeffnen(treffer[aktiv])
-          } else if (e.key === 'Escape') {
-            setQ('')
-            feld.current?.blur()
-          }
-        }}
-        placeholder={'Was möchtest du tun? — z. B. „Bestellung anlegen", „P01670", „Umsatz je Monat"'}
-        aria-label="Befehl oder Suche"
-      />
+            if (treffer[aktiv]) oeffnen(treffer[aktiv])
+          }}
+        >
+          <SendenSymbol />
+        </button>
+      </div>
       {meldung && (
         <div className="notice danger" role="alert" style={{ marginTop: 8, marginBottom: 0 }}>
           <span className="led warn" style={{ marginRight: 6 }} />

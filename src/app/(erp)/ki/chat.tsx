@@ -4,6 +4,7 @@ import { ColumnChart, HBars, ShareBar } from '@/components/charts'
 import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
 import { gruppenSpalten, gruppiereVorschlaege } from '@/modules/ki/vorschlag-gruppen'
+import { MikrofonKnopf, SendenSymbol } from '@/components/spracheingabe'
 import { VorschlagEditor, Zelle } from './vorschlag-editor'
 
 /**
@@ -882,22 +883,30 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Composer im Claude-App-Stil: Frage tippen oder diktieren, Pfeil sendet. */}
       <form
-        className="ki-input row"
+        className="ki-input"
         onSubmit={(e) => {
           e.preventDefault()
           void send(input)
         }}
       >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Frage an die Daten stellen …"
-          disabled={busy}
-        />
-        <div className="shrink">
-          <button className="primary" type="submit" disabled={busy || !input.trim()}>
-            {busy ? 'Denkt …' : 'Fragen'}
+        <div className="composer">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Frage an die Daten stellen …"
+            disabled={busy}
+          />
+          <MikrofonKnopf onText={(text) => setInput(text)} titel="Frage diktieren (Deutsch)" />
+          <button
+            className="composer-knopf senden"
+            type="submit"
+            disabled={busy || !input.trim()}
+            title="Fragen"
+            aria-label="Fragen"
+          >
+            {busy ? <span className="led on" /> : <SendenSymbol />}
           </button>
         </div>
       </form>

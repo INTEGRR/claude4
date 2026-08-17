@@ -642,6 +642,35 @@ machen:
   Schema geprüft), die Maske baut sich in Echtzeit um — ausgeführt wird
   weiterhin nur über den Absende-Knopf.
 
+## PWA, Spracheingabe, deutsche Feldbeschriftungen (umgesetzt)
+
+Das ERP fühlt sich installiert wie eine native App an — und man kann
+hineinsprechen:
+
+- **PWA-Installation**: `src/app/manifest.ts` liefert das Web-App-Manifest
+  (`display: standalone`, Icons 192/512 + maskable, generiert in
+  `public/`), `layout.tsx` trägt die `appleWebApp`-Metadaten und den
+  Viewport (`viewportFit: cover`, Theme-Farbe hell/dunkel). Damit bieten
+  Chrome/Edge den Installieren-Knopf an, auf iOS „Zum Startbildschirm" —
+  randlos, ohne Browserleiste. Bewusst OHNE Service-Worker-Caching: ein
+  ERP zeigt live Daten, nie einen alten Bestand aus dem Cache.
+- **Composer im Claude-App-Stil** (`.composer` in `globals.css`): eine
+  runde Kapsel mit Eingabefeld, Mikrofon und Senden-Pfeil INNEN — benutzt
+  vom Befehlsfeld (Übersicht + Strg/Cmd+K), vom KI-Chat und von der
+  Zuruf-Zeile der Ad-hoc-Masken. Auf dem Handy sitzt das
+  Dashboard-Befehlsfeld fixiert unten am Daumen (Safe-Area beachtet), die
+  Treffer klappen nach oben auf.
+- **Spracheingabe** (`src/components/spracheingabe.tsx`): Web Speech API
+  (de-DE), läuft komplett im Browser. Der Mikrofon-Knopf schreibt Diktat
+  in Echtzeit ins Feld (Zwischenergebnisse live), abgeschickt wird
+  bewusst per Hand — gesprochen wird in das Feld, entschieden mit Enter
+  oder dem Pfeil. Wo die API fehlt, erscheint der Knopf gar nicht.
+- **Deutsche Feldbeschriftungen**: das `TEXTE`-Wörterbuch in
+  `schema-felder.ts` deckt alle ~175 Formularfelder der Registry ab
+  (`list_price` → „Verkaufspreis (netto)", `uom_id` → „Einheit",
+  `street` → „Straße" …) — generierte Masken sprechen durchgehend
+  Deutsch, nicht mehr Spaltennamen-Englisch.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

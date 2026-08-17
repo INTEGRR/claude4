@@ -1017,19 +1017,65 @@ label.field > span {
 
 @media print { .ticket-tab, .ticket-panel { display: none; } }
 
-/* Befehlsfeld der Daily Routine: ein Feld, darunter die Treffer als Liste. */
-.befehlsfeld { position: relative; }
-.befehlsfeld input {
-  width: 100%;
+/* --- Composer im Stil der Claude-App --------------------------------------
+   Runde Kapsel mit dem Eingabefeld, Mikrofon und Senden-Pfeil INNEN —
+   benutzt vom Befehlsfeld, dem KI-Chat und der Zuruf-Zeile der Masken. */
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  padding: 4px 5px 4px 16px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.composer:focus-within { border-color: var(--accent); box-shadow: var(--shadow-lift); }
+.composer input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 7px 4px 7px 0;
   font-size: 14px;
 }
-.befehlsfeld.gross input {
-  font-size: 16px;
-  padding: 14px 18px;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
+.composer input:focus { outline: none; border-color: transparent; background: transparent; }
+.composer-knopf {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
 }
+.composer-knopf:hover { background: var(--surface-2); border-color: transparent; }
+.composer-knopf.senden { background: var(--accent); color: #fff; }
+.composer-knopf.senden:hover { background: var(--accent); filter: brightness(1.06); }
+.composer-knopf.senden:disabled { background: var(--surface-2); color: var(--text-muted); }
+.composer-knopf.mikro-an {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  animation: mikro-puls 1.4s ease infinite;
+}
+@keyframes mikro-puls {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(255 90 31 / 0.35); }
+  50% { box-shadow: 0 0 0 7px rgb(255 90 31 / 0); }
+}
+
+/* Befehlsfeld der Daily Routine: ein Composer, darunter die Treffer. */
+.befehlsfeld { position: relative; }
+.befehlsfeld.gross .composer {
+  border-radius: 28px;
+  padding: 7px 7px 7px 20px;
+}
+.befehlsfeld.gross .composer input { font-size: 16px; padding: 9px 4px 9px 0; }
+.befehlsfeld.gross .composer-knopf { width: 38px; height: 38px; }
 .befehls-liste {
   position: absolute;
   z-index: 20;
@@ -1068,6 +1114,37 @@ label.field > span {
   overflow: visible;
 }
 .befehls-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+
+/* Handy/PWA: das Dashboard-Befehlsfeld sitzt wie in der Claude-App unten am
+   Daumen (Safe-Area beachtet), die Treffer klappen nach OBEN auf. */
+@media (max-width: 720px) {
+  .content:has(> div .befehlsfeld.gross) { padding-bottom: 96px; }
+  .befehlsfeld.gross {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+  }
+  .befehlsfeld.gross .composer { box-shadow: var(--shadow-lift); }
+  .befehlsfeld.gross .befehls-liste {
+    top: auto;
+    bottom: calc(100% + 8px);
+    max-height: 55dvh;
+    overflow-y: auto;
+  }
+  /* Im Overlay-Dialog bleibt das Feld oben — dort gilt die Fixierung nicht. */
+  .befehls-dialog .befehlsfeld.gross {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+  }
+  .befehls-dialog .befehlsfeld.gross .befehls-liste {
+    top: calc(100% + 6px);
+    bottom: auto;
+  }
+}
 
 /* Großansicht der KI-Diagramme (BUG/00008): natives <dialog>, Karte in groß. */
 .chart-dialog {
