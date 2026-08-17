@@ -65,6 +65,37 @@ describe('Einkauf: Bestellablauf', () => {
     })
   })
 
+  // BUG/00004: Der Liefertermin wird EINMAL an der Bestellung gepflegt
+  // (bestätigte ETA vor Schätzung) und wandert an offene Eingangs-Transfers.
+  test('ETA-Sync: bestätigter Termin wandert an den offenen Wareneingang', async () => {
+    await withRollback(async (t) => {
+      const s = await purchaseScenario(t)
+      const [res] = await t<{ confirm_purchase_order: string }[]>`
+        select confirm_purchase_order(${s.orderId})`
+
+      await t`update purchase_orders
+              set eta_confirmed = current_date + 5,
+                  carrier = 'DHL Freight', tracking_number = 'JD014600003RS'
+              where id = ${s.orderId}`
+      await t`select purchase_order_eta_sync(${s.orderId})`
+
+      const [soll] = await t<{ d: string }[]>`select (current_date + 5)::text as d`
+      const [pick] = await t<{ scheduled: string }[]>`
+        select scheduled_date::date::text as scheduled
+        from stock_pickings where id = ${res.confirm_purchase_order}`
+      assert.equal(pick.scheduled, soll.d, 'bestätigte ETA gilt vor der Schätzung')
+
+      // Erledigte Transfers behalten ihren Termin — der Sync fasst sie nicht an.
+      await t`select picking_validate(${res.confirm_purchase_order})`
+      await t`update purchase_orders set eta_confirmed = current_date + 9 where id = ${s.orderId}`
+      await t`select purchase_order_eta_sync(${s.orderId})`
+      const [nachher] = await t<{ scheduled: string }[]>`
+        select scheduled_date::date::text as scheduled
+        from stock_pickings where id = ${res.confirm_purchase_order}`
+      assert.equal(nachher.scheduled, soll.d, 'erledigter Transfer bleibt unangetastet')
+    })
+  })
+
   test('Wareneingang füllt die erhaltene Menge', async () => {
     await withRollback(async (t) => {
       const s = await purchaseScenario(t)

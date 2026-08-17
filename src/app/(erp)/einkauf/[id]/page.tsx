@@ -80,6 +80,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     priority: string
     receipt_reminder_email: boolean
     reminder_date_before_receipt: number
+    eta_confirmed: string | null
+    carrier: string | null
+    tracking_number: string | null
+    tracking_url: string | null
   }
   const benutzer = await sql<{ id: string; name: string }[]>`
     select id, name from users where active order by name`
@@ -115,9 +119,11 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             {order.vendor_reference && (
               <> · Referenz <span className="mono">{order.vendor_reference}</span></>
             )}
-            {order.expected_arrival && (
+            {kopf.eta_confirmed ? (
+              <> · bestätigt <span className="mono">{date(kopf.eta_confirmed)}</span></>
+            ) : order.expected_arrival ? (
               <> · erwartet <span className="mono">{date(order.expected_arrival)}</span></>
-            )}
+            ) : null}
           </>
         }
         actions={
@@ -204,6 +210,49 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 min="0"
                 defaultValue={kopf.reminder_date_before_receipt}
               />
+            </label>
+          </div>
+          {/* Liefertermin und Sendung: EINMAL hier gepflegt, sichtbar am
+              Wareneingangs-Transfer und im Zulauf-Kalender. Der bestätigte
+              Termin gilt vor der Schätzung. */}
+          <div className="row" style={{ marginTop: 8 }}>
+            <label className="field">
+              <span>ETA (geschätzt)</span>
+              {/* timestamptz kommt als Date-Objekt, date je nach Treiber als
+                  String — beides sicher auf JJJJ-MM-TT bringen. */}
+              <input
+                type="date"
+                name="eta"
+                defaultValue={
+                  order.expected_arrival
+                    ? new Date(order.expected_arrival).toISOString().slice(0, 10)
+                    : ''
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Vom Lieferanten bestätigt</span>
+              <input
+                type="date"
+                name="eta_bestaetigt"
+                defaultValue={
+                  kopf.eta_confirmed
+                    ? new Date(kopf.eta_confirmed).toISOString().slice(0, 10)
+                    : ''
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Carrier</span>
+              <input name="carrier" defaultValue={kopf.carrier ?? ''} placeholder="z. B. DHL Freight" />
+            </label>
+            <label className="field">
+              <span>Tracking-Nummer</span>
+              <input name="tracking_nummer" defaultValue={kopf.tracking_number ?? ''} />
+            </label>
+            <label className="field" style={{ flex: 2 }}>
+              <span>Tracking-Link</span>
+              <input name="tracking_url" defaultValue={kopf.tracking_url ?? ''} placeholder="https://…" />
             </label>
             <div className="shrink field">
               <button type="submit">Speichern</button>

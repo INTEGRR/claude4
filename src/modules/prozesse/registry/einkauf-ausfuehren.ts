@@ -72,6 +72,11 @@ export async function kopfAendern(
     priority: boolean
     receipt_reminder_email: boolean
     reminder_date_before_receipt: number
+    eta?: string
+    eta_bestaetigt?: string
+    carrier?: string
+    tracking_nummer?: string
+    tracking_url?: string
   },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
@@ -82,8 +87,16 @@ export async function kopfAendern(
       incoterm_code = ${p.incoterm_code ?? null},
       priority = ${p.priority ? '1' : '0'},
       receipt_reminder_email = ${p.receipt_reminder_email},
-      reminder_date_before_receipt = ${p.reminder_date_before_receipt}
+      reminder_date_before_receipt = ${p.reminder_date_before_receipt},
+      expected_arrival = ${p.eta ?? null},
+      eta_confirmed = ${p.eta_bestaetigt ?? null},
+      carrier = ${p.carrier ?? null},
+      tracking_number = ${p.tracking_nummer ?? null},
+      tracking_url = ${p.tracking_url ?? null}
     where id = ${ctx.recordId!} and state <> 'cancel'`
+  // Der Termin ist EINMAL gepflegt und wandert an die offenen
+  // Wareneingangs-Transfers — der Lagerist plant nach scheduled_date.
+  await sql`select purchase_order_eta_sync(${ctx.recordId!})`
   return { recordId: ctx.recordId }
 }
 

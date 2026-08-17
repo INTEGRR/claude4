@@ -33,11 +33,23 @@ Zahlungsbedingung, Verwendungszweck, Prüf-Flag und
 Fertigungsaufträge und Reparaturen kennen Verantwortliche und Priorität;
 `stock_moves` können verkettet werden (`move_dest_id`).
 
-**Meldebestände (0015)** — `stock_orderpoints` (Min/Max/Vielfaches je
-Variante+Ort), `orderpoint_suggestions()` (Bedarf, sobald die Prognose
-unter Min fällt) und `orderpoint_execute()` (Entwurfs-Bestellung mit
-Merge je Lieferant bzw. bestätigter Fertigungsauftrag). Seite
-**Lager → Beschaffung**.
+**Meldebestände (0015, verfeinert in 0053–0055)** — `stock_orderpoints`
+(Min/Max/Vielfaches je Variante+Ort), `orderpoint_suggestions()` (Bedarf,
+sobald Prognose PLUS offener Zulauf unter Min fällt — draft/sent-
+Bestellungen und laufende Fertigungsaufträge zählen mit, ein ausgeführter
+Vorschlag verschwindet also sofort, BUG/00005) und `orderpoint_execute()`
+(Entwurfs-Bestellung mit Merge je Lieferant bzw. bestätigter
+Fertigungsauftrag; nimmt eine Wunschmenge entgegen). **MOQ + Staffeln**
+(BUG/00006): `vendor_prices.min_qty` je Staffelzeile, gepflegt auf der
+Produktseite („Lieferantenpreise & Staffeln"); die Vorschlagszeile nennt
+MOQ und empfohlene Menge, die Seite fragt die Menge AB (Chips schlagen
+günstigere Staffelgrenzen mit Ersparnis vor), Kaufmengen unter der MOQ
+lehnt die Ausführung ab. **ETA + Zulauf** (BUG/00004): an der Bestellung
+ETA (geschätzt), vom Lieferanten bestätigter Termin, Carrier + Tracking;
+`purchase_order_eta_sync()` überträgt den Termin (bestätigt vor
+geschätzt) auf offene Wareneingangs-Transfers. Seiten
+**Lager → Beschaffung** und **Lager → Zulauf** (Wochenkalender der
+erwarteten Eingänge, Überfälliges rot, Sendungen verlinkt).
 
 **Lose & Seriennummern (0017)** — `tracking` je Produkt
 (keine/Los/Serie), `stock_lots`, `move_lot_assignments`,

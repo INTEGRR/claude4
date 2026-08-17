@@ -131,6 +131,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items: sees('lager')
         ? [
             { href: '/lager', label: 'Transfers', count: counts.offene_eingaenge },
+            { href: '/lager/zulauf', label: 'Zulauf' },
             { href: '/lager/bestand', label: 'Bestand' },
             { href: '/lager/bewertung', label: 'Bewertung' },
             // Beschaffungsvorschläge münden in Bestellungen oder Fertigungs-

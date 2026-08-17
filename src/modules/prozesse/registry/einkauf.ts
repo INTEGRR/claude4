@@ -65,7 +65,10 @@ export const EINKAUF = {
   'einkauf.kopf_aendern': {
     label: 'Kopffelder ändern',
     bereich: 'einkauf',
-    beschreibung: 'Einkäufer, Zahlungsbedingung, Incoterm, Priorität und Wareneingangs-Erinnerung.',
+    beschreibung:
+      'Einkäufer, Zahlungsbedingung, Incoterm, Priorität, Wareneingangs-Erinnerung — und der ' +
+      'Liefertermin: ETA (Schätzung), vom Lieferanten bestätigter Termin sowie Carrier und ' +
+      'Tracking. Termine wandern automatisch an die offenen Wareneingangs-Transfers.',
     bindung: 'beleg',
     modell: 'purchase_order',
     prozessfrei: true,
@@ -76,6 +79,11 @@ export const EINKAUF = {
       priority: z.boolean().default(false),
       receipt_reminder_email: z.boolean().default(false),
       reminder_date_before_receipt: z.number().int().min(0).max(60).default(1),
+      eta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      eta_bestaetigt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      carrier: z.string().max(60).optional(),
+      tracking_nummer: z.string().max(120).optional(),
+      tracking_url: z.string().max(400).optional(),
     }),
     formdata: (fd) => ({
       user_id: String(fd.get('user_id') ?? '') || undefined,
@@ -84,8 +92,13 @@ export const EINKAUF = {
       priority: fd.get('priority') === 'on',
       receipt_reminder_email: fd.get('receipt_reminder_email') === 'on',
       reminder_date_before_receipt: Number(fd.get('reminder_date_before_receipt') ?? 1),
+      eta: String(fd.get('eta') ?? '') || undefined,
+      eta_bestaetigt: String(fd.get('eta_bestaetigt') ?? '') || undefined,
+      carrier: String(fd.get('carrier') ?? '').trim() || undefined,
+      tracking_nummer: String(fd.get('tracking_nummer') ?? '').trim() || undefined,
+      tracking_url: String(fd.get('tracking_url') ?? '').trim() || undefined,
     }),
-    revalidate: ['/einkauf/:id'],
+    revalidate: ['/einkauf/:id', '/lager/zulauf'],
   },
 
   'einkauf.bestaetigen': {

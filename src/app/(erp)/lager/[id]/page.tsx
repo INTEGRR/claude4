@@ -100,6 +100,23 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
           ? `/reparatur/${picking.origin_id}`
           : null
 
+  // Zulauf-Infos der Herkunfts-Bestellung: Termin (bestätigt vor geschätzt),
+  // Carrier und Tracking — gepflegt am Einkauf, hier nur angezeigt.
+  const [zulauf] =
+    picking.origin_model === 'purchase_order' && picking.origin_id
+      ? await sql<
+          {
+            expected_arrival: string | null
+            eta_confirmed: string | null
+            carrier: string | null
+            tracking_number: string | null
+            tracking_url: string | null
+          }[]
+        >`
+          select expected_arrival, eta_confirmed::text, carrier, tracking_number, tracking_url
+          from purchase_orders where id = ${picking.origin_id}`
+      : [undefined]
+
   return (
     <>
       <PageHeader
@@ -152,6 +169,37 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       <div style={{ marginBottom: 12 }}>
         <ResponsibleForm action={updatePickingDetails.bind(null, id)} userId={picking.user_id} priority={picking.priority} />
       </div>
+
+      {zulauf &&
+        (zulauf.eta_confirmed || zulauf.expected_arrival || zulauf.carrier || zulauf.tracking_number) && (
+        <div className="display-panel" style={{ marginBottom: 12 }}>
+          <div className="display-head">
+            <span>Zulauf</span>
+            <span>{zulauf.eta_confirmed ? 'Termin vom Lieferanten bestätigt' : 'Termin geschätzt'}</span>
+          </div>
+          <div className="small">
+            {(zulauf.eta_confirmed || zulauf.expected_arrival) && (
+              <>
+                <span className={`led ${zulauf.eta_confirmed ? 'ok' : 'off'}`} /> Erwartet am{' '}
+                <span className="mono">{date(zulauf.eta_confirmed ?? zulauf.expected_arrival)}</span>
+              </>
+            )}
+            {zulauf.carrier && <> · {zulauf.carrier}</>}
+            {zulauf.tracking_number && (
+              <>
+                {' '}·{' '}
+                {zulauf.tracking_url ? (
+                  <a href={zulauf.tracking_url} target="_blank" rel="noreferrer">
+                    <span className="mono">{zulauf.tracking_number}</span>
+                  </a>
+                ) : (
+                  <span className="mono">{zulauf.tracking_number}</span>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {picking.state === 'done' && (
         <div className="notice success">
