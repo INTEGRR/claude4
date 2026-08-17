@@ -182,6 +182,85 @@ describe('Finanzen: Zahlungsregister', () => {
     })
   })
 
+  test('Vertrag: rollierende Mindestlaufzeit wahrt die Kündigungsfrist', async () => {
+    await withRollback(async (t) => {
+      // 12 Monate Laufzeit ab 2024-01-01, 3 Monate Frist. Kandidaten enden
+      // am 2024-12-31, 2025-12-31, 2026-12-31 … — heute (2026-08-17) ist die
+      // Frist für 2026-12-31 (bis 2026-09-30) noch offen.
+      const [v] = await t<{ id: string }[]>`
+        insert into vertraege (nummer, name, kategorie, betrag, beginn,
+                               laufzeit_monate, kuendigungsfrist_monate)
+        values (next_sequence('vertrag'), 'Lager Miete', 'miete', 2500, '2024-01-01', 12, 3)
+        returning id`
+      const [k] = await t<{ zum: string; frist: string }[]>`
+        select vertrag_naechstes_kuendbar_zum(v)::text as zum,
+               vertrag_kuendigungsfrist_bis(v)::text as frist
+        from vertraege v where v.id = ${v.id}`
+      const zum = new Date(k.zum)
+      const frist = new Date(k.frist)
+      assert.ok(frist >= new Date(), 'Der nächste Kandidat hat eine noch offene Frist')
+      assert.equal(
+        (zum.getTime() - new Date('2024-01-01').getTime()) % 1 >= 0 && zum.getMonth(),
+        11,
+        'Kandidat liegt am Laufzeitende (Dezember)',
+      )
+
+      // Kündigen ohne Datum nimmt genau diesen Termin.
+      const [ergebnis] = await t<{ zum: string }[]>`
+        select vertrag_kuendigen(${v.id}, null, 'test')::text as zum`
+      assert.equal(ergebnis.zum, k.zum)
+
+      // Ein früherer Termin als der fristgerechte wird abgewiesen.
+      const [v2] = await t<{ id: string }[]>`
+        insert into vertraege (nummer, name, kategorie, betrag, beginn,
+                               laufzeit_monate, kuendigungsfrist_monate)
+        values (next_sequence('vertrag'), 'Lager Miete 2', 'miete', 2500, '2024-01-01', 12, 3)
+        returning id`
+      await expectError(
+        t,
+        (sp) => sp`select vertrag_kuendigen(${v2.id}, current_date, 'test')`,
+        /Frühester Kündigungstermin/,
+      )
+    })
+  })
+
+  test('Vertrag: Projektion endet mit der Kündigung, Zahlung deckt den Monatstermin', async () => {
+    await withRollback(async (t) => {
+      const [v] = await t<{ id: string }[]>`
+        insert into vertraege (nummer, name, kategorie, betrag, beginn, zahltag)
+        values (next_sequence('vertrag'), 'Sendcloud', 'lizenzen', 89, '2026-01-01', 15)
+        returning id`
+      // Unbefristet: 12-Monats-Horizont liefert monatliche Termine am 15.
+      const termine = await t<{ faellig_am: string; betrag_eur: number }[]>`
+        select * from vertrag_zahlungen_bis(${v.id}, current_date + 365)`
+      assert.ok(termine.length >= 11 && termine.length <= 13, `Monatstermine (${termine.length})`)
+      assert.ok(termine.every((z) => new Date(z.faellig_am).getDate() === 15))
+
+      // Kündigung deckelt die Projektion.
+      await t`update vertraege
+              set status = 'gekuendigt', gekuendigt_zum = current_date + 45 where id = ${v.id}`
+      const gedeckelt = await t<{ faellig_am: string }[]>`
+        select faellig_am from vertrag_zahlungen_bis(${v.id}, current_date + 365)`
+      assert.ok(gedeckelt.length <= 2, 'Nach dem Kündigungstermin kommt nichts mehr')
+
+      // Vertragszahlung im Monat des Termins nimmt ihn aus der Fällig-Liste.
+      await t`update vertraege set status = 'aktiv', gekuendigt_zum = null where id = ${v.id}`
+      const vorher = await t<{ ref: string }[]>`
+        select ref from finanz_faellig(current_date + 45) where ref = ${v.id}`
+      if (vorher.length > 0) {
+        await t`select zahlung_erfassen('aus', 89, 'EUR',
+                  (select min(faellig_am) from vertrag_zahlungen_bis(${v.id}, current_date + 45)),
+                  null, 'vertrag', ${v.id}, null, 'test')`
+        const nachher = await t<{ ref: string; faellig_am: string }[]>`
+          select ref, faellig_am from finanz_faellig(current_date + 45) where ref = ${v.id}`
+        assert.ok(
+          nachher.length < vorher.length,
+          'Der beglichene Monatstermin verschwindet aus der Fällig-Liste',
+        )
+      }
+    })
+  })
+
   test('Zahlplan-Riegel: bezahlte Raten überleben das Neu-Aufsetzen nicht heimlich', async () => {
     await withRollback(async (t) => {
       const s = await finanzSzenario(t)

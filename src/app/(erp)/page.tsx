@@ -51,6 +51,8 @@ export default async function Dashboard({
       tickets: number
       offene_auftraege: number
       umsatz_monat: number
+      kuendigungen: number
+      zahlungen_faellig: number
     }[]
   >`
     select
@@ -73,7 +75,9 @@ export default async function Dashboard({
       coalesce((select sum((select net from sales_order_total(so.id)))
                 from sales_orders so
                 where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)
-        as umsatz_monat`
+        as umsatz_monat,
+      (select count(*) from vertraege v where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
+      (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig`
 
   // wichtig = Entscheidungssignal (Violett): hier wartet eine Freigabe auf
   // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
@@ -95,6 +99,12 @@ export default async function Dashboard({
       : []),
     ...(sees('personal') && s.abwesenheiten > 0
       ? [{ label: 'Abwesenheitsanträge', wert: s.abwesenheiten, href: '/personal/abwesenheiten', wichtig: true }]
+      : []),
+    ...(sees('finanzen') && s.kuendigungen > 0
+      ? [{ label: 'Verträge: Kündigungsfrist läuft ab', wert: s.kuendigungen, href: '/finanzen/vertraege', wichtig: true }]
+      : []),
+    ...(sees('finanzen') && s.zahlungen_faellig > 0
+      ? [{ label: 'Zahlungen fällig diese Woche', wert: s.zahlungen_faellig, href: '/finanzen', warn: true }]
       : []),
     ...(sees('fehler') && s.tickets > 0
       ? [{ label: 'Offene Tickets', wert: s.tickets, href: '/tickets' }]

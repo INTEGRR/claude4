@@ -38,6 +38,7 @@ async function badges() {
       fehler: number
       offene_bugs: number
       faellige_zahlungen: number
+      kuendigungen: number
     }[]
   >`
     select
@@ -58,7 +59,9 @@ async function badges() {
        + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler,
       (select count(*) from bug_reports
         where status in ('offen', 'in_arbeit'))::int as offene_bugs,
-      (select count(*) from finanz_faellig(current_date + 7))::int as faellige_zahlungen`
+      (select count(*) from finanz_faellig(current_date + 7))::int as faellige_zahlungen,
+      (select count(*) from vertraege v
+        where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen`
   return row
 }
 
@@ -199,7 +202,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       label: 'Finanzen',
       items: [
         ...(sees('finanzen')
-          ? [{ href: '/finanzen', label: 'Cashflow', count: counts.faellige_zahlungen }]
+          ? [
+              { href: '/finanzen', label: 'Cashflow', count: counts.faellige_zahlungen },
+              { href: '/finanzen/vertraege', label: 'Verträge', count: counts.kuendigungen },
+            ]
           : []),
       ],
     },

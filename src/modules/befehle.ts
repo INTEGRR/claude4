@@ -46,6 +46,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/auswertungen', label: 'Auswertungen: Mengen & Abverkauf', area: 'auswertungen' },
   { href: '/auswertungen/kennzahlen', label: 'Kennzahlen', area: 'auswertungen' },
   { href: '/finanzen', label: 'Finanzen (Cashflow)', area: 'finanzen', prozess: ['finanzen'] },
+  { href: '/finanzen/vertraege', label: 'Verträge (Fixkosten)', area: 'finanzen', prozess: ['finanzen'] },
   { href: '/ki', label: 'KI-Analyse', area: 'ki' },
   { href: '/produkte', label: 'Produkte', area: 'produkte' },
   { href: '/kontakte', label: 'Kontakte', area: 'kontakte' },

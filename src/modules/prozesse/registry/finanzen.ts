@@ -196,5 +196,109 @@ export const FINANZEN = {
     }),
     revalidate: ['/einkauf/:id', '/finanzen'],
   },
+
+  // --- Fixkosten-Verträge (0059) -------------------------------------------
+
+  'finanzen.vertrag_anlegen': {
+    label: 'Vertrag anlegen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Legt einen Fixkosten-Vertrag an (Miete, Lizenz, Personal-Posten …): Betrag je Intervall, Zahltag, Laufzeit und Kündigungsfrist.',
+    bindung: 'frei',
+    ki: true,
+    schema: z.object({
+      name: z.string().min(1, 'Bitte einen Namen angeben').max(160),
+      kategorie: z.string().min(1).max(60).default('sonstiges'),
+      partner_id: z.string().uuid().optional(),
+      betrag: z.number().positive('Der Betrag muss größer als null sein'),
+      waehrung: z.string().length(3).default('EUR'),
+      intervall: z.enum(['monatlich', 'quartalsweise', 'jaehrlich']).default('monatlich'),
+      zahltag: z.number().int().min(1).max(28).default(1),
+      beginn: DATUM,
+      ende: DATUM.optional(),
+      laufzeit_monate: z.number().int().positive().optional(),
+      kuendigungsfrist_monate: z.number().int().min(0).max(24).default(0),
+      notiz: z.string().max(500).optional(),
+    }),
+    zusammenfassung: (p) => `Vertrag „${p.name}" (${p.betrag} ${p.waehrung} ${p.intervall}) anlegen`,
+    revalidate: ['/finanzen/vertraege', '/finanzen'],
+  },
+
+  'finanzen.vertrag_aendern': {
+    label: 'Vertrag ändern',
+    bereich: 'finanzen',
+    beschreibung: 'Ändert Stammdaten eines Vertrags (Betrag, Intervall, Fristen, Laufzeit).',
+    bindung: 'beleg',
+    modell: 'vertrag',
+    prozessfrei: true,
+    schema: z.object({
+      name: z.string().min(1).max(160),
+      kategorie: z.string().min(1).max(60),
+      partner_id: z.string().uuid().optional(),
+      betrag: z.number().positive(),
+      waehrung: z.string().length(3).default('EUR'),
+      intervall: z.enum(['monatlich', 'quartalsweise', 'jaehrlich']),
+      zahltag: z.number().int().min(1).max(28),
+      beginn: DATUM,
+      ende: DATUM.optional(),
+      laufzeit_monate: z.number().int().positive().optional(),
+      kuendigungsfrist_monate: z.number().int().min(0).max(24),
+      notiz: z.string().max(500).optional(),
+    }),
+    formdata: (fd) => ({
+      name: String(fd.get('name') ?? '').trim(),
+      kategorie: String(fd.get('kategorie') ?? '').trim() || 'sonstiges',
+      partner_id: String(fd.get('partner_id') ?? '') || undefined,
+      betrag: Number(fd.get('betrag')),
+      waehrung: String(fd.get('waehrung') ?? 'EUR'),
+      intervall: String(fd.get('intervall') ?? 'monatlich'),
+      zahltag: Number(fd.get('zahltag') ?? 1),
+      beginn: String(fd.get('beginn') ?? ''),
+      ende: String(fd.get('ende') ?? '') || undefined,
+      laufzeit_monate: String(fd.get('laufzeit_monate') ?? '')
+        ? Number(fd.get('laufzeit_monate'))
+        : undefined,
+      kuendigungsfrist_monate: Number(fd.get('kuendigungsfrist_monate') ?? 0),
+      notiz: String(fd.get('notiz') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/finanzen/vertraege/:id', '/finanzen/vertraege', '/finanzen'],
+  },
+
+  'finanzen.vertrag_kuendigen': {
+    label: 'Vertrag kündigen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Kündigt den Vertrag fristgerecht — ohne Datum zum nächstmöglichen Termin; ein früherer Termin als der fristgerechte wird abgewiesen.',
+    bindung: 'beleg',
+    modell: 'vertrag',
+    uebergang: { von: ['aktiv'], nach: ['gekuendigt'] },
+    schema: z.object({
+      zum: DATUM.optional(),
+    }),
+    formdata: (fd) => ({
+      zum: String(fd.get('zum') ?? '') || undefined,
+    }),
+    zusammenfassung: (p) => (p.zum ? `Kündigen zum ${p.zum}` : 'Zum nächstmöglichen Termin kündigen'),
+    revalidate: ['/finanzen/vertraege/:id', '/finanzen/vertraege', '/finanzen'],
+  },
+
+  'finanzen.vertrag_zahlen': {
+    label: 'Vertragszahlung erfassen',
+    bereich: 'finanzen',
+    beschreibung:
+      'Erfasst die Zahlung des Vertragsbetrags im Register — der Termin des laufenden Monats gilt damit als beglichen.',
+    bindung: 'beleg',
+    modell: 'vertrag',
+    prozessfrei: true,
+    schema: z.object({
+      gezahlt_am: DATUM.optional(),
+      bankkonto_id: z.string().uuid().optional(),
+    }),
+    formdata: (fd) => ({
+      gezahlt_am: String(fd.get('gezahlt_am') ?? '') || undefined,
+      bankkonto_id: String(fd.get('bankkonto_id') ?? '') || undefined,
+    }),
+    revalidate: ['/finanzen/vertraege/:id', '/finanzen'],
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

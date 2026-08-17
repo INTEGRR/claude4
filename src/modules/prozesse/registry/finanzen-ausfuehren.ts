@@ -195,3 +195,80 @@ export async function verschiffungErfassen(
     update purchase_orders set verschifft_am = ${p.verschifft_am} where id = ${ctx.recordId!}`
   return { recordId: ctx.recordId, text: 'Verschiffungstag erfasst.' }
 }
+
+// --- Fixkosten-Verträge (0059) ----------------------------------------------
+
+interface VertragsFelder {
+  name: string
+  kategorie: string
+  partner_id?: string
+  betrag: number
+  waehrung: string
+  intervall: 'monatlich' | 'quartalsweise' | 'jaehrlich'
+  zahltag: number
+  beginn: string
+  ende?: string
+  laufzeit_monate?: number
+  kuendigungsfrist_monate: number
+  notiz?: string
+}
+
+export async function vertragAnlegen(
+  p: VertragsFelder,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ id: string; nummer: string }[]>`
+    insert into vertraege (nummer, name, kategorie, partner_id, betrag, waehrung,
+                           intervall, zahltag, beginn, ende, laufzeit_monate,
+                           kuendigungsfrist_monate, notiz)
+    values (next_sequence('vertrag'), ${p.name}, ${p.kategorie}, ${p.partner_id ?? null},
+            ${p.betrag}, ${p.waehrung}, ${p.intervall}, ${p.zahltag}, ${p.beginn},
+            ${p.ende ?? null}, ${p.laufzeit_monate ?? null},
+            ${p.kuendigungsfrist_monate}, ${p.notiz ?? null})
+    returning id, nummer`
+  await sql`select log_event('vertrag', ${row.id}, 'state', 'Vertrag angelegt', ${ctx.actor})`
+  return {
+    recordId: row.id,
+    text: `Vertrag ${row.nummer} angelegt.`,
+    link: `/finanzen/vertraege/${row.id}`,
+  }
+}
+
+export async function vertragAendern(
+  p: VertragsFelder,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    update vertraege set
+      name = ${p.name}, kategorie = ${p.kategorie}, partner_id = ${p.partner_id ?? null},
+      betrag = ${p.betrag}, waehrung = ${p.waehrung}, intervall = ${p.intervall},
+      zahltag = ${p.zahltag}, beginn = ${p.beginn}, ende = ${p.ende ?? null},
+      laufzeit_monate = ${p.laufzeit_monate ?? null},
+      kuendigungsfrist_monate = ${p.kuendigungsfrist_monate}, notiz = ${p.notiz ?? null}
+    where id = ${ctx.recordId!}`
+  return { recordId: ctx.recordId, text: 'Vertrag geändert.' }
+}
+
+export async function vertragKuendigen(
+  p: { zum?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ zum: string }[]>`
+    select vertrag_kuendigen(${ctx.recordId!}, ${p.zum ?? null}, ${ctx.actor})::text as zum`
+  return { recordId: ctx.recordId, text: `Gekündigt zum ${row.zum.slice(0, 10)}.` }
+}
+
+export async function vertragZahlen(
+  p: { gezahlt_am?: string; bankkonto_id?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [vertrag] = await sql<{ betrag: number; waehrung: string }[]>`
+    select betrag, waehrung from vertraege where id = ${ctx.recordId!}`
+  if (!vertrag) throw new Error('Unbekannter Vertrag')
+  await sql`
+    select zahlung_erfassen(
+      'aus', ${vertrag.betrag}, ${vertrag.waehrung},
+      ${p.gezahlt_am ?? sql`current_date`}, ${p.bankkonto_id ?? null},
+      'vertrag', ${ctx.recordId!}, null, ${ctx.actor})`
+  return { recordId: ctx.recordId, text: 'Vertragszahlung erfasst.' }
+}

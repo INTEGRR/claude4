@@ -110,6 +110,10 @@ export const AUSFUEHRUNG = {
   'finanzen.zahlplan_rate_entfernen': finanzen.zahlplanRateEntfernen,
   'finanzen.rate_zahlen': finanzen.rateZahlen,
   'finanzen.verschiffung_erfassen': finanzen.verschiffungErfassen,
+  'finanzen.vertrag_anlegen': finanzen.vertragAnlegen,
+  'finanzen.vertrag_aendern': finanzen.vertragAendern,
+  'finanzen.vertrag_kuendigen': finanzen.vertragKuendigen,
+  'finanzen.vertrag_zahlen': finanzen.vertragZahlen,
   'kontakte.partner_aendern': kontakte.partnerAendern,
   'kontakte.unterkontakt_anlegen': kontakte.unterkontaktAnlegen,
 

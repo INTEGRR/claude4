@@ -1,4 +1,5 @@
 import { ANFRAGE } from './anfrage.ts'
+import { FINANZEN_VERTRAG } from './finanzen.ts'
 import { ARTIKEL_ANLEGEN } from './artikel-anlegen.ts'
 import { BASIS } from './basis.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
@@ -22,6 +23,7 @@ export type { Eingabe, FixtureKontext, ProzessFixture, ProzessLauf } from './typ
 export const FIXTURES = {
   basis: BASIS,
   anfrage: ANFRAGE,
+  vertrag_fixkosten: FINANZEN_VERTRAG,
   artikel_anlegen: ARTIKEL_ANLEGEN,
   bug_ticket: BUG_TICKET,
   einkauf_wareneingang_rechnung: EINKAUF_FIXTURE,
