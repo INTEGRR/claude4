@@ -72,8 +72,10 @@ export async function Splash() {
       </div>
       <script
         // Vor dem ersten Anstrich: Splash nur beim Sitzungsstart zeigen.
+        // Bewusst KEINE DOM-Entfernung (die kollidiert mit Reacts Hydration) —
+        // nur ein Attribut auf <html>, das der Splash per CSS respektiert.
         dangerouslySetInnerHTML={{
-          __html: `(function(){try{var s=document.getElementById('splash');if(!s)return;if(sessionStorage.getItem('erp.splash')){s.remove()}else{sessionStorage.setItem('erp.splash','1');s.addEventListener('animationend',function(e){if(e.animationName==='splash-aus'){s.remove()}})}}catch(e){}})()`,
+          __html: `(function(){try{if(sessionStorage.getItem('erp.splash')){document.documentElement.setAttribute('data-splash-gesehen','1')}else{sessionStorage.setItem('erp.splash','1');document.documentElement.removeAttribute('data-splash-gesehen')}}catch(e){}})()`,
         }}
       />
     </>

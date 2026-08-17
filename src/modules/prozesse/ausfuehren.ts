@@ -5,6 +5,7 @@ import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
+import * as finanzen from './registry/finanzen-ausfuehren.ts'
 import * as integrationen from './registry/integrationen-ausfuehren.ts'
 import * as kontakte from './registry/kontakte-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
@@ -99,6 +100,16 @@ export const AUSFUEHRUNG = {
   'lager.beschaffung_ausfuehren': lager.beschaffungAusfuehren,
   'lager.eroeffnungsbewertung': lager.eroeffnungsbewertung,
 
+  'finanzen.bankkonto_anlegen': finanzen.bankkontoAnlegen,
+  'finanzen.kontostand_erfassen': finanzen.kontostandErfassen,
+  'finanzen.zahlung_erfassen': finanzen.zahlungErfassen,
+  'finanzen.zahlung_stornieren': finanzen.zahlungStornieren,
+  'finanzen.rechnung_teilzahlung': finanzen.rechnungTeilzahlung,
+  'finanzen.po_zahlplan_setzen': finanzen.poZahlplanSetzen,
+  'finanzen.zahlplan_rate_hinzufuegen': finanzen.zahlplanRateHinzufuegen,
+  'finanzen.zahlplan_rate_entfernen': finanzen.zahlplanRateEntfernen,
+  'finanzen.rate_zahlen': finanzen.rateZahlen,
+  'finanzen.verschiffung_erfassen': finanzen.verschiffungErfassen,
   'kontakte.partner_aendern': kontakte.partnerAendern,
   'kontakte.unterkontakt_anlegen': kontakte.unterkontaktAnlegen,
 

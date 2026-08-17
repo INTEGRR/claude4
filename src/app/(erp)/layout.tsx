@@ -37,6 +37,7 @@ async function badges() {
       abwesenheiten: number
       fehler: number
       offene_bugs: number
+      faellige_zahlungen: number
     }[]
   >`
     select
@@ -56,7 +57,8 @@ async function badges() {
       ((select count(*) from integration_jobs where status = 'failed')
        + (select count(*) from shopify_unmatched_lines where resolved_at is null))::int as fehler,
       (select count(*) from bug_reports
-        where status in ('offen', 'in_arbeit'))::int as offene_bugs`
+        where status in ('offen', 'in_arbeit'))::int as offene_bugs,
+      (select count(*) from finanz_faellig(current_date + 7))::int as faellige_zahlungen`
   return row
 }
 
@@ -64,7 +66,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const user = await currentUser()
   if (!user) redirect('/login')
   const counts = await badges()
-  const sees = (area: Area) => canAccess(user.role, area)
+  const sees = (area: Area) => canAccess(user.role, area, user.befugnisse)
 
   const [company] = await sql<{ name: string }[]>`
     select value ->> 'name' as name from settings where key = 'company'`
@@ -188,6 +190,17 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             ]
           : []),
         ...(sees('ki') ? [{ href: '/ki', label: 'KI-Analyse' }] : []),
+      ],
+    },
+    {
+      // Chamäleon: erscheint erst mit einem aktiven Finanz-Prozess (0059);
+      // in Ausbaustufe 1 zieht der fällige-Zahlungen-Badge die Gruppe hoch,
+      // sobald der Bereich freigeschaltet ist.
+      label: 'Finanzen',
+      items: [
+        ...(sees('finanzen')
+          ? [{ href: '/finanzen', label: 'Cashflow', count: counts.faellige_zahlungen }]
+          : []),
       ],
     },
     {

@@ -1220,6 +1220,9 @@ label.field > span {
   font-display: block;
 }
 
+/* Schon gesehen (Sitzungs-Attribut vom Boot-Script): gar nicht erst zeigen. */
+html[data-splash-gesehen] .splash { display: none; }
+
 .splash {
   position: fixed;
   inset: 0;

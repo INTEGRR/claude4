@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import { canAccess } from '@/modules/auth/permissions'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -7,12 +8,14 @@ import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { date, money, qty } from '@/modules/shared/format'
 import { cancelBill, payBill, postBill, setBillChecked, setBillDate } from '../../actions'
+import { rechnungTeilzahlung, zahlungStornieren } from '../../../finanzen/actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BillPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('einkauf')
+  const user = await requireArea('einkauf')
   const { id } = await params
+  const darfFinanzen = canAccess(user.role, 'finanzen', user.befugnisse)
 
   const [bill] = await sql<
     {
@@ -47,6 +50,29 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
     where b.id = ${id}`
 
   if (!bill) notFound()
+
+  // Zahlungen (0058): offener Betrag mit Anrechnung der Zahlplan-Anzahlungen.
+  const [offen] = darfFinanzen
+    ? await sql<{ offen: number }[]>`select vendor_bill_offen(${id}) as offen`
+    : [{ offen: 0 }]
+  const billZahlungen = darfFinanzen
+    ? await sql<
+        { id: string; nummer: string; betrag_eur: number; gezahlt_am: string;
+          konto: string | null; storniert: boolean; quelle: string; bezeichnung: string | null }[]
+      >`
+        select z.id, z.nummer, z.betrag_eur, z.gezahlt_am, k.name as konto,
+               (z.storniert_am is not null) as storniert, z.quelle, r.bezeichnung
+        from zahlungen z
+        left join bankkonten k on k.id = z.bankkonto_id
+        left join zahlplan_raten r on r.id = z.zahlplan_rate_id
+        where z.vendor_bill_id = ${id}
+           or (r.purchase_order_id = ${bill.purchase_order_id ?? null} and ${bill.purchase_order_id ?? null}::uuid is not null)
+        order by z.gezahlt_am`
+    : []
+  const konten = darfFinanzen
+    ? await sql<{ id: string; name: string }[]>`
+        select id, name from bankkonten where aktiv order by sequence, name`
+    : []
 
   const lines = await sql<{ id: string; name: string; qty: number; price_unit: number; tax_rate: number }[]>`
     select id, name, qty, price_unit, tax_rate from vendor_bill_lines
@@ -210,6 +236,93 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
           </table>
         </TableWrap>
       </Card>
+
+      {/* Zahlungen (Finanzen): Teilzahlungen mit Anrechnung der Zahlplan-
+          Anzahlungen derselben Bestellung — bezahlt wird die Rechnung erst
+          bei voller Deckung (Logik in vendor_bill_offen/zahlung_erfassen). */}
+      {darfFinanzen && !bill.is_credit_note && (
+        <Card title="Zahlungen">
+          <div className="row" style={{ alignItems: 'center', marginBottom: billZahlungen.length > 0 ? 10 : 0 }}>
+            <div style={{ flex: 1 }}>
+              Offen:{' '}
+              <span className="mono" style={{ fontWeight: 650 }}>{money(offen.offen)}</span>
+              {Number(offen.offen) <= 0 && <> — <span className="led ok" /> vollständig gedeckt</>}
+            </div>
+          </div>
+          {billZahlungen.length > 0 && (
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zahlung</th>
+                    <th>Datum</th>
+                    <th>Konto</th>
+                    <th>Bezug</th>
+                    <th style={{ textAlign: 'right' }}>Betrag</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {billZahlungen.map((z) => (
+                    <tr key={z.id} style={z.storniert ? { opacity: 0.45 } : undefined}>
+                      <td className="mono">{z.nummer}{z.storniert ? ' (storniert)' : ''}</td>
+                      <td className="mono muted">{date(z.gezahlt_am)}</td>
+                      <td className="muted">{z.konto ?? '—'}</td>
+                      <td className="muted">
+                        {z.quelle === 'po_rate' ? `Zahlplan: ${z.bezeichnung ?? 'Rate'}` : 'Rechnung'}
+                      </td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{money(z.betrag_eur)}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {!z.storniert && (
+                          <ActionButton className="small danger" action={zahlungStornieren.bind(null, z.id)}>
+                            Stornieren
+                          </ActionButton>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+          {bill.state === 'posted' && Number(offen.offen) > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <ActionForm action={rechnungTeilzahlung.bind(null, id)}>
+                <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <label className="field shrink">
+                    <span>Betrag (€)</span>
+                    <input
+                      type="number"
+                      name="betrag"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      defaultValue={Number(offen.offen).toFixed(2)}
+                      style={{ width: 130 }}
+                    />
+                  </label>
+                  <label className="field shrink">
+                    <span>Gezahlt am</span>
+                    <input type="date" name="gezahlt_am" defaultValue={new Date().toISOString().slice(0, 10)} />
+                  </label>
+                  <label className="field shrink">
+                    <span>Bankkonto</span>
+                    <select name="bankkonto_id" defaultValue="">
+                      <option value="">—</option>
+                      {konten.map((k) => (
+                        <option key={k.id} value={k.id}>{k.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="shrink field">
+                    <button className="primary" type="submit">Zahlung erfassen</button>
+                  </div>
+                </div>
+              </ActionForm>
+            </div>
+          )}
+        </Card>
+      )}
 
       <RecordComments model="vendor_bill" recordId={id} path={`/einkauf/rechnungen/${id}`} />
     </>

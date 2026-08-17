@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import { canAccess } from '@/modules/auth/permissions'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -17,12 +18,21 @@ import {
   sendPoEmail,
   updatePoHeader,
 } from '../actions'
+import {
+  poZahlplanSetzen,
+  rateZahlen,
+  verschiffungErfassen,
+  zahlplanRateEntfernen,
+} from '../../finanzen/actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('einkauf')
+  const user = await requireArea('einkauf')
   const { id } = await params
+  // Zahlungskonditionen sind Finanzsache: die Zahlplan-Karte sieht nur, wer
+  // den Finanzbereich betreten darf (Admin oder Befugnis finanzen:zugriff).
+  const darfFinanzen = canAccess(user.role, 'finanzen', user.befugnisse)
 
   const [order] = await sql<
     {
@@ -48,6 +58,26 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     where po.id = ${id}`
 
   if (!order) notFound()
+
+  // Zahlplan (0058): Raten mit gerechneter Fälligkeit + Plausibilitätswarnung.
+  const zahlplan = darfFinanzen
+    ? await sql<
+        { id: string; bezeichnung: string; ausloeser: string; termin: string | null;
+          versatz_tage: number; anteil_pct: number | null; betrag: number | null;
+          bezahlt_am: string | null; faellig: string; betrag_eur: number; verschifft_am: string | null }[]
+      >`
+        select r.id, r.bezeichnung, r.ausloeser, r.termin, r.versatz_tage,
+               r.anteil_pct, r.betrag, r.bezahlt_am,
+               zahlplan_faelligkeit(r) as faellig, zahlplan_betrag(r) as betrag_eur,
+               po.verschifft_am
+        from zahlplan_raten r
+        join purchase_orders po on po.id = r.purchase_order_id
+        where r.purchase_order_id = ${id}
+        order by r.sequence`
+    : []
+  const [zahlplanWarnung] = darfFinanzen
+    ? await sql<{ w: string | null }[]>`select zahlplan_pruefen(${id}) as w`
+    : [{ w: null }]
 
   // Belegsignal folgt dem Prozessschritt: abgeschalteter Rechnungsschritt
   // (Abrechnung extern) blendet Knopf und leere Rechnungs-Karte aus —
@@ -420,6 +450,114 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           </div>
         )}
       </Card>
+
+      {/* Zahlplan (Finanzen): Raten mit Auslöser und gerechneter Fälligkeit.
+          Der harte Zahlungspfad läuft über das Register (0058) — hier wird
+          geplant und abgehakt. */}
+      {darfFinanzen && (
+        <Card title="Zahlplan">
+          {zahlplanWarnung.w && (
+            <div className="notice warn" style={{ marginBottom: 10 }}>{zahlplanWarnung.w}</div>
+          )}
+          {zahlplan.length > 0 && (
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Rate</th>
+                    <th>Fällig bei</th>
+                    <th>Fällig am</th>
+                    <th style={{ textAlign: 'right' }}>Betrag</th>
+                    <th>Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {zahlplan.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.bezeichnung}</td>
+                      <td className="muted">
+                        {{ bestellung: 'Bestellung', verschiffung: 'Verschiffung',
+                           ankunft: 'Ankunft', termin: 'Termin' }[r.ausloeser]}
+                        {r.versatz_tage > 0 ? ` +${r.versatz_tage} T` : ''}
+                      </td>
+                      <td className="mono muted">{date(r.faellig)}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{money(r.betrag_eur)}</td>
+                      <td>
+                        {r.bezahlt_am ? (
+                          <><span className="led ok" /> bezahlt am {date(r.bezahlt_am)}</>
+                        ) : (
+                          <><span className="led warn" /> offen</>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {!r.bezahlt_am && (
+                          <span className="actions" style={{ justifyContent: 'flex-end' }}>
+                            <ActionButton className="small" action={rateZahlen.bind(null, r.id)}>
+                              Bezahlt
+                            </ActionButton>
+                            <ActionButton className="small danger" action={zahlplanRateEntfernen.bind(null, r.id)}>
+                              Entfernen
+                            </ActionButton>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+          {editable && (
+            <div style={{ marginTop: zahlplan.length > 0 ? 12 : 0 }}>
+              <ActionForm action={poZahlplanSetzen.bind(null, id)}>
+                <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <label className="field shrink">
+                    <span>Anzahlung (%)</span>
+                    <input type="number" name="anzahlung_pct" defaultValue={30} min={0} max={100} style={{ width: 110 }} />
+                  </label>
+                  <label className="field shrink">
+                    <span>Rest fällig bei</span>
+                    <select name="rest_ausloeser" defaultValue="verschiffung">
+                      <option value="verschiffung">Verschiffung</option>
+                      <option value="ankunft">Ankunft</option>
+                      <option value="termin">Termin</option>
+                    </select>
+                  </label>
+                  <label className="field shrink">
+                    <span>Rest-Termin (optional)</span>
+                    <input type="date" name="rest_termin" />
+                  </label>
+                  <div className="shrink field">
+                    <button className="small" type="submit">
+                      {zahlplan.length > 0 ? 'Zahlplan neu setzen' : 'Zahlplan anlegen'}
+                    </button>
+                  </div>
+                </div>
+              </ActionForm>
+            </div>
+          )}
+          <div className="row" style={{ alignItems: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
+            <ActionForm action={verschiffungErfassen.bind(null, id)}>
+              <div className="row" style={{ alignItems: 'flex-end' }}>
+                <label className="field shrink">
+                  <span>Verschifft am</span>
+                  <input
+                    type="date"
+                    name="verschifft_am"
+                    defaultValue={zahlplan[0]?.verschifft_am
+                      ? new Date(zahlplan[0].verschifft_am).toISOString().slice(0, 10)
+                      : undefined}
+                  />
+                </label>
+                <div className="shrink field">
+                  <button className="small" type="submit">Speichern</button>
+                </div>
+              </div>
+            </ActionForm>
+          </div>
+        </Card>
+      )}
 
       <div className="grid-2">
         <Card title={`Wareneingänge (${receipts.length})`} tight>

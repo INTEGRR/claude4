@@ -40,6 +40,9 @@ async function ladeOptionen(
     } else if (quelle === 'users') {
       ergebnis.users = await sql<{ id: string; label: string }[]>`
         select id, name as label from users where active order by name limit 200`
+    } else if (quelle === 'bankkonten') {
+      ergebnis.bankkonten = await sql<{ id: string; label: string }[]>`
+        select id, name as label from bankkonten where aktiv order by sequence, name limit 50`
     }
   }
   return ergebnis

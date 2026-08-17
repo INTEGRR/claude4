@@ -53,6 +53,7 @@ const VERWEIS_QUELLEN: Record<string, string> = {
   vendor_id: 'vendors',
   variant_id: 'product_variants',
   user_id: 'users',
+  bankkonto_id: 'bankkonten',
 }
 
 function beschriftung(name: string): string {
@@ -68,6 +69,28 @@ function beschriftung(name: string): string {
     vendor_id: 'Lieferant',
     variant_id: 'Produkt',
     user_id: 'Verantwortlich',
+    bankkonto_id: 'Bankkonto',
+    // Finanzen
+    iban: 'IBAN',
+    waehrung: 'Währung',
+    stichtag: 'Stichtag',
+    saldo: 'Saldo (€)',
+    richtung: 'Richtung',
+    betrag: 'Betrag',
+    gezahlt_am: 'Gezahlt am',
+    verwendungszweck: 'Verwendungszweck',
+    zahlung_id: 'Zahlung',
+    anzahlung_pct: 'Anzahlung (%)',
+    rest_ausloeser: 'Rest fällig bei',
+    rest_termin: 'Rest-Termin',
+    rest_versatz_tage: 'Rest-Versatz (Tage)',
+    bezeichnung: 'Bezeichnung',
+    anteil_pct: 'Anteil (%)',
+    ausloeser: 'Fällig bei',
+    versatz_tage: 'Versatz (Tage)',
+    termin: 'Termin',
+    rate_id: 'Zahlplan-Rate',
+    verschifft_am: 'Verschifft am',
     // Allgemein
     name: 'Name',
     qty: 'Menge',
@@ -90,7 +113,6 @@ function beschriftung(name: string): string {
     reason: 'Grund',
     reference: 'Referenz',
     sequence: 'Reihenfolge',
-    richtung: 'Richtung',
     // Produkt
     uom_id: 'Einheit',
     purchase_uom_id: 'Einkaufseinheit',
