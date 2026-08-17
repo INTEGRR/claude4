@@ -205,12 +205,11 @@ a:hover { text-decoration: underline; }
 }
 
 .sidebar .brand {
-  font-weight: 600;
-  font-size: 16px;
-  letter-spacing: -0.015em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 2px 8px 4px;
 }
-.sidebar .brand .dot { color: var(--text-muted); }
 .sidebar .brand-sub {
   font-family: var(--font-mono), monospace;
   font-size: 9.5px;
@@ -1265,7 +1264,8 @@ label.field > span {
   gap: clamp(16px, 2vw, 26px);
   animation: splash-einrasten 1.5s cubic-bezier(0.2, 0.85, 0.1, 1) both;
 }
-.splash-mark { width: clamp(58px, 9vw, 130px); height: auto; flex: none; }
+.splash-mark { width: clamp(58px, 9vw, 130px); flex: none; }
+.splash-mark svg { width: 100%; height: auto; display: block; }
 .splash-wortmarke {
   position: relative;
   font-family: var(--font-geist-sans), sans-serif;

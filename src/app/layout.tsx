@@ -5,15 +5,16 @@ import { themeBootScript } from '@/components/theme-toggle'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'ERP',
-  description: 'Verkauf, Fertigung, Einkauf, Lager, Versand',
+  title: 'KRNL',
+  description: 'Enterprise Resource Kernel — Verkauf, Fertigung, Einkauf, Lager, Versand, Finanzen',
   // PWA: installierbar, auf iOS randlos als Web-App vom Startbildschirm.
   appleWebApp: {
     capable: true,
-    title: 'erp.system',
+    title: 'KRNL',
     statusBarStyle: 'default',
   },
   icons: {
+    icon: '/icon-192.png',
     apple: '/apple-icon.png',
   },
 }

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { currentUser, login } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { HexcoreMark, Wortmarke } from '@/components/marke'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,12 +31,13 @@ export default async function LoginPage({
       <div className="login-card">
         {/* Typenschild wie in der Anwendung — auch der Anmeldeschirm gehört zur Maschine. */}
         <div style={{ padding: '0 2px 14px' }}>
-          <div style={{ fontWeight: 600, fontSize: 17, letterSpacing: '-0.015em' }}>
-            erp<span className="muted">.system</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <HexcoreMark groesse={26} />
+            <Wortmarke groesse={20} />
           </div>
           <div
             className="mono-label"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}
           >
             <span className="led ok" /> System bereit
           </div>

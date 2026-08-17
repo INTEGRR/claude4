@@ -11,6 +11,7 @@ import { TicketOverlay } from '@/components/ticket-overlay'
 import { KiOverlay } from '@/components/ki-overlay'
 import { BefehlsOverlay } from '@/components/befehls-overlay'
 import { Splash } from '@/components/splash'
+import { HexcoreMark, Wortmarke } from '@/components/marke'
 import { befehlsKatalog } from '@/modules/befehle'
 import { kiConfigured } from '@/modules/ki/agent'
 
@@ -219,7 +220,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       sidebar={
         <>
           <div className="brand">
-            erp<span className="dot">.system</span>
+            <HexcoreMark groesse={22} variante="einfach" />
+            <Wortmarke groesse={17} />
           </div>
           <div className="brand-sub">{firma}</div>
           <SidebarNav groups={groups} />

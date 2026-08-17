@@ -1,4 +1,5 @@
 import { sql } from '@/db/client'
+import { HexcoreMark } from './marke'
 
 /**
  * Boot-Splash (Design-Handoff „KRNL"): Hexcore-Logo, Schriftzug, Ladebalken —
@@ -16,27 +17,6 @@ import { sql } from '@/db/client'
  * Balken sind reines CSS — der Schriftzug hängt an keiner Animation
  * (Sichtbarkeit nie über opacity-Keyframes, siehe Handoff-Hinweis).
  */
-
-function HexcoreMark() {
-  return (
-    <svg className="splash-mark" viewBox="0 0 100 100" fill="none" aria-hidden>
-      <path
-        d="M50 6 L88 28 L88 72 L50 94 L12 72 L12 28 Z"
-        stroke="#F4F3EF"
-        strokeWidth="6"
-      />
-      {/* Die Glitch-Signatur des Zeichens: zwei verrutschte Kanten. */}
-      <path d="M50 6 L88 28" stroke="#FF5A1F" strokeWidth="6" transform="translate(6,-3)" />
-      <path d="M12 72 L50 94" stroke="#7C5AFF" strokeWidth="6" transform="translate(-5,3)" />
-      <rect x="42" y="42" width="16" height="16" fill="#FF5A1F" />
-      <path
-        d="M50 20 L50 42 M28 40 L42 50 M72 40 L58 50 M50 58 L50 78"
-        stroke="#7C5AFF"
-        strokeWidth="3"
-      />
-    </svg>
-  )
-}
 
 function SiebenSegment({ wert, farbe }: { wert: number; farbe: 'signal' | 'kernel' }) {
   const text = String(wert)
@@ -61,7 +41,10 @@ export async function Splash() {
         <span className="splash-rail oben" />
         <div className="splash-buehne">
           <div className="splash-lockup">
-            <HexcoreMark />
+            <span className="splash-mark">
+              {/* Der Splash hat genau ein Gesicht — Kontur fest auf Phosphor. */}
+              <HexcoreMark groesse={130} kontur="#F4F3EF" />
+            </span>
             <span className="splash-wortmarke">
               KRNL
               <span className="splash-geist violett" aria-hidden>KRNL</span>
