@@ -160,10 +160,10 @@ export async function meldebestandWecken(_p: object, ctx: AktionsKontext): Promi
 }
 
 /*
- * Legt Bestellung oder Fertigungsauftrag an. Beides entsteht als Entwurf und
- * verändert die Prognose noch nicht — der Vorschlag bleibt also stehen.
- * Deshalb muss die Rückmeldung sagen, welcher Beleg entstanden ist; sonst
- * sieht es aus, als hätte der Knopf nichts getan.
+ * Legt Bestellung oder Fertigungsauftrag an. Der entstandene Beleg zählt als
+ * offener Zulauf, der Vorschlag verschwindet also aus der Liste (0053) — die
+ * Rückmeldung muss trotzdem sagen, welcher Beleg entstanden ist, damit der
+ * Weg dorthin klickbar bleibt.
  */
 export async function beschaffungAusfuehren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   const [row] = await sql<{ orderpoint_execute: string }[]>`

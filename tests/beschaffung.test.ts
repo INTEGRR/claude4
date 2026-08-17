@@ -98,6 +98,58 @@ describe('Meldebestände (0015)', () => {
     })
   })
 
+  // BUG/00005: Entwurfs-Bestellungen und laufende Fertigungsaufträge zählen
+  // als Zulauf — der ausgeführte Vorschlag darf nicht erneut angeboten werden.
+  test('nach dem Bestellen verschwindet der Vorschlag; Storno bringt ihn zurück', async () => {
+    await withRollback(async (t) => {
+      const s = await orderpointScenario(t)
+      const [erste] = await t<{ orderpoint_execute: string }[]>`
+        select orderpoint_execute(${s.orderpointId}, 'test')`
+
+      let rows = await t`select 1 from orderpoint_suggestions()
+                         where orderpoint_id = ${s.orderpointId}`
+      assert.equal(rows.length, 0, 'Entwurfs-Bestellung ist Zulauf — kein Vorschlag mehr')
+
+      // Im Savepoint, damit der erwartete Fehler die Testtransaktion nicht abbricht.
+      await assert.rejects(
+        t.savepoint(async (sp) => {
+          await sp`select orderpoint_execute(${s.orderpointId}, 'test')`
+        }),
+        /Kein offener Beschaffungsvorschlag/,
+        'zweiter Klick bestellt nicht erneut',
+      )
+
+      // Bestellung stornieren, ohne dass Ware kam → der Bedarf lebt wieder auf.
+      const [po] = await t<{ id: string }[]>`
+        select id from purchase_orders where number = ${erste.orderpoint_execute}`
+      await t`select cancel_purchase_order(${po.id}, 'test')`
+      rows = await t`select 1 from orderpoint_suggestions()
+                     where orderpoint_id = ${s.orderpointId}`
+      assert.equal(rows.length, 1, 'stornierte Bestellung ist kein Zulauf mehr')
+    })
+  })
+
+  test('laufender Fertigungsauftrag unterdrückt den Fertigen-Vorschlag', async () => {
+    await withRollback(async (t) => {
+      const s = await orderpointScenario(t, { route: 'manufacture' })
+      const komponente = await makeProduct(t, 'Melde-Komponente Z')
+      const [uom] = await t<{ uom_id: string }[]>`
+        select uom_id from product_templates pt
+        join product_variants pv on pv.template_id = pt.id where pv.id = ${s.variantId}`
+      const [bom] = await t<{ id: string }[]>`
+        insert into boms (template_id, qty, uom_id)
+        select pv.template_id, 1, ${uom.uom_id} from product_variants pv
+        where pv.id = ${s.variantId} returning id`
+      await t`insert into bom_lines (bom_id, component_variant_id, qty, uom_id)
+              values (${bom.id}, ${komponente}, 2, ${uom.uom_id})`
+
+      await t`select orderpoint_execute(${s.orderpointId}, 'test')`
+      const rows = await t`select 1 from orderpoint_suggestions()
+                           where orderpoint_id = ${s.orderpointId}`
+      assert.equal(rows.length, 0, 'bestätigter MO deckt den Bedarf — kein Vorschlag mehr')
+    })
+  })
+
   test('Ausführung (manufacture): bestätigter Fertigungsauftrag mit Herkunft', async () => {
     await withRollback(async (t) => {
       const s = await orderpointScenario(t, { route: 'manufacture' })

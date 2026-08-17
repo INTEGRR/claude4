@@ -39,9 +39,9 @@ export default async function BeschaffungPage() {
     }[]
   >`select * from orderpoint_suggestions()`
 
-  // Was aus früheren Klicks schon offen ist. Entwurfs-Bestellungen verändern
-  // die Prognose nicht, deshalb steht der Vorschlag weiter da — ohne diesen
-  // Hinweis würde man ihn ein zweites Mal ausführen.
+  // Was aus früheren Klicks schon offen ist. Der offene Zulauf zählt seit
+  // 0053 in die Vorschlagsrechnung (ausgeführte Vorschläge verschwinden) —
+  // die Spalte zeigt, WOHIN der Bedarf gewandert ist, solange der Beleg lebt.
   const offen = await sql<
     { orderpoint_id: string; beleg: string; art: string; ziel: string; menge: number }[]
   >`
@@ -49,7 +49,7 @@ export default async function BeschaffungPage() {
            po.id::text as ziel, sum(pol.qty) as menge
     from stock_orderpoints op
     join purchase_order_lines pol on pol.variant_id = op.variant_id
-    join purchase_orders po on po.id = pol.order_id and po.state = 'draft'
+    join purchase_orders po on po.id = pol.order_id and po.state in ('draft', 'sent')
     group by 1, 2, 3, 4
     union all
     select mo.orderpoint_id, mo.number, 'Fertigungsauftrag', mo.id::text, mo.qty_to_produce
