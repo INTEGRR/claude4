@@ -173,12 +173,17 @@ a:hover { text-decoration: underline; }
   background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 14px 10px;
+  /* Auf Telefonen liegt der untere Rand sonst hinter Browserleiste bzw.
+     Home-Bar (100vh = großer Viewport) — dvh misst den sichtbaren Bereich,
+     die Safe-Area hält „Abmelden" über der Gestenleiste (BUG/00007). */
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 1px;
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   font-size: 13px;
 }
@@ -825,6 +830,9 @@ label.field > span {
     position: fixed;
     z-index: 40;
     inset: 0 auto 0 0;
+    /* inset streckt zwischen oben und unten — die feste vh-Höhe würde auf
+       dem Telefon hinter der Browserleiste enden (BUG/00007). */
+    height: auto;
     width: 264px;
     max-width: 84vw;
     transform: translateX(-100%);
@@ -1008,6 +1016,20 @@ label.field > span {
 }
 
 @media print { .ticket-tab, .ticket-panel { display: none; } }
+
+/* Großansicht der KI-Diagramme (BUG/00008): natives <dialog>, Karte in groß. */
+.chart-dialog {
+  width: min(96vw, 1100px);
+  max-height: 90dvh;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.chart-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 
 /* --- Prozessdiagramm (React Flow + ELK) ------------------------------------ */
 
