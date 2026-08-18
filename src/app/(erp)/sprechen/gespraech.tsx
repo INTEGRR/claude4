@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HexcoreMark } from '@/components/marke'
-import { DC_EVENTS } from '@/modules/ki/sprechen-katalog'
+import { DC_EVENTS, istTranskriptHalluzination } from '@/modules/ki/sprechen-katalog'
 
 /**
  * Der Gesprächs-Client: WebRTC direkt zu OpenAI (Audio), Function-Calls über
@@ -218,7 +218,9 @@ export function Gespraech() {
           break
         case DC_EVENTS.nutzerTranskript: {
           const text = (ev.transcript ?? '').trim()
-          if (text) {
+          // Whisper-Halluzinationen bei Stille (Amara.org, Senderfloskeln)
+          // gar nicht erst ins Log/Protokoll lassen.
+          if (text && !istTranskriptHalluzination(text)) {
             pufferRef.current.push({ rolle: 'nutzer', text })
             zeile('nutzer', text.length > 90 ? `${text.slice(0, 90)}…` : text)
             if (pufferRef.current.length >= 10) spuelen(false)

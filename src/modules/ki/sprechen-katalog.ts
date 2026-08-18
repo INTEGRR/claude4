@@ -136,6 +136,25 @@ export function sprechenWerkzeuge(mitDatenfrage: boolean): RealtimeWerkzeug[] {
   return werkzeuge
 }
 
+/**
+ * Whisper halluziniert bei Stille/Atemgeräuschen notorische Untertitel-
+ * Floskeln aus seinen Trainingsdaten („Untertitel der Amara.org-Community",
+ * „Copyright WDR" …). Solche Zeilen fliegen aus Log und Protokoll — das
+ * Sprachmodell hört das Audio direkt und ist davon ohnehin unberührt.
+ */
+const HALLUZINATIONEN = [
+  /untertitel/i,
+  /amara\.org/i,
+  /\b(zdf|wdr|ndr|ard|swr|br|funk)\b/i,
+  /copyright/i,
+  /vielen dank f(ü|ue)rs? zuschauen/i,
+  /abonniert|abonnieren/i,
+]
+
+export function istTranskriptHalluzination(text: string): boolean {
+  return HALLUZINATIONEN.some((muster) => muster.test(text))
+}
+
 export function sprechenInstructions(
   nutzer: { name: string; rolle: string },
   firma: string,

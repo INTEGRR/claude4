@@ -4,6 +4,7 @@ import { closeDb, db, expectError, makeProduct, stockUp, withRollback } from './
 import { suchworte, varianteSuchen, wortstamm } from '../src/modules/ki/produkt-suche.ts'
 import {
   ARGUMENTE,
+  istTranskriptHalluzination,
   sprechenInstructions,
   sprechenWerkzeuge,
 } from '../src/modules/ki/sprechen-katalog.ts'
@@ -106,6 +107,14 @@ describe('Sprechen: Werkzeugkatalog (DB-frei)', () => {
       }).success,
       true,
     )
+  })
+
+  test('Whisper-Halluzinationen werden erkannt, echte Sätze nicht', () => {
+    assert.equal(istTranskriptHalluzination('Untertitel der Amara.org-Community'), true)
+    assert.equal(istTranskriptHalluzination('Copyright WDR 2021'), true)
+    assert.equal(istTranskriptHalluzination('Untertitelung des ZDF für funk, 2017'), true)
+    assert.equal(istTranskriptHalluzination('Ich zähle 788 Switches Gateron Blue'), false)
+    assert.equal(istTranskriptHalluzination('Ja, genau den mit K-009'), false)
   })
 
   test('Zähl-Aktionen sind KI-sichtbar, nurAdmin bleibt admin-only', () => {
