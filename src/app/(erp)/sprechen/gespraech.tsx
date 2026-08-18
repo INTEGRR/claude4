@@ -299,7 +299,23 @@ export function Gespraech() {
           'Content-Type': 'application/sdp',
         },
       })
-      if (!sdpRes.ok) throw new Error(`Realtime-Verbindung abgelehnt (${sdpRes.status})`)
+      if (!sdpRes.ok) {
+        // Die Begründung von OpenAI mit ausgeben — bei 429 steht dort, ob es
+        // ein Rate-Limit oder fehlendes Guthaben (insufficient_quota) ist.
+        const detail = await sdpRes.text().catch(() => '')
+        let meldung = detail.slice(0, 200)
+        try {
+          const geparst = JSON.parse(detail) as { error?: { message?: string; code?: string } }
+          if (geparst.error?.message) {
+            meldung = `${geparst.error.code ? `${geparst.error.code}: ` : ''}${geparst.error.message}`
+          }
+        } catch {
+          // kein JSON — der gekürzte Rohtext bleibt
+        }
+        throw new Error(
+          `Realtime-Verbindung abgelehnt (${sdpRes.status})${meldung ? `: ${meldung}` : ''}`,
+        )
+      }
       await pc.setRemoteDescription({ type: 'answer', sdp: await sdpRes.text() })
 
       // 4) Schirm anlassen, solange gesprochen wird (Muster KI-Chat).
