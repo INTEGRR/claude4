@@ -12,6 +12,10 @@ import type { RealtimeWerkzeug } from './sprechen-katalog'
 
 const MODELL = process.env.SPRECHEN_MODELL ?? 'gpt-realtime-2.1'
 const STIMME = process.env.SPRECHEN_STIMME ?? 'marin'
+// Pflichtfeld der Realtime-API fürs Nutzer-Transkript — dasselbe Modell wie
+// die Diktierfunktion, sofern nicht eigens übersteuert.
+const TRANSKRIPTION =
+  process.env.SPRECHEN_TRANSKRIPTION ?? process.env.TRANSKRIPTION_MODELL ?? 'whisper-1'
 
 export function sprechenKonfiguriert(): boolean {
   return Boolean(process.env.OPENAI_API_KEY)
@@ -39,7 +43,7 @@ export async function clientSecretErstellen(opts: {
         tools: opts.tools,
         audio: {
           output: { voice: STIMME },
-          input: { transcription: { language: 'de' } },
+          input: { transcription: { model: TRANSKRIPTION, language: 'de' } },
         },
       },
     }),
