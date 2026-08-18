@@ -735,6 +735,43 @@ Fälligkeits-Auslöser, Kündigungsfristen, Tilgungs-Mathematik,
 USt-Nachrechnung und die vier Deckungskonto-Prüffälle auf neutralisierter
 Datenlage (`tests/finanzen.test.ts`).
 
+## Sprachmodus /sprechen: Echtzeit-Gespräch mit Sammel-Transaktion (0062, umgesetzt)
+
+Freisprech-Dialog wie mit einem Gaming-Assistenten — „Ich zähle 788 Switches
+Gateron Blue, was hast du im System?" → gesprochene Sofort-Antwort. Technik:
+**OpenAI Realtime** (Speech-to-Speech), WebRTC direkt Browser ↔ OpenAI; der
+Server (`/api/sprechen/session`) mintet nur kurzlebige Client Secrets
+(`SPRECHEN_MODELL`, Standard gpt-realtime-2.1; `SPRECHEN_STIMME`). Kein
+API-Key im Client. **Achtung Kosten:** Realtime rechnet Audio-Tokens ab
+(Input je 100 ms, Output je 50 ms) — lange Gespräche kosten spürbar; nach
+fünf Minuten Stille trennt der Client selbst.
+
+Kernprinzip **Sammeln statt Sofort-Buchen**: Lesewerkzeuge antworten live
+(`produkt_bestand` — unscharfer Resolver mit Wortstamm-Suche und Bestand;
+`aktionen_suchen` — beide KI-Kataloge, rechtegefiltert, Felder mit deutschen
+Labels; `datenfrage` — kleines Anthropic-Modell mit Schema-Doku +
+Read-only-SQL, nur bei gesetztem ANTHROPIC_API_KEY). Schreibwünsche landen
+über `vorgang_sammeln` NUR in der Sammel-Transaktion der Sitzung
+(`sprach_vorgaenge`, Status offen) — Schema und Rechte werden beim Sammeln
+sofort geprüft (Torwächter, die Stimme meldet Lücken), gebucht wird nichts.
+Nach dem Beenden zeigt `/sprechen` die **Prüftabelle**: Zeilen mit
+angesagter Zusammenfassung, Zählmengen korrigierbar, Verwerfen je Zeile,
+dann **„Alle offenen buchen"** — sequenziell über
+`aktionAusfuehrenGeprueft`, Zählungen als Kette erfassen → buchen (der
+Bestands-Wächter von `inventory_apply` greift im Buchungsmoment). Nicht
+gebuchte Sammlungen warten beim nächsten Besuch als „offene Sammlung".
+
+Oberfläche: das KRNL-Hexcore ist die einzige Zustandsanzeige (pulsiert beim
+Hören, atmet beim Antworten), darunter ein kompaktes Live-Log mit den
+besprochenen Werten statt eines Volltranskripts. **Hosentaschen-Modus** für
+In-Ears: app-seitig schwarz + berührungsgesperrt (Doppeltipp entsperrt),
+Wake Lock hält den Schirm — bewusst keine echte OS-Sperre, die würde auf
+iOS das Mikrofon kappen. Jede Sitzung hinterlässt ein Protokoll
+(`sprachprotokolle` + `…_eintraege`: Transkript client-gepuffert,
+Werkzeug-Einträge serverseitig); die KI-SQL-Sperrliste deckt die
+Protokolltabellen ab. Sichtbar für Bereich `ki`, Aktionen können nie mehr
+als die Rolle des Sprechers (Torwächter, nurAdmin, Befugnisse).
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

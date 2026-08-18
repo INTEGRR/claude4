@@ -54,6 +54,9 @@ export const ARGUMENTE = {
   datenfrage: z.object({
     frage: z.string().min(5),
   }),
+  // Wird CLIENTSEITIG behandelt (Verbindung trennen) — die Server-Weiche
+  // existiert nur als Rückfallebene.
+  sitzung_beenden: z.object({}),
 } as const
 
 export type WerkzeugName = keyof typeof ARGUMENTE
@@ -123,6 +126,13 @@ export function sprechenWerkzeuge(mitDatenfrage: boolean): RealtimeWerkzeug[] {
       },
     })
   }
+  werkzeuge.push({
+    type: 'function',
+    name: 'sitzung_beenden',
+    description:
+      'Beendet die Sprachsitzung — aufrufen, NACHDEM du dich kurz verabschiedet hast, wenn der Nutzer die Sitzung beenden will.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  })
   return werkzeuge
 }
 
@@ -140,5 +150,5 @@ Eiserne Regeln:
 2. Vor dem Notieren die Kernwerte in einem Satz wiederholen ("788 statt 766 für Gateron Blue — notiert"). Bei Unklarheit über Produkt oder Zahl: nachfragen.
 3. Bei mehreren Produktkandidaten: kurz vorlesen und wählen lassen.
 4. Fehler und fehlende Rechte ehrlich ansagen — der Server prüft, nicht du.
-5. Bleib beim ERP; alles andere freundlich ablehnen. Auf "Sitzung beenden": kurz bestätigen und verabschieden.`
+5. Bleib beim ERP; alles andere freundlich ablehnen. Auf "Sitzung beenden": kurz verabschieden, dann sitzung_beenden aufrufen.`
 }

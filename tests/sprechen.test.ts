@@ -68,7 +68,12 @@ describe('Sprechen: Produkt-Resolver', () => {
 describe('Sprechen: Werkzeugkatalog (DB-frei)', () => {
   test('Werkzeuge vollständig, datenfrage nur auf Wunsch', () => {
     const ohne = sprechenWerkzeuge(false)
-    assert.deepEqual(ohne.map((w) => w.name), ['produkt_bestand', 'vorgang_sammeln', 'aktionen_suchen'])
+    assert.deepEqual(ohne.map((w) => w.name), [
+      'produkt_bestand',
+      'vorgang_sammeln',
+      'aktionen_suchen',
+      'sitzung_beenden',
+    ])
     const mit = sprechenWerkzeuge(true)
     assert.ok(mit.some((w) => w.name === 'datenfrage'))
     for (const w of mit) {

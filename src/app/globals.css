@@ -1165,6 +1165,25 @@ label.field > span {
 .sprechen-log-zeile.art-notiert span.mono { color: var(--wichtig); }
 .sprechen-log-zeile.art-fehler span.mono { color: var(--danger); }
 
+/* Hosentaschen-Modus: schwarz, berührungsgesperrt (nur Doppeltipp entsperrt),
+   das dunkel pulsierende Hexcore zeigt, dass die Sitzung lebt. */
+.sprechen-hosentasche {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #3a3a3a;
+  touch-action: none;
+  user-select: none;
+  cursor: default;
+}
+.sprechen-hosentasche .sprechen-kern { opacity: 0.55; }
+.sprechen-hosentasche .mono-label { color: #555; }
+
 /* Befehlsfeld der Daily Routine: ein Composer, darunter die Treffer. */
 .befehlsfeld { position: relative; }
 .befehlsfeld.gross .composer {

@@ -48,6 +48,7 @@ export function Gespraech() {
   const [zustand, setZustand] = useState<Zustand>('aus')
   const [fehler, setFehler] = useState<string | null>(null)
   const [log, setLog] = useState<LogZeile[]>([])
+  const [hosentasche, setHosentasche] = useState(false)
 
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
@@ -57,6 +58,8 @@ export function Gespraech() {
   const pufferRef = useRef<{ rolle: 'nutzer' | 'assistent'; text: string }[]>([])
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
   const logEndeRef = useRef<HTMLDivElement | null>(null)
+  const zuletztAktivRef = useRef(0)
+  const leerlaufTimerRef = useRef<number | null>(null)
 
   const zeile = useCallback((art: LogZeile['art'], text: string) => {
     setLog((alt) => [...alt.slice(-60), { id: ++logId, art, text }])
@@ -87,6 +90,10 @@ export function Gespraech() {
 
   const trennen = useCallback(
     (mitRefresh: boolean) => {
+      if (leerlaufTimerRef.current) {
+        window.clearInterval(leerlaufTimerRef.current)
+        leerlaufTimerRef.current = null
+      }
       dcRef.current?.close()
       dcRef.current = null
       pcRef.current?.close()
@@ -101,6 +108,7 @@ export function Gespraech() {
       wakeLockRef.current = null
       spuelen(true)
       protokollRef.current = null
+      setHosentasche(false)
       setZustand('aus')
       if (mitRefresh) router.refresh()
     },
@@ -124,6 +132,14 @@ export function Gespraech() {
   const werkzeug = useCallback(
     async (ev: FunctionCallEvent) => {
       const name = ev.name ?? ''
+
+      // Verabschiedung: der Client trennt selbst — kein Server-Umweg. Kurze
+      // Gnadenfrist, damit das gesprochene "Tschüss" noch zu Ende spielt.
+      if (name === 'sitzung_beenden') {
+        zeile('info', 'Sitzung wird beendet.')
+        window.setTimeout(() => trennen(true), 2500)
+        return
+      }
       let argumente: unknown = {}
       try {
         argumente = ev.arguments ? JSON.parse(ev.arguments) : {}
@@ -175,7 +191,7 @@ export function Gespraech() {
         dc.send(JSON.stringify({ type: DC_EVENTS.responseCreate }))
       }
     },
-    [zeile],
+    [trennen, zeile],
   )
 
   const beiEvent = useCallback(
@@ -186,6 +202,7 @@ export function Gespraech() {
       } catch {
         return
       }
+      zuletztAktivRef.current = Date.now()
       switch (ev.type) {
         case DC_EVENTS.sprichtStart:
           setZustand('hoert')
@@ -297,6 +314,16 @@ export function Gespraech() {
 
       setZustand('leerlauf')
       zeile('info', 'Verbunden — einfach lossprechen.')
+
+      // Leerlauf-Leine: fünf Minuten ohne jedes Datachannel-Event → sauber
+      // trennen statt Audio-Tokens im Schweigen zu verbrennen.
+      zuletztAktivRef.current = Date.now()
+      leerlaufTimerRef.current = window.setInterval(() => {
+        if (Date.now() - zuletztAktivRef.current > 5 * 60_000) {
+          zeile('info', 'Fünf Minuten Stille — Sitzung beendet.')
+          trennen(true)
+        }
+      }, 30_000)
     } catch (err) {
       setFehler(err instanceof Error ? err.message : 'Verbindung fehlgeschlagen')
       trennen(false)
@@ -304,6 +331,29 @@ export function Gespraech() {
   }, [beiEvent, trennen, zeile])
 
   const aktiv = zustand !== 'aus' && zustand !== 'verbindet'
+
+  // Hosentaschen-Modus: app-seitig abgedunkelt + berührungsgesperrt, das
+  // Gespräch läuft weiter (WebRTC-Audio wie ein Telefonat, In-Ears via
+  // Bluetooth). Bewusst KEINE echte Bildschirmsperre — iOS würde dabei das
+  // Mikrofon kappen; der Wake Lock hält den Schirm, die Abdunkelung spart
+  // Augen und verhindert Hosentaschen-Tipper. Doppeltipp entsperrt.
+  if (hosentasche && aktiv) {
+    return (
+      <div
+        className="sprechen-hosentasche"
+        onDoubleClick={() => setHosentasche(false)}
+        role="button"
+        aria-label="Hosentaschen-Modus — Doppeltipp zum Entsperren"
+      >
+        <div className={`sprechen-kern zustand-${zustand}`}>
+          <HexcoreMark groesse={72} variante="voll" />
+        </div>
+        <div className="mono-label" style={{ opacity: 0.5, marginTop: 14 }}>
+          Doppeltipp zum Entsperren
+        </div>
+      </div>
+    )
+  }
 
   return (
     <section className="card">
@@ -326,9 +376,14 @@ export function Gespraech() {
               {zustand === 'verbindet' ? 'Verbinde …' : 'Verbinden'}
             </button>
           ) : (
-            <button className="wichtig" onClick={() => trennen(true)} style={{ minWidth: 200 }}>
-              Beenden &amp; prüfen
-            </button>
+            <span style={{ display: 'inline-flex', gap: 8 }}>
+              <button className="wichtig" onClick={() => trennen(true)} style={{ minWidth: 170 }}>
+                Beenden &amp; prüfen
+              </button>
+              <button onClick={() => setHosentasche(true)} title="Bildschirm abdunkeln und sperren — das Gespräch läuft weiter (In-Ears)">
+                Hosentasche
+              </button>
+            </span>
           )}
         </div>
         {fehler && (

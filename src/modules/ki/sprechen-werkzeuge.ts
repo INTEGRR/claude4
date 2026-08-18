@@ -188,5 +188,9 @@ async function ausfuehren(
       const antwort = await datenfrageBeantworten(String(argumente.frage), nutzer.name)
       return { output: antwort, protokoll: { frage: argumente.frage } }
     }
+
+    case 'sitzung_beenden':
+      // Behandelt der Client selbst (Verbindung trennen) — Rückfallebene.
+      return { output: 'Sitzung wird beendet.' }
   }
 }

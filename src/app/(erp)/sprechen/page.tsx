@@ -3,6 +3,7 @@ import { currentUser } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { Card, Empty, PageHeader } from '@/components/ui'
 import { registrierteAktion } from '@/modules/prozesse/registry'
+import { formularFelder } from '@/modules/prozesse/schema-felder'
 import { AKTIONEN, type Aktion } from '@/modules/ki/aktionen'
 import { sprechenKonfiguriert, sprechenModell } from '@/modules/ki/sprechen'
 import { Gespraech } from './gespraech'
@@ -40,6 +41,16 @@ export default async function SprechenSeite() {
     (AKTIONEN as Record<string, Aktion>)[aktion]?.label ??
     aktion
 
+  // Parameter mit deutschen Feldlabels für die Prüftabelle — dieselben
+  // Beschriftungen wie in den generierten Masken (formularFelder).
+  const werteMitLabels = (aktion: string, parameter: Record<string, unknown>) => {
+    const def = registrierteAktion(aktion)
+    const labels = new Map(def ? formularFelder(def).map((f) => [f.name, f.label]) : [])
+    return Object.entries(parameter)
+      .filter(([, w]) => w !== null && w !== undefined && w !== '')
+      .map(([k, w]) => ({ label: labels.get(k) ?? k, wert: String(w).slice(0, 60) }))
+  }
+
   // Offene Sammlungen: Sitzungen dieses Nutzers mit noch offenen Vorgängen.
   const offeneVorgaenge = await sql<
     {
@@ -75,6 +86,7 @@ export default async function SprechenSeite() {
       aktion: v.aktion,
       label: label(v.aktion),
       parameter: v.parameter,
+      werte: werteMitLabels(v.aktion, v.parameter),
       zusammenfassung: v.zusammenfassung,
       status: v.status as PruefVorgang['status'],
       ergebnis_text: v.ergebnis_text,

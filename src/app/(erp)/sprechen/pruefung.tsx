@@ -17,6 +17,8 @@ export interface PruefVorgang {
   aktion: string
   label: string
   parameter: Record<string, unknown>
+  /** Parameter mit deutschen Feldlabels (formularFelder, serverseitig aufgelöst). */
+  werte: { label: string; wert: string }[]
   zusammenfassung: string
   status: 'offen' | 'gebucht' | 'verworfen' | 'fehler'
   ergebnis_text: string | null
@@ -27,13 +29,6 @@ const STATUS_LED: Record<PruefVorgang['status'], string> = {
   gebucht: 'led ok',
   verworfen: 'led off',
   fehler: 'led warn',
-}
-
-function parameterKompakt(p: Record<string, unknown>): string {
-  return Object.entries(p)
-    .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
-    .map(([schluessel, wert]) => `${schluessel}: ${String(wert).slice(0, 40)}`)
-    .join(' · ')
 }
 
 export function Pruefung({
@@ -110,7 +105,7 @@ export function Pruefung({
                         </button>
                       </ActionForm>
                     ) : (
-                      parameterKompakt(v.parameter) || '—'
+                      v.werte.map((w) => `${w.label}: ${w.wert}`).join(' · ') || '—'
                     )}
                   </td>
                   <td>

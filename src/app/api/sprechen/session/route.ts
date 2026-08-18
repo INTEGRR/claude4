@@ -4,6 +4,7 @@ import { ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { clientSecretErstellen, sprechenKonfiguriert, sprechenModell } from '@/modules/ki/sprechen'
 import { sprechenInstructions, sprechenWerkzeuge } from '@/modules/ki/sprechen-katalog'
+import { datenfrageKonfiguriert } from '@/modules/ki/datenfrage'
 
 /**
  * Startet eine Sprachsitzung: legt den Protokollkopf an und mintet den
@@ -24,14 +25,16 @@ export async function POST() {
   const firma = company?.name ?? 'KRNL'
 
   try {
-    // Datenfrage kommt in Ausbaustufe 3 dazu (braucht ANTHROPIC_API_KEY).
+    // Die Datenfrage läuft über ein kleines Anthropic-Modell — ohne
+    // ANTHROPIC_API_KEY bekommt die Session das Werkzeug gar nicht erst.
+    const mitDatenfrage = datenfrageKonfiguriert()
     const secret = await clientSecretErstellen({
       instructions: sprechenInstructions(
         { name: user.name, rolle: ROLE_LABELS[user.role] },
         firma,
-        false,
+        mitDatenfrage,
       ),
-      tools: sprechenWerkzeuge(false),
+      tools: sprechenWerkzeuge(mitDatenfrage),
     })
     const [protokoll] = await sql<{ id: string }[]>`
       insert into sprachprotokolle (user_id, modell)
