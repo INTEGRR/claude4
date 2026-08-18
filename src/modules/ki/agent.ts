@@ -2,8 +2,8 @@ import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 import { randomUUID } from 'node:crypto'
 import { sql } from '@/db/client'
-import { SCHEMA_DOKU } from './schema-doku'
-import { MAX_ROWS, runReadOnlyQuery } from './sql-tool'
+import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
+import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
 import { aktionPruefen, aktionenTool } from './aktionen'
 import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
@@ -26,9 +26,11 @@ export function kiConfigured(): boolean {
 
 // --- Agent -----------------------------------------------------------------
 
-const SYSTEM = `Du bist der Datenanalyst im selbstgebauten ERP eines Tastaturherstellers.
-Du beantwortest Fragen zu Verkauf, Einkauf, Fertigung, Lager, Reparatur und Versand,
-indem du SQL-Abfragen (PostgreSQL, nur lesend) über das Werkzeug sql_abfrage ausführst.
+const systemPrompt = (
+  finanzen: boolean,
+) => `Du bist der Datenanalyst im selbstgebauten ERP eines Tastaturherstellers.
+Du beantwortest Fragen zu Verkauf, Einkauf, Fertigung, Lager, Reparatur und Versand${finanzen ? ' sowie Finanzen (Kassenstand, Cashflow, Verträge, Darlehen, Steuern)' : ''},
+indem du SQL-Abfragen (PostgreSQL, nur lesend) über das Werkzeug sql_abfrage ausführst.${finanzen ? '' : '\nFür Finanzdaten fehlt dem Fragenden die Berechtigung — sag das ehrlich, statt es zu versuchen.'}
 
 Du hast drei Werkzeuge: sql_abfrage (lesen), diagramm (anzeigen) und
 aktion_vorschlagen (anlegen — nur nach Bestätigung durch den Benutzer).
@@ -50,7 +52,7 @@ Regeln:
 - Nutze die dokumentierten Hilfsfunktionen (on_hand_qty, variant_display_name, sales_order_total, …) statt Bestände selbst zusammenzurechnen.
 - Runde Geldwerte auf 2 Nachkommastellen; nenne die Kostenbasis, wenn du Werte bewertest.
 - Wenn eine Frage nicht aus den Daten beantwortbar ist, sage das ehrlich.
-${SCHEMA_DOKU}`
+${SCHEMA_DOKU}${finanzen ? SCHEMA_DOKU_FINANZEN : ''}`
 
 const TOOLS: Anthropic.Messages.Tool[] = [
   DIAGRAMM_TOOL,
@@ -104,6 +106,9 @@ export async function runAgent(
   history: ChatTurn[],
   actor: string,
   onEvent: (ev: KiEvent) => void | Promise<void>,
+  // Rechte des Fragenden: Finanzdaten sieht die KI nur, wenn er sie sieht
+  // (Admin oder Befugnis finanzen:zugriff) — Schema-Doku UND SQL-Sperre.
+  rechte: { finanzen: boolean } = { finanzen: false },
 ): Promise<void> {
   const client = new Anthropic()
   const requestId = randomUUID()
@@ -123,7 +128,7 @@ export async function runAgent(
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      system: SYSTEM,
+      system: systemPrompt(rechte.finanzen),
       tools: TOOLS,
       messages,
     })
@@ -242,7 +247,11 @@ export async function runAgent(
       await onEvent({ type: 'status', text: 'Abfrage läuft …' })
       await sql`select log_event('ki', ${requestId}, 'note', ${'SQL: ' + query.slice(0, 900)}, ${actor})`
 
-      const ergebnis = await runReadOnlyQuery(sql, query)
+      const ergebnis = await runReadOnlyQuery(
+        sql,
+        query,
+        rechte.finanzen ? undefined : FINANZ_SPERRE,
+      )
       const content = ergebnis.error
         ? `Fehler: ${ergebnis.error}`
         : JSON.stringify({

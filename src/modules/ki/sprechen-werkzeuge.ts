@@ -185,7 +185,7 @@ async function ausfuehren(
       // Stufe 3 — Modul datenfrage.ts. Bis dahin ist das Werkzeug nicht im
       // Katalog; die Weiche existiert, damit der Dispatcher vollständig ist.
       const { datenfrageBeantworten } = await import('./datenfrage')
-      const antwort = await datenfrageBeantworten(String(argumente.frage), nutzer.name)
+      const antwort = await datenfrageBeantworten(String(argumente.frage), nutzer)
       return { output: antwort, protokoll: { frage: argumente.frage } }
     }
 

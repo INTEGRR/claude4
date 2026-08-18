@@ -290,3 +290,44 @@ describe('Schreibende Aktionen', () => {
     assert.equal(canWrite('fertigung', AKTIONEN.fertigungsauftrag_anlegen.bereich), true)
   })
 })
+
+describe('KI: Schema-Doku wächst mit dem Schema (Wächter)', () => {
+  /**
+   * Handgepflegte Doku + dieser Test = die Doku KANN nicht veralten: Jede
+   * neue Tabelle einer Migration muss entweder in SCHEMA_DOKU /
+   * SCHEMA_DOKU_FINANZEN beschrieben werden oder hier BEWUSST mit Begründung
+   * versteckt sein — sonst wird die Suite rot (Muster: Registry-Abdeckung).
+   */
+  const VERSTECKT = new Set([
+    'schema_migrations',        // Runner-Buchhaltung, kein Fachinhalt
+    'users',                    // Passworthashes — per Sperrliste blockiert
+    'sessions',                 // Sitzungstokens — per Sperrliste blockiert
+    'settings',                 // API-Schlüssel möglich — per Sperrliste blockiert
+    'integration_jobs',         // Outbox mit Payloads — per Sperrliste blockiert
+    'sprachprotokolle',         // Gesprächsmitschnitte — per Sperrliste blockiert
+    'sprachprotokoll_eintraege',
+    'sprach_vorgaenge',
+    'nutzungs_zaehler',         // Lern-Gedächtnis des Befehlsfelds, personenbezogen
+    'shopify_webhook_events',   // Shopify-Rohpayloads, nur für den Import
+  ])
+
+  test('jede Tabelle ist dokumentiert oder bewusst versteckt', async () => {
+    const { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } = await import(
+      '../src/modules/ki/schema-doku.ts'
+    )
+    const doku = SCHEMA_DOKU + SCHEMA_DOKU_FINANZEN
+    const tabellen = await db()<{ table_name: string }[]>`
+      select table_name from information_schema.tables
+      where table_schema = current_schema() and table_type = 'BASE TABLE'
+      order by table_name`
+    const fehlen = tabellen
+      .map((t) => t.table_name)
+      .filter((name) => !VERSTECKT.has(name) && !doku.includes(name))
+    assert.deepEqual(
+      fehlen,
+      [],
+      `Nicht in der Schema-Doku und nicht bewusst versteckt:\n${fehlen.join('\n')}\n` +
+        '→ in SCHEMA_DOKU(_FINANZEN) beschreiben oder mit Begründung in VERSTECKT aufnehmen.',
+    )
+  })
+})

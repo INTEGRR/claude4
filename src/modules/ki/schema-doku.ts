@@ -78,10 +78,43 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **mv_labor_hours**: Minuten und Lohnkosten je Monat, Mitarbeiter, Art und Arbeitsplatz.
 - Stand der Berechnung: settings.value ->> 'refreshed_at' für key = 'analytics'.
 
+### Prozesse & Vorgänge (das ERP ist prozessgetrieben — Abläufe sind Daten)
+- **prozesse**: Prozesskopf (code z. B. 'einkauf_wareneingang_rechnung', name, bereich, aktiv). **prozess_versionen** (prozess_id, nr, aktiv) mit **prozess_schritte** (schluessel, art 'start'|'aktion'|'ende'|'teilprozess', aktion = Registry-Name, zustand, optional, befugnis) und **prozess_uebergaenge** (von/nach, bedingung).
+- **prozess_instanzen**: laufende Assistenten (prozess_id, schritt, status 'laeuft'|'fertig'|'abgebrochen', daten jsonb mit beleg_id, gestartet_von).
+- **prozess_modelle** (code → Tabelle, Statusspalte, Detailroute), **prozess_routen** (Einstiegsrouten), **prozess_pakete** (Prozess-Pakete fürs Geschäftsmodell, prozess_codes[]), **prozess_overrides** (Laufzeit-Anpassungen). Ist ein Schritt Teil des aktiven Ablaufs: prozessschritt_aktiv(code, schluessel).
+- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb). **feld_definitionen**: administrativ definierte Zusatzfelder je Modell (modell, feld, label, typ, pflicht, auswahl).
+- **bug_reports**: Tickets (number 'BUG/…', titel, beschreibung, status 'offen'|'in_arbeit'|'behoben'|'geschlossen', schwere, seite, commit_sha).
+
+### Versand-Extras & Shopify-Abgleich
+- **operation_types**: Transferarten (name, kind 'receipt'|'delivery'|'internal'|'repair', sequence_code). **warehouses**: Lagerhäuser (code, name).
+- **packagings**: Kartonagen (name, Innenmaße, max_weight_g, kosten). **shipping_rules**: Versandregeln zur Kartonagen-/Produktwahl (priority, bedingungen, packaging_id). **return_labels**: Retourenlabels (shipment_number, sales_order_id, state).
+- **shopify_unmatched_lines**: Klärliste nicht zuordenbarer Shopify-Positionen (order_name, sku, title, resolved_at). **shopify_inventory_state** / **shopify_sync_state**: Abgleich-Zustand (variant_id bzw. Schlüssel, zuletzt gemeldete Menge/Cursor).
+- **uom_categories**: Einheitenkategorien. **product_template_attribute_lines**: welche Attribute ein Template nutzt. **bom_byproducts**: Kuppelprodukte einer Stückliste (variant_id, qty).
+
 ### Sonstiges
 - **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at).
 - **sequences**: Nummernkreise. **integration_jobs**: Outbox für Shopify/E-Mail (nicht abfragbar).
 - **api_transactions**: Protokoll aller Aufrufe an Shopify/DHL/Mail (system, kind, reference, ok, status_code, error, duration_ms, created_at).
 
 Konventionen: Geldwerte sind netto in EUR, sofern nicht anders benannt. 'state' immer als Text vergleichen. Monatsauswertungen mit date_trunc('month', …).
+`
+
+/**
+ * Finanzmodul-Schema — wird dem Systemprompt NUR angehängt, wenn der Fragende
+ * den Bereich Finanzen sehen darf (Admin oder Befugnis finanzen:zugriff).
+ * Ohne die Berechtigung sind die Tabellen zusätzlich per SQL-Sperre blockiert.
+ */
+export const SCHEMA_DOKU_FINANZEN = `
+### Finanzen (Cashflow, Verträge, Darlehen, Steuern, Prognose)
+- **bankkonten** (name, iban, waehrung, aktiv) und **kontostaende** (bankkonto_id, stichtag, saldo) — manuelle Kontostands-Anker.
+- **Liquide Mittel / Kassenstand: finanz_saldo()** → je Konto (bankkonto_id, name, saldo, stichtag); Summe über alle Zeilen = liquide Mittel gesamt. Saldo = letzter Anker + alle nicht stornierten Zahlungen danach.
+- **zahlungen**: das Ist-Register. nummer ('ZA/…'), richtung 'ein'|'aus', betrag, waehrung, kurs, **betrag_eur** (Rechenwahrheit), gezahlt_am, bankkonto_id, quelle ('vendor_bill','po_rate','vertrag','darlehen','darlehen_rate','steuer','manuell'), vendor_bill_id, zahlplan_rate_id, vertrag_id, darlehen_id, steuerzahlung_id, partner_id, verwendungszweck, storniert_am (Storno statt Löschen — stornierte immer ausfiltern).
+- **zahlplan_raten** je Bestellung: purchase_order_id, bezeichnung, anteil_pct XOR betrag, ausloeser ('bestellung','verschiffung','ankunft','termin'), versatz_tage, termin, bezahlt_am. Helfer: zahlplan_betrag(rate), zahlplan_faelligkeit(rate); offener Rechnungsrest inkl. Raten-Anrechnung: vendor_bill_offen(bill_id).
+- **Fällige Zahlungen: finanz_faellig(bis_datum)** → (quelle, ref, label, partner, faellig_am, betrag_eur, richtung, link) — offene Raten, Rechnungen, Vertrags-, Darlehens- und Steuertermine in einer Liste.
+- **vertraege**: Fixkosten (nummer 'VT/…', name, kategorie, partner_id, betrag BRUTTO je Intervall, waehrung, intervall 'monatlich'|'quartalsweise'|'jaehrlich', zahltag, beginn, ende, laufzeit_monate, kuendigungsfrist_monate, gekuendigt_zum, status 'aktiv'|'gekuendigt'|'beendet'). Helfer: vertrag_naechstes_kuendbar_zum(v), vertrag_kuendigung_ansteht(id), vertrag_zahlungen_bis(id, bis).
+- **darlehen** (nummer 'DA/…', name, betrag, zinssatz_pct p. a., art 'annuitaet'|'rate'|'endfaellig', auszahlung_am, laufzeit_monate, tilgungsfrei_monate, zahltag, bankkonto_id, status 'geplant'|'laufend'|'getilgt') und **darlehen_raten** (nr, faellig_am, zins, tilgung, restschuld, bezahlt_am). Restschuld = restschuld der letzten bezahlten Rate bzw. betrag.
+- **steuerzahlungen**: art 'ust'|'gewst'|'kst'|'sonstige', zeitraum_von/bis, bezeichnung, betrag (>0 Zahllast, <0 Erstattung), faellig_am, quelle, bezahlt_am. USt-Schätzung aus Belegen: ust_zahllast_vorschlag(monat) → (umsatzsteuer, vorsteuer, zahllast, faellig_am).
+- **umsatzplan**: Planumsatz netto je (monat, szenario 'best'|'base'|'worst'), quelle 'vorschlag'|'manuell'.
+- **Cashflow-Prognose: finanz_prognose(szenario, raster 'woche'|'monat', perioden)** → je Periode (periode_start, periode_ende, anfangssaldo, einzahlungen, aus_bestellungen, aus_vertraegen, aus_darlehen, aus_steuern, aus_variable_quote, auszahlungen, endsaldo). **Fremdkapitalbedarf: finanz_unterdeckung(szenario)** → (min_saldo, min_periode, fremdkapitalbedarf).
+- Einstellungen (Quoten, Sätze, Zahltage): finanz_einstellung(schluessel, standard) — z. B. finanz_einstellung('wareneinsatz_pct', 30).
 `

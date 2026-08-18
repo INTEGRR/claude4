@@ -2,8 +2,10 @@ import 'server-only'
 
 import Anthropic from '@anthropic-ai/sdk'
 import { sql } from '@/db/client'
-import { SCHEMA_DOKU } from './schema-doku'
-import { MAX_ROWS, runReadOnlyQuery } from './sql-tool'
+import type { Role } from '@/modules/auth/permissions'
+import { canAccess } from '@/modules/auth/permissions'
+import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
+import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 
 /**
  * Datenfrage-Fallback des Sprachmodus: eine kurze, nicht streamende
@@ -20,10 +22,16 @@ export function datenfrageKonfiguriert(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
-export async function datenfrageBeantworten(frage: string, actor: string): Promise<string> {
+export async function datenfrageBeantworten(
+  frage: string,
+  nutzer: { name: string; role: Role; befugnisse?: readonly string[] },
+): Promise<string> {
   if (!datenfrageKonfiguriert()) {
     return 'Datenfragen sind nicht konfiguriert (ANTHROPIC_API_KEY fehlt).'
   }
+  // Finanzdaten nur, wenn der Fragende sie auch am Bildschirm sehen dürfte
+  // (Admin oder Befugnis finanzen:zugriff) — Schema-Doku UND SQL-Sperre.
+  const finanzen = canAccess(nutzer.role, 'finanzen', nutzer.befugnisse ?? [])
 
   const client = new Anthropic()
   const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: frage }]
@@ -38,8 +46,13 @@ export async function datenfrageBeantworten(frage: string, actor: string): Promi
           'Du beantwortest EINE Datenfrage aus einem ERP für eine Sprachausgabe. ' +
           'Frage die Datenbank über `sql_abfrage` (nur SELECT) ab und antworte dann in ' +
           'höchstens drei kurzen deutschen Sätzen mit den konkreten Zahlen — keine ' +
-          'Tabellen, keine Aufzählungen, keine SQL-Erklärungen. Runde Beträge sinnvoll.\n\n' +
-          SCHEMA_DOKU,
+          'Tabellen, keine Aufzählungen, keine SQL-Erklärungen. Runde Beträge sinnvoll.' +
+          (finanzen
+            ? ''
+            : ' Für Finanzdaten fehlt dem Fragenden die Berechtigung — sag das ehrlich.') +
+          '\n\n' +
+          SCHEMA_DOKU +
+          (finanzen ? SCHEMA_DOKU_FINANZEN : ''),
         tools: [
           {
             name: 'sql_abfrage',
@@ -68,9 +81,9 @@ export async function datenfrageBeantworten(frage: string, actor: string): Promi
     }
 
     const query = String((toolUse.input as { query?: unknown }).query ?? '')
-    const ergebnis = await runReadOnlyQuery(sql, query)
+    const ergebnis = await runReadOnlyQuery(sql, query, finanzen ? undefined : FINANZ_SPERRE)
     await sql`select log_event('ki', gen_random_uuid(), 'state',
-      ${`Datenfrage (Sprachmodus): ${query.slice(0, 200)}`}, ${actor})`
+      ${`Datenfrage (Sprachmodus): ${query.slice(0, 200)}`}, ${nutzer.name})`
 
     messages.push({ role: 'assistant', content: antwort.content })
     messages.push({

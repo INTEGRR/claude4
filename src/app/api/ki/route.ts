@@ -44,7 +44,9 @@ export async function POST(request: Request) {
       const send = (ev: KiEvent) =>
         controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'))
       try {
-        await runAgent(turns, user.name, send)
+        await runAgent(turns, user.name, send, {
+          finanzen: canAccess(user.role, 'finanzen', user.befugnisse),
+        })
       } catch (err) {
         send({
           type: 'error',

@@ -11,6 +11,15 @@ export const MAX_ROWS = 500
 /** Tabellen/Spalten, die die KI nie sehen darf. */
 const GESPERRT = /\b(users|sessions|settings|password_hash|integration_jobs|sprachprotokoll\w*)\b/i
 
+/**
+ * Finanztabellen und -funktionen — für Fragende OHNE Finanzen-Berechtigung
+ * (Admin oder Befugnis finanzen:zugriff) als zusatzSperre mitgeben. Die
+ * Rechte-Entscheidung trifft der Aufrufer (canAccess), dieses Modul bleibt
+ * app-frei.
+ */
+export const FINANZ_SPERRE =
+  /\b(bankkonten|kontostaende|zahlungen|zahlplan_raten|zahlplan_\w*|vertraege|vertrag_\w*|darlehen\w*|steuerzahlungen|umsatzplan\w*|finanz_\w*|ust_\w*|vendor_bill_offen)\b/i
+
 export interface SqlErgebnis {
   rows?: Record<string, unknown>[]
   rowCount?: number
@@ -19,12 +28,23 @@ export interface SqlErgebnis {
 }
 
 /** Führt eine Abfrage schreibgeschützt mit Timeout und Zeilenkappung aus. */
-export async function runReadOnlyQuery(client: Sql, query: string): Promise<SqlErgebnis> {
+export async function runReadOnlyQuery(
+  client: Sql,
+  query: string,
+  zusatzSperre?: RegExp,
+): Promise<SqlErgebnis> {
   if (GESPERRT.test(query)) {
     return {
       error:
         'Diese Abfrage berührt gesperrte Tabellen (Benutzer, Sitzungen, Einstellungen, Jobs). ' +
         'Bitte auf Fachdaten beschränken.',
+    }
+  }
+  if (zusatzSperre?.test(query)) {
+    return {
+      error:
+        'Diese Abfrage berührt Daten, für die dem Fragenden die Berechtigung fehlt ' +
+        '(z. B. Finanzen). Bitte ehrlich sagen, dass die Berechtigung fehlt.',
     }
   }
   try {
