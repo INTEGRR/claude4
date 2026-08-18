@@ -14,6 +14,7 @@ import { Splash } from '@/components/splash'
 import { HexcoreMark, Wortmarke } from '@/components/marke'
 import { befehlsKatalog } from '@/modules/befehle'
 import { kiConfigured } from '@/modules/ki/agent'
+import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
 
 export const dynamic = 'force-dynamic'
 
@@ -193,6 +194,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             ]
           : []),
         ...(sees('ki') ? [{ href: '/ki', label: 'KI-Analyse' }] : []),
+        ...(sees('ki') && sprechenKonfiguriert() ? [{ href: '/sprechen', label: 'Sprechen' }] : []),
       ],
     },
     {

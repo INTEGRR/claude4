@@ -116,6 +116,9 @@ export const LAGER = {
     bereich: 'lager',
     beschreibung: 'Erfasst eine Inventurzählung (Buchbestand wird festgehalten).',
     bindung: 'frei',
+    // Für KI-Chat und Sprachmodus sichtbar — der Zähldialog im Lager ist
+    // DER Anwendungsfall des Sprechens.
+    ki: true,
     schema: z.object({
       variant_id: z.string().min(1, 'Bitte ein Produkt auswählen'),
       counted_qty: z.number().nonnegative('Bitte eine gültige Menge erfassen'),
@@ -133,6 +136,7 @@ export const LAGER = {
     beschreibung: 'Wendet eine Zählung an: bucht die Differenz gegen den Inventur-Ort.',
     bindung: 'beleg',
     modell: 'inventory_count',
+    ki: true,
     schema: z.object({}),
     revalidate: ['/lager/inventur', '/lager/bestand'],
   },

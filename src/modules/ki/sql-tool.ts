@@ -9,7 +9,7 @@ import type { Sql, TransactionSql } from 'postgres'
 export const MAX_ROWS = 500
 
 /** Tabellen/Spalten, die die KI nie sehen darf. */
-const GESPERRT = /\b(users|sessions|settings|password_hash|integration_jobs)\b/i
+const GESPERRT = /\b(users|sessions|settings|password_hash|integration_jobs|sprachprotokoll\w*)\b/i
 
 export interface SqlErgebnis {
   rows?: Record<string, unknown>[]

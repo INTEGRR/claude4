@@ -1116,6 +1116,55 @@ label.field > span {
   50% { box-shadow: 0 0 0 7px rgb(255 90 31 / 0); }
 }
 
+/* --- Sprachmodus (/sprechen): Hexcore als Zustandsanzeige + Kurz-Log ------ */
+/* Das Hexcore IST die Statusanzeige: pulsiert beim Hören (Aufnahme läuft),
+   atmet ruhig beim Antworten, steht still im Leerlauf, grau getrennt. */
+.sprechen-kern {
+  display: inline-flex;
+  border-radius: 50%;
+  padding: 18px;
+  color: var(--text);
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+.sprechen-kern.zustand-aus { color: var(--text-muted); opacity: 0.5; }
+.sprechen-kern.zustand-verbindet { color: var(--text-muted); animation: hexcore-atmen 1.2s ease infinite; }
+.sprechen-kern.zustand-hoert { color: var(--accent); animation: hexcore-puls 1.1s ease infinite; }
+.sprechen-kern.zustand-denkt { color: var(--wichtig); animation: hexcore-atmen 1.6s ease infinite; }
+.sprechen-kern.zustand-spricht { color: var(--accent); animation: hexcore-atmen 2.2s ease infinite; }
+@keyframes hexcore-puls {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgb(255 90 31 / 0.4)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 14px rgb(255 90 31 / 0.35)); }
+}
+@keyframes hexcore-atmen {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sprechen-kern { animation: none !important; transform: none !important; }
+}
+
+/* Kompaktes Live-Log: kurze Zeilen mit Werten — kein Volltranskript. */
+.sprechen-log {
+  margin: 18px auto 0;
+  max-width: 560px;
+  max-height: 260px;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.sprechen-log-zeile {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  line-height: 1.4;
+}
+.sprechen-log-zeile.art-nutzer span { color: var(--text-muted); }
+.sprechen-log-zeile.art-notiert span.mono { color: var(--wichtig); }
+.sprechen-log-zeile.art-fehler span.mono { color: var(--danger); }
+
 /* Befehlsfeld der Daily Routine: ein Composer, darunter die Treffer. */
 .befehlsfeld { position: relative; }
 .befehlsfeld.gross .composer {

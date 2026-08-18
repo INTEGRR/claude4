@@ -168,10 +168,18 @@ const NOCH_NICHT_MIGRIERT = new Set<string>([
 /**
  * Rahmenaktionen ohne Registry-Gegenstück — bewusst DAUERHAFT, kein
  * Migrationsrest: sie schalten die Prozessinstanz-Maschine selbst
- * (Assistent starten/abschließen), dahinter steht keine Fachaktion.
+ * (Assistent starten/abschließen) bzw. die Sammel-Maschine des Sprachmodus
+ * (Vorgänge verwerfen/korrigieren/Bulk-buchen — die FACHAKTIONEN darin
+ * laufen über aktionAusfuehrenGeprueft, also durch den Torwächter).
  * Geschlossene Liste wie die fünf UI-Umgehungen.
  */
-const RAHMEN_AKTIONEN = new Set(['p:instanzStarten', 'p:instanzAbschliessen'])
+const RAHMEN_AKTIONEN = new Set([
+  'p:instanzStarten',
+  'p:instanzAbschliessen',
+  'sprechen:vorgangVerwerfen',
+  'sprechen:zaehlmengeAendern',
+  'sprechen:sammlungBuchen',
+])
 
 describe('Registry-Abdeckung (statisch)', () => {
   const dateien = dateienUnter(WURZEL)
