@@ -10,7 +10,7 @@ import { KiChat } from '@/app/(erp)/ki/chat'
  * Öffnen/Schließen wie beim Fehler-Panel über das NATIVE popover-Attribut:
  * der erste Klick sitzt auch vor der Hydration.
  */
-export function KiOverlay() {
+export function KiOverlay({ sprechen }: { sprechen?: boolean }) {
   return (
     <>
       <button type="button" className="ticket-tab ki-tab" popoverTarget="ki-panel">
@@ -40,7 +40,7 @@ export function KiOverlay() {
             </button>
           </span>
         </div>
-        <KiChat />
+        <KiChat sprechen={sprechen} />
       </div>
     </>
   )

@@ -1,5 +1,6 @@
 import { requireArea } from '@/modules/auth'
 import { kiConfigured } from '@/modules/ki/agent'
+import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
 import { PageHeader } from '@/components/ui'
 import { KiChat } from './chat'
 
@@ -21,7 +22,7 @@ export default async function KiPage({
         subtitle="Auswertungen, Listen und Diagramme auf Zuruf — lesend auf allen ERP-Daten; Anlegen nur nach Bestätigung"
       />
       {aktiv ? (
-        <KiChat startFrage={frage} />
+        <KiChat startFrage={frage} sprechen={sprechenKonfiguriert()} />
       ) : (
         <div className="notice info">
           Die KI-Analyse ist noch nicht konfiguriert. In der Umgebung

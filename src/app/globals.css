@@ -1184,6 +1184,22 @@ label.field > span {
 .sprechen-hosentasche .sprechen-kern { opacity: 0.55; }
 .sprechen-hosentasche .mono-label { color: #555; }
 
+/* Buddy-Modus im KI-Chat: die Sprachsitzung als Vollfläche des Panels —
+   dasselbe Hexcore, dieselben Zustände wie auf /sprechen, nur eingebettet. */
+.ki-buddy {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  overflow-y: auto;
+}
+.ki-buddy .sprechen-log { width: 100%; max-width: 480px; flex: none; }
+
 /* Befehlsfeld der Daily Routine: ein Composer, darunter die Treffer. */
 .befehlsfeld { position: relative; }
 .befehlsfeld.gross .composer {

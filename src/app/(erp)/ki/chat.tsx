@@ -5,6 +5,8 @@ import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
 import { gruppenSpalten, gruppiereVorschlaege } from '@/modules/ki/vorschlag-gruppen'
 import { MikrofonKnopf, SendenSymbol } from '@/components/spracheingabe'
+import { HexcoreMark } from '@/components/marke'
+import { SprechenLog, useGespraech, ZUSTAND_TEXT } from '@/app/(erp)/sprechen/nutze-gespraech'
 import { VorschlagEditor, Zelle } from './vorschlag-editor'
 
 /**
@@ -12,6 +14,11 @@ import { VorschlagEditor, Zelle } from './vorschlag-editor'
  * /api/ki; Markdown-Tabellen werden gerendert und lassen sich als CSV
  * herunterladen. Bewusst ohne Markdown-Bibliothek — der kleine Renderer
  * unten deckt Tabellen, Listen, Überschriften und Inline-Auszeichnung ab.
+ *
+ * Dazu der Buddy-Modus (Hexcore-Knopf im Composer): dieselbe Sprachsitzung
+ * wie auf /sprechen, aber als Vollfläche IM Chat — wie der Voice-Mode der
+ * Claude-/ChatGPT-Apps. Das Sprechen ist der Kern-Einstieg ins ERP; der
+ * Chat kann deshalb beides, tippen und reden.
  */
 
 interface Vorschlag {
@@ -684,13 +691,20 @@ function SammelCard({
 
 // --- Chat ------------------------------------------------------------------
 
-export function KiChat({ startFrage }: { startFrage?: string } = {}) {
+export function KiChat({
+  startFrage,
+  sprechen,
+}: { startFrage?: string; sprechen?: boolean } = {}) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   /** Stream abgerissen (BUG/00010) — mit Merker, ob es im Hintergrund geschah. */
   const [abbruch, setAbbruch] = useState<{ imHintergrund: boolean } | null>(null)
+  /** Buddy-Modus: die Sprachsitzung als Vollfläche statt des Textverlaufs. */
+  const [buddy, setBuddy] = useState(false)
+  const [gesammelt, setGesammelt] = useState(0)
+  const stimme = useGespraech({ beiEnde: (notiert) => setGesammelt(notiert) })
   const bottomRef = useRef<HTMLDivElement>(null)
   const verlauf = useRef<HTMLDivElement>(null)
   const startGesendet = useRef(false)
@@ -847,6 +861,72 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startFrage])
 
+  /** Buddy starten: Verbindungsaufbau direkt in der Klick-Geste (iOS-Audio). */
+  function buddyStarten() {
+    setGesammelt(0)
+    setBuddy(true)
+    void stimme.verbinden()
+  }
+
+  /** Zurück zum Text-Chat; eine laufende Sitzung wird sauber beendet. */
+  function buddySchliessen() {
+    if (stimme.aktiv) stimme.trennen(true)
+    setBuddy(false)
+  }
+
+  // Buddy-Modus: dieselbe Sitzung wie /sprechen, als Vollfläche im Chat —
+  // das Hexcore ist der Gesprächspartner, darunter das kompakte Live-Log.
+  if (buddy) {
+    return (
+      <div className="ki-chat">
+        <div className="ki-buddy">
+          <div className={`sprechen-kern zustand-${stimme.zustand}`} aria-live="polite">
+            <HexcoreMark groesse={84} variante="voll" />
+          </div>
+          <div className="mono-label">{ZUSTAND_TEXT[stimme.zustand]}</div>
+
+          {stimme.fehler && (
+            <div className="notice danger" role="alert" style={{ marginBottom: 0 }}>
+              <span className="led warn" style={{ marginRight: 6 }} />
+              {stimme.fehler}
+            </div>
+          )}
+          {/* Sitzung vorbei, Vorgänge notiert: der Weg zur Prüftabelle —
+              gebucht wird NUR dort, nach Sichtprüfung. */}
+          {stimme.zustand === 'aus' && gesammelt > 0 && (
+            <div className="notice info" style={{ marginBottom: 0 }}>
+              <span className="led wichtig" style={{ marginRight: 6 }} />
+              {gesammelt === 1 ? 'Ein Vorgang' : `${gesammelt} Vorgänge`} notiert —{' '}
+              <a href="/sprechen">prüfen &amp; buchen</a>
+            </div>
+          )}
+
+          <div className="actions" style={{ justifyContent: 'center', marginTop: 4 }}>
+            {stimme.aktiv ? (
+              <button className="wichtig" type="button" onClick={() => stimme.trennen(true)}>
+                Beenden
+              </button>
+            ) : (
+              <button
+                className="primary"
+                type="button"
+                onClick={() => void stimme.verbinden()}
+                disabled={stimme.zustand === 'verbindet'}
+              >
+                {stimme.zustand === 'verbindet' ? 'Verbinde …' : 'Verbinden'}
+              </button>
+            )}
+            <button type="button" onClick={buddySchliessen}>
+              Zurück zum Chat
+            </button>
+          </div>
+
+          <SprechenLog log={stimme.log} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="ki-chat">
       <div className="ki-messages" ref={verlauf}>
@@ -969,7 +1049,8 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Composer im Claude-App-Stil: Frage tippen oder diktieren, Pfeil sendet. */}
+      {/* Composer im Claude-App-Stil: Frage tippen oder diktieren, Pfeil
+          sendet — und das Hexcore öffnet den Buddy-Modus (Sprachsitzung). */}
       <form
         className="ki-input"
         onSubmit={(e) => {
@@ -977,6 +1058,21 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
           void send(input)
         }}
       >
+        {gesammelt > 0 && (
+          <div className="notice info" style={{ marginBottom: 8 }}>
+            <span className="led wichtig" style={{ marginRight: 6 }} />
+            {gesammelt === 1 ? 'Ein Vorgang' : `${gesammelt} Vorgänge`} aus der Sprachsitzung
+            notiert — <a href="/sprechen">prüfen &amp; buchen</a>
+            <button
+              type="button"
+              className="small"
+              style={{ marginLeft: 8 }}
+              onClick={() => setGesammelt(0)}
+            >
+              Ausblenden
+            </button>
+          </div>
+        )}
         <div className="composer">
           <input
             value={input}
@@ -985,6 +1081,17 @@ export function KiChat({ startFrage }: { startFrage?: string } = {}) {
             disabled={busy}
           />
           <MikrofonKnopf onText={(text) => setInput(text)} titel="Frage diktieren (Deutsch)" />
+          {sprechen && (
+            <button
+              type="button"
+              className="composer-knopf buddy"
+              title="Buddy-Modus: mit dem ERP sprechen"
+              aria-label="Buddy-Modus: mit dem ERP sprechen"
+              onClick={buddyStarten}
+            >
+              <HexcoreMark groesse={19} variante="einfach" />
+            </button>
+          )}
           <button
             className="composer-knopf senden"
             type="submit"

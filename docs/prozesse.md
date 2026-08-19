@@ -772,6 +772,16 @@ Werkzeug-Einträge serverseitig); die KI-SQL-Sperrliste deckt die
 Protokolltabellen ab. Sichtbar für Bereich `ki`, Aktionen können nie mehr
 als die Rolle des Sprechers (Torwächter, nurAdmin, Befugnisse).
 
+Das Sprechen ist der **Kern-Einstieg** ins ERP, keine Randnotiz: der
+Sidebar-Eintrag steht ganz oben neben der Übersicht, und der KI-Chat
+(Slide-out im Header wie Seite `/ki`) kann beides — tippen UND reden. Der
+Hexcore-Knopf im Composer öffnet den **Buddy-Modus**: dieselbe Sprachsitzung
+als Vollfläche im Chat (wie der Voice-Mode der Claude-/ChatGPT-Apps), nach
+dem Beenden führt ein Hinweis zur Prüftabelle auf `/sprechen`. Die
+Sitzungslogik lebt dafür in einem geteilten Hook
+(`sprechen/nutze-gespraech.tsx`) — Seite und Buddy sind nur zwei
+Oberflächen derselben Sitzung.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

@@ -107,6 +107,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       label: null,
       items: [
         { href: '/', label: 'Übersicht' },
+        // Das Sprechen ist der Kern-Einstieg ins ERP — ganz oben neben der
+        // Übersicht, nicht als Randnotiz unter den Auswertungen.
+        ...(sees('ki') && sprechenKonfiguriert() ? [{ href: '/sprechen', label: 'Sprechen' }] : []),
         ...(sees('scanner') ? [{ href: '/scanner', label: 'Scanner' }] : []),
       ],
     },
@@ -194,7 +197,6 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             ]
           : []),
         ...(sees('ki') ? [{ href: '/ki', label: 'KI-Analyse' }] : []),
-        ...(sees('ki') && sprechenKonfiguriert() ? [{ href: '/sprechen', label: 'Sprechen' }] : []),
       ],
     },
     {
@@ -288,8 +290,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       {children}
       {/* Fehler melden von jeder Seite aus — der Reiter am rechten Rand. */}
       {sees('fehler') && <TicketOverlay />}
-      {/* Der KI-Chat als zweiter Reiter: offen lassen und weiterarbeiten. */}
-      {sees('ki') && kiConfigured() && <KiOverlay />}
+      {/* Der KI-Chat als zweiter Reiter: offen lassen und weiterarbeiten —
+          mit Buddy-Modus (Sprachsitzung), wenn der Sprachdienst da ist. */}
+      {sees('ki') && kiConfigured() && <KiOverlay sprechen={sprechenKonfiguriert()} />}
     </AppShell>
     </>
   )
