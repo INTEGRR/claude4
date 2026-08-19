@@ -1,4 +1,4 @@
-# ERP lokal starten — vollständige Anleitung
+# KRNL lokal starten — vollständige Anleitung
 
 Zwei Wege. **Weg 1 (Docker)** ist der schnellste zum Ausprobieren und braucht
 außer Docker nichts. **Weg 2 (ohne Docker)** ist der richtige, wenn du am Code
@@ -337,7 +337,7 @@ docker compose exec -T db pg_restore -U erp -d erp --clean < sicherung-2026-08-0
 
 Die Oberfläche ist für schmale Geräte gebaut — am Packtisch oder an der
 Werkbank ist das Telefon oft die bequemste Bedienung. Standardmäßig lauscht
-das ERP aber **nur auf dem eigenen Rechner**:
+KRNL aber **nur auf dem eigenen Rechner**:
 
 ```yaml
 ports:
@@ -352,7 +352,7 @@ ports:
   - '${ERP_PORT:-3000}:3000'
 ```
 
-Danach ist das ERP unter `http://<IP-des-Rechners>:3000` erreichbar — und
+Danach ist KRNL unter `http://<IP-des-Rechners>:3000` erreichbar — und
 zwar **für jeden im selben Netz, ohne weitere Hürde**. Das ist die bewusste
 Entscheidung, die dahintersteht: im eigenen, vertrauenswürdigen Netz in
 Ordnung, in einem Gast- oder Büro-WLAN mit Fremdgeräten nicht. Wer das
@@ -499,7 +499,7 @@ SHOPIFY_CLIENT_ID=…
 SHOPIFY_CLIENT_SECRET=…
 ```
 
-Ein Token muss nirgends kopiert werden: das ERP tauscht Client ID und Secret
+Ein Token muss nirgends kopiert werden: KRNL tauscht Client ID und Secret
 selbst gegen ein Access Token (Client-Credentials-Grant, 24 Stunden gültig)
 und erneuert es automatisch. Das funktioniert, weil App und Shop derselben
 Organisation gehören. Alt-Apps von vor 2026 mit statischem `shpat_…`-Token
@@ -508,7 +508,7 @@ laufen weiter über `SHOPIFY_ADMIN_TOKEN`.
 Webhooks brauchen eine öffentlich erreichbare URL — `localhost` kann Shopify
 nicht anrufen. Lokal ist das einkalkuliert: der viertelstündliche Abgleich
 holt Bestellungen aktiv ab, es geht nur die Sekunden-Aktualität verloren.
-Läuft das ERP öffentlich (z. B. Vercel), die Webhooks `orders/create`,
+Läuft KRNL öffentlich (z. B. Vercel), die Webhooks `orders/create`,
 `orders/updated`, `orders/cancelled` und `inventory_levels/update` auf
 `https://<erp>/api/webhooks/shopify` registrieren (im Dev Dashboard in der
 App-Konfiguration). Shopify signiert sie mit dem Client Secret — 
@@ -634,6 +634,6 @@ Das Image enthält einen Produktions-Build. Nach Codeänderungen entweder
 # Was als Nächstes?
 
 - **Weiterbetrieb im Team:** [betrieb.md](betrieb.md) — inklusive der Variante,
-  das ERP vollständig hinter einem VPN zu betreiben.
+  KRNL vollständig hinter einem VPN zu betreiben.
 - **Wie es funktioniert:** [architektur.md](architektur.md)
 - **Was jedes Modul kann:** [module/](module/)

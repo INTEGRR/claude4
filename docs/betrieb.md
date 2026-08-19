@@ -2,7 +2,7 @@
 
 ## Ausgangslage
 
-Das ERP enthält Auftrags-, Kunden- und Lieferantendaten. Die Oberfläche soll
+KRNL enthält Auftrags-, Kunden- und Lieferantendaten. Die Oberfläche soll
 nicht öffentlich erreichbar sein. Gleichzeitig braucht das System Kontakt nach
 außen: Shopify (Bestellungen), DHL (Labels, Tracking) und den Mailversand.
 

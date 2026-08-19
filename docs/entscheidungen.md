@@ -9,6 +9,15 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Produktname KRNL überall, Arbeitstitel „ERP" abgelöst
+
+Der Arbeitstitel „ERP — Eigenentwicklung (Odoo-Nachbau)" weicht dem
+Produktnamen: README und Anleitungen sprechen von **KRNL** (Marke seit
+2026-08-17 in der App). Der Odoo-Nachbau bleibt als Herkunft im Text,
+ist aber nicht mehr der Titel. Interne Bezeichner (package.json „erp",
+Env-Namen wie ERP_PORT) bleiben unverändert — Umbenennen brächte
+Migrationsaufwand ohne Nutzen.
+
 ## 2026-08-19 — Doku-System: Landkarte, Entscheidungslog, Doku-Wächter
 
 Alle Entscheidungen und Konzepte müssen dauerhaft auffindbar sein und die

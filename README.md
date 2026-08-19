@@ -1,6 +1,8 @@
-# ERP — Eigenentwicklung (Odoo-Nachbau)
+# KRNL
 
-Schlankes ERP, das die bei uns genutzten Odoo-Funktionen nachbaut:
+**KRNL** ist unser selbst entwickeltes Prozess-ERP — schlank, deutsch,
+sprachgesteuert. Es baut die bei uns genutzten Odoo-Funktionen mit eigenem
+Code nach:
 
 - **Verkauf** — Verkaufsaufträge (v. a. aus Shopify), Bestätigung erzeugt Lieferung und Fertigungsauftrag
 - **Fertigung** — Produkte mit Varianten, Stücklisten inkl. **„Auf Varianten anwenden"** und Phantom-Baugruppen, Fertigungsaufträge (druckbar, mit Barcode), Arbeitsplätze mit Arbeitsgängen und Zeiterfassung, Backflush, Demontage
@@ -75,7 +77,7 @@ cp .env.example .env      # dann Schlüssel eintragen
 docker compose up -d --build
 ```
 
-Ohne `.env` läuft das ERP vollständig, nur die externen Anbindungen sind
+Ohne `.env` läuft KRNL vollständig, nur die externen Anbindungen sind
 deaktiviert (die Seite „KI-Analyse" sagt das ausdrücklich, wenn
 `ANTHROPIC_API_KEY` fehlt). `DATABASE_URL`, `PORT` und `NODE_ENV` aus der
 `.env` werden für den Container bewusst überschrieben: dort gilt die Datenbank
