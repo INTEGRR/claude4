@@ -121,6 +121,14 @@ Danach ist die Anwendung erreichbar. Anmeldung:
 gar nicht erst anlegen will, setzt vor der ersten Bereitstellung
 `SEED_ADMIN_EMAIL` und `SEED_ADMIN_PASSWORD`.
 
+Wer die Wurzel **ohne Anmeldung** aufruft, sieht zuerst die öffentliche
+Startseite `/start` (was KRNL ist, wie ein Einstieg abläuft) — die Weiche
+dafür ist `src/middleware.ts`. Die Seite ist bewusst eigenständig gebaut
+(eigene Route, eigenes Stylesheet) und soll später in ein **separates
+Vercel-Projekt** umziehen; dann fällt die Middleware weg und die Wurzel
+zeigt wieder direkt den Login. Vor dem Livegang die Kontaktadresse in
+`src/app/start/page.tsx` (`KONTAKT_MAIL`) setzen.
+
 Der erste Admin-Login auf der frischen Datenbank landet automatisch in der
 **Ersteinrichtung** (`/einrichtung`): Demo-Modus mit Beispieldaten oder
 geführtes Onboarding (Firma, Geschäftsmodell-Paket, Team, Passwort) — Details
@@ -167,6 +175,13 @@ Cron nicht mehr:
 - `/api/webhooks/shopify` — prüft die HMAC-Signatur selbst und weist alles ohne
   gültige Signatur mit 401 ab.
 - `/api/cron/*` — abgesichert über `CRON_SECRET`.
+
+Die öffentliche Startseite `/start` wird von der Deployment Protection
+ebenfalls ausgesperrt — sie ist dann nur nach Vercel-Anmeldung sichtbar.
+Solange sie hier mitläuft, ist das für einen geschützten Testbetrieb
+richtig so; **öffentlich erreichbar wird sie erst mit dem geplanten eigenen
+Vercel-Projekt**, das ohne Deployment Protection läuft und keine
+Kundendaten enthält.
 
 ---
 

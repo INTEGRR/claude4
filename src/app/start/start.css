@@ -1,0 +1,232 @@
+/*
+ * Startseite (öffentlich, vor dem Login). Bewusst EIGENE Datei mit eigenem
+ * Namensraum `.krnl-start` — die Seite soll später als separates
+ * Vercel-Deployment herausziehbar sein, ohne das ERP-Stylesheet mitzunehmen.
+ * Farben und Schriften kommen aus den globalen Tokens (:root in globals.css),
+ * damit Hell/Dunkel automatisch mitläuft und die Marke identisch bleibt.
+ */
+
+.krnl-start {
+  --mass: min(1120px, 100% - 48px);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.krnl-start .bahn { width: var(--mass); margin-inline: auto; }
+
+/* --- Kopf ---------------------------------------------------------------- */
+
+.krnl-start .kopf {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.krnl-start .kopf .bahn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+.krnl-start .kopf nav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 14px;
+}
+.krnl-start .kopf nav a { color: var(--text-2); }
+.krnl-start .kopf nav a:hover { color: var(--accent-text); }
+@media (max-width: 720px) {
+  .krnl-start .kopf nav .weg-schmal { display: none; }
+}
+
+/* --- Held ---------------------------------------------------------------- */
+
+.krnl-start .held { padding: 72px 0 56px; }
+.krnl-start .held h1 {
+  font-size: clamp(34px, 6vw, 60px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+  max-width: 17ch;
+}
+.krnl-start .held h1 em {
+  font-style: normal;
+  color: var(--accent-text);
+}
+.krnl-start .vorspann {
+  font-size: clamp(16px, 2vw, 19px);
+  color: var(--text-2);
+  max-width: 58ch;
+  margin: 0 0 28px;
+}
+
+.krnl-start .marke-zeile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 22px;
+}
+.krnl-start .marke-zeile .punkt {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.krnl-start .knopfreihe { display: flex; flex-wrap: wrap; gap: 10px; }
+.krnl-start .taste {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 550;
+  transition: filter 0.15s ease, border-color 0.15s ease;
+}
+.krnl-start .taste:hover { border-color: var(--text-muted); }
+.krnl-start .taste.fuehrend {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.krnl-start .taste.fuehrend:hover { filter: brightness(1.06); }
+
+/* --- Abschnitte ---------------------------------------------------------- */
+
+.krnl-start section { padding: 56px 0; border-top: 1px solid var(--border); }
+.krnl-start .marke-klein {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.krnl-start h2 {
+  font-size: clamp(24px, 3.4vw, 34px);
+  letter-spacing: -0.015em;
+  line-height: 1.18;
+  margin: 0 0 14px;
+  max-width: 24ch;
+}
+.krnl-start section > .bahn > p {
+  color: var(--text-2);
+  max-width: 62ch;
+  margin: 0 0 26px;
+}
+
+.krnl-start .raster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  gap: 16px;
+}
+.krnl-start .kachel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.krnl-start .kachel h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.krnl-start .kachel p { margin: 0; color: var(--text-2); font-size: 15px; }
+.krnl-start .kachel .nr {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+/* Der Ablauf als Kette — dieselbe Sprache wie die Prozessdiagramme. */
+.krnl-start .kette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 6px;
+}
+.krnl-start .glied {
+  flex: 1 1 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px;
+}
+.krnl-start .glied.entscheidung { border-left-color: var(--wichtig); }
+.krnl-start .glied .schritt {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 6px;
+}
+.krnl-start .glied strong { display: block; margin-bottom: 5px; font-size: 15px; }
+.krnl-start .glied span.text { color: var(--text-2); font-size: 14px; }
+
+/* Gegenüberstellung: Standard-ERP vs. KRNL */
+.krnl-start .gegen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.krnl-start .gegen > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.krnl-start .gegen .sonst { background: transparent; }
+.krnl-start .gegen .so { background: var(--surface); border-color: var(--border-strong); }
+.krnl-start .gegen h3 {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  color: var(--text-muted);
+}
+.krnl-start .gegen .so h3 { color: var(--accent-text); }
+.krnl-start .gegen ul { margin: 0; padding-left: 18px; color: var(--text-2); }
+.krnl-start .gegen li { margin-bottom: 8px; }
+.krnl-start .gegen li:last-child { margin-bottom: 0; }
+
+/* --- Abschluss ----------------------------------------------------------- */
+
+.krnl-start .abschluss { text-align: center; }
+.krnl-start .abschluss h2 { margin-inline: auto; }
+.krnl-start .abschluss > .bahn > p { margin-inline: auto; }
+.krnl-start .abschluss .knopfreihe { justify-content: center; }
+
+.krnl-start footer {
+  border-top: 1px solid var(--border);
+  padding: 26px 0 40px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.krnl-start footer .bahn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+}

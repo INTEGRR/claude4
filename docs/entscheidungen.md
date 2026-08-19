@@ -9,6 +9,32 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Öffentliche Startseite vor dem Login (später eigenes Deployment)
+
+KRNL braucht für die Piloten-Ansprache eine Seite, die erklärt, was das
+Produkt ist. Sie kommt **vor den Login**: Wer die Wurzel ohne Sitzung
+aufruft, landet auf `/start`; jede andere geschützte Seite leitet
+weiterhin direkt zum Anmeldeformular (wer /verkauf aufruft, will
+arbeiten). Die Weiche ist eine schlanke Middleware, die nur das
+Sitzungs-Cookie prüft — die echte Prüfung bleibt bei `currentUser()`,
+ein abgelaufenes Cookie landet also auf /login und nicht auf der
+Werbeseite.
+
+Ziel ist ein **separates Vercel-Deployment**, sobald die Seite steht.
+Deshalb ist sie schon jetzt eigenständig gebaut: eigene Route außerhalb
+der (erp)-Gruppe, eigenes Stylesheet mit eigenem Namensraum
+(`.krnl-start`), keine ERP-Komponenten außer der Marke. Sie nutzt
+lediglich die globalen Farbtokens, damit Hell/Dunkel und die Marke
+identisch bleiben. Beim Umzug fällt die Middleware ersatzlos weg.
+
+Die Inhalte folgen der **Positionierung**, nicht dem Funktionsumfang:
+Prozess First (der Ablauf ist die Software), Sprechen als Einstieg,
+Einstieg in drei Schritten (aufnehmen → zeichnen → läuft), eigene Instanz
+je Kunde. Bewusst ohne erfundene Referenzen, Kundenzahlen oder
+Testimonials — es steht nur da, was das System kann. Die Kontaktadresse
+ist ein sichtbar markierter Platzhalter (`KONTAKT_MAIL`), der vor dem
+Livegang gesetzt werden muss.
+
 ## 2026-08-19 — Verkauf komponiert; Herkunftsfelder für Bedingungen
 
 Der Verkauf bekommt die Lieferung als **Teilprozess** statt als
