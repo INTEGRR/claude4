@@ -796,7 +796,9 @@ hantiert.
 Beim Abschluss übernimmt die Arbeitsteilung nach Stärke: Das
 Sitzungstranskript (serverseitig in `sprachprotokoll_eintraege`, der Client
 spült seinen Puffer vor dem Abschluss) geht an den Claude-Agenten
-(`AUFNAHME_MODELL`, Standard = Agentenmodell), der es in einen
+(`AUFNAHME_MODELL`, Standard = Agentenmodell), der es — angeleitet von der
+versionierten Wissensbasis `src/modules/ki/wissen.ts` (Schritt-Granularität,
+XOR-Muster, Abbruchwege, Interview-Leitfragen) — in einen
 `einstellungen.prozess_entwerfen`-Aufruf strukturiert — Ist-Prozesse immer
 als `vorgang`-Modell mit frei definierten Zuständen, also **ohne eine Zeile
 Entwicklung**. Ausführung über denselben geprüften Weg wie jede KI-Aktion

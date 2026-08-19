@@ -5,6 +5,7 @@ import { sql } from '@/db/client'
 import type { User } from '@/modules/auth'
 import { REGISTRY } from '@/modules/prozesse/registry'
 import { bestaetigteAktionAusfuehren } from './aktion-bestaetigt'
+import { PROZESS_WISSEN } from './wissen'
 
 /**
  * Prozess-Aufnahme beim Kunden: das Realtime-Modell führt das INTERVIEW
@@ -27,7 +28,7 @@ export function aufnahmeKonfiguriert(): boolean {
 }
 
 /** System-Anleitung der Strukturierung — pur, damit der Test sie prüfen kann. */
-export function aufnahmeSystem(): string {
+export function aufnahmeSystem(wissen: string = PROZESS_WISSEN): string {
   // Die Registry-Beschreibung ist die EINE Wahrheit darüber, wie ein
   // Entwurf auszusehen hat — sie wird mitgegeben statt hier dupliziert.
   const beschreibung = REGISTRY['einstellungen.prozess_entwerfen'].beschreibung ?? ''
@@ -45,7 +46,8 @@ export function aufnahmeSystem(): string {
     'Transkript nicht vorkommt — lieber weniger Schritte als erfundene. ' +
     'Wähle einen kurzen, sprechenden code (Kleinbuchstaben/Unterstriche) ' +
     'und den Bereich, der fachlich am besten passt.\n\n' +
-    'Maßgeblich für Struktur und Pflichtfelder ist die folgende ' +
+    wissen +
+    '\n\nMaßgeblich für Struktur und Pflichtfelder ist die folgende ' +
     'Aktionsbeschreibung:\n' +
     beschreibung
   )

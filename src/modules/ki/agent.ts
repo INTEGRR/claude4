@@ -7,7 +7,9 @@ import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
 import { aktionPruefen, aktionenTool } from './aktionen'
 import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
+import { registrierteAktion } from '@/modules/prozesse/registry'
 import { kiKatalog } from '@/modules/prozesse/introspektion'
+import { werkstattSystemZusatz } from './wissen'
 
 /**
  * KI-Agent für Ad-hoc-Auswertungen: Claude mit genau einem Werkzeug —
@@ -26,8 +28,12 @@ export function kiConfigured(): boolean {
 
 // --- Agent -----------------------------------------------------------------
 
+/** Zusatzkontexte je Einsatzort — Enum statt Freitext: kein Injection-Kanal. */
+export type KiKontext = 'werkstatt'
+
 const systemPrompt = (
   finanzen: boolean,
+  kontext?: KiKontext,
 ) => `Du bist der Datenanalyst im selbstgebauten ERP eines Tastaturherstellers.
 Du beantwortest Fragen zu Verkauf, Einkauf, Fertigung, Lager, Reparatur und Versand${finanzen ? ' sowie Finanzen (Kassenstand, Cashflow, Verträge, Darlehen, Steuern)' : ''},
 indem du SQL-Abfragen (PostgreSQL, nur lesend) über das Werkzeug sql_abfrage ausführst.${finanzen ? '' : '\nFür Finanzdaten fehlt dem Fragenden die Berechtigung — sag das ehrlich, statt es zu versuchen.'}
@@ -52,13 +58,16 @@ Regeln:
 - Nutze die dokumentierten Hilfsfunktionen (on_hand_qty, variant_display_name, sales_order_total, …) statt Bestände selbst zusammenzurechnen.
 - Runde Geldwerte auf 2 Nachkommastellen; nenne die Kostenbasis, wenn du Werte bewertest.
 - Wenn eine Frage nicht aus den Daten beantwortbar ist, sage das ehrlich.
-${SCHEMA_DOKU}${finanzen ? SCHEMA_DOKU_FINANZEN : ''}`
+${SCHEMA_DOKU}${finanzen ? SCHEMA_DOKU_FINANZEN : ''}${kontext === 'werkstatt' ? werkstattSystemZusatz() : ''}`
 
-const TOOLS: Anthropic.Messages.Tool[] = [
+const werkzeuge = (admin: boolean): Anthropic.Messages.Tool[] => [
   DIAGRAMM_TOOL,
   // Eigener KI-Katalog (namensbasierte Anlage-Aktionen) plus alle
   // Registry-Aktionen mit ki-Flag — eine Definition, alle Transporte.
-  aktionenTool(kiKatalog()),
+  // nurAdmin-Aktionen bekommen Nicht-Admins gar nicht erst angeboten:
+  // der Torwächter würde sie ohnehin ablehnen, aber erst NACH dem Klick —
+  // ein Vorschlag, der sicher scheitert, ist schlechte Führung.
+  aktionenTool(kiKatalog().filter((a) => admin || !registrierteAktion(a.name)?.nurAdmin)),
   {
     name: 'sql_abfrage',
     description:
@@ -108,7 +117,11 @@ export async function runAgent(
   onEvent: (ev: KiEvent) => void | Promise<void>,
   // Rechte des Fragenden: Finanzdaten sieht die KI nur, wenn er sie sieht
   // (Admin oder Befugnis finanzen:zugriff) — Schema-Doku UND SQL-Sperre.
-  rechte: { finanzen: boolean } = { finanzen: false },
+  // admin filtert zusätzlich nurAdmin-Aktionen aus dem Vorschlagskatalog.
+  rechte: { finanzen: boolean; admin?: boolean } = { finanzen: false },
+  // Einsatzort-Kontext (z. B. Prozess-Werkstatt) — hängt kuratierte
+  // Zusatzblöcke an den Systemprompt; nur diese Runden zahlen die Tokens.
+  kontext?: KiKontext,
 ): Promise<void> {
   const client = new Anthropic()
   const requestId = randomUUID()
@@ -128,8 +141,8 @@ export async function runAgent(
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      system: systemPrompt(rechte.finanzen),
-      tools: TOOLS,
+      system: systemPrompt(rechte.finanzen, kontext),
+      tools: werkzeuge(rechte.admin ?? false),
       messages,
     })
 

@@ -28,7 +28,10 @@ der [AGENTS.md](../AGENTS.md).
 - [datenmodell.md](datenmodell.md) — das Datenmodell der Gründungsphase
   (Notation + Odoo-Statuswerte). Das stets aktuelle Tabelleninventar ist
   `src/modules/ki/schema-doku.ts` — ein Wächter-Test gleicht es gegen die
-  echte Datenbank ab.
+  echte Datenbank ab. Die zweite Prompt-Wissensquelle der KI ist
+  `src/modules/ki/wissen.ts` (Prozess-Best-Practices für Werkstatt und
+  Aufnahme, ebenfalls wächter-geprüft) — bewusst im Code versioniert,
+  nicht als Doku-Datei.
 
 ## Betrieb
 

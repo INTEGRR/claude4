@@ -9,6 +9,20 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Wissensbasis im Code, Kontext-Kanal statt Prompt-Stuffing
+
+Prozess-Best-Practices leben als EINE versionierte Quelle in
+`src/modules/ki/wissen.ts` (Muster schema-doku.ts: Konstante + Wächter-Test
+`tests/wissen.test.ts`), keine parallele Markdown-Doku (Sync-Drift). Sie
+fließt in den Werkstatt-Kontext des Chat-Agenten und in die
+Aufnahme-Strukturierung — NICHT in die Realtime-Instructions
+(2.000-Zeichen-Budget). Der Agent bekommt dafür einen Kontext-Kanal als
+**Enum** (`kontext: 'werkstatt'`), nie Freitext vom Client (kein
+Injection-Kanal); nur Werkstatt-Runden zahlen die Wissens-Tokens.
+Nebenbefund behoben: der Vorschlagskatalog des Chats bot nurAdmin-Aktionen
+auch Nicht-Admins an (Ablehnung kam erst beim Klick) — der Katalog ist
+jetzt rollengefiltert.
+
 ## 2026-08-19 — Prozess-Aufnahme beim Kunden: Interview per Stimme, Entwurf per Agent
 
 Der Idealfall des Vertriebs: Beim Kunden wird der Ist-Prozess diktiert,
