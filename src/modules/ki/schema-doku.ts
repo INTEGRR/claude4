@@ -22,6 +22,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **stock_locations**: Orte, full_path z. B. 'WH/Stock', 'Virtuell/Produktion', 'Virtuell/Inventurdifferenz', 'Virtuell/Ausschuss', 'Partner/Kunden', 'Partner/Lieferanten'.
 - **stock_moves**: variant_id, qty (Soll), qty_done (Ist), src_location_id, dest_location_id, state ('draft','waiting','confirmed','assigned','done','cancel'), reference (z. B. 'Fertigmeldung', 'Komponentenverbrauch', 'Inventur'), date_done, picking_id, production_id (→ manufacturing_orders), unbuild_id, repair_id, inventory_id.
 - **stock_pickings**: Transfers. number ('WH/IN/…', 'WH/OUT/…', 'WH/INT/…', 'WH/REP/…'), operation_type_id, state, partner_id, origin_model/origin_id (z. B. 'sales_order'), backorder_of_id, date_done.
+- **Erwarteter Zulauf** („wann kommt X an?"): OFFENE Empfänge zählen — stock_pickings mit operation_types.kind = 'receipt' und state not in ('done','cancel'), Positionen/Termine über stock_moves + scheduled_date. NICHT am Bestellstatus festmachen: eine purchase_order kann 'done' sein, während ihr Wareneingang noch aussteht. Schnellprüfung je Variante: incoming_qty(variant_id).
 - **stock_quants**: aktueller Bestand je (location_id, variant_id): on_hand, reserved. Nur über Funktionen gepflegt — für Auswertungen besser die Helfer nutzen:
   on_hand_qty(variant_id), free_to_use(variant_id), incoming_qty(variant_id), outgoing_qty(variant_id), forecasted_qty(variant_id).
 - **inventory_counts**: Inventuren (counted_qty, book_qty, applied_at).

@@ -2,6 +2,7 @@ import { sql } from '@/db/client'
 import { ShopifyError, shopifyGraphQL } from './shopify'
 import {
   type VarianteMitBestand,
+  bestandsInput,
   deuteInventarPayload,
   inBloecken,
   zuUebertragen,
@@ -125,22 +126,10 @@ export async function pushInventar(): Promise<PushErgebnis> {
       `mutation bestand($input: InventorySetQuantitiesInput!) {
          inventorySetQuantities(input: $input) { userErrors { field message } }
        }`,
-      {
-        // Ohne compareQuantity je Position prüft Shopify nicht gegen den
-        // letzten Stand — gewollt, das ERP ist die Quelle der Wahrheit.
-        // (ignoreCompareQuantity gab es bis 2026-04; in 2026-07 ist das Feld
-        // weg und das Weglassen von compareQuantity übernimmt seine Rolle.)
-        input: {
-          name: 'available',
-          reason: 'correction',
-          referenceDocumentUri: 'erp://bestandsabgleich',
-          quantities: block.map((v) => ({
-            inventoryItemId: v.inventory_item_gid,
-            locationId: location,
-            quantity: Math.floor(v.frei),
-          })),
-        },
-      },
+      // changeFromQuantity: null je Position — Pflichtfeld seit 2026-07,
+      // null heißt „nicht vergleichen": das ERP ist die Quelle der Wahrheit
+      // (Details am Builder in inventar-logik.ts).
+      { input: bestandsInput(block, location) },
     )
     const fehler = data.inventorySetQuantities.userErrors
     if (fehler.length > 0) {

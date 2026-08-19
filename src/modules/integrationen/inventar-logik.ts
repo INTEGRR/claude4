@@ -66,6 +66,31 @@ export function deuteInventarPayload(payload: Record<string, unknown>): Inventar
   return { inventoryItemGid: inventoryItemGid(item as string | number), verfuegbar }
 }
 
+/**
+ * Baut den InventorySetQuantitiesInput einer Meldung. Seit API 2026-07 ist
+ * changeFromQuantity in JEDEM Eintrag Pflicht: eine Zahl aktiviert
+ * Compare-and-Swap, explizites null überspringt den Vergleich. Wir senden
+ * null — das ERP ist die Quelle der Wahrheit. Das Feld schlicht WEGLASSEN
+ * lehnt Shopify ab („InventoryQuantityInput must include the following
+ * argument: changeFromQuantity").
+ */
+export function bestandsInput(
+  block: VarianteMitBestand[],
+  locationGid: string,
+): Record<string, unknown> {
+  return {
+    name: 'available',
+    reason: 'correction',
+    referenceDocumentUri: 'erp://bestandsabgleich',
+    quantities: block.map((v) => ({
+      inventoryItemId: v.inventory_item_gid,
+      locationId: locationGid,
+      quantity: Math.floor(v.frei),
+      changeFromQuantity: null,
+    })),
+  }
+}
+
 /** Zerlegt eine Liste in Blöcke — Shopify nimmt höchstens 250 Mengen je Aufruf. */
 export function inBloecken<T>(liste: T[], groesse: number): T[][] {
   const bloecke: T[][] = []

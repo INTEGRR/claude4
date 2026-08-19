@@ -1,6 +1,7 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  bestandsInput,
   deuteInventarPayload,
   inBloecken,
   inventoryItemGid,
@@ -60,6 +61,23 @@ describe('Shopify-Bestandsabgleich: Logik', () => {
   test('zerlegt in Blöcke von höchstens n Einträgen', () => {
     assert.deepEqual(inBloecken([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])
     assert.deepEqual(inBloecken([], 2), [])
+  })
+
+  test('Meldung trägt changeFromQuantity: null in JEDEM Eintrag (Pflicht seit 2026-07)', () => {
+    // Regression: das weggelassene Feld hat in Prod jeden Bestandsabgleich
+    // scheitern lassen („InventoryQuantityInput must include the following
+    // argument: changeFromQuantity"). null = kein Vergleich, das ERP führt.
+    const input = bestandsInput([variante(4.6, null)], 'gid://shopify/Location/1') as {
+      name: string
+      quantities: Record<string, unknown>[]
+    }
+    assert.equal(input.name, 'available')
+    assert.equal(input.quantities.length, 1)
+    const eintrag = input.quantities[0]
+    assert.ok('changeFromQuantity' in eintrag, 'Feld muss explizit vorhanden sein')
+    assert.equal(eintrag.changeFromQuantity, null)
+    assert.equal(eintrag.quantity, 4, 'abgerundet auf ganze Stücke')
+    assert.equal(eintrag.locationId, 'gid://shopify/Location/1')
   })
 })
 

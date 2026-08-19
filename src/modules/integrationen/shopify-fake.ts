@@ -66,6 +66,20 @@ export async function fakeShopifyGraphQL<T>(
         }
       case 'fulfillmentTrackingInfoUpdate':
         return { fulfillmentTrackingInfoUpdate: { userErrors: [] } }
+      case 'inventorySetQuantities': {
+        // Wie der echte Shop seit 2026-07: changeFromQuantity ist in jedem
+        // Eintrag Pflicht (null erlaubt = kein Vergleich). Genau dieses
+        // fehlende Feld hat in Prod jeden Bestandsabgleich scheitern lassen.
+        const input = variables.input as
+          | { quantities?: Record<string, unknown>[] }
+          | undefined
+        if ((input?.quantities ?? []).some((q) => !('changeFromQuantity' in q))) {
+          throw new Error(
+            'InventoryQuantityInput must include the following argument: changeFromQuantity.',
+          )
+        }
+        return { inventorySetQuantities: { userErrors: [] } }
+      }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }
       case 'orderCancel': {

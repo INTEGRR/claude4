@@ -32,6 +32,8 @@ export const DC_EVENTS = {
   /** Server → Client: Modell-Antwort läuft/fertig (fürs Hexcore). */
   antwortStart: 'response.created',
   antwortEnde: 'response.done',
+  /** Server → Client: abgelehntes Event/API-Fehler — sichtbar machen statt schlucken. */
+  apiFehler: 'error',
   /** Client → Server: Function-Ergebnis + neue Antwort anstoßen. */
   itemCreate: 'conversation.item.create',
   responseCreate: 'response.create',

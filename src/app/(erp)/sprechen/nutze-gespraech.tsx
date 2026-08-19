@@ -26,6 +26,7 @@ interface FunctionCallEvent {
   name?: string
   arguments?: string
   transcript?: string
+  error?: { message?: string; code?: string }
 }
 
 export const ZUSTAND_TEXT: Record<Zustand, string> = {
@@ -61,6 +62,13 @@ export function useGespraech(opts?: {
   const zuletztAktivRef = useRef(0)
   const leerlaufTimerRef = useRef<number | null>(null)
   const notiertRef = useRef(0)
+  // Antwort-Verkehrsregel: response.create darf nicht in eine LAUFENDE
+  // Antwort feuern (die API lehnt das ab — „already has an active response").
+  // Läuft gerade eine (etwa weil der Nutzer während einer langen datenfrage
+  // weitergesprochen hat), wird der Anstoß gemerkt und nach response.done
+  // nachgeholt — so kommt das Werkzeugergebnis garantiert zu Wort.
+  const antwortAktivRef = useRef(false)
+  const antwortAusstehendRef = useRef(false)
   // Callback im Ref, damit trennen/verbinden nicht bei jedem Render neu entstehen.
   const beiEndeRef = useRef(opts?.beiEnde)
   beiEndeRef.current = opts?.beiEnde
@@ -189,7 +197,8 @@ export function useGespraech(opts?: {
             item: { type: 'function_call_output', call_id: ev.call_id, output },
           }),
         )
-        dc.send(JSON.stringify({ type: DC_EVENTS.responseCreate }))
+        if (antwortAktivRef.current) antwortAusstehendRef.current = true
+        else dc.send(JSON.stringify({ type: DC_EVENTS.responseCreate }))
       }
     },
     [trennen, zeile],
@@ -212,11 +221,30 @@ export function useGespraech(opts?: {
           setZustand('denkt')
           break
         case DC_EVENTS.antwortStart:
+          antwortAktivRef.current = true
           setZustand('spricht')
           break
-        case DC_EVENTS.antwortEnde:
+        case DC_EVENTS.antwortEnde: {
+          antwortAktivRef.current = false
           setZustand('leerlauf')
+          // Aufgeschobener Anstoß (Werkzeugergebnis kam mitten in eine
+          // laufende Antwort): jetzt ist die Bahn frei.
+          if (antwortAusstehendRef.current) {
+            antwortAusstehendRef.current = false
+            const dc = dcRef.current
+            if (dc && dc.readyState === 'open') {
+              dc.send(JSON.stringify({ type: DC_EVENTS.responseCreate }))
+            }
+          }
           break
+        }
+        case DC_EVENTS.apiFehler: {
+          // Abgelehnte Events leise zu schlucken hieße raten, warum der
+          // Dialog hakt — kurz ins Log, das Gespräch läuft weiter.
+          const text = ev.error?.message ?? 'Unbekannter API-Fehler'
+          zeile('fehler', `API: ${text.slice(0, 120)}`)
+          break
+        }
         case DC_EVENTS.nutzerTranskript: {
           const text = (ev.transcript ?? '').trim()
           // Whisper-Halluzinationen bei Stille (Amara.org, Senderfloskeln)
@@ -251,6 +279,8 @@ export function useGespraech(opts?: {
     setZustand('verbindet')
     setLog([])
     notiertRef.current = 0
+    antwortAktivRef.current = false
+    antwortAusstehendRef.current = false
     try {
       // 1) Sitzung + kurzlebigen Client Secret vom eigenen Server holen.
       const res = await fetch('/api/sprechen/session', { method: 'POST' })
