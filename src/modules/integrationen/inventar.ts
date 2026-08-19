@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { sql } from '@/db/client'
 import { ShopifyError, shopifyGraphQL } from './shopify'
 import {
+  INVENTAR_MUTATION,
   type VarianteMitBestand,
   bestandsInput,
   deuteInventarPayload,
@@ -123,13 +125,11 @@ export async function pushInventar(): Promise<PushErgebnis> {
     const data = await shopifyGraphQL<{
       inventorySetQuantities: { userErrors: { field: string[] | null; message: string }[] }
     }>(
-      `mutation bestand($input: InventorySetQuantitiesInput!) {
-         inventorySetQuantities(input: $input) { userErrors { field message } }
-       }`,
-      // changeFromQuantity: null je Position — Pflichtfeld seit 2026-07,
-      // null heißt „nicht vergleichen": das ERP ist die Quelle der Wahrheit
-      // (Details am Builder in inventar-logik.ts).
-      { input: bestandsInput(block, location) },
+      // changeFromQuantity: null je Position (Pflichtfeld, null = nicht
+      // vergleichen — das ERP ist die Quelle der Wahrheit) und @idempotent
+      // mit frischem Schlüssel je Aufruf; Details in inventar-logik.ts.
+      INVENTAR_MUTATION,
+      { input: bestandsInput(block, location), idempotencyKey: randomUUID() },
     )
     const fehler = data.inventorySetQuantities.userErrors
     if (fehler.length > 0) {

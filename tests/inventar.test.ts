@@ -1,6 +1,7 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  INVENTAR_MUTATION,
   bestandsInput,
   deuteInventarPayload,
   inBloecken,
@@ -78,6 +79,14 @@ describe('Shopify-Bestandsabgleich: Logik', () => {
     assert.equal(eintrag.changeFromQuantity, null)
     assert.equal(eintrag.quantity, 4, 'abgerundet auf ganze Stücke')
     assert.equal(eintrag.locationId, 'gid://shopify/Location/1')
+  })
+
+  test('Mutation trägt die @idempotent-Direktive (Laufzeit-Pflicht seit 2026-04)', () => {
+    // Zweite Prod-Regression derselben API-Umstellung: „The @idempotent
+    // directive is required for this mutation but was not provided."
+    assert.ok(INVENTAR_MUTATION.includes('inventorySetQuantities'))
+    assert.ok(INVENTAR_MUTATION.includes('@idempotent(key: $idempotencyKey)'))
+    assert.ok(INVENTAR_MUTATION.includes('$idempotencyKey: String!'))
   })
 })
 

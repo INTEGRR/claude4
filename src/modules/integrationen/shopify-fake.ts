@@ -68,14 +68,20 @@ export async function fakeShopifyGraphQL<T>(
         return { fulfillmentTrackingInfoUpdate: { userErrors: [] } }
       case 'inventorySetQuantities': {
         // Wie der echte Shop seit 2026-07: changeFromQuantity ist in jedem
-        // Eintrag Pflicht (null erlaubt = kein Vergleich). Genau dieses
-        // fehlende Feld hat in Prod jeden Bestandsabgleich scheitern lassen.
+        // Eintrag Pflicht (null erlaubt = kein Vergleich), und die Mutation
+        // braucht die @idempotent-Direktive mit Schlüssel. Beide Lücken haben
+        // in Prod je einen Schwung Bestandsabgleiche scheitern lassen.
         const input = variables.input as
           | { quantities?: Record<string, unknown>[] }
           | undefined
         if ((input?.quantities ?? []).some((q) => !('changeFromQuantity' in q))) {
           throw new Error(
             'InventoryQuantityInput must include the following argument: changeFromQuantity.',
+          )
+        }
+        if (!/@idempotent\s*\(/.test(query) || typeof variables.idempotencyKey !== 'string') {
+          throw new Error(
+            'The @idempotent directive is required for this mutation but was not provided.',
           )
         }
         return { inventorySetQuantities: { userErrors: [] } }

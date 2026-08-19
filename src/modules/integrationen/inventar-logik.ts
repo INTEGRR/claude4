@@ -91,6 +91,18 @@ export function bestandsInput(
   }
 }
 
+/**
+ * Die Mutation der Bestandsmeldung. Seit 2026-04 erzwingt Shopify für
+ * Inventur- und Refund-Mutationen die @idempotent-Direktive mit eindeutigem
+ * Schlüssel — zur LAUFZEIT, im Schema ist sie unsichtbar („The @idempotent
+ * directive is required for this mutation"). Je Aufruf kommt ein frischer
+ * UUID-Schlüssel mit; da absolute Mengen GESETZT werden, wäre selbst eine
+ * Wiederholung folgenlos.
+ */
+export const INVENTAR_MUTATION = `mutation bestand($input: InventorySetQuantitiesInput!, $idempotencyKey: String!) {
+  inventorySetQuantities(input: $input) @idempotent(key: $idempotencyKey) { userErrors { field message } }
+}`
+
 /** Zerlegt eine Liste in Blöcke — Shopify nimmt höchstens 250 Mengen je Aufruf. */
 export function inBloecken<T>(liste: T[], groesse: number): T[][] {
   const bloecke: T[][] = []
