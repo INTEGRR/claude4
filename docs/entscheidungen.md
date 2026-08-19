@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Verkauf komponiert; Herkunftsfelder für Bedingungen
+
+Der Verkauf bekommt die Lieferung als **Teilprozess** statt als
+Nebenprozess (Spiegelbild des Einkaufs-Piloten aus 0050): Der Auftrag ist
+erst fertig, wenn die Ware raus ist. Der Versandprozess trägt dafür einen
+neutralen Anzeigenamen („Lieferung & Versand") — sein Beleg-Filter deckt
+jeden Verkaufsauftrag ab; der Code `shopify_bestellung_versand` bleibt als
+technische ID, weil Instanzen und Vorgänge ihn referenzieren (ein
+Code-Rename wäre eine Fremdschlüssel-Wanderung ohne fachlichen Gewinn).
+
+Dabei kam ein Fehler heraus, den erst die geschlossene Kette sichtbar
+macht: Der Versandprozess verlangte die Shop-Rückmeldung von JEDEM
+Ausgangs-Transfer, auch von manuellen Aufträgen ohne Shop. Statt den
+Schritt einfach abzuschalten, wurde die Ursache behoben — Bedingungen
+sahen bisher nur die Spalten des eigenen Belegs, am Transfer steht die
+Herkunft aber nur als origin_model/origin_id. `prozess_beleg_daten()`
+reichert Belege mit Herkunft jetzt generisch um die Felder des
+Herkunftsbelegs an (Präfix `herkunft_`, rein additiv, Tabellennamen
+weiterhin nur über den Modell-Katalog). Damit können Kindprozesse auf den
+Elternbeleg bedingen — hier: Rückmeldung nur bei
+`herkunft_source = shopify`.
+
+Bewusst offen: Die Kette endet nach der Lieferung. Der
+Abrechnungs-Teilprozess kommt erst mit einem Kundenrechnungs-Modul (AR) —
+dieselbe Begründung wie 0052 für die entfernte invoice_status-Kachel.
+Doku: [prozesse.md](prozesse.md), Abschnitt Verkauf komponiert.
+
 ## 2026-08-19 — Nutzungsbericht light: Zählen statt Lizenzieren
 
 Für die ersten zahlenden Piloten gibt es KEIN Lizenz-/Abrechnungsmodul —

@@ -1,21 +1,44 @@
 import assert from 'node:assert/strict'
+import type { Sql } from 'postgres'
 import type { ProzessFixture } from './typen.ts'
 import { bestellungEinspeisen } from './shopify-versand.ts'
 
 /**
- * P: Manueller Verkauf — Angebot, wiederholbarer Positionsschritt,
- * Bestätigung (Lieferung entsteht) und der Storno-Ausstieg.
+ * P: Manueller Verkauf als KOMPONIERTE Kette (0064) — Angebot,
+ * wiederholbarer Positionsschritt, Bestätigung (der Ausgangs-Transfer
+ * entsteht), Teilprozess Lieferung am Transfer, Ende. Dazu der
+ * Storno-Ausstieg (im Entwurf und als Shop-Auftrag).
  */
+
+/** Den Warenausgang buchen — wie im Betrieb über picking_validate. */
+async function lieferungBuchen(sql: Sql, orderId: string): Promise<void> {
+  const [lieferung] = await sql<{ id: string }[]>`
+    select p.id from stock_pickings p
+    join operation_types ot on ot.id = p.operation_type_id
+    where p.origin_model = 'sales_order' and p.origin_id = ${orderId}
+      and ot.kind = 'delivery' and p.state not in ('done', 'cancel')
+    limit 1`
+  assert.ok(lieferung, 'die Bestätigung muss eine Lieferung angelegt haben')
+  await sql`select picking_validate(${lieferung.id}, '{}'::jsonb, false)`
+}
+
 export const VERKAUF_FIXTURE: ProzessFixture = {
   prozess: 'verkauf',
   benoetigt: ['basis'],
   laeufe: [
     {
-      name: 'Angebot mit Position bestätigen — die Lieferung entsteht',
-      pfad: ['anlegen', 'positionen', 'bestaetigen'],
+      name: 'Angebot bestätigen, Teilprozess Lieferung, Ende',
+      pfad: ['anlegen', 'positionen', 'bestaetigen', 'lieferung'],
       eingaben: {
         anlegen: (ctx) => ({ partner_id: ctx.kundeId }),
         positionen: (ctx) => ({ variant_id: ctx.geraetId, qty: 1 }),
+      },
+      ereignisse: {
+        // Teilprozess Lieferung: der Kindbeleg (Warenausgang) läuft seinen
+        // eigenen Prozess bis „gebucht" — erst danach ist der Auftrag fertig.
+        lieferung: async (ctx, sql) => {
+          await lieferungBuchen(sql, ctx.verkauf_beleg_id)
+        },
       },
       pruefen: async (sql, _ctx, orderId) => {
         const [auftrag] = await sql<{ state: string }[]>`
@@ -29,6 +52,8 @@ export const VERKAUF_FIXTURE: ProzessFixture = {
           where p.origin_model = 'sales_order' and p.origin_id = ${orderId}
             and ot.kind = 'delivery'`
         assert.ok(pickings.length > 0, 'die Bestätigung muss eine Lieferung anlegen')
+        // Der Teilprozess ist durch — der Warenausgang ist gebucht.
+        assert.deepEqual(pickings.map((p) => p.state), ['done'])
       },
     },
     {

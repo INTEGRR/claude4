@@ -538,6 +538,41 @@ Sperr-Zustand (kein Automatik-Mapping); direkte Teilprozess-Rekursion
 ist verboten, tiefere Zyklen zwischen Prozessen prüft die Aktivierung
 noch nicht.
 
+## Verkauf komponiert: Auftrag → Lieferung (Migrationen 0064/0065, umgesetzt)
+
+Das Spiegelbild des Einkaufs-Piloten: Der Verkauf endete bisher an einer
+offenen Kante („Lieferung läuft") — der Versand lief als eigener Prozess
+DANEBEN, nicht IN der Kette. Jetzt hängt er als Teilprozess am
+Ausgangs-Transfer, den `confirm_sales_order` mit der Bestätigung ohnehin
+anlegt (genau wie die Bestellbestätigung den Eingangs-Transfer):
+**Angebot → Positionen → Bestätigen → Teilprozess Lieferung → Ende**, der
+Storno-Ausstieg bleibt. Der Auftrag ist erst fertig, wenn die Ware raus
+ist, und das Diagramm zeigt dem Kunden seinen Ablauf von Anfang bis Ende.
+Der Versandprozess heißt jetzt neutral **„Lieferung & Versand"** — sein
+Beleg-Filter (origin_model = sales_order) deckt seit 0050 jeden
+Verkaufsauftrag ab, nicht nur Shop-Bestellungen; der Code
+`shopify_bestellung_versand` bleibt als technische ID (Instanzen und
+Vorgänge referenzieren ihn).
+
+Der Umbau legte einen echten Fehler frei: Der Versandprozess verlangte die
+**Shop-Rückmeldung von jedem** Ausgangs-Transfer — auch von manuell
+erfassten Aufträgen, die nie eine bekommen. Unsichtbar, solange der
+Verkauf vorher endete; mit der Kette hätte jeder manuelle Auftrag ewig
+gewartet. Die Kante konnte nicht danach fragen, ob der Auftrag aus dem
+Shop kam, weil Bedingungen nur die Spalten des eigenen Belegs sehen — am
+Transfer steht die Herkunft nur als origin_model/origin_id. Deshalb
+reichert `prozess_beleg_daten()` Belege mit Herkunft jetzt generisch um
+die Felder des Herkunftsbelegs an, flach unter dem Präfix **`herkunft_`**
+(rein additiv, Tabellennamen weiter nur über den Modell-Katalog). Damit
+trägt die Kante zur Rückmeldung die Bedingung
+`herkunft_source = shopify`, der Schritt ist optional, und manuelle
+Lieferungen sind mit dem gebuchten Warenausgang fertig.
+
+Bewusste Grenze: Nach der Lieferung endet die Kette. Eine Abrechnung
+fehlt, weil es kein Kundenrechnungs-Modul gibt (aus demselben Grund flog
+in 0052 die invoice_status-Kachel). Kommt ein AR-Modul, kommt der
+Abrechnungs-Teilprozess dahinter — wie im Einkauf.
+
 ## Belegsignale folgen dem Prozessschritt (Migration 0052, umgesetzt)
 
 Felder wie `billing_status` bleiben als **Fakten** am Beleg (Historie,
@@ -926,8 +961,9 @@ Wochen-Feedback über bug_ticket. Wächter: tests/nutzung.test.ts.
 
 ## Noch offen (Kurzfassung)
 
-- Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),
-  nach dem Muster des Einkaufs-Piloten.
+- **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:
+  Ausgangsrechnung, Zahlungseingang, Mahnwesen. Erst damit bekommt der
+  Verkauf seinen Abrechnungs-Teilprozess (siehe oben).
 - **Signal-Kopplung deklarativ machen**, sobald ~5 Stellen von Hand
   verdrahtet sind: Signale als Schritt-Metadaten deklarieren (welcher
   Schritt trägt welches Beleg-Signal), Oberflächen fragen generisch, ein
