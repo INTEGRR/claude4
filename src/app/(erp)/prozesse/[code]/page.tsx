@@ -1,12 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireArea } from '@/modules/auth'
-import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { ProzessFlow } from '@/components/prozess-flow'
-import type { FlowKante, FlowSchritt } from '@/modules/prozesse/flow-daten'
-import { flowLayout } from '@/modules/prozesse/flow-layout'
+import { versionDiagramm } from '@/modules/prozesse/version-diagramm'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
 import { dateTime } from '@/modules/shared/format'
 import { prozessSchalten, schrittSchalten, versionAktivieren } from '../actions'
@@ -29,68 +27,14 @@ export default async function ProzessDetailPage({
   const { code } = await params
   const { version: versionParam } = await searchParams
 
-  // Bewusst OHNE `and p.aktiv` und ohne Join auf die aktive Version:
-  // abgeschaltete Prozesse und reine Entwürfe (KI-Vorschläge ohne aktive
-  // Version) bleiben hier sichtbar — sie fehlen nur in Navigation und
-  // Assistenten.
-  const [prozess] = await sql<
-    {
-      id: string
-      code: string
-      name: string
-      beschreibung: string | null
-      bereich: string
-      modell: string | null
-      aktiv: boolean
-    }[]
-  >`
-    select id, code, name, beschreibung, bereich, modell, aktiv
-    from prozesse where code = ${code}`
-  if (!prozess) notFound()
-
-  const versionen = await sql<
-    {
-      id: string
-      version: number
-      status: string
-      created_by: string | null
-      created_at: string
-      aktiviert_am: string | null
-    }[]
-  >`
-    select id, version, status, created_by, created_at, aktiviert_am
-    from prozess_versionen
-    where prozess_id = ${prozess.id}
-    order by version desc`
-  if (versionen.length === 0) notFound()
-
-  // Angezeigt wird: die per ?version gewählte, sonst die aktive, sonst die
-  // neueste (reiner Entwurf).
-  const gezeigt =
-    (versionParam && versionen.find((v) => Number(v.version) === Number(versionParam))) ||
-    versionen.find((v) => v.status === 'aktiv') ||
-    versionen[0]
-
-  const schritte = await sql<
-    (FlowSchritt & { override_aktiv: boolean | null })[]
-  >`
-    select s.code, s.name, s.art::text as art, s.optional,
-           s.aktion, s.job_kind, s.ereignis, s.teilprozess, s.zustand, s.rollen,
-           o.aktiv as override_aktiv,
-           coalesce(o.aktiv, true) = false and s.optional as abgeschaltet
-    from prozess_schritte s
-    left join prozess_overrides o
-      on o.prozess_code = ${code} and o.schritt_code = s.code
-    where s.version_id = ${gezeigt.id}
-    order by s.sequence`
-
-  const kanten = await sql<FlowKante[]>`
-    select von_code as von, nach_code as nach, sequence, beschriftung
-    from prozess_uebergaenge
-    where version_id = ${gezeigt.id}
-    order by sequence`
-
-  const diagramm = await flowLayout(schritte, kanten, null)
+  // Lesen + Layout geteilt mit der Werkstatt — siehe version-diagramm.ts
+  // (dort auch die Auswahlregel gewählt > aktiv > neueste).
+  const daten = await versionDiagramm(
+    code,
+    versionParam !== undefined ? Number(versionParam) : undefined,
+  )
+  if (!daten) notFound()
+  const { prozess, versionen, gezeigt, schritte, diagramm } = daten
   const fixture = Object.values(FIXTURES).some((f) => f.prozess === code)
   const admin = user.role === 'admin'
 
