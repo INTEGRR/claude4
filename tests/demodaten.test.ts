@@ -159,7 +159,10 @@ describe('Neustart: demodaten_loeschen', () => {
 
   test('die Automatik ist wirklich tot: kein Startpfad reicht --demo weiter', async () => {
     // Absichtlich als Text geprüft: wer --demo je wieder in den Build oder
-    // den Container-Standard schreibt, soll hier auflaufen.
+    // den Container-Standard schreibt, soll hier auflaufen. Der EINZIGE
+    // Weg neben dem Skript-Flag ist die bewusste Admin-Aktion
+    // einstellungen.demodaten_einspielen (Onboarding-Weiche) — die läuft
+    // durch den Torwächter und den Idempotenz-Wächter des Demo-Moduls.
     const { readFile } = await import('node:fs/promises')
     const vorbereiten = await readFile('scripts/vorbereiten.ts', 'utf8')
     assert.ok(!vorbereiten.includes("'--demo'"), 'vercel-build darf --demo nicht setzen')

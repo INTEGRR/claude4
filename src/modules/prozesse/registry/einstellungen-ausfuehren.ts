@@ -6,6 +6,54 @@ import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
 
+// --- Einrichtung (Onboarding) ----------------------------------------------
+
+export async function firmaSpeichern(
+  p: {
+    name: string
+    street: string
+    house: string
+    zip: string
+    city: string
+    country: string
+    email: string
+    phone: string
+  },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`update settings set value = ${sql.json(p)} where key = 'company'`
+  return { text: `Firmendaten von „${p.name}" gespeichert.` }
+}
+
+export async function demodatenEinspielenAktion(
+  _p: Record<string, never>,
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Das Demodaten-Modul ist bewusst skriptfähig (kein server-only) und
+  // wirft selbst, wenn schon Produkte existieren — Idempotenz-Wächter.
+  const { demodatenEinspielen } = await import('@/modules/demo/daten')
+  const zeilen = await demodatenEinspielen(sql)
+  return {
+    text: `Beispieldaten eingespielt (${zeilen.length} Bausteine) — Rundgang: docs/lokal-starten.md.`,
+  }
+}
+
+export async function einrichtungAbschliessen(
+  p: { modus: 'demo' | 'gefuehrt' },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value)
+    values ('einrichtung', ${sql.json({
+      abgeschlossen: true,
+      modus: p.modus,
+      am: new Date().toISOString(),
+      durch: ctx.actor,
+    })})
+    on conflict (key) do update set value = excluded.value`
+  return { text: 'Einrichtung abgeschlossen — willkommen in KRNL.' }
+}
+
 export async function prozessschrittSchalten(
   p: { prozess_code: string; schritt_code: string; aktiv: boolean },
   ctx: AktionsKontext,

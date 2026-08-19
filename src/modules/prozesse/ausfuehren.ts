@@ -46,6 +46,9 @@ export const AUSFUEHRUNG = {
   'einkauf.nebenkosten_stornieren': einkauf.nebenkostenStornieren,
   'einkauf.wechselkurs_erfassen': einkauf.wechselkursErfassen,
 
+  'einstellungen.firma_speichern': einstellungen.firmaSpeichern,
+  'einstellungen.demodaten_einspielen': einstellungen.demodatenEinspielenAktion,
+  'einstellungen.einrichtung_abschliessen': einstellungen.einrichtungAbschliessen,
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
   'einstellungen.prozess_schalten': einstellungen.prozessSchalten,
   'einstellungen.paket_aktivieren': einstellungen.paketAktivieren,

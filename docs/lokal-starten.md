@@ -164,6 +164,11 @@ Demo-Konten und aller Buchungen; Benutzer, Lagerorte und Konfiguration
 bleiben. Zurück kommen Beispieldaten nur, wenn du sie ausdrücklich neu
 einspielst (`SEED_DEMO=true` bzw. `--demo`) — nie von selbst.
 
+Wer stattdessen **ohne** Beispieldaten startet (Seed ohne `--demo`), landet
+beim ersten Admin-Login automatisch in der **Ersteinrichtung**
+(`/einrichtung`): Demo-Modus oder geführtes Onboarding — Details in
+[prozesse.md](prozesse.md), Abschnitt Onboarding.
+
 Das Terminal lässt du offen — dort laufen die Protokolle. Zum Beenden `Strg+C`.
 
 ---

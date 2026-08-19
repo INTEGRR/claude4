@@ -72,6 +72,74 @@ export const EINSTELLUNGEN = {
     revalidate: ['/prozesse', '/'],
   },
 
+  // --- Einrichtung (Onboarding-Weiche + Firmendaten) ------------------------
+
+  'einstellungen.firma_speichern': {
+    label: 'Firmendaten speichern',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Speichert Name und Anschrift der Firma (settings.company) — genutzt von ' +
+      'Belegen, Absenderadressen und der Sidebar.',
+    bindung: 'frei',
+    schema: z.object({
+      name: z.string().min(1).max(120),
+      street: z.string().max(120).default(''),
+      house: z.string().max(20).default(''),
+      zip: z.string().max(12).default(''),
+      city: z.string().max(80).default(''),
+      country: z.string().length(3).default('DEU'),
+      email: z.string().max(120).default(''),
+      phone: z.string().max(40).default(''),
+    }),
+    zusammenfassung: (p) => `Firma ${p.name}`,
+    formdata: (fd) => ({
+      name: String(fd.get('name') ?? ''),
+      street: String(fd.get('street') ?? ''),
+      house: String(fd.get('house') ?? ''),
+      zip: String(fd.get('zip') ?? ''),
+      city: String(fd.get('city') ?? ''),
+      country: String(fd.get('country') ?? 'DEU'),
+      email: String(fd.get('email') ?? ''),
+      phone: String(fd.get('phone') ?? ''),
+    }),
+    revalidate: ['/einstellungen', '/'],
+  },
+
+  'einstellungen.demodaten_einspielen': {
+    label: 'Beispieldaten einspielen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Spielt die kompletten Beispieldaten ein (Tastatur mit Varianten, Stückliste, ' +
+      'Historie, Finanzen) — nur in eine leere Instanz: existieren Produkte, lehnt die ' +
+      'Aktion ab. Bewusster Admin-Opt-in, nie automatisch (Demo-Modus des Onboardings).',
+    bindung: 'frei',
+    schema: z.object({}),
+    zusammenfassung: () => 'Beispieldaten einspielen',
+    formdata: () => ({}),
+    revalidate: ['/'],
+  },
+
+  'einstellungen.einrichtung_abschliessen': {
+    label: 'Einrichtung abschließen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Markiert die Ersteinrichtung als abgeschlossen (settings.einrichtung) — die ' +
+      'Onboarding-Weiche erscheint danach nie wieder, auch nach „alle Daten löschen" nicht.',
+    bindung: 'frei',
+    schema: z.object({
+      modus: z.enum(['demo', 'gefuehrt']),
+    }),
+    zusammenfassung: (p) => `Einrichtung (${p.modus}) abgeschlossen`,
+    formdata: (fd) => ({ modus: String(fd.get('modus') ?? 'gefuehrt') }),
+    revalidate: ['/'],
+  },
+
   // --- Prozessentwurf (Chamäleon: KI entwirft, Mensch aktiviert) ------------
 
   'einstellungen.prozess_entwerfen': {

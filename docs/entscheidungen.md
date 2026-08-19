@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Onboarding-Weiche: Demo-Modus oder geführte Einrichtung
+
+Eine frische Instanz fragt beim ersten Admin-Login: **Beispieldaten
+ansehen oder richtig loslegen.** Die Frisch-Erkennung ist eine Heuristik
+ohne Schema-Umbau — settings-Schlüssel `einrichtung` fehlt UND der
+Firmenname steht auf dem Migrations-Default UND es gibt genau einen
+Nutzer; das ERP-Layout leitet dann nach `/einrichtung` (klassische Route
+außerhalb der (erp)-Gruppe, Muster /login). Der Abschluss schreibt den
+Schlüssel, und weil die Gefahrenzone (`demodaten_loeschen`) settings
+stehen lässt, kommt die Weiche **nie wieder** — auch nicht nach einem
+Daten-Neustart. Der Wizard ist bewusst klassisch (Firma → Paket → Team →
+Passwort), kein Agent-Gespräch: er muss ohne KI-Schlüssel funktionieren
+und VOR jeder Konfiguration liegen; der Abschluss verweist auf die
+Werkstatt. Dafür wurden die Demodaten aus `scripts/seed.ts` in das Modul
+`src/modules/demo/daten.ts` gezogen (Skript und Server teilen den Code)
+und drei Registry-Aktionen ergänzt: `einstellungen.demodaten_einspielen`
+(bewusster Admin-Opt-in, Idempotenz-Wächter bleibt),
+`einstellungen.firma_speichern` (löst die freie saveCompany-Action ab)
+und `einstellungen.einrichtung_abschliessen`. Doku:
+[prozesse.md](prozesse.md), Abschnitt Onboarding; Tests:
+tests/einrichtung.test.ts.
+
 ## 2026-08-19 — Prozess-Werkstatt: Bauen ist ein Einstellungs-Thema, kein Alltagsmodus
 
 Die Prozess-Aufnahme wandert aus dem Alltags-Sprachassistenten (/sprechen)

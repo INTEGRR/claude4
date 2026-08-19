@@ -826,6 +826,37 @@ Oberfläche zurück (`beiEntwurf`-Callback des Hooks), die Werkstatt springt
 direkt auf die Diagramm-Vorschau — die Sichtprüfung mit dem Kunden ist das
 BPMN-Diagramm, aktiviert wird auf /prozesse/&lt;code&gt; von Hand.
 
+## Onboarding einer frischen Instanz (Weiche: Demo oder geführt)
+
+Jede neue Kundeninstanz startet leer (Deploy migriert und seedet nur den
+Administrator). Der **erste Admin-Login** landet automatisch in der
+Ersteinrichtung `/einrichtung` — erkannt an drei Merkmalen zugleich:
+settings-Schlüssel `einrichtung` fehlt, Firmenname steht noch auf dem
+Migrations-Default, genau ein Nutzer. Dort steht die Weiche:
+
+- **Demo-Modus**: spielt per Registry-Aktion
+  `einstellungen.demodaten_einspielen` die komplette Beispielfirma ein
+  (Tastaturfertigung mit Varianten, Betriebshistorie, Finanzen) — zum
+  Ausprobieren und für den Rundgang. Der Idempotenz-Wächter verweigert
+  das, sobald echte Produkte existieren; die Gefahrenzone räumt die
+  Beispieldaten später restlos ab.
+- **Geführtes Onboarding**: Firma (`einstellungen.firma_speichern`) →
+  Geschäftsmodell-Paket (der wichtigste Schritt: ohne Wahl bleiben ALLE
+  Prozesse aktiv und die Navigation zeigt das Maximum — Chamäleon) →
+  Team anlegen (optional, wiederholbar) → Admin-Passwort ersetzen →
+  Abschluss mit Sprung in die **Prozess-Werkstatt**, wo die eigenen
+  Abläufe aufgenommen werden.
+
+Der Abschluss (`einstellungen.einrichtung_abschliessen`) schreibt den
+settings-Schlüssel `einrichtung` — der überlebt auch die Gefahrenzone,
+die Weiche erscheint also nie wieder. Alle drei Aktionen sind nurAdmin,
+prozessfrei und laufen durch den Torwächter; der Wizard selbst ist
+bewusst klassisch (kein Agent-Gespräch), damit er ohne KI-Schlüssel
+funktioniert. Nicht-Admins sehen bis zur Einrichtung nur einen Hinweis.
+Wächter: tests/einrichtung.test.ts (Registry-Statik, Demodaten-Guard,
+Weichen-Heuristik) und tests/demodaten.test.ts (kein automatischer
+Beispieldaten-Pfad).
+
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 
 KRNL wird an mehrere Kunden ausgerollt, mit häufigen Feature-Updates. Der

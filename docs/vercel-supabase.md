@@ -121,6 +121,11 @@ Danach ist die Anwendung erreichbar. Anmeldung:
 gar nicht erst anlegen will, setzt vor der ersten Bereitstellung
 `SEED_ADMIN_EMAIL` und `SEED_ADMIN_PASSWORD`.
 
+Der erste Admin-Login auf der frischen Datenbank landet automatisch in der
+**Ersteinrichtung** (`/einrichtung`): Demo-Modus mit Beispieldaten oder
+geführtes Onboarding (Firma, Geschäftsmodell-Paket, Team, Passwort) — Details
+in [prozesse.md](prozesse.md), Abschnitt Onboarding.
+
 **Falls mit Beispieldaten getestet wurde:** Einstellungen → „Gefahrenzone:
 alle Daten löschen (Neustart)" entfernt vor dem echten Betrieb sämtliche
 Belege, Produkte, Partner, Bestände und Protokolle samt der beiden

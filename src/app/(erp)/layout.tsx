@@ -69,6 +69,18 @@ async function badges() {
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser()
   if (!user) redirect('/login')
+
+  // Erststart-Weiche: solange die Einrichtung offen ist (kein
+  // settings-Schlüssel, Firmenname noch der Migrations-Default, nur ein
+  // Benutzer), führt jeder Aufruf in den Assistenten. /einrichtung liegt
+  // außerhalb dieser Layout-Gruppe — kein Redirect-Kreis; der Schlüssel
+  // überlebt die Gefahrenzone, die Weiche kommt also nie wieder.
+  const [einrichtung] = await sql<{ offen: boolean }[]>`
+    select not exists (select 1 from settings where key = 'einrichtung')
+       and (select value ->> 'name' from settings where key = 'company') = 'Meine Firma GmbH'
+       and (select count(*) from users) = 1 as offen`
+  if (einrichtung?.offen) redirect('/einrichtung')
+
   const counts = await badges()
   const sees = (area: Area) => canAccess(user.role, area, user.befugnisse)
 

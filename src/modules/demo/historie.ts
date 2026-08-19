@@ -1,4 +1,7 @@
-import type { Sql } from 'postgres'
+import type { Sql, TransactionSql } from 'postgres'
+
+// Läuft auch innerhalb einer Transaktion (Tests mit Rollback).
+type Client = Sql | TransactionSql
 
 /**
  * Baut eine Betriebshistorie über die letzten Monate auf.
@@ -73,7 +76,7 @@ const ZEITSPALTEN: Record<string, string[]> = {
  * Ort im ganzen Projekt, der das tut, und er läuft nur beim Aufbau der
  * Beispieldaten.
  */
-async function verschiebe(sql: Sql, marker: string, tage: number): Promise<void> {
+async function verschiebe(sql: Client, marker: string, tage: number): Promise<void> {
   await sql`alter table stock_valuation_layers disable trigger valuation_layer_immutable`
   try {
     for (const [tabelle, spalten] of Object.entries(ZEITSPALTEN)) {
@@ -87,14 +90,14 @@ async function verschiebe(sql: Sql, marker: string, tage: number): Promise<void>
   }
 }
 
-async function jetzt(sql: Sql): Promise<string> {
+async function jetzt(sql: Client): Promise<string> {
   const [row] = await sql<{ now: string }[]>`select now()::text as now`
   return row.now
 }
 
 // --- Aufbau -----------------------------------------------------------------
 
-export async function baueHistorie(sql: Sql): Promise<string[]> {
+export async function baueHistorie(sql: Client): Promise<string[]> {
   const r = zufall(20260808)
   const bericht: string[] = []
 

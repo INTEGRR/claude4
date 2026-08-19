@@ -4,6 +4,7 @@ import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
+import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
@@ -22,24 +23,9 @@ interface Company {
 
 async function saveCompany(formData: FormData) {
   'use server'
-  await requireAdmin()
-  const value: Company = {
-    name: String(formData.get('name') ?? ''),
-    street: String(formData.get('street') ?? ''),
-    house: String(formData.get('house') ?? ''),
-    zip: String(formData.get('zip') ?? ''),
-    city: String(formData.get('city') ?? ''),
-    country: String(formData.get('country') ?? 'DEU'),
-    email: String(formData.get('email') ?? ''),
-    phone: String(formData.get('phone') ?? ''),
-  }
-  try {
-    await sql`update settings set value = ${sql.json(value)} where key = 'company'`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/einstellungen')
-  return actionInfo('Firmendaten gespeichert.')
+  // Prozess First: die Firmendaten laufen wie alles über die Registry
+  // (einstellungen.firma_speichern) — Torwächter prüft und auditiert.
+  return serverAktion('einstellungen.firma_speichern', { formData })
 }
 
 async function saveDhl(formData: FormData) {
