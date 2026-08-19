@@ -59,6 +59,13 @@ export const JOB_KATALOG = {
     beschreibung: 'Holt historische Bestellungen zur Abfrage q in Häppchen.',
     faehigkeit: 'shop:bestellungen_import',
   },
+  daten_tuev: {
+    label: 'Daten-TÜV (Invarianten-Check)',
+    beschreibung:
+      'Prüft nachts die Kern-Ledger (Bestand = Moves, Bewertung schlüssig, Reservierungen); ' +
+      'Befunde schlagen absichtlich als Fehler auf.',
+    faehigkeit: 'daten:integritaet_pruefen',
+  },
   send_po_email: {
     label: 'Bestellung mailen',
     beschreibung: 'Schickt die Einkaufsbestellung als PDF an den Lieferanten.',

@@ -782,6 +782,36 @@ Sitzungslogik lebt dafür in einem geteilten Hook
 (`sprechen/nutze-gespraech.tsx`) — Seite und Buddy sind nur zwei
 Oberflächen derselben Sitzung.
 
+## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
+
+KRNL wird an mehrere Kunden ausgerollt, mit häufigen Feature-Updates. Der
+Schutz gegen Datenverlust ist gestapelt — kein einzelner Mechanismus, sondern
+vier Schichten:
+
+- **Instanz pro Kunde**: jeder Kunde bekommt ein eigenes Deployment und eine
+  eigene Datenbank (eigenes Supabase-Projekt). Updates rollen in Ringen aus:
+  erst die eigene ANVIL-Instanz, dann ein Pilotkunde, dann der Rest. Ein
+  fehlerhaftes Update trifft so höchstens einen Kunden, Restore geht pro
+  Kunde, und es gibt kein mandantenübergreifendes Leck-Szenario.
+- **Point-in-Time-Recovery** je Kundenprojekt aktivieren (Supabase-Add-on)
+  und den Restore vierteljährlich in ein Wegwerf-Projekt PROBEN — ein
+  ungetestetes Backup zählt nicht. (Betriebsaufgabe, kein Code.)
+- **Migrations-Wächter** (tests/migrationen.test.ts): Migrationen sind der
+  einzige Schreibweg am Torwächter vorbei. Destruktive Statements (drop,
+  truncate, delete außerhalb von Funktionskörpern) machen die Suite rot,
+  außer die Migration begründet sie ausdrücklich mit `-- DESTRUKTIV: …`.
+  Regel dazu: **Expand-Contract** — neue Struktur zuerst anlegen und
+  befüllen, Altes erst Releases später wegräumen, nie beides im selben
+  Deploy.
+- **Daten-TÜV** (`daten_tuev`-Job, nächtlich über den housekeeping-Cron):
+  prüft die Kern-Invarianten — Bestand = Move-Ledger, Reservierungs-Cache =
+  offene Moves, Wertschichten = bewerteter Bestand, fertige Moves
+  vollständig. Befunde lassen den Job absichtlich FEHLSCHLAGEN (roter Badge,
+  Integrationen-Monitor); Betriebszustände wie negativer Bestand oder nicht
+  mehr gedeckte Reservierungen laufen als Warnungen im Ergebnistext mit.
+  Neue Invarianten kommen als weitere Prüfung in
+  src/modules/lager/daten-tuev.ts dazu.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

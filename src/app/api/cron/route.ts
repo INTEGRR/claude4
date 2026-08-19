@@ -56,13 +56,18 @@ export async function GET(request: Request) {
         const [row] = await sql<{ refresh_analytics: string }[]>`select refresh_analytics('cron')`
         return NextResponse.json({ task, dauer: row.refresh_analytics })
       }
-      case 'housekeeping':
+      case 'housekeeping': {
+        // Daten-TÜV über die Outbox (Retry + Monitor-Sichtbarkeit inklusive);
+        // Befunde erscheinen als fehlgeschlagener Job — siehe daten-tuev.ts.
+        await sql`select enqueue_job('daten_tuev', '{}'::jsonb, 'daten-tuev')`
         return NextResponse.json({
           task,
           sessions: await pruneSessions(),
           tracking: await pruneTrackingData(),
           monitor: await pruneMonitorData(),
+          tuev: 'eingereiht',
         })
+      }
       case 'finanzen': {
         // Tageslauf: abgelaufene Verträge beenden, USt-Vorschlag für den
         // Vormonat anlegen (idempotent, Logik in finanz_tageslauf/0060).

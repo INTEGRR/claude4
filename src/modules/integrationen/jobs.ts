@@ -187,6 +187,28 @@ const handlers = {
   },
 
   /**
+   * Nächtlicher Daten-TÜV: Invarianten der Kern-Ledger prüfen (Bestand =
+   * Moves, Bewertung schlüssig, Reservierungen im Rahmen). Befunde lassen den
+   * Job absichtlich FEHLSCHLAGEN — roter Badge und Integrationen-Monitor sind
+   * genau der Alarmweg, den das ERP für „braucht Aufmerksamkeit" schon hat.
+   */
+  async daten_tuev() {
+    const { datenTuev } = await import('../lager/daten-tuev')
+    const r = await datenTuev(sql)
+    if (r.befunde.length > 0) {
+      const kopf = r.befunde.slice(0, 5).join(' | ')
+      const rest = r.befunde.length > 5 ? ` … +${r.befunde.length - 5} weitere` : ''
+      throw new Error(`${r.befunde.length} Integritätsbefund(e): ${kopf}${rest}`)
+    }
+    const warnung =
+      r.warnungen.length > 0
+        ? ` — ${r.warnungen.length} Warnung(en): ${r.warnungen.slice(0, 3).join(' | ')}` +
+          (r.warnungen.length > 3 ? ` … +${r.warnungen.length - 3} weitere` : '')
+        : ''
+    return `${r.pruefungen} Invarianten geprüft, keine Befunde${warnung}`
+  },
+
+  /**
    * Erstübernahme der Kunden, ein Häppchen je Lauf (100 Stück). Solange es
    * weitere Seiten gibt, reiht sich der Job mit dem nächsten Cursor selbst
    * wieder ein — der Schlüssel trägt den Cursor, damit der noch laufende
