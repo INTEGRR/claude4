@@ -59,6 +59,11 @@ export const ARGUMENTE = {
   // Wird CLIENTSEITIG behandelt (Verbindung trennen) — die Server-Weiche
   // existiert nur als Rückfallebene.
   sitzung_beenden: z.object({}),
+  // Aufnahme-Modus: schließt das Interview ab — der Server strukturiert das
+  // Transkript in einen prozess_entwerfen-ENTWURF (nichts wird aktiv).
+  aufnahme_abschliessen: z.object({
+    titel: z.string().min(3).max(120),
+  }),
 } as const
 
 export type WerkzeugName = keyof typeof ARGUMENTE
@@ -136,6 +141,51 @@ export function sprechenWerkzeuge(mitDatenfrage: boolean): RealtimeWerkzeug[] {
     parameters: { type: 'object', properties: {}, required: [] },
   })
   return werkzeuge
+}
+
+/**
+ * Werkzeuge des AUFNAHME-Modus (Prozess-Aufnahme beim Kunden): bewusst nur
+ * zwei — das Modell soll interviewen, nicht im ERP hantieren. Den schweren
+ * Teil (Transkript → Entwurf) macht der Server nach dem Abschluss.
+ */
+export function aufnahmeWerkzeuge(): RealtimeWerkzeug[] {
+  return [
+    {
+      type: 'function',
+      name: 'aufnahme_abschliessen',
+      description:
+        'Schließt die Prozess-Aufnahme ab: das Gespräch wird zu einem Prozess-ENTWURF ' +
+        'strukturiert (nichts wird aktiv). Erst aufrufen, wenn der Ablauf vollständig ' +
+        'besprochen und zusammengefasst wurde. Dauert eine Weile — vorher ankündigen.',
+      parameters: {
+        type: 'object',
+        properties: {
+          titel: {
+            type: 'string',
+            description: "Arbeitstitel des Prozesses, z. B. 'Reklamation Endkunde'",
+          },
+        },
+        required: ['titel'],
+      },
+    },
+    {
+      type: 'function',
+      name: 'sitzung_beenden',
+      description:
+        'Beendet die Sprachsitzung — aufrufen, NACHDEM du dich kurz verabschiedet hast.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  ]
+}
+
+export function aufnahmeInstructions(nutzer: { name: string }, firma: string): string {
+  return `Du nimmst für das ERP von ${firma} einen IST-Prozess auf — ${nutzer.name} sitzt beim Kunden, ihr sprecht zu dritt. Deutsch, freundlich, kurze Sätze.
+
+DU FÜHRST DAS INTERVIEW: Was löst den Prozess aus? Welche Schritte folgen, in welcher Reihenfolge, wer macht sie? Wo wird entschieden (und wonach)? Wie endet er — auch die Abbruchwege? Frag nach Ausnahmen ("Was passiert, wenn …?"). IMMER nur eine Frage auf einmal.
+
+ZWISCHENBILANZ: Fasse nach jedem Abschnitt kurz zusammen ("Bisher habe ich: …") und lass es bestätigen oder korrigieren. Nimm die Worte des Kunden — keine ERP-Begriffe erzwingen, nichts dazuerfinden.
+
+ABSCHLUSS: Wenn der Ablauf vollständig ist, fasse ihn einmal komplett zusammen. Erst nach Bestätigung: ankündigen, dass der Entwurf gezeichnet wird ("Einen Moment, ich zeichne das auf"), dann aufnahme_abschliessen mit einem Arbeitstitel aufrufen. Es entsteht NUR ein Entwurf — geprüft und aktiviert wird am Bildschirm, sag das dazu. Auf "Sitzung beenden": verabschieden, dann sitzung_beenden.`
 }
 
 /**

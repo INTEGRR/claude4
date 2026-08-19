@@ -782,6 +782,29 @@ Sitzungslogik lebt dafür in einem geteilten Hook
 (`sprechen/nutze-gespraech.tsx`) — Seite und Buddy sind nur zwei
 Oberflächen derselben Sitzung.
 
+## Prozess-Aufnahme beim Kunden (Sprachinterview → Entwurf → Diagramm)
+
+Die Spitze des Prozess-First-Ansatzes: Beim Kunden wird der **Ist-Prozess im
+Gespräch aufgenommen** — der violette Knopf „Prozess-Aufnahme" auf /sprechen
+(nur Admin, braucht OPENAI_API_KEY + ANTHROPIC_API_KEY) startet eine
+Realtime-Sitzung mit Interview-Anleitung: die KI fragt nach Auslöser,
+Schritten, Zuständigkeiten, Entscheidungen und Ausnahmen, fasst
+abschnittsweise zusammen und lässt bestätigen. Bewusst nur zwei Werkzeuge
+(`aufnahme_abschliessen`, `sitzung_beenden`) — interviewt wird, nicht im ERP
+hantiert.
+
+Beim Abschluss übernimmt die Arbeitsteilung nach Stärke: Das
+Sitzungstranskript (serverseitig in `sprachprotokoll_eintraege`, der Client
+spült seinen Puffer vor dem Abschluss) geht an den Claude-Agenten
+(`AUFNAHME_MODELL`, Standard = Agentenmodell), der es in einen
+`einstellungen.prozess_entwerfen`-Aufruf strukturiert — Ist-Prozesse immer
+als `vorgang`-Modell mit frei definierten Zuständen, also **ohne eine Zeile
+Entwicklung**. Ausführung über denselben geprüften Weg wie jede KI-Aktion
+(Torwächter, nurAdmin, log_event); lehnt die Validierung ab, darf das
+Modell bis zu dreimal nachbessern. Ergebnis ist IMMER nur ein **Entwurf**
+(inaktive Prozessversion): die Sichtprüfung mit dem Kunden ist das
+BPMN-Diagramm auf /prozesse/&lt;code&gt;, aktiviert wird dort von Hand.
+
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 
 KRNL wird an mehrere Kunden ausgerollt, mit häufigen Feature-Updates. Der

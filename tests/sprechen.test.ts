@@ -4,6 +4,8 @@ import { closeDb, db, expectError, makeProduct, stockUp, withRollback } from './
 import { suchworte, varianteSuchen, wortstamm } from '../src/modules/ki/produkt-suche.ts'
 import {
   ARGUMENTE,
+  aufnahmeInstructions,
+  aufnahmeWerkzeuge,
   istTranskriptHalluzination,
   sprechenInstructions,
   sprechenWerkzeuge,
@@ -107,6 +109,23 @@ describe('Sprechen: Werkzeugkatalog (DB-frei)', () => {
       }).success,
       true,
     )
+  })
+
+  test('Aufnahme-Modus: zwei Werkzeuge, Interview-Anleitung kurz und entwurfs-treu', () => {
+    // Die Prozess-Aufnahme interviewt nur — kein ERP-Hantieren nebenbei.
+    assert.deepEqual(aufnahmeWerkzeuge().map((w) => w.name), [
+      'aufnahme_abschliessen',
+      'sitzung_beenden',
+    ])
+    const anleitung = aufnahmeInstructions({ name: 'Patrick' }, 'ANVIL')
+    assert.ok(anleitung.length < 2000, `Anleitung zu lang: ${anleitung.length} Zeichen`)
+    assert.ok(anleitung.includes('NUR ein Entwurf'), 'Entwurf-statt-aktiv steht drin')
+    assert.ok(anleitung.includes('eine Frage'), 'Interviewregel: eine Frage auf einmal')
+    assert.equal(
+      ARGUMENTE.aufnahme_abschliessen.safeParse({ titel: 'Reklamation Endkunde' }).success,
+      true,
+    )
+    assert.equal(ARGUMENTE.aufnahme_abschliessen.safeParse({ titel: 'ab' }).success, false)
   })
 
   test('Whisper-Halluzinationen werden erkannt, echte Sätze nicht', () => {

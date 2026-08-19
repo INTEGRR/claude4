@@ -6,6 +6,7 @@ import { registrierteAktion } from '@/modules/prozesse/registry'
 import { formularFelder } from '@/modules/prozesse/schema-felder'
 import { AKTIONEN, type Aktion } from '@/modules/ki/aktionen'
 import { sprechenKonfiguriert, sprechenModell } from '@/modules/ki/sprechen'
+import { aufnahmeKonfiguriert } from '@/modules/ki/prozess-aufnahme'
 import { Gespraech } from './gespraech'
 import { Pruefung, type PruefVorgang } from './pruefung'
 import { ProtokollListe } from './protokoll-liste'
@@ -120,7 +121,7 @@ export default async function SprechenSeite() {
         title="Sprechen"
         subtitle={`Echtzeit-Gespräch mit dem ERP (${sprechenModell()}) — Schreibwünsche werden gesammelt und nach der Sitzung gebucht`}
       />
-      <Gespraech />
+      <Gespraech aufnahme={user.role === 'admin' && aufnahmeKonfiguriert()} />
       {[...sammlungen.entries()].map(([protokollId, s]) => (
         <Pruefung
           key={protokollId}

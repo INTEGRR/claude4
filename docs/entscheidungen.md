@@ -9,6 +9,18 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Prozess-Aufnahme beim Kunden: Interview per Stimme, Entwurf per Agent
+
+Der Idealfall des Vertriebs: Beim Kunden wird der Ist-Prozess diktiert,
+gezeichnet und umgesetzt. Entscheidung: eigener Aufnahme-Modus der
+Sprachsitzung (Realtime führt das Interview — primäres Medium ist das
+Live-Gespräch), danach strukturiert der Claude-Agent das Transkript in
+einen `prozess_entwerfen`-ENTWURF (`vorgang`-Modell, frei definierte
+Zustände — kein Code nötig). Sichtprüfung ist das Diagramm auf
+/prozesse/&lt;code&gt;, aktiviert wird von Hand. Arbeitsteilung nach
+Modellstärke, Wirkung nur über den Torwächter. Doku:
+[prozesse.md](prozesse.md), Abschnitt Prozess-Aufnahme.
+
 ## 2026-08-19 — Produktname KRNL überall, Arbeitstitel „ERP" abgelöst
 
 Der Arbeitstitel „ERP — Eigenentwicklung (Odoo-Nachbau)" weicht dem

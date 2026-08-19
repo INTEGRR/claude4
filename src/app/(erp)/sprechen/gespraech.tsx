@@ -15,7 +15,7 @@ import { SprechenLog, useGespraech, ZUSTAND_TEXT } from './nutze-gespraech'
  * Nach dem Beenden lädt router.refresh() die Seite neu — die gesammelten
  * Vorgänge erscheinen dann als Prüftabelle (gebucht wird NUR dort).
  */
-export function Gespraech() {
+export function Gespraech({ aufnahme }: { aufnahme?: boolean }) {
   const router = useRouter()
   const [hosentasche, setHosentasche] = useState(false)
   const { zustand, fehler, log, aktiv, verbinden, trennen } = useGespraech({
@@ -60,14 +60,26 @@ export function Gespraech() {
 
         <div style={{ marginTop: 16 }}>
           {!aktiv ? (
-            <button
-              className="primary"
-              onClick={() => void verbinden()}
-              disabled={zustand === 'verbindet'}
-              style={{ minWidth: 200 }}
-            >
-              {zustand === 'verbindet' ? 'Verbinde …' : 'Verbinden'}
-            </button>
+            <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                className="primary"
+                onClick={() => void verbinden()}
+                disabled={zustand === 'verbindet'}
+                style={{ minWidth: 200 }}
+              >
+                {zustand === 'verbindet' ? 'Verbinde …' : 'Verbinden'}
+              </button>
+              {aufnahme && (
+                <button
+                  className="wichtig"
+                  onClick={() => void verbinden('aufnahme')}
+                  disabled={zustand === 'verbindet'}
+                  title="Ist-Prozess beim Kunden aufnehmen — die KI führt das Interview; am Ende entsteht ein Entwurf mit Diagramm, aktiviert wird von Hand"
+                >
+                  Prozess-Aufnahme
+                </button>
+              )}
+            </span>
           ) : (
             <span style={{ display: 'inline-flex', gap: 8 }}>
               <button className="wichtig" onClick={() => trennen(true)} style={{ minWidth: 170 }}>

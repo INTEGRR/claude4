@@ -189,6 +189,25 @@ async function ausfuehren(
       return { output: antwort, protokoll: { frage: argumente.frage } }
     }
 
+    case 'aufnahme_abschliessen': {
+      // Prozess-Aufnahme: das Sitzungstranskript wird zu einem
+      // prozess_entwerfen-ENTWURF strukturiert (nichts wird aktiv; nurAdmin
+      // erzwingt der Torwächter in der Strukturierung).
+      if (!protokollId) {
+        throw new AktionsFehler('Keine aktive Sitzung — es gibt kein Transkript.')
+      }
+      const zeilen = await sql<{ rolle: string; text: string }[]>`
+        select rolle, text from sprachprotokoll_eintraege
+        where protokoll_id = ${protokollId} and rolle in ('nutzer', 'assistent')
+        order by zeit`
+      const transkript = zeilen
+        .map((z) => `${z.rolle === 'nutzer' ? 'Kunde/Berater' : 'Interviewer'}: ${z.text}`)
+        .join('\n')
+      const { aufnahmeStrukturieren } = await import('./prozess-aufnahme')
+      const antwort = await aufnahmeStrukturieren(transkript, String(argumente.titel), nutzer)
+      return { output: antwort, protokoll: { titel: argumente.titel } }
+    }
+
     case 'sitzung_beenden':
       // Behandelt der Client selbst (Verbindung trennen) — Rückfallebene.
       return { output: 'Sitzung wird beendet.' }

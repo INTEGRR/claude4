@@ -78,7 +78,7 @@ export function useGespraech(opts?: {
   }, [])
 
   /** Transkript-Puffer an den Server spülen (Batch; sendBeacon beim Schließen). */
-  const spuelen = useCallback((beendet: boolean, alsBeacon = false) => {
+  const spuelen = useCallback(async (beendet: boolean, alsBeacon = false) => {
     const protokollId = protokollRef.current
     if (!protokollId) return
     const eintraege = pufferRef.current.splice(0)
@@ -87,7 +87,9 @@ export function useGespraech(opts?: {
     if (alsBeacon && navigator.sendBeacon) {
       navigator.sendBeacon('/api/sprechen/protokoll', new Blob([body], { type: 'application/json' }))
     } else {
-      void fetch('/api/sprechen/protokoll', {
+      // Awaitbar: die Prozess-Aufnahme muss den Puffer VOR der
+      // Strukturierung sicher beim Server wissen.
+      await fetch('/api/sprechen/protokoll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
@@ -153,6 +155,10 @@ export function useGespraech(opts?: {
       } catch {
         // kaputte Argumente — der Server meldet es als Text
       }
+      // Die Aufnahme strukturiert das SERVERSEITIGE Transkript — was noch im
+      // Client-Puffer liegt, muss vorher ankommen.
+      if (name === 'aufnahme_abschliessen') await spuelen(false)
+
       let output = 'Werkzeug fehlgeschlagen.'
       try {
         const res = await fetch('/api/sprechen/werkzeug', {
@@ -185,6 +191,9 @@ export function useGespraech(opts?: {
         const notiert = output.startsWith('Notiert')
         if (notiert) notiertRef.current += 1
         zeile(notiert ? 'notiert' : 'fehler', output.slice(0, 160))
+      } else if (name === 'aufnahme_abschliessen') {
+        // Der Entwurf-Link soll vollständig im Log stehen.
+        zeile(output.includes('/prozesse/') ? 'notiert' : 'fehler', output.slice(0, 240))
       } else {
         zeile('werkzeug', `${name}: ${output.slice(0, 120)}`)
       }
@@ -201,7 +210,7 @@ export function useGespraech(opts?: {
         else dc.send(JSON.stringify({ type: DC_EVENTS.responseCreate }))
       }
     },
-    [trennen, zeile],
+    [spuelen, trennen, zeile],
   )
 
   const beiEvent = useCallback(
@@ -274,7 +283,7 @@ export function useGespraech(opts?: {
     [spuelen, werkzeug, zeile],
   )
 
-  const verbinden = useCallback(async () => {
+  const verbinden = useCallback(async (modus: 'gespraech' | 'aufnahme' = 'gespraech') => {
     setFehler(null)
     setZustand('verbindet')
     setLog([])
@@ -283,7 +292,11 @@ export function useGespraech(opts?: {
     antwortAusstehendRef.current = false
     try {
       // 1) Sitzung + kurzlebigen Client Secret vom eigenen Server holen.
-      const res = await fetch('/api/sprechen/session', { method: 'POST' })
+      const res = await fetch('/api/sprechen/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modus }),
+      })
       const daten = (await res.json()) as {
         client_secret?: string
         protokoll_id?: string
@@ -363,7 +376,12 @@ export function useGespraech(opts?: {
       }
 
       setZustand('leerlauf')
-      zeile('info', 'Verbunden — einfach lossprechen.')
+      zeile(
+        'info',
+        modus === 'aufnahme'
+          ? 'Prozess-Aufnahme läuft — beschreibt den Ablauf, ich frage nach.'
+          : 'Verbunden — einfach lossprechen.',
+      )
 
       // Leerlauf-Leine: fünf Minuten ohne jedes Datachannel-Event → sauber
       // trennen statt Audio-Tokens im Schweigen zu verbrennen.
