@@ -93,7 +93,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **uom_categories**: Einheitenkategorien. **product_template_attribute_lines**: welche Attribute ein Template nutzt. **bom_byproducts**: Kuppelprodukte einer Stückliste (variant_id, qty).
 
 ### Sonstiges
-- **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at).
+- **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at). model='ki' zählt KI-Nutzung (Chat-Fragen, ausgeführte Aktionen). Monatsübersicht der Nutzung: nutzungsbericht(monate) → (monat, aktive_nutzer, belege, ki_fragen, sprachsitzungen).
 - **sequences**: Nummernkreise. **integration_jobs**: Outbox für Shopify/E-Mail (nicht abfragbar).
 - **api_transactions**: Protokoll aller Aufrufe an Shopify/DHL/Mail (system, kind, reference, ok, status_code, error, duration_ms, created_at).
 

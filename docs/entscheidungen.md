@@ -9,6 +9,21 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Nutzungsbericht light: Zählen statt Lizenzieren
+
+Für die ersten zahlenden Piloten gibt es KEIN Lizenz-/Abrechnungsmodul —
+nur einen **Nutzungsbericht** als Gesprächsgrundlage:
+`nutzungsbericht(monate)` (Migration 0063, rein additiv) liefert je Monat
+aktive Nutzer, neue Kernbelege, KI-Fragen und Sprachsitzungen aus
+Bestandsdaten (audit_log, Belegtabellen, sprachprotokolle). Einzige neue
+Zählstelle: /api/ki schreibt pro Chat-Runde einen log_event-Eintrag
+model='ki' — vorher wurden nur ausgeführte KI-Aktionen protokolliert,
+die reine Chat-Nutzung war unsichtbar. Die Zahlen bleiben in der
+jeweiligen Instanz (kein Phone-Home, passend zur Instanz-pro-Kunde-
+Entscheidung); gezogen wird monatlich von Hand auf /einstellungen/nutzung
+(nur Admin). Doku: [prozesse.md](prozesse.md), Abschnitt Pilotbetrieb;
+Wächter: tests/nutzung.test.ts.
+
 ## 2026-08-19 — Onboarding-Weiche: Demo-Modus oder geführte Einrichtung
 
 Eine frische Instanz fragt beim ersten Admin-Login: **Beispieldaten

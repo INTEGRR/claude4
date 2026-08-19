@@ -887,6 +887,43 @@ vier Schichten:
   Neue Invarianten kommen als weitere Prüfung in
   src/modules/lager/daten-tuev.ts dazu.
 
+## Pilotbetrieb: Provisionierung, Ringe, Nutzungsbericht
+
+Phase 1 der Monetarisierung: **2–3 zahlende Pilotkunden**, Instanz pro
+Kunde. Kein Lizenzmodul — stattdessen **Nutzungs-Reporting light** als
+Grundlage der Preisgespräche.
+
+**Provisionierungs-Checkliste je Kunde** (Betriebsaufgaben, kein Code):
+
+1. Supabase-Projekt (EU) anlegen, PITR + Retention aktivieren.
+2. Vercel-Projekt auf den Ring-Branch des Kunden zeigen lassen.
+3. Env-Satz setzen — eigene KI-Schlüssel je Kunde (Kostentrennung),
+   eigene Shopify-/DHL-Zugänge, `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`.
+4. Deploy: migriert und seedet nur den Administrator.
+5. Erstlogin **mit dem Kunden**: die Onboarding-Weiche (oben) durchgehen —
+   geführt, Paket wählen, Team, Passwort.
+6. Prozess-Aufnahme in der Werkstatt als Onboarding-Ritual: die
+   Ist-Prozesse des Kunden im Gespräch aufnehmen, Diagramm gemeinsam
+   prüfen, aktivieren.
+7. Restore-Probe VOR Go-Live (PITR in Wegwerf-Projekt zurückspielen).
+8. Support-Kanal = bug_ticket-Prozess der Instanz.
+
+**Ringe**: Ring 0 = eigene ANVIL-Instanz, Ring 1 = Pilot A, Ring 2 =
+Piloten B/C. Updates rollen ringweise mit Soak-Zeit; Details in der
+Schutzschicht (oben).
+
+**Nutzungsbericht** (`/einstellungen/nutzung`, nur Admin): die
+SQL-Funktion `nutzungsbericht(monate)` (Migration 0063) liefert je Monat
+aktive Nutzer (Audit-Log-Akteure mit Konto + Sprachsitzungs-Nutzer),
+neue Kernbelege (Verkauf, Einkauf, Fertigung, Reparatur,
+Lieferantenrechnung), KI-Fragen (audit_log model='ki': jede Chat-Runde —
+Zählpunkt in /api/ki — und jede ausgeführte KI-Aktion) und
+Sprachsitzungen. Die Zahlen **bleiben in der Instanz** (kein Phone-Home);
+für Pilotverträge werden sie monatlich von Hand gezogen. Pilotstruktur
+(Platzhalter, mit den Piloten zu füllen): Pilotvertrag + AV, Preis /
+Laufzeit / Ausstieg, Metriken = die drei Berichtsgrößen,
+Wochen-Feedback über bug_ticket. Wächter: tests/nutzung.test.ts.
+
 ## Noch offen (Kurzfassung)
 
 - Verkauf/Shop als komponierte Kette (Auftrag → Lieferung → Abrechnung),

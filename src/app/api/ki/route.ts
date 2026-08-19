@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { currentUser } from '@/modules/auth'
 import { canAccess } from '@/modules/auth/permissions'
 import { type ChatTurn, type KiEvent, kiConfigured, runAgent } from '@/modules/ki/agent'
+import { sql } from '@/db/client'
 
 /**
  * Streamt die Antwort des KI-Agenten als NDJSON (eine JSON-Zeile je
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 })
   }
+
+  // Zählpunkt für den Nutzungsbericht (nutzungsbericht(), ki_fragen):
+  // eine Zeile pro Chat-Runde, wie bei ausgeführten KI-Aktionen.
+  await sql`select log_event('ki', gen_random_uuid(), 'note',
+    ${kontext === 'werkstatt' ? 'Chat-Frage (Werkstatt)' : 'Chat-Frage'}, ${user.name})`
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({

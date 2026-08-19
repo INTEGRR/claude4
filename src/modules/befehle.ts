@@ -60,6 +60,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/prozesse/werkstatt', label: 'Prozess-Werkstatt', area: 'einstellungen' },
   { href: '/einstellungen', label: 'Einstellungen', area: 'einstellungen' },
   { href: '/einstellungen/benutzer', label: 'Benutzer verwalten', area: 'einstellungen' },
+  { href: '/einstellungen/nutzung', label: 'Nutzungsbericht', area: 'einstellungen' },
   { href: '/tickets', label: 'Tickets', area: 'fehler' },
 ]
 
