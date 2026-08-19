@@ -9,6 +9,19 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-19 — Prozess-Werkstatt: Bauen ist ein Einstellungs-Thema, kein Alltagsmodus
+
+Die Prozess-Aufnahme wandert aus dem Alltags-Sprachassistenten (/sprechen)
+in die neue **Werkstatt** unter /prozesse/werkstatt: Dort baut der Admin
+MIT dem Agenten — Chat mit Tabellen, Entwürfen und Diagramm-Vorschau,
+nicht nebenbei. Der Alltags-Assistent bleibt schlank (Zählen, Fragen,
+Sammeln). Technisch: gemeinsamer Sitzungs-Hook jetzt in
+`src/components/nutze-gespraech.tsx` (drei Verbraucher), der
+Aufnahme-Abschluss liefert den Entwurf-Code strukturiert (`beiEntwurf`) —
+die Werkstatt springt direkt aufs Diagramm. `werkstatt` ist als
+Prozess-Code reserviert (statisches Routensegment schlägt /prozesse/[code]).
+Doku: [prozesse.md](prozesse.md), Abschnitt Prozess-Werkstatt.
+
 ## 2026-08-19 — Wissensbasis im Code, Kontext-Kanal statt Prompt-Stuffing
 
 Prozess-Best-Practices leben als EINE versionierte Quelle in

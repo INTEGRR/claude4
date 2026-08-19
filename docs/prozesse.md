@@ -782,11 +782,28 @@ Sitzungslogik lebt dafür in einem geteilten Hook
 (`sprechen/nutze-gespraech.tsx`) — Seite und Buddy sind nur zwei
 Oberflächen derselben Sitzung.
 
+## Prozess-Werkstatt (/prozesse/werkstatt): mit dem Agenten bauen
+
+Prozesse entstehen nicht nebenbei im Alltags-Chat, sondern in der
+**Werkstatt** (Einstieg: violetter Knopf auf /prozesse, Befehlsfeld
+„Prozess-Werkstatt"; Bereich `einstellungen`): Der KI-Chat läuft dort im
+**Werkstatt-Kontext** — der Agent wird zum Prozess-Architekten
+(`werkstattSystemZusatz()` aus `src/modules/ki/wissen.ts`: Bestand per SQL
+nachschlagen und als Tabelle zeigen, Schrittliste bestätigen lassen,
+Entwürfe NUR über `aktion_vorschlagen` mit `einstellungen.prozess_entwerfen`).
+Der Kontext ist ein serverseitig geprüftes Enum (nur Admins), kein Freitext.
+Auf der Seite: die Entwurfsliste aller Prozesse, und per `?code=` die
+**Diagramm-Vorschau der neuesten Entwurfsversion** (React Flow, geteiltes
+Lese-Modul `version-diagramm.ts`) mit Sprung zur Detailseite — dort wird
+nach Sichtprüfung von Hand aktiviert. `werkstatt` ist als Prozess-Code
+reserviert (Routen-Kollision, per Schema-refine + Test abgesichert).
+
 ## Prozess-Aufnahme beim Kunden (Sprachinterview → Entwurf → Diagramm)
 
 Die Spitze des Prozess-First-Ansatzes: Beim Kunden wird der **Ist-Prozess im
-Gespräch aufgenommen** — der violette Knopf „Prozess-Aufnahme" auf /sprechen
-(nur Admin, braucht OPENAI_API_KEY + ANTHROPIC_API_KEY) startet eine
+Gespräch aufgenommen** — der violette Knopf „Sprach-Interview starten" in
+der **Werkstatt** (nur Admin, braucht OPENAI_API_KEY + ANTHROPIC_API_KEY;
+bewusst NICHT im Alltags-Assistenten /sprechen) startet eine
 Realtime-Sitzung mit Interview-Anleitung: die KI fragt nach Auslöser,
 Schritten, Zuständigkeiten, Entscheidungen und Ausnahmen, fasst
 abschnittsweise zusammen und lässt bestätigen. Bewusst nur zwei Werkzeuge
@@ -804,8 +821,10 @@ als `vorgang`-Modell mit frei definierten Zuständen, also **ohne eine Zeile
 Entwicklung**. Ausführung über denselben geprüften Weg wie jede KI-Aktion
 (Torwächter, nurAdmin, log_event); lehnt die Validierung ab, darf das
 Modell bis zu dreimal nachbessern. Ergebnis ist IMMER nur ein **Entwurf**
-(inaktive Prozessversion): die Sichtprüfung mit dem Kunden ist das
-BPMN-Diagramm auf /prozesse/&lt;code&gt;, aktiviert wird dort von Hand.
+(inaktive Prozessversion): der Entwurf-Code geht strukturiert an die
+Oberfläche zurück (`beiEntwurf`-Callback des Hooks), die Werkstatt springt
+direkt auf die Diagramm-Vorschau — die Sichtprüfung mit dem Kunden ist das
+BPMN-Diagramm, aktiviert wird auf /prozesse/&lt;code&gt; von Hand.
 
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 

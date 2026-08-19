@@ -25,6 +25,8 @@ import { varianteSuchen } from './produkt-suche'
 
 export interface WerkzeugErgebnis {
   output: string
+  /** Bei aufnahme_abschliessen: der Code des angelegten Prozessentwurfs. */
+  entwurf_code?: string
 }
 
 export async function werkzeugAusfuehren(
@@ -35,6 +37,7 @@ export async function werkzeugAusfuehren(
 ): Promise<WerkzeugErgebnis> {
   let output: string
   let ergebnisFuersProtokoll: unknown = null
+  let entwurfCode: string | undefined
   try {
     const schema = ARGUMENTE[name as WerkzeugName]
     if (!schema) {
@@ -50,6 +53,7 @@ export async function werkzeugAusfuehren(
         const ergebnis = await ausfuehren(name as WerkzeugName, geparst.data, nutzer, protokollId)
         output = ergebnis.output
         ergebnisFuersProtokoll = ergebnis.protokoll ?? null
+        entwurfCode = ergebnis.entwurf_code
       }
     }
   } catch (err) {
@@ -65,7 +69,7 @@ export async function werkzeugAusfuehren(
       values (${protokollId}, 'werkzeug', ${output.slice(0, 2000)}, ${name},
               ${ergebnisFuersProtokoll === null ? null : sql.json(ergebnisFuersProtokoll as never)})`
   }
-  return { output }
+  return entwurfCode ? { output, entwurf_code: entwurfCode } : { output }
 }
 
 async function ausfuehren(
@@ -73,7 +77,7 @@ async function ausfuehren(
   argumente: Record<string, unknown>,
   nutzer: User,
   protokollId: string | null,
-): Promise<{ output: string; protokoll?: unknown }> {
+): Promise<{ output: string; protokoll?: unknown; entwurf_code?: string }> {
   switch (name) {
     case 'produkt_bestand': {
       const treffer = await varianteSuchen(sql, String(argumente.suchbegriff))
@@ -205,7 +209,11 @@ async function ausfuehren(
         .join('\n')
       const { aufnahmeStrukturieren } = await import('./prozess-aufnahme')
       const antwort = await aufnahmeStrukturieren(transkript, String(argumente.titel), nutzer)
-      return { output: antwort, protokoll: { titel: argumente.titel } }
+      return {
+        output: antwort.text,
+        protokoll: { titel: argumente.titel, code: antwort.code ?? null },
+        entwurf_code: antwort.code,
+      }
     }
 
     case 'sitzung_beenden':

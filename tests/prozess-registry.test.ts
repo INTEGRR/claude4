@@ -92,6 +92,27 @@ describe('Torwächter: Prüfung ohne Ausführung', () => {
     )
   })
 
+  test("'werkstatt' ist als Prozess-Code reserviert (Routen-Kollision)", () => {
+    // /prozesse/werkstatt ist ein statisches Segment und gewinnt gegen
+    // /prozesse/[code] — ein Prozess dieses Namens wäre unerreichbar.
+    assert.throws(
+      () =>
+        aktionPruefen('einstellungen.prozess_entwerfen', {
+          parameter: {
+            code: 'werkstatt',
+            name: 'Kollision',
+            bereich: 'lager',
+            schritte: [
+              { code: 'start', name: 'Start', art: 'start' },
+              { code: 'ende', name: 'Ende', art: 'ende' },
+            ],
+            uebergaenge: [{ von: 'start', nach: 'ende' }],
+          },
+        }),
+      /reserviert/,
+    )
+  })
+
   test('FormData läuft durch den Adapter der Aktion', () => {
     const fd = new FormData()
     fd.set('titel', 'Knopf tut nichts')

@@ -57,6 +57,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/scanner', label: 'Scanner', area: 'scanner' },
   { href: '/integrationen', label: 'Integrationen', area: 'integrationen' },
   { href: '/prozesse', label: 'Prozesse', area: 'einstellungen' },
+  { href: '/prozesse/werkstatt', label: 'Prozess-Werkstatt', area: 'einstellungen' },
   { href: '/einstellungen', label: 'Einstellungen', area: 'einstellungen' },
   { href: '/einstellungen/benutzer', label: 'Benutzer verwalten', area: 'einstellungen' },
   { href: '/tickets', label: 'Tickets', area: 'fehler' },

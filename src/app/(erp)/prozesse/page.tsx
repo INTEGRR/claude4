@@ -72,6 +72,10 @@ export default async function ProzesseRepositoryPage({
         subtitle="Abläufe und das Repository der Aktionen: jeder Knopf ist ein registrierter, API-aufrufbarer Aufruf"
         actions={
           <>
+            {/* Violett: hier wird gebaut — der Entscheidungsakzent. */}
+            <Link className="btn wichtig" href="/prozesse/werkstatt">
+              Werkstatt
+            </Link>
             <Link
               className={`btn${aktiv === 'ablaeufe' ? ' primary' : ''}`}
               href="/prozesse?reiter=ablaeufe"

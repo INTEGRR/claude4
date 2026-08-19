@@ -76,12 +76,14 @@ export async function aufnahmeStrukturieren(
   transkript: string,
   titel: string,
   nutzer: User,
-): Promise<string> {
+): Promise<{ text: string; code?: string }> {
   if (!aufnahmeKonfiguriert()) {
-    return 'Die Prozess-Aufnahme ist nicht konfiguriert (ANTHROPIC_API_KEY fehlt).'
+    return { text: 'Die Prozess-Aufnahme ist nicht konfiguriert (ANTHROPIC_API_KEY fehlt).' }
   }
   if (transkript.trim().length < 80) {
-    return 'Das Gespräch war zu kurz für einen Prozessentwurf — bitte den Ablauf ausführlicher besprechen.'
+    return {
+      text: 'Das Gespräch war zu kurz für einen Prozessentwurf — bitte den Ablauf ausführlicher besprechen.',
+    }
   }
 
   const client = new Anthropic()
@@ -107,13 +109,17 @@ export async function aufnahmeStrukturieren(
         messages,
       })
     } catch (err) {
-      return `Die Strukturierung ist fehlgeschlagen: ${err instanceof Error ? err.message : 'KI nicht erreichbar'}`
+      return {
+        text: `Die Strukturierung ist fehlgeschlagen: ${err instanceof Error ? err.message : 'KI nicht erreichbar'}`,
+      }
     }
 
     const toolUse = antwort.content.find(
       (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use',
     )
-    if (!toolUse) return 'Die Strukturierung hat keinen Entwurf geliefert — bitte erneut versuchen.'
+    if (!toolUse) {
+      return { text: 'Die Strukturierung hat keinen Entwurf geliefert — bitte erneut versuchen.' }
+    }
 
     try {
       // Derselbe geprüfte Weg wie jede KI-Aktion: Torwächter validiert
@@ -126,10 +132,12 @@ export async function aufnahmeStrukturieren(
       const code = String((toolUse.input as { code?: unknown }).code ?? '')
       await sql`select log_event('ki', gen_random_uuid(), 'state',
         ${`Prozess-Aufnahme: Entwurf ${code} aus Sprachinterview`}, ${nutzer.name})`
-      return (
-        `${ergebnis.text} Das Diagramm steht unter /prozesse/${code} zur Sichtprüfung — ` +
-        'aktiviert wird dort von Hand, bis dahin ist nichts in Betrieb.'
-      )
+      return {
+        text:
+          `${ergebnis.text} Das Diagramm steht unter /prozesse/${code} zur Sichtprüfung — ` +
+          'aktiviert wird dort von Hand, bis dahin ist nichts in Betrieb.',
+        code,
+      }
     } catch (err) {
       // Validierungs-/Fachfehler zurück ans Modell — es darf nachbessern.
       const meldung = err instanceof Error ? err.message : String(err)
@@ -148,5 +156,7 @@ export async function aufnahmeStrukturieren(
     }
   }
 
-  return 'Der Entwurf wurde mehrfach abgelehnt — bitte am Bildschirm in der KI-Analyse fortsetzen.'
+  return {
+    text: 'Der Entwurf wurde mehrfach abgelehnt — bitte am Bildschirm in der KI-Analyse fortsetzen.',
+  }
 }

@@ -6,7 +6,7 @@ import { money, qty as menge } from '@/modules/shared/format'
 import { gruppenSpalten, gruppiereVorschlaege } from '@/modules/ki/vorschlag-gruppen'
 import { MikrofonKnopf, SendenSymbol } from '@/components/spracheingabe'
 import { HexcoreMark } from '@/components/marke'
-import { SprechenLog, useGespraech, ZUSTAND_TEXT } from '@/app/(erp)/sprechen/nutze-gespraech'
+import { SprechenLog, useGespraech, ZUSTAND_TEXT } from '@/components/nutze-gespraech'
 import { VorschlagEditor, Zelle } from './vorschlag-editor'
 
 /**
@@ -48,6 +48,13 @@ const BEISPIELE = [
   'Welche Komponenten reichen bei aktueller Prognose nicht mehr aus?',
   'Lege für die Schrauben M2x6 einen Meldebestand an: unter 500 auf 4000 auffüllen.',
   'Leg ein Produkt „Anvil Native 1800" an, in 3 Gehäusefarben und 4 Switch-Typen.',
+]
+
+const WERKSTATT_BEISPIELE = [
+  'Zeig mir die Schritte des Reklamationsprozesses als Tabelle.',
+  'Entwirf einen Prozess „Musterversand an Händler" — ich beschreibe ihn dir.',
+  'Der Freigabeschritt im Einkauf soll erst ab 5.000 € greifen — bau eine neue Version.',
+  'Welche Prozesse haben keinen Abbruchweg?',
 ]
 
 // --- Mini-Markdown ---------------------------------------------------------
@@ -694,7 +701,8 @@ function SammelCard({
 export function KiChat({
   startFrage,
   sprechen,
-}: { startFrage?: string; sprechen?: boolean } = {}) {
+  kontext,
+}: { startFrage?: string; sprechen?: boolean; kontext?: 'werkstatt' } = {}) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -775,6 +783,7 @@ export function KiChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history.map((m) => ({ role: m.role, text: m.text })),
+          ...(kontext ? { kontext } : {}),
         }),
       })
       if (!res.ok || !res.body) {
@@ -933,12 +942,16 @@ export function KiChat({
         {msgs.length === 0 && (
           <div className="ki-empty">
             <p className="muted">
-              Fragen zu allen ERP-Daten — der Agent liest die Datenbank, bereitet die Antwort
-              auf und zeichnet bei Bedarf ein Diagramm. Anlegen kann er auch, aber nur als
-              Vorschlag: gespeichert wird erst nach Ihrer Bestätigung. Zum Beispiel:
+              {kontext === 'werkstatt'
+                ? 'Prozesse gemeinsam bauen: beschreiben Sie den Ablauf, der Agent fragt nach, ' +
+                  'zeigt Zwischenstände als Tabellen und reicht Entwürfe ein — aktiv wird eine ' +
+                  'Version erst nach Sichtprüfung des Diagramms, per Hand. Zum Beispiel:'
+                : 'Fragen zu allen ERP-Daten — der Agent liest die Datenbank, bereitet die ' +
+                  'Antwort auf und zeichnet bei Bedarf ein Diagramm. Anlegen kann er auch, aber ' +
+                  'nur als Vorschlag: gespeichert wird erst nach Ihrer Bestätigung. Zum Beispiel:'}
             </p>
             <div className="ki-beispiele">
-              {BEISPIELE.map((b) => (
+              {(kontext === 'werkstatt' ? WERKSTATT_BEISPIELE : BEISPIELE).map((b) => (
                 <button key={b} type="button" className="small" onClick={() => void send(b)}>
                   {b}
                 </button>

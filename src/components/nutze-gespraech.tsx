@@ -47,6 +47,12 @@ export function useGespraech(opts?: {
    * Oberfläche zur Prüftabelle führen kann. Läuft NICHT beim Unmount.
    */
   beiEnde?: (notiert: number) => void
+  /**
+   * Aufnahme-Modus: sobald die Strukturierung einen Prozessentwurf angelegt
+   * hat — mit dessen Code, damit die Oberfläche direkt zum Diagramm
+   * springen kann, statt den Link aus dem Log lesen zu lassen.
+   */
+  beiEntwurf?: (code: string) => void
 }) {
   const [zustand, setZustand] = useState<Zustand>('aus')
   const [fehler, setFehler] = useState<string | null>(null)
@@ -69,9 +75,11 @@ export function useGespraech(opts?: {
   // nachgeholt — so kommt das Werkzeugergebnis garantiert zu Wort.
   const antwortAktivRef = useRef(false)
   const antwortAusstehendRef = useRef(false)
-  // Callback im Ref, damit trennen/verbinden nicht bei jedem Render neu entstehen.
+  // Callbacks im Ref, damit trennen/verbinden nicht bei jedem Render neu entstehen.
   const beiEndeRef = useRef(opts?.beiEnde)
   beiEndeRef.current = opts?.beiEnde
+  const beiEntwurfRef = useRef(opts?.beiEntwurf)
+  beiEntwurfRef.current = opts?.beiEntwurf
 
   const zeile = useCallback((art: LogZeile['art'], text: string) => {
     setLog((alt) => [...alt.slice(-60), { id: ++logId, art, text }])
@@ -166,8 +174,15 @@ export function useGespraech(opts?: {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, argumente, protokoll_id: protokollRef.current }),
         })
-        const daten = (await res.json()) as { output?: string; error?: string }
+        const daten = (await res.json()) as {
+          output?: string
+          error?: string
+          entwurf_code?: string
+        }
         output = daten.output ?? daten.error ?? output
+        // Aufnahme-Abschluss: der Entwurf-Code geht strukturiert an die
+        // Oberfläche (Sprung aufs Diagramm), nicht nur als Log-Text.
+        if (daten.entwurf_code) beiEntwurfRef.current?.(daten.entwurf_code)
       } catch {
         output = 'Keine Verbindung zum ERP-Server.'
       }

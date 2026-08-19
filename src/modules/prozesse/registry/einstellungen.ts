@@ -103,7 +103,10 @@ export const EINSTELLUNGEN = {
         .string()
         .min(1)
         .max(40)
-        .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
+        .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche')
+        // Statisches Routen-Segment /prozesse/werkstatt gewinnt gegen
+        // /prozesse/[code] — ein Prozess dieses Namens wäre unerreichbar.
+        .refine((c) => c !== 'werkstatt', "'werkstatt' ist als Code reserviert (Werkstatt-Seite)"),
       name: z.string().min(1).max(120),
       beschreibung: z.string().max(500).optional(),
       bereich: z.enum([
