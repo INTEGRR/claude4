@@ -10,6 +10,25 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # KRNL-Projektregeln
 
+## Prozess First (der Architektur-Grundsatz)
+
+KRNL orientiert sich an **Prozessen statt Masken**: Prozesse sind Daten
+(designbar, je Firma anpassbar), Knöpfe sind registrierte Aktionen. Für jede
+Änderung gilt:
+
+- **Neue Fachfunktion = Aktion in der Registry**
+  (src/modules/prozesse/registry/), ausgeführt NUR über den Torwächter
+  (`aktionAusfuehrenGeprueft`) — nie eine freie Server Action. Der
+  Abdeckungs-Wächter (tests/prozess-registry.test.ts) macht die Suite sonst
+  rot; Ausnahmen sind geschlossene, begründete Listen.
+- **Neuer Ablauf = Prozess(-Version) in der Datenbank** — Masken entstehen
+  aus Schritten, Navigation und Dashboard sind Projektionen der aktiven
+  Prozesse (Chamäleon). Keine hartkodierten Sonderwege.
+- **Der Belegstatus bleibt die einzige Zustandswahrheit** — Prozessschritte
+  mappen auf Belegstatus, es gibt kein zweites Token-Modell.
+- Einstieg: [docs/prozesse.md](docs/prozesse.md); Begründung:
+  Entscheidungslog 2026-08-16.
+
 ## Doku-Pflicht (nicht optional)
 
 Einstieg in die gesamte Dokumentation: [docs/README.md](docs/README.md) —
