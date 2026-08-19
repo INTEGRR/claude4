@@ -81,17 +81,30 @@ Jeder Beleg (Verkaufsauftrag, Bestellung, Transfer, Fertigungsauftrag, Reparatur
 
 Eingehend: Shopify-Webhooks werden nur **verifiziert und gespeichert** (Tabelle `shopify_webhook_events`, idempotent über die Webhook-/Order-ID), die Verarbeitung passiert asynchron per Job-Runner. Ausgehend: Seiteneffekte (Tag in Shopify setzen, E-Mail senden) werden als Job in `integration_jobs` geschrieben und mit Retry/Backoff abgearbeitet. Kein API-Call innerhalb einer DB-Transaktion.
 
-### 5. Erweiterbarkeit
+### 5. Weiterentwicklung seit dem Gründungsstand
 
-Vorgesehene, aber **nicht** im ersten Ausbau enthaltene Erweiterungen — das Datenmodell lässt sie zu, ohne Umbau:
+Dieses Dokument beschreibt das Fundament (Stand Anfang August 2026). Seither
+dazugekommen — jeweils dokumentiert in [prozesse.md](prozesse.md) und
+begründet im [Entscheidungslog](entscheidungen.md):
 
-- **Los-/Seriennummern**: `stock_move_lines`-Tabelle ist als Erweiterungspunkt beschrieben (Seriennummer je gefertigter Tastatur).
-- **Mehrere Lagerhäuser**: `warehouses` existiert von Anfang an, UI geht zunächst von einem Lager aus.
-- **Arbeitspläne/Arbeitsplätze** (Odoo Work Orders): `boms` bekommt später `bom_operations`; MO-Struktur ist darauf vorbereitet.
-- **Buchhaltung**: Rechnungen sind eigenständige Belege; eine spätere Journal-/Konten-Schicht dockt an `vendor_bills`/`customer_invoices` an.
-- **Kits (Bausatz-Stücklisten)**: `boms.bom_type` enthält `kit` bereits als Wert, Verhalten wird später implementiert.
-- **Weitere Vertriebskanäle**: Der Shopify-Import läuft über eine generische Import-Pipeline (`source`-Feld am Verkaufsauftrag).
-- **Versand-Ausbau**: Multicollo (mehrere Pakete je Lieferung — `shipments` ist 1:n modelliert), ZPL-Thermodruck, DHL-Tracking per Push-API statt Polling, weitere Carrier hinter einem Carrier-Interface, Zolldokumente für Nicht-EU-Versand.
+- **Prozess-ERP** (2026-08-16, der große Umbau): jede fachliche Aktion läuft
+  über die Aktions-Registry und den **Torwächter** (`aktionAusfuehrenGeprueft`
+  — zod-Validierung, Rollen/Befugnisse, Audit) als einzigen Schreibweg;
+  Prozesse sind Daten in der DB, Masken werden aus Schritten generiert, die
+  Navigation ist eine Projektion der aktiven Prozesse (Chamäleon).
+- **Los-/Seriennummern, Arbeitsplätze/Arbeitsgänge, Kits/Phantom-Baugruppen,
+  Befugnisse** — die früher hier als „später" gelisteten Punkte sind gebaut.
+- **Finanzmodul** (Zahlungen, Verträge, Darlehen/Steuern, 13-Wochen-Prognose)
+  und **KRNL-Marke** (2026-08-17).
+- **KI-Schicht**: Chat-Agent mit Read-only-SQL und rechtegesteuerter
+  Schema-Doku, **Sprachmodus** (OpenAI Realtime, Sammeln statt
+  Sofort-Buchen) als Kern-Einstieg (2026-08-18/19).
+- **Schutzschicht für den Kundenbetrieb** (2026-08-19): Instanz pro Kunde,
+  Migrations-Wächter, nächtlicher Daten-TÜV.
+
+Weiterhin bewusst offen: Buchhaltung (Journal-/Konten-Schicht dockt an die
+Belege an), Multicollo/ZPL/weitere Carrier, weitere Vertriebskanäle (die
+Import-Pipeline ist generisch, `source`-Feld am Verkaufsauftrag).
 
 ## Sicherheit & Betrieb
 
@@ -99,5 +112,7 @@ Vorgesehene, aber **nicht** im ersten Ausbau enthaltene Erweiterungen — das Da
 - **Secrets**: Shopify-Token (`shpat_…`), Webhook-Secret, Resend-Key, DHL-API-Key/-Secret + GKP-Systembenutzer als Umgebungsvariablen; nie im Client. DHL-Systembenutzer-Passwort läuft nach 365 Tagen ab — Erinnerung einplanen.
 - **Idempotenz**: Webhooks über `X-Shopify-Webhook-Id` + Order-ID; DHL-Label-Erstellung über Sendungs-Datensatz je Lieferung (kein Doppel-Label ohne vorherigen Storno).
 - **Zeitzone/Währung**: Europe/Berlin, EUR (einwährungsfähig; `currency`-Spalten vorhanden).
-- **Backups**: PITR bzw. regelmäßige Dumps aktivieren, sobald produktiv.
+- **Backups & Kundenbetrieb**: PITR je Projekt + Restore-Proben, Instanz pro
+  Kunde, Update-Ringe — siehe „Schutzschicht" in [prozesse.md](prozesse.md)
+  und das [Entscheidungslog](entscheidungen.md) (2026-08-19).
 - **Deployment**: Varianten inkl. vollständigem VPN-Betrieb in [betrieb.md](betrieb.md).

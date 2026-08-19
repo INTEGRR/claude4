@@ -28,6 +28,10 @@ hinter VPN oder auf Vercel mit Supabase ([Anleitung](docs/vercel-supabase.md)).
 
 > **Ausführliche Schritt-für-Schritt-Anleitung mit Rundgang durch die
 > Beispieldaten und Fehlerbehebung: [docs/lokal-starten.md](docs/lokal-starten.md)**
+>
+> **Einstieg in die gesamte Dokumentation (Konzepte, Module, Entscheidungen):
+> [docs/README.md](docs/README.md)** — jede Entscheidung ist datiert im
+> [Entscheidungslog](docs/entscheidungen.md) begründet.
 
 ## Schnellstart mit Docker (empfohlen zum Ausprobieren)
 

@@ -1,5 +1,11 @@
 # Datenmodell (Postgres / Supabase)
 
+> **Stand:** Gründungsmodell (Migrationen 0001–0030). Maßgeblich ist immer
+> `src/db/migrations/`; das stets aktuelle, wächter-geprüfte
+> Tabelleninventar (inkl. Prozesse, Finanzen, Sprachmodus) steht in
+> `src/modules/ki/schema-doku.ts` — ein Test gleicht es gegen die echte
+> Datenbank ab. Konzepte der späteren Ausbauten: [prozesse.md](prozesse.md).
+
 Notation: vereinfachtes SQL. Alle Tabellen bekommen zusätzlich `id uuid primary key default gen_random_uuid()`, `created_at timestamptz default now()`, `updated_at timestamptz`. Enums als Postgres-Enums. Mengen als `numeric(16,4)`, Preise als `numeric(16,2)`.
 
 Die Statuswerte übernehmen bewusst die **technischen Odoo-18-Werte** (siehe `docs/odoo-referenz/`), damit Verhalten 1:1 vergleichbar bleibt.
