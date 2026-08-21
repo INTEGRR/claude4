@@ -60,14 +60,27 @@ describe('Einrichtung: Demodaten-Wächter und Weichen-Heuristik', () => {
              and (select count(*) from users) = 1 as offen`
         return zeile.offen
       }
-      // Eingerichtete Instanz (Demodaten, mehrere Nutzer): Weiche bleibt zu.
-      assert.equal(await offen(), false)
-      // Selbst wenn alles andere „frisch" aussähe: der Schlüssel gewinnt —
-      // er überlebt auch die Gefahrenzone (demodaten_loeschen behält settings).
+      // Den frischen Zustand HERSTELLEN statt ihn vorauszusetzen: Der Test
+      // ging vorher davon aus, dass die Entwickler-Datenbank Demodaten und
+      // mehrere Nutzer hat — gegen eine frisch geseedete Instanz (genau ein
+      // Administrator, Default-Firmenname) war die Weiche zu Recht OFFEN und
+      // der Test rot. Beide Richtungen werden jetzt deterministisch geprüft.
+      await t`delete from settings where key = 'einrichtung'`
+      await t`update settings
+                 set value = jsonb_set(value, '{name}', '"Meine Firma GmbH"')
+               where key = 'company'`
+      const [ersterNutzer] = await t<{ id: string }[]>`
+        select id from users order by created_at limit 1`
+      await t`delete from users where id <> ${ersterNutzer.id}`
+      assert.equal(await offen(), true, 'frische Instanz: die Weiche steht offen')
+
+      // Und der Schlüssel schließt sie — dauerhaft. Er überlebt auch die
+      // Gefahrenzone (demodaten_loeschen behält settings), deshalb kommt die
+      // Weiche nach dem Abschluss nie wieder.
       await t`insert into settings (key, value)
               values ('einrichtung', '{"abgeschlossen": true, "modus": "gefuehrt"}')
               on conflict (key) do update set value = excluded.value`
-      assert.equal(await offen(), false)
+      assert.equal(await offen(), false, 'nach dem Abschluss: nie wieder')
     })
   })
 })
