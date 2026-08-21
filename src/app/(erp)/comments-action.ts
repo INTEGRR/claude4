@@ -24,10 +24,26 @@ const MODELS: Record<string, { table: string; area: Area }> = {
   product_variant: { table: 'product_variants', area: 'produkte' },
   partner: { table: 'partners', area: 'kontakte' },
   shipment: { table: 'shipments', area: 'versand' },
+  vorgang: { table: 'vorgaenge', area: 'verkauf' },
+  vertrag: { table: 'vertraege', area: 'finanzen' },
+  darlehen: { table: 'darlehen', area: 'finanzen' },
+  employee: { table: 'employees', area: 'personal' },
+  bug_report: { table: 'bug_reports', area: 'fehler' },
 }
 
+/**
+ * Die kommentierbaren Modelle als Typ — er koppelt diese Registry an ihre
+ * Aufrufer. Eine Detailseite, die <RecordComments model="…"> mit einem hier
+ * fehlenden Modell rendert, bricht ab jetzt den Typecheck. Genau das fehlte:
+ * fuenf Seiten (vorgaenge, vertraege, darlehen, personal, tickets) zeigten
+ * das Kommentarfeld an, waehrend jeder Absendeversuch mit „nicht vorgesehen"
+ * scheiterte — der Fehler war nur fuer den Benutzer sichtbar, nie fuer den
+ * Compiler.
+ */
+export type KommentarModell = keyof typeof MODELS
+
 export async function addComment(
-  model: string,
+  model: KommentarModell,
   recordId: string,
   path: string,
   formData: FormData,

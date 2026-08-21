@@ -160,17 +160,59 @@ function dateienUnter(pfad: string): string[] {
   for (const eintrag of readdirSync(pfad)) {
     const voll = join(pfad, eintrag)
     if (statSync(voll).isDirectory()) treffer.push(...dateienUnter(voll))
-    else if (/actions\.ts$/.test(eintrag)) treffer.push(voll)
+    // ALLE Dateien, nicht nur actions.ts: Server Actions duerfen auch inline
+    // in page.tsx oder in *-action.ts stehen — und genau die sind dem
+    // Waechter frueher entgangen (er meldete grün, waehrend 26 Actions am
+    // Torwaechter vorbeiliefen, 11 davon mit direktem Schreib-SQL).
+    else if (/\.tsx?$/.test(eintrag)) treffer.push(voll)
   }
   return treffer
 }
 
-/** Modulschlüssel einer actions.ts: 'src/app/(erp)/einkauf/actions.ts' → 'einkauf'. */
+/**
+ * Modulschlüssel einer Datei, damit Namen eindeutig werden (checkAvailability
+ * gibt es in Lager UND Fertigung):
+ *   'src/app/(erp)/einkauf/actions.ts'              → 'einkauf'
+ *   'src/app/(erp)/einstellungen/page.tsx'          → 'einstellungen'
+ *   'src/app/(erp)/produkte/konfiguration/page.tsx' → 'produkte/konfiguration'
+ *   'src/app/(erp)/tags-action.ts'                  → 'tags-action'
+ */
 function modulVon(datei: string): string {
   return datei
     .replace(WURZEL, '')
     .replace(/^\/(\(erp\)\/)?/, '')
-    .replace(/\/actions\.ts$/, '')
+    .replace(/\/(actions|page)\.tsx?$/, '')
+    .replace(/\.tsx?$/, '')
+}
+
+/**
+ * Alle Server Actions einer Datei — BEIDE Deklarationsformen:
+ *   (a) Datei-weites 'use server' oben + `export async function x`  (actions.ts)
+ *   (b) `async function x() { 'use server'; … }`                     (page.tsx)
+ * Form (b) war dem Waechter frueher unsichtbar. Genau dort saßen die
+ * Umgehungen: 23 Direktiven in fuenf Dateien, davon 21 mit Schreib-SQL.
+ */
+function serverAktionenIn(inhalt: string): { name: string; koerper: string }[] {
+  const kopf = inhalt.slice(0, 400)
+  const dateiWeit = /^\s*['"]use server['"]/m.test(kopf)
+  const gefunden: { name: string; koerper: string }[] = []
+  for (const treffer of inhalt.matchAll(/^(export )?async function (\w+)\s*\(/gm)) {
+    const exportiert = Boolean(treffer[1])
+    const ab = inhalt.slice(treffer.index!)
+    // Rumpf bis zur naechsten Deklaration auf oberster Ebene.
+    const rest = ab.slice(1)
+    const ende = rest.search(/\n(?:export |async function |function |const |class |\/\*\*)/)
+    const koerper = ende > 0 ? ab.slice(0, ende + 1) : ab
+    const klammer = koerper.indexOf('{')
+    const inlineDirektive =
+      klammer >= 0 && /['"]use server['"]/.test(koerper.slice(klammer, klammer + 80))
+    // Datei-weites 'use server' macht nur EXPORTIERTE Funktionen zu Actions;
+    // private Helfer in derselben Datei sind normale Funktionen.
+    if ((dateiWeit && exportiert) || inlineDirektive) {
+      gefunden.push({ name: treffer[2], koerper })
+    }
+  }
+  return gefunden
 }
 
 /**
@@ -187,12 +229,60 @@ const NOCH_NICHT_MIGRIERT = new Set<string>([
 ])
 
 /**
+ * UI-UMGEHUNGEN — Server Actions, die (noch) NICHT ueber den Torwaechter
+ * laufen: kein log_event, kein Nutzungszaehler, nicht ueber /api/aktion
+ * erreichbar, nicht im Prozesstest durchspielbar. Das widerspricht der Regel
+ * aus AGENTS.md („ausgefuehrt NUR ueber den Torwaechter") und ist damit
+ * bewusste, sichtbare Schuld — kein Freibrief.
+ *
+ * Sie sind nicht ungeschuetzt: jede prueft requireAdmin()/requireWrite().
+ * Aber sie fehlen in Protokoll und Prozessbild.
+ *
+ * Diese Liste darf nur SCHRUMPFEN. Wandert eine Action auf serverAktion() um,
+ * muss ihr Eintrag hier raus — sonst schlaegt der Gegen-Check an. Sie wuchs
+ * frueher unbemerkt, weil der Waechter nur Dateien namens actions.ts las.
+ */
+const UI_UMGEHUNGEN = new Set<string>([
+  // Einstellungen: schreiben settings-Schluessel bzw. raeumen Daten ab
+  'einstellungen:saveDhl',
+  'einstellungen:savePolicies',
+  'einstellungen:saveFreigaben',
+  'einstellungen:saveFinanzen',
+  'einstellungen:demodatenLoeschen',
+  // Stammdaten-Schnellanlage aus der Konfigurationsseite
+  'produkte/konfiguration:createCategory',
+  'produkte/konfiguration:createTax',
+  'produkte/konfiguration:createPaymentTerm',
+  'produkte/konfiguration:deleteTag',
+  // Kontakt anlegen — inkonsistent: kontakte.partner_aendern IST registriert
+  'kontakte:createPartner',
+  // Integrationen: Outbox/Webhooks/Abgleich anstossen, Ersteinrichtung, Retry
+  'integrationen:runJobs',
+  'integrationen:processWebhooks',
+  'integrationen:runReconcile',
+  'integrationen:starteUebernahme',
+  'integrationen:starteProduktUebernahme',
+  'integrationen:registriereWebhooks',
+  'integrationen:pushInventarJetzt',
+  'integrationen:retry',
+  'integrationen:retryWebhook',
+  'integrationen:resetRunning',
+  'integrationen/import:uebernehmen',
+  'integrationen/import:alleUebernehmen',
+  // Querschnitt: Kommentare und Tags an beliebigen Belegen. Beide haben eine
+  // EIGENE Modell-Allowlist statt der Registry — bewusstes Muster, aber
+  // dadurch ohne Prozessbindung und ohne Nutzungszaehler.
+  'comments-action:addComment',
+  'tags-action:setTags',
+])
+
+/**
  * Rahmenaktionen ohne Registry-Gegenstück — bewusst DAUERHAFT, kein
  * Migrationsrest: sie schalten die Prozessinstanz-Maschine selbst
  * (Assistent starten/abschließen) bzw. die Sammel-Maschine des Sprachmodus
  * (Vorgänge verwerfen/korrigieren/Bulk-buchen — die FACHAKTIONEN darin
  * laufen über aktionAusfuehrenGeprueft, also durch den Torwächter).
- * Geschlossene Liste wie die fünf UI-Umgehungen.
+ * Geschlossene Liste wie UI_UMGEHUNGEN.
  */
 const RAHMEN_AKTIONEN = new Set([
   'p:instanzStarten',
@@ -200,6 +290,9 @@ const RAHMEN_AKTIONEN = new Set([
   'sprechen:vorgangVerwerfen',
   'sprechen:zaehlmengeAendern',
   'sprechen:sammlungBuchen',
+  // Anmeldung/Abmeldung: Rahmen der Sitzung, keine Fachaktion an einem Beleg.
+  'login:signIn',
+  'layout:signOut',
 ])
 
 describe('Registry-Abdeckung (statisch)', () => {
@@ -210,13 +303,11 @@ describe('Registry-Abdeckung (statisch)', () => {
     for (const datei of dateien) {
       const inhalt = readFileSync(datei, 'utf8')
       if (!inhalt.includes("'use server'")) continue
-      for (const treffer of inhalt.matchAll(/export async function (\w+)/g)) {
-        const schluessel = `${modulVon(datei)}:${treffer[1]}`
+      for (const { name, koerper } of serverAktionenIn(inhalt)) {
+        const schluessel = `${modulVon(datei)}:${name}`
         if (NOCH_NICHT_MIGRIERT.has(schluessel) || RAHMEN_AKTIONEN.has(schluessel)) continue
+        if (UI_UMGEHUNGEN.has(schluessel)) continue
         // Migriert heißt: der Funktionsrumpf ruft serverAktion(…).
-        const rumpf = inhalt.slice(treffer.index)
-        const ende = rumpf.indexOf('\nexport ', 1)
-        const koerper = ende > 0 ? rumpf.slice(0, ende) : rumpf
         if (!koerper.includes('serverAktion(')) {
           verstoesse.push(schluessel)
         }
@@ -227,16 +318,14 @@ describe('Registry-Abdeckung (statisch)', () => {
 
   test('die Restliste verrottet nicht: migrierte Actions müssen raus', () => {
     const nochDa = new Set<string>()
+    const offen = new Set([...NOCH_NICHT_MIGRIERT, ...UI_UMGEHUNGEN])
     for (const datei of dateien) {
       const inhalt = readFileSync(datei, 'utf8')
-      for (const treffer of inhalt.matchAll(/export async function (\w+)/g)) {
-        const schluessel = `${modulVon(datei)}:${treffer[1]}`
-        if (!NOCH_NICHT_MIGRIERT.has(schluessel)) continue
-        const rumpf = inhalt.slice(treffer.index)
-        const ende = rumpf.indexOf('\nexport ', 1)
-        const koerper = ende > 0 ? rumpf.slice(0, ende) : rumpf
+      for (const { name, koerper } of serverAktionenIn(inhalt)) {
+        const schluessel = `${modulVon(datei)}:${name}`
+        if (!offen.has(schluessel)) continue
         if (koerper.includes('serverAktion(')) {
-          nochDa.add(`${schluessel} ist migriert — bitte von der Restliste streichen`)
+          nochDa.add(`${schluessel} ist migriert — bitte von der Liste streichen`)
         }
       }
     }

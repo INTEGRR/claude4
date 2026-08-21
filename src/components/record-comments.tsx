@@ -1,5 +1,5 @@
 import { sql } from '@/db/client'
-import { addComment } from '@/app/(erp)/comments-action'
+import { addComment, type KommentarModell } from '@/app/(erp)/comments-action'
 import { ActionForm } from '@/components/action-button'
 import { AuditLog, Card, type LogEntry } from '@/components/ui'
 
@@ -13,7 +13,7 @@ export async function RecordComments({
   path,
   title = 'Verlauf & Kommentare',
 }: {
-  model: string
+  model: KommentarModell
   recordId: string
   /** Pfad der Detailseite — wird nach dem Speichern neu geladen. */
   path: string

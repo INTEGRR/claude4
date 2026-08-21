@@ -25,6 +25,16 @@ const MUSTER: [RegExp, string][] = [
   [/\bdrop\s+schema\b/i, 'drop schema'],
   [/\bdrop\s+column\b/i, 'drop column'],
   [/\bdelete\s+from\b/i, 'delete from'],
+  // Nachgetragen: diese fünf waren dem Wächter entgangen, obwohl sie im
+  // Bestand vorkommen. Folge: der DESTRUKTIV-Marker stand in KEINER der 65
+  // Migrationen — der Wächter lief seit seiner Einführung leer durch und
+  // wirkte dabei grün. Ein Constraint oder Trigger, der beim Deploy fällt,
+  // kann genauso Daten unbrauchbar machen wie eine gelöschte Spalte.
+  [/\bdrop\s+constraint\b/i, 'drop constraint'],
+  [/\bdrop\s+trigger\b/i, 'drop trigger'],
+  [/\bdrop\s+function\b/i, 'drop function'],
+  [/\bdrop\s+(?:materialized\s+)?view\b/i, 'drop view'],
+  [/\balter\s+column\s+\S+\s+type\b/i, 'alter column type'],
 ]
 
 /**
@@ -35,6 +45,22 @@ const ALTLASTEN = new Set([
   // drop column kleinpaket_max_qty — vom packagings-Modell ersetzt; lief
   // lange vor dem Wächter und vor jedem Kundenbetrieb.
   '0033_kartonagen.sql',
+
+  // --- Nachtrag beim Schärfen des Wächters -------------------------------
+  // Diese sechs enthalten destruktive Statements, die die Musterliste bis
+  // jetzt NICHT kannte (drop trigger/function/constraint). Sie sind bereits
+  // eingespielt und Migrationen sind über Prüfsummen unveränderlich — der
+  // Marker lässt sich also nicht mehr nachtragen, ohne jede bestehende
+  // Instanz zu brechen. Sie stehen deshalb hier, und der Ehrlichkeits-Test
+  // unten hält die Liste sauber. Alle sechs ersetzen jeweils ihr eigenes
+  // Vorgänger-Objekt im selben Deploy (Trigger/Funktion neu definiert,
+  // Check-Constraint erweitert) — kein Datenverlust.
+  '0017_lots.sql',                      // drop function (Signaturwechsel)
+  '0026_nummernkreise.sql',             // drop trigger (durch Sequenzen ersetzt)
+  '0030_inventar_sofort.sql',           // drop trigger (Neudefinition)
+  '0054_beschaffung_moq.sql',           // drop function (Signaturwechsel)
+  '0059_finanzen_vertraege.sql',        // drop constraint (Check erweitert)
+  '0060_finanzen_darlehen_steuern.sql', // drop constraint (Check erweitert)
 ])
 
 /** Destruktive Statements außerhalb von Funktionskörpern und Kommentaren. */
@@ -44,9 +70,15 @@ function destruktiveStatements(sqlText: string): string[] {
   return MUSTER.filter(([re]) => re.test(ohneKommentare)).map(([, name]) => name)
 }
 
-function hatBegruendung(sqlText: string): boolean {
-  // Marker mit echter Begründung, nicht nur das Schlagwort.
-  return /--\s*DESTRUKTIV:\s*\S.{9,}/.test(sqlText)
+/**
+ * Ein Marker gilt nur für das, was in seiner Nähe steht — sonst würde eine
+ * einzige Begründung am Dateikopf beliebig viele destruktive Statements
+ * weiter unten decken. Verlangt wird deshalb: mindestens so viele Marker wie
+ * verschiedene destruktive Statement-Arten in der Datei.
+ */
+function hatBegruendung(sqlText: string, anzahlArten: number): boolean {
+  const marker = sqlText.match(/--\s*DESTRUKTIV:\s*\S.{9,}/g) ?? []
+  return marker.length >= anzahlArten
 }
 
 describe('Migrations-Wächter: destruktive DDL nur mit Begründung', () => {
@@ -64,7 +96,7 @@ describe('Migrations-Wächter: destruktive DDL nur mit Begründung', () => {
       const treffer = destruktiveStatements(body)
       if (treffer.length === 0 || ALTLASTEN.has(datei)) continue
       assert.ok(
-        hatBegruendung(body),
+        hatBegruendung(body, treffer.length),
         `${datei} enthält „${treffer.join(', ')}" ohne DESTRUKTIV-Begründung. ` +
           `Entweder Expand-Contract fahren (Altes erst Releases später wegräumen) ` +
           `oder mit "-- DESTRUKTIV: <warum gefahrlos>" begründen.`,
@@ -102,7 +134,9 @@ describe('Migrations-Wächter: destruktive DDL nur mit Begründung', () => {
     // Prosa in Kommentaren zählt nicht.
     assert.deepEqual(destruktiveStatements('-- hier wird nichts per delete from entfernt\nselect 1;'), [])
     // Der Marker braucht eine echte Begründung.
-    assert.ok(!hatBegruendung('-- DESTRUKTIV:'))
-    assert.ok(hatBegruendung('-- DESTRUKTIV: Spalte war nie befüllt, Feature kam nie in Prod.'))
+    assert.ok(!hatBegruendung('-- DESTRUKTIV:', 1))
+    assert.ok(hatBegruendung('-- DESTRUKTIV: Spalte war nie befüllt, Feature kam nie in Prod.', 1))
+    // Ein Marker deckt nicht zwei verschiedene destruktive Arten.
+    assert.ok(!hatBegruendung('-- DESTRUKTIV: nur einer, aber zwei Arten drin.', 2))
   })
 })

@@ -21,7 +21,11 @@ export interface BefehlsSeite {
   label: string
 }
 
-/** Seitenkatalog — Spiegel der Navigation (layout.tsx). */
+/**
+ * Seitenkatalog — Spiegel der Navigation (layout.tsx). Der Abgleich beider
+ * Kataloge ist wächter-geprüft (tests/navigation.test.ts); vorher stand die
+ * Spiegel-Regel nur als Kommentar hier und driftete unbemerkt.
+ */
 const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] = [
   { href: '/verkauf', label: 'Verkaufsaufträge', area: 'verkauf' },
   { href: '/verkauf/neu', label: 'Neuer Verkaufsauftrag', area: 'verkauf' },
@@ -29,8 +33,10 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/versand', label: 'Versand', area: 'versand', prozess: ['versand'] },
   { href: '/fertigung', label: 'Fertigungsaufträge', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/fertigung/stuecklisten', label: 'Stücklisten', area: 'fertigung', prozess: ['fertigung'] },
+  { href: '/fertigung/arbeitsplaetze', label: 'Arbeitsplätze', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/einkauf', label: 'Bestellungen', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/rechnungen', label: 'Lieferantenrechnungen', area: 'einkauf', prozess: ['einkauf'] },
+  { href: '/einkauf/kurse', label: 'Wechselkurse', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/lager', label: 'Transfers', area: 'lager' },
   { href: '/lager/zulauf', label: 'Zulauf (Wareneingangskalender)', area: 'lager' },
   { href: '/lager/bestand', label: 'Bestand', area: 'lager' },
