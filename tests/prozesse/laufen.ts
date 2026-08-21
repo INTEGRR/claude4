@@ -86,8 +86,17 @@ async function dienstAusfuehren(sql: Sql, prozess: string, schritt: Schritt): Pr
   assert.ok(schritt.job_kind, `${prozess}/${schritt.code}: Dienstschritt ohne Job`)
   const { runDueJobs } = await import('../../src/modules/integrationen/jobs.ts')
   let runde: Awaited<ReturnType<typeof runDueJobs>>
+  // Gedeckelt: ein Job, der sofort neu eingeplant wird, würde die Schleife
+  // sonst ewig drehen lassen — ohne Ausgabe und ohne Fehler.
+  let runden = 0
   do {
     runde = await runDueJobs(20)
+    runden++
+    assert.ok(
+      runden < 100,
+      `${prozess}/${schritt.code}: Outbox wird nach 100 Runden nicht leer — ` +
+        'ein Job plant sich immer wieder neu ein.',
+    )
   } while (runde.ran > 0)
 
   const [job] = await sql<{ status: string; last_error: string | null }[]>`

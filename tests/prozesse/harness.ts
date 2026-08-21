@@ -19,12 +19,30 @@
  */
 import '../../scripts/env.ts'
 import { spawnSync } from 'node:child_process'
+import { appendFileSync } from 'node:fs'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 
 export interface Harness {
   sql: Sql
   staging: boolean
+}
+
+/**
+ * Fortschrittsspur auf stderr. Klingt nach Kleinkram, ist aber der
+ * Unterschied zwischen „hängt" und „hängt HIER": der Aufbau (Datenbank
+ * wegwerfen, anlegen, migrieren) passiert VOR dem ersten Test, also bevor
+ * der Test-Reporter irgendetwas ausgibt. Bleibt er stecken, sieht man ohne
+ * diese Zeilen nur einen stummen Prozess — genau das ist in der CI passiert.
+ */
+function spur(text: string): void {
+  const zeile = `[harness] ${text}\n`
+  process.stderr.write(zeile)
+  // In der CI zusätzlich in eine Datei: node:test sammelt die Ausgabe der
+  // Kindprozesse und gibt sie erst aus, wenn eine Testdatei FERTIG ist —
+  // bei einem Hänger also nie. Die Datei überlebt auch einen Abbruch und
+  // wird vom Workflow ausgegeben.
+  if (process.env.CI) appendFileSync('prozess-harness.log', zeile)
 }
 
 function basisUrl(datenbank?: string): string {
@@ -57,12 +75,17 @@ export async function harnessStart(datenbank: string): Promise<Harness> {
   if (stagingUrl) {
     ziel = stagingUrl
   } else {
-    const admin = postgres(basisUrl(), { max: 1 })
+    spur(`${datenbank}: verbinde zur Verwaltungsdatenbank`)
+    // connect_timeout: eine hängende Verbindung soll auffallen, nicht warten.
+    const admin = postgres(basisUrl(), { max: 1, connect_timeout: 30 })
+    spur(`${datenbank}: alte Wegwerf-Datenbank entfernen`)
     await admin.unsafe(`drop database if exists ${datenbank} with (force)`)
+    spur(`${datenbank}: anlegen`)
     await admin.unsafe(`create database ${datenbank}`)
     await admin.end()
 
     ziel = basisUrl(datenbank)
+    spur(`${datenbank}: migrieren`)
     const migration = spawnSync(
       process.execPath,
       ['--experimental-strip-types', 'scripts/migrate.ts'],
@@ -73,17 +96,24 @@ export async function harnessStart(datenbank: string): Promise<Harness> {
     if (migration.status !== 0) {
       throw new Error(`Migration der Testdatenbank fehlgeschlagen:\n${migration.stderr}`)
     }
+    spur(`${datenbank}: bereit`)
   }
 
   // Ab jetzt zeigt auch der App-Client auf die Zieldatenbank.
   process.env.DATABASE_URL = ziel
   process.env.DIRECT_URL = ''
 
-  const sql = postgres(ziel, { max: 4, prepare: false, types: NUMERIC_ALS_ZAHL })
+  const sql = postgres(ziel, {
+    max: 4,
+    prepare: false,
+    connect_timeout: 30,
+    types: NUMERIC_ALS_ZAHL,
+  })
   return { sql, staging: Boolean(stagingUrl) }
 }
 
 export async function harnessEnde(h: Harness, datenbank: string): Promise<void> {
+  spur(`${datenbank}: aufräumen`)
   await h.sql.end()
 
   // Auch den Pool des App-Clients schließen, sonst hält er den Prozess offen.
@@ -95,4 +125,5 @@ export async function harnessEnde(h: Harness, datenbank: string): Promise<void> 
     await admin.unsafe(`drop database if exists ${datenbank} with (force)`).catch(() => undefined)
     await admin.end()
   }
+  spur(`${datenbank}: fertig`)
 }

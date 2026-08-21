@@ -76,8 +76,19 @@ jobs:
       - name: Tests
         run: npm test
 
+      # `timeout` statt eines Schritt-Limits: bei SIGINT gibt der Test-Runner
+      # noch aus, was er hat, und der Schritt SCHEITERT sichtbar. Ein
+      # abgebrochener Job verliert die gepufferte Ausgabe — genau daran ist
+      # die Ursachensuche beim ersten Hänger gescheitert.
       - name: Prozessläufe
-        run: npm run test:prozesse
+        run: timeout --signal=INT --kill-after=30s 300 npm run test:prozesse
+
+      # Spur des Harness (Datenbank wegwerfen/anlegen/migrieren) — sie
+      # entsteht VOR dem ersten Test und ist die einzige Ausgabe, die einen
+      # Hänger im Aufbau verortet.
+      - name: Harness-Spur
+        if: always()
+        run: cat prozess-harness.log || echo "keine Spur geschrieben"
 
       # Der Build fängt, was die Tests nicht sehen: fehlerhafte Server/Client-
       # Grenzen, kaputte Importe in Seiten, ungültige Route-Signaturen.
