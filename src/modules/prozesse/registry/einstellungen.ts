@@ -267,6 +267,30 @@ export const EINSTELLUNGEN = {
     revalidate: ['/prozesse', '/prozesse/:ergebnis'],
   },
 
+  'einstellungen.prozess_abnahme': {
+    label: 'Diagramm abnehmen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Hält die Kundenabnahme einer Prozessversion fest (wer, wann, mit welcher ' +
+      'Anmerkung) — der Beleg, den die Startseite verspricht: „Das ist die Abnahme, ' +
+      'kein Lastenheft." Schaltet NICHTS; das Aktivieren bleibt ein eigener Schritt.',
+    bindung: 'frei',
+    schema: z.object({
+      prozess_code: z.string().min(1),
+      version: z.number().int().positive(),
+      notiz: z.string().max(1000).optional(),
+    }),
+    zusammenfassung: (p) => `${p.prozess_code} Version ${p.version} abgenommen`,
+    formdata: (fd) => ({
+      prozess_code: String(fd.get('prozess_code') ?? ''),
+      version: Number(fd.get('version') ?? 0),
+      notiz: String(fd.get('notiz') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/prozesse/:ergebnis'],
+  },
+
   'einstellungen.prozessversion_aktivieren': {
     label: 'Prozessversion aktivieren',
     bereich: 'einstellungen',
@@ -425,5 +449,29 @@ export const EINSTELLUNGEN = {
     formdata: (fd) => ({ password: String(fd.get('password') ?? '') }),
     revalidate: ['/einstellungen/benutzer'],
   },
+  // --- Registrierungen von der öffentlichen Startseite ----------------------
+
+  'einstellungen.registrierung_status': {
+    label: 'Registrierung bearbeiten',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Setzt den Bearbeitungsstand einer Registrierung von der Startseite (offen, ' +
+      'kontaktiert, erledigt, abgelehnt) und hält eine Notiz fest. Der Eingang selbst ' +
+      'läuft ohne Sitzung über /api/registrierung — alles danach über diesen Weg.',
+    bindung: 'beleg',
+    schema: z.object({
+      status: z.enum(['offen', 'kontaktiert', 'erledigt', 'abgelehnt']),
+      notiz: z.string().max(2000).optional(),
+    }),
+    zusammenfassung: (p) => `Registrierung → ${p.status}`,
+    formdata: (fd) => ({
+      status: String(fd.get('status') ?? 'offen'),
+      notiz: String(fd.get('notiz') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/einstellungen/registrierungen'],
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

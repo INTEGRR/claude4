@@ -205,6 +205,7 @@ export default async function EinstellungenPage() {
             <Link className="btn" href="/einstellungen/kartonagen">Kartonagen</Link>
             <Link className="btn" href="/einstellungen/benutzer">Benutzer verwalten</Link>
             <Link className="btn" href="/einstellungen/nutzung">Nutzung</Link>
+            <Link className="btn" href="/einstellungen/registrierungen">Registrierungen</Link>
           </>
         }
       />

@@ -96,6 +96,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **audit_log**: Verlauf je Datensatz (model, record_id, kind 'state'|'note'|'email'|'error', message, actor, created_at). model='ki' zählt KI-Nutzung (Chat-Fragen, ausgeführte Aktionen). Monatsübersicht der Nutzung: nutzungsbericht(monate) → (monat, aktive_nutzer, belege, ki_fragen, sprachsitzungen).
 - **sequences**: Nummernkreise. **integration_jobs**: Outbox für Shopify/E-Mail (nicht abfragbar).
 - **api_transactions**: Protokoll aller Aufrufe an Shopify/DHL/Mail (system, kind, reference, ok, status_code, error, duration_ms, created_at).
+- **registrierungen**: Interessenten von der öffentlichen Startseite (firma, ansprechpartner, email, telefon, nutzer, heutiges_system, ablauf, quelle, status 'offen'|'kontaktiert'|'erledigt'|'abgelehnt', notiz, bearbeitet_am, bearbeitet_durch, created_at). Einziger Schreibweg ohne Sitzung.
 
 Konventionen: Geldwerte sind netto in EUR, sofern nicht anders benannt. 'state' immer als Text vergleichen. Monatsauswertungen mit date_trunc('month', …).
 `

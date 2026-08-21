@@ -12,6 +12,9 @@ der [AGENTS.md](../AGENTS.md).
   ausprobieren (Docker oder ohne), Rundgang durch die Beispieldaten.
 - [vercel-supabase.md](vercel-supabase.md) — Deployment auf Vercel +
   Supabase, so läuft die Prod-Instanz.
+- [website.md](website.md) — die öffentliche Startseite vor dem Login,
+  das Registrierungsformular und der einzige Schreibweg ohne Sitzung;
+  dazu die Liste offener Platzhalter vor dem Livegang.
 
 ## Für Entwickler
 

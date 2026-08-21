@@ -89,6 +89,8 @@ SHOPIFY_ADMIN_TOKEN      nur Alt-Apps von vor 2026 (statisches shpat_…)
 DHL_API_KEY              …und die übrigen DHL_-Variablen aus .env.example
 RESEND_API_KEY           Mailversand an Lieferanten
 MAIL_FROM                "Einkauf <einkauf@example.com>"
+REGISTRIERUNG_MAIL       Empfänger der Hinweis-Mail bei neuen Registrierungen
+INSTANZ_REGION           Anzeige in der Ersteinrichtung, z. B. "EU-Central · Frankfurt"
 ```
 
 Die Startseite `/integrationen` zeigt später, welche Anbindungen scharf sind.
@@ -122,17 +124,19 @@ gar nicht erst anlegen will, setzt vor der ersten Bereitstellung
 `SEED_ADMIN_EMAIL` und `SEED_ADMIN_PASSWORD`.
 
 Wer die Wurzel **ohne Anmeldung** aufruft, sieht zuerst die öffentliche
-Startseite `/start` (was KRNL ist, wie ein Einstieg abläuft) — die Weiche
-dafür ist `src/middleware.ts`. Die Seite ist bewusst eigenständig gebaut
-(eigene Route, eigenes Stylesheet) und soll später in ein **separates
-Vercel-Projekt** umziehen; dann fällt die Middleware weg und die Wurzel
-zeigt wieder direkt den Login. Vor dem Livegang die Kontaktadresse in
-`src/app/start/page.tsx` (`KONTAKT_MAIL`) setzen.
+Startseite `/start` (was KRNL ist, wie ein Einstieg abläuft, plus das
+Registrierungsformular) — die Weiche dafür ist `src/proxy.ts`. Die Seite ist
+bewusst eigenständig gebaut (eigene Route, eigenes Stylesheet) und soll
+später in ein **separates Vercel-Projekt** umziehen; dann fällt die Weiche
+weg und die Wurzel zeigt wieder direkt den Login. Was vor dem Livegang noch
+zu klären ist — allen voran die Annahmen des Kostenrechners — steht in
+[website.md](website.md).
 
 Der erste Admin-Login auf der frischen Datenbank landet automatisch in der
-**Ersteinrichtung** (`/einrichtung`): Demo-Modus mit Beispieldaten oder
-geführtes Onboarding (Firma, Geschäftsmodell-Paket, Team, Passwort) — Details
-in [prozesse.md](prozesse.md), Abschnitt Onboarding.
+**Ersteinrichtung** (`/einrichtung`): Demo-Modus mit Beispieldaten oder die
+geführte Strecke Instanz → Team → Aufnehmen → Zeichnen → Läuft, an deren Ende
+der erste eigene Prozess geschaltet ist — Details in
+[prozesse.md](prozesse.md), Abschnitt Onboarding.
 
 **Falls mit Beispieldaten getestet wurde:** Einstellungen → „Gefahrenzone:
 alle Daten löschen (Neustart)" entfernt vor dem echten Betrieb sämtliche

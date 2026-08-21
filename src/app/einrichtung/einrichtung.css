@@ -1,0 +1,360 @@
+/*
+ * Ersteinrichtung — Design-Handoff „KRNL Onboarding". Bewusst dieselbe
+ * Sprache wie die öffentliche Startseite (heller Chassis-Grund, dunkle
+ * eingelassene Anzeigen, Haarlinien): Wer sich auf /start das Versprechen
+ * angesehen hat, läuft hier durch dieselben drei Schritte — Aufnehmen,
+ * Zeichnen, Läuft.
+ *
+ * Die Farb-Tokens stehen hier NOCH EINMAL statt in einer gemeinsamen Datei.
+ * Das ist Absicht: start.css soll ohne diese Datei in ein eigenes
+ * Vercel-Deployment umziehen können. Zwei kurze Blöcke sind billiger als
+ * eine Abhängigkeit, die genau beim Herausziehen bricht.
+ */
+
+.krnl-einrichtung {
+  --paper: #efeee9;
+  --aluminium: #d9d8d2;
+  --line: #c7c6c0;
+  --ink: #1a1b1d;
+  --display: #0e0f11;
+  --muted: #8a8a84;
+  --accent: #ff5a1f;
+  --kernel: #7c5aff;
+  --feld: #faf9f5;
+  --text-2: #46474a;
+  --text-3: #5c5d5f;
+
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  line-height: 1.6;
+  z-index: 50;
+}
+
+.krnl-einrichtung .mono {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.krnl-einrichtung .seg {
+  position: relative;
+  display: inline-block;
+  font-family: 'DSEG7', var(--font-geist-mono), monospace;
+  line-height: 1;
+}
+.krnl-einrichtung .seg-geist { opacity: 0.13; }
+.krnl-einrichtung .seg-wert { position: absolute; right: 0; top: 0; }
+.krnl-einrichtung .seg.signal .seg-wert { color: var(--accent); text-shadow: 0 0 12px rgb(255 90 31 / 0.5); }
+.krnl-einrichtung .seg.signal .seg-geist { color: var(--accent); }
+.krnl-einrichtung .seg.kernel .seg-wert { color: var(--kernel); text-shadow: 0 0 12px rgb(124 90 255 / 0.5); }
+.krnl-einrichtung .seg.kernel .seg-geist { color: var(--kernel); }
+
+/* --- Schale --------------------------------------------------------------- */
+
+.krnl-einrichtung .kopfleiste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px clamp(16px, 3vw, 32px);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.krnl-einrichtung .marke { display: flex; align-items: center; gap: 9px; }
+.krnl-einrichtung .schrittstand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--display);
+  border-radius: 5px;
+  padding: 7px 12px;
+}
+.krnl-einrichtung .schrittstand .seg { font-size: 20px; }
+.krnl-einrichtung .schrittstand .mono { color: #6a6c70; }
+
+.krnl-einrichtung .schale {
+  display: grid;
+  grid-template-columns: 268px 1fr;
+  gap: 0;
+  max-width: 1320px;
+  margin-inline: auto;
+  align-items: start;
+}
+.krnl-einrichtung .rail {
+  padding: 26px 18px;
+  border-right: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+}
+.krnl-einrichtung .buehne { padding: 26px clamp(16px, 3vw, 32px) 40px; min-width: 0; }
+@media (max-width: 900px) {
+  .krnl-einrichtung .schale { grid-template-columns: 1fr; }
+  .krnl-einrichtung .rail { border-right: none; border-bottom: 1px solid var(--line); position: static; }
+}
+
+/* --- Schrittleiste -------------------------------------------------------- */
+
+.krnl-einrichtung .rail-eintrag {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--muted);
+}
+.krnl-einrichtung .rail-eintrag:disabled { cursor: default; }
+.krnl-einrichtung .rail-eintrag.aktiv { background: var(--aluminium); color: var(--ink); }
+.krnl-einrichtung .rail-eintrag.erledigt { color: var(--text-2); }
+.krnl-einrichtung .rail-nr {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px;
+}
+.krnl-einrichtung .rail-eintrag.aktiv .rail-nr { background: var(--accent); border-color: transparent; color: #fff; }
+.krnl-einrichtung .rail-eintrag.erledigt .rail-nr { background: var(--ink); border-color: transparent; color: #fff; }
+.krnl-einrichtung .rail-titel { display: block; font-size: 15px; }
+.krnl-einrichtung .rail-meta {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a9a93;
+}
+.krnl-einrichtung .rail-eintrag.aktiv .rail-meta { color: var(--accent); }
+.krnl-einrichtung .rail-fuss {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+/* --- Inhalte -------------------------------------------------------------- */
+
+.krnl-einrichtung .eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.krnl-einrichtung h1 {
+  font-size: clamp(26px, 3.6vw, 36px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  margin: 0 0 10px;
+}
+.krnl-einrichtung .lead { color: var(--text-2); max-width: 62ch; margin: 0 0 26px; font-size: 16px; }
+
+.krnl-einrichtung .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+@media (max-width: 1040px) {
+  .krnl-einrichtung .zwei { grid-template-columns: 1fr; }
+}
+
+.krnl-einrichtung .karte {
+  background: var(--aluminium);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 20px 22px;
+}
+.krnl-einrichtung .karte + .karte { margin-top: 18px; }
+.krnl-einrichtung .karte h2 { font-size: 19px; font-weight: 600; margin: 0 0 12px; }
+
+.krnl-einrichtung .anzeige {
+  background: var(--display);
+  border: 1px solid #1e2023;
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: inset 0 2px 20px rgb(0 0 0 / 0.65), inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  color: #ededea;
+}
+.krnl-einrichtung .anzeige .mono { color: #9a9c9f; }
+.krnl-einrichtung .anzeige-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #1e2023;
+  margin-bottom: 14px;
+}
+.krnl-einrichtung .protokoll { font-family: var(--font-geist-mono), monospace; font-size: 12px; }
+.krnl-einrichtung .protokoll div { display: flex; gap: 10px; padding: 4px 0; color: #9a9c9f; }
+.krnl-einrichtung .protokoll .ok { color: var(--accent); flex: none; white-space: nowrap; }
+.krnl-einrichtung .protokoll .wartet { color: #5a5c62; flex: none; white-space: nowrap; }
+.krnl-einrichtung .balken { height: 5px; background: #1c1e21; border-radius: 3px; overflow: hidden; margin-top: 14px; }
+.krnl-einrichtung .balken span { display: block; height: 100%; background: linear-gradient(90deg, #7c5aff, #ff5a1f); }
+
+/* Dialog (Aufnehmen) */
+.krnl-einrichtung .blase { border-radius: 6px; padding: 11px 13px; font-size: 14.5px; margin-bottom: 10px; max-width: 88%; }
+.krnl-einrichtung .blase.krnl { background: #16181b; border: 1px solid #1e2023; }
+.krnl-einrichtung .blase.nutzer { background: #1b1e22; margin-left: auto; }
+.krnl-einrichtung .blase .wer {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.krnl-einrichtung .blase.krnl .wer { color: var(--kernel); }
+.krnl-einrichtung .blase.nutzer .wer { color: #6a6c70; text-align: right; }
+
+/* Erfassungsliste */
+.krnl-einrichtung .erfassung { list-style: none; margin: 0; padding: 0; }
+.krnl-einrichtung .erfassung li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.krnl-einrichtung .erfassung li:last-child { border-bottom: none; }
+.krnl-einrichtung .erfassung .titel { flex: 1; min-width: 0; }
+.krnl-einrichtung .punkt { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.krnl-einrichtung .punkt.jetzt { background: var(--kernel); box-shadow: 0 0 8px rgb(124 90 255 / 0.55); }
+.krnl-einrichtung .punkt.erfasst { background: var(--accent); box-shadow: 0 0 8px rgb(255 90 31 / 0.55); }
+
+/* Team-Tabelle */
+.krnl-einrichtung table { width: 100%; border-collapse: collapse; }
+.krnl-einrichtung th {
+  text-align: left;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 400;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+.krnl-einrichtung td { padding: 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.krnl-einrichtung td .zeile2 {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.krnl-einrichtung .rolle-fuehrung { color: var(--kernel); }
+
+/* Formularfelder */
+.krnl-einrichtung .feld { margin-bottom: 14px; }
+.krnl-einrichtung .feldreihe { display: flex; gap: 12px; flex-wrap: wrap; }
+.krnl-einrichtung .feldreihe > .feld { flex: 1 1 160px; }
+.krnl-einrichtung .feld label {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.krnl-einrichtung .feld input,
+.krnl-einrichtung .feld select,
+.krnl-einrichtung .feld textarea {
+  width: 100%;
+  background: var(--feld);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+}
+.krnl-einrichtung .feld textarea { min-height: 92px; resize: vertical; }
+.krnl-einrichtung .feld input:focus,
+.krnl-einrichtung .feld select:focus,
+.krnl-einrichtung .feld textarea:focus { outline: none; border-color: var(--accent); }
+.krnl-einrichtung .feldhinweis { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+
+/* Tasten */
+.krnl-einrichtung .taste {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.krnl-einrichtung .taste:hover { border-color: var(--ink); }
+.krnl-einrichtung .taste.fuehrend { background: var(--accent); border-color: var(--accent); color: #fff; }
+.krnl-einrichtung .taste.kern { background: var(--kernel); border-color: var(--kernel); color: #fff; }
+.krnl-einrichtung .taste:disabled { opacity: 0.5; cursor: default; }
+.krnl-einrichtung .tastenreihe { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+
+/* Tasten IN einer dunklen Anzeige (Dialogpanel „Beispiel einsetzen"): sonst
+   steht dunkler Text auf dunklem Grund. */
+.krnl-einrichtung .anzeige .taste { color: #ededea; border-color: #33363b; }
+.krnl-einrichtung .anzeige .taste:hover { border-color: #6a6c70; }
+.krnl-einrichtung .anzeige .taste.fuehrend,
+.krnl-einrichtung .anzeige .taste.kern { color: #fff; }
+
+/* Meldungen */
+.krnl-einrichtung .meldung {
+  border-radius: 5px;
+  padding: 11px 13px;
+  margin-bottom: 16px;
+  font-size: 14.5px;
+  border: 1px solid var(--line);
+  background: var(--feld);
+}
+.krnl-einrichtung .meldung.fehler { border-color: var(--accent); background: #fdeee8; }
+
+/* Diagramm-Rahmen (React Flow bringt eigene Farben aus globals.css mit) */
+.krnl-einrichtung .diagramm {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--feld);
+}
+
+/* Fußnavigation */
+.krnl-einrichtung .fussnav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* Weiche (Demo oder geführt) — vor der Schrittleiste */
+.krnl-einrichtung .weiche {
+  max-width: 900px;
+  margin: 8vh auto;
+  padding: 0 clamp(16px, 4vw, 32px);
+}
+.krnl-einrichtung .weiche .zwei { gap: 18px; }

@@ -540,3 +540,51 @@ export async function benutzerPasswort(
   await sql`select log_event('user', ${userId}, 'state', 'Passwort zurückgesetzt', ${ctx.actor})`
   return { recordId: userId }
 }
+
+// --- Registrierungen von der öffentlichen Startseite ------------------------
+
+export async function registrierungStatus(
+  p: { status: string; notiz?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const id = ctx.recordId!
+  const [zeile] = await sql<{ firma: string }[]>`
+    update registrierungen
+       set status = ${p.status},
+           notiz = coalesce(${p.notiz ?? null}, notiz),
+           bearbeitet_am = now(),
+           bearbeitet_durch = ${ctx.actor}
+     where id = ${id}
+    returning firma`
+  if (!zeile) throw new Error('Diese Registrierung gibt es nicht (mehr)')
+
+  await sql`select log_event('registrierung', ${id}, 'state',
+    ${`Stand: ${p.status}`}, ${ctx.actor})`
+  return { text: `${zeile.firma} → ${p.status}.`, recordId: id }
+}
+
+// --- Abnahme einer Prozessversion -------------------------------------------
+
+export async function prozessAbnahme(
+  p: { prozess_code: string; version: number; notiz?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [zeile] = await sql<{ id: string; prozess_id: string }[]>`
+    update prozess_versionen v
+       set abnahme_am = now(),
+           abnahme_durch = ${ctx.actor},
+           abnahme_notiz = ${p.notiz ?? null}
+      from prozesse pr
+     where v.prozess_id = pr.id
+       and pr.code = ${p.prozess_code}
+       and v.version = ${p.version}
+    returning v.id, v.prozess_id`
+  if (!zeile) throw new Error(`Version ${p.version} von „${p.prozess_code}" gibt es nicht`)
+
+  await sql`select log_event('prozess_version', ${zeile.id}, 'state',
+    ${`Diagramm abgenommen (Version ${p.version})`}, ${ctx.actor})`
+  return {
+    text: `Abnahme für „${p.prozess_code}" Version ${p.version} protokolliert.`,
+    recordId: p.prozess_code,
+  }
+}

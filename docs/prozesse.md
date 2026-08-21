@@ -861,13 +861,13 @@ Oberfläche zurück (`beiEntwurf`-Callback des Hooks), die Werkstatt springt
 direkt auf die Diagramm-Vorschau — die Sichtprüfung mit dem Kunden ist das
 BPMN-Diagramm, aktiviert wird auf /prozesse/&lt;code&gt; von Hand.
 
-## Onboarding einer frischen Instanz (Weiche: Demo oder geführt)
+## Onboarding einer frischen Instanz (Weiche + fünf Schritte)
 
 Jede neue Kundeninstanz startet leer (Deploy migriert und seedet nur den
 Administrator). Der **erste Admin-Login** landet automatisch in der
 Ersteinrichtung `/einrichtung` — erkannt an drei Merkmalen zugleich:
 settings-Schlüssel `einrichtung` fehlt, Firmenname steht noch auf dem
-Migrations-Default, genau ein Nutzer. Dort steht die Weiche:
+Migrations-Default, genau ein Nutzer. Dort steht zuerst die Weiche:
 
 - **Demo-Modus**: spielt per Registry-Aktion
   `einstellungen.demodaten_einspielen` die komplette Beispielfirma ein
@@ -875,22 +875,47 @@ Migrations-Default, genau ein Nutzer. Dort steht die Weiche:
   Ausprobieren und für den Rundgang. Der Idempotenz-Wächter verweigert
   das, sobald echte Produkte existieren; die Gefahrenzone räumt die
   Beispieldaten später restlos ab.
-- **Geführtes Onboarding**: Firma (`einstellungen.firma_speichern`) →
-  Geschäftsmodell-Paket (der wichtigste Schritt: ohne Wahl bleiben ALLE
-  Prozesse aktiv und die Navigation zeigt das Maximum — Chamäleon) →
-  Team anlegen (optional, wiederholbar) → Admin-Passwort ersetzen →
-  Abschluss mit Sprung in die **Prozess-Werkstatt**, wo die eigenen
-  Abläufe aufgenommen werden.
+- **Richtig loslegen**: die fünf Schritte unten.
+
+Die fünf Schritte lösen ein, was die öffentliche Startseite verspricht
+(Aufnehmen → Zeichnen → Läuft) — [website.md](website.md) beschreibt die
+Gegenseite:
+
+| # | Schritt | Was passiert | Aktionen |
+|---|---|---|---|
+| 01 | **Instanz** | Firmendaten und Geschäftsmodell-Paket. Rechts steht, was an der Instanz schon wahr ist: echter Host, Region, Anzahl eingespielter Migrationen, Rückholpunkt und Daten-TÜV. Keine erfundene Fortschrittsanzeige. | `einstellungen.firma_speichern`, `einstellungen.paket_aktivieren` |
+| 02 | **Team** | Personen und Rollen (Rollen entscheiden später, wer welchen Prozessschritt sehen und buchen darf — auch per Sprache), dazu das Ersetzen des Start-Passworts. | `einstellungen.benutzer_anlegen`, `einstellungen.benutzer_passwort` |
+| 03 | **Aufnehmen** | Vier Fragen (Auslöser, Schritte, Zuständigkeiten, Ausnahmen). Die Antworten gehen als Transkript an **dieselbe** Strukturierung wie das Sprach-Interview der Werkstatt (`/api/aufnahme` → `aufnahmeStrukturieren`) und enden in einem Entwurf. | `einstellungen.prozess_entwerfen` (aus der Strukturierung heraus) |
+| 04 | **Zeichnen** | Das **echte** Diagramm des Entwurfs (`versionDiagramm` + `ProzessFlow`, dieselbe Ansicht wie unter /prozesse). Jeder Schritt lässt sich als „stimmt nicht" markieren: dann geht es mit einer Korrekturrunde zurück nach 03. Ohne Markierung wird die Abnahme protokolliert. | `einstellungen.prozess_abnahme` |
+| 05 | **Läuft** | Kennzahlen des Entwurfs (Schritte, Rollen, generierte Masken) und das Schalten der Version. Danach ist der Ablauf das System. | `einstellungen.prozessversion_aktivieren` |
+
+Das Paket in Schritt 01 ist weiterhin der folgenreichste Klick: ohne Wahl
+bleiben ALLE Prozesse aktiv und die Navigation zeigt das Maximum (Chamäleon).
+
+**Die Abnahme ist ein Beleg, keine Bildschirmgeste.** Migration 0067 gibt
+`prozess_versionen` die Spalten `abnahme_am`, `abnahme_durch`,
+`abnahme_notiz`; `einstellungen.prozess_abnahme` schreibt sie und
+protokolliert im Audit-Log. Bewusst an der Version festgemacht und nicht an
+der Aktivierung: aktiviert wird eine Version vielleicht mehrfach
+(Rückfall auf eine ältere), abgenommen wird sie einmal.
+
+Nach der Aufnahme lädt die Seite mit `?entwurf=<code>` neu — der Server
+kennt den Entwurf, der Assistent steigt in Schritt 04 ein. Die getippten
+Antworten überleben das in der `sessionStorage` (für Korrekturrunden);
+sie gehören weder in die Datenbank noch in die URL.
+
+**Ohne KI-Schlüssel** bleiben die Schritte 01/02 vollständig nutzbar,
+Schritt 03 sagt das offen und die Einrichtung lässt sich trotzdem
+abschließen — der erste Ablauf entsteht dann später in der Werkstatt. Kein
+Schritt ist eine Sackgasse.
 
 Der Abschluss (`einstellungen.einrichtung_abschliessen`) schreibt den
 settings-Schlüssel `einrichtung` — der überlebt auch die Gefahrenzone,
-die Weiche erscheint also nie wieder. Alle drei Aktionen sind nurAdmin,
-prozessfrei und laufen durch den Torwächter; der Wizard selbst ist
-bewusst klassisch (kein Agent-Gespräch), damit er ohne KI-Schlüssel
-funktioniert. Nicht-Admins sehen bis zur Einrichtung nur einen Hinweis.
-Wächter: tests/einrichtung.test.ts (Registry-Statik, Demodaten-Guard,
-Weichen-Heuristik) und tests/demodaten.test.ts (kein automatischer
-Beispieldaten-Pfad).
+die Weiche erscheint also nie wieder. Alle Aktionen sind nurAdmin,
+prozessfrei und laufen durch den Torwächter; Nicht-Admins sehen bis zur
+Einrichtung nur einen Hinweis. Wächter: tests/einrichtung.test.ts
+(Registry-Statik, Demodaten-Guard, Weichen-Heuristik) und
+tests/demodaten.test.ts (kein automatischer Beispieldaten-Pfad).
 
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 

@@ -9,6 +9,113 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-21 — Registrierung: ein einziger Schreibweg ohne Sitzung
+
+Die Startseite bekommt ein Anmeldeformular („Erzählt uns euren Ablauf").
+Damit entsteht die erste Stelle im System, an der **ohne angemeldeten
+Nutzer** geschrieben wird — ein Bruch mit der Regel „jede Schreiboperation
+läuft über den Torwächter" (AGENTS.md). Der Bruch ist unvermeidbar: der
+Torwächter setzt Rolle und Nutzer voraus, ein Interessent hat beides nicht.
+
+Entschieden: **eine** solche Stelle, so eng wie möglich, und keine zweite.
+Konkret `POST /api/registrierung` → Tabelle `registrierungen`
+(Migration 0066), ohne Verknüpfung zu Belegen und ohne Nebenwirkung.
+Geschützt durch serverseitige Prüfung nach denselben Regeln wie im Formular
+(eine Quelle: `modules/shared/registrierung.ts`), Längengrenzen je Feld,
+Honigtopf gegen Bots, Drosselung von 5 Eingängen je 10 Minuten und einen
+Eintrag im Audit-Log. Die IP wird **nicht im Klartext** gespeichert, nur ein
+mit `SESSION_SECRET` gesalzener Hash, ausschließlich zur Drosselung.
+
+Alles, was danach mit einem Eingang passiert, läuft wieder über die Registry
+(`einstellungen.registrierung_status`, nurAdmin, beleggebunden) und ist damit
+protokolliert. Arbeitsliste: /einstellungen/registrierungen.
+
+Verworfen: das Formular als Server Action zu bauen (hätte die Umgehung
+unsichtbar in `UI_UMGEHUNGEN` versteckt, statt sie als bewusste Ausnahme zu
+benennen) und der Fallback des Design-Prototyps, bei Serverfehlern einen
+**simulierten Erfolg** anzuzeigen — wer nichts absetzen kann, muss das
+sehen, sonst wartet er auf einen Rückruf, den es nie gab.
+
+Umgesetzt: src/app/api/registrierung/route.ts, src/app/start/registrierung.tsx,
+src/modules/shared/registrierung.ts, Migration 0066,
+src/app/(erp)/einstellungen/registrierungen/, tests/registrierung.test.ts.
+Doku: [website.md](website.md).
+
+## 2026-08-21 — Onboarding als fünf Schritte, mit protokollierter Abnahme
+
+Der Einrichtungs-Assistent wird nach dem Design-Handoff auf eine
+Fünf-Schritt-Strecke umgebaut: Instanz → Team → Aufnehmen → Zeichnen →
+Läuft. Grund ist nicht die Optik, sondern die **Deckungsgleichheit mit dem
+Verkaufsversprechen**: Die Startseite verspricht Aufnehmen, Zeichnen, Läuft —
+also muss das Produkt genau das liefern, in derselben Reihenfolge und
+Sprache. Ein Onboarding, das stattdessen Stammdatenmasken abfragt, macht
+die Startseite zur Behauptung.
+
+Drei Festlegungen dabei:
+
+1. **Schritt 03 nutzt dieselbe Strukturierung wie das Sprach-Interview**
+   (`aufnahmeStrukturieren`), nur mit getippten Antworten. Kein zweiter
+   Aufnahmeweg, keine zweite Prompt-Quelle — die Route `/api/aufnahme` reicht
+   nur das Transkript durch und endet in `einstellungen.prozess_entwerfen`,
+   also IM Torwächter.
+2. **Schritt 04 zeigt das echte Diagramm** (`versionDiagramm` +
+   `ProzessFlow`), nicht eine hübschere Nachbildung. Was der Kunde abnimmt,
+   ist exakt das, was er später unter /prozesse sieht. Markierte Schritte
+   führen in eine Korrekturrunde zurück nach 03 und erzeugen die nächste
+   Version desselben Prozesscodes.
+3. **Die Abnahme ist ein Beleg.** Migration 0067 ergänzt
+   `prozess_versionen` um `abnahme_am/_durch/_notiz`;
+   `einstellungen.prozess_abnahme` schreibt sie. Festgemacht an der Version,
+   nicht an der Aktivierung: aktiviert wird vielleicht mehrfach (Rückfall auf
+   eine ältere Version), abgenommen wird einmal.
+
+Das Geschäftsmodell-Paket bleibt drin und wandert in Schritt 01 — es ist
+weiterhin der folgenreichste Klick der Einrichtung (ohne Wahl sind ALLE
+Prozesse aktiv). Die Weiche „erst Beispieldaten ansehen" bleibt als
+Vorschritt bestehen; sie ist echt und hat sich bewährt.
+
+Kein Schritt ist eine Sackgasse: Ohne `ANTHROPIC_API_KEY` sagt Schritt 03
+das offen, und die Einrichtung lässt sich trotzdem abschließen — der erste
+Ablauf entsteht dann in der Werkstatt.
+
+Nicht übernommen aus dem Handoff: die simulierte Provisionierungsanzeige
+(„84 %", `<name>.krnl.eu`). Wer diese Seite sieht, hat eine laufende
+Instanz — angezeigt wird deshalb der **echte** Host mit der tatsächlichen
+Zahl eingespielter Migrationen. Eine erfundene Fortschrittsanzeige wäre die
+erste Lüge des Produkts.
+
+Umgesetzt: src/app/einrichtung/ (page, wizard, einrichtung.css, actions),
+src/app/api/aufnahme/route.ts, Migration 0067,
+registry/einstellungen.ts (`prozess_abnahme`). Doku:
+[prozesse.md](prozesse.md), Abschnitt Onboarding.
+
+## 2026-08-21 — Startseite nach dem Design-Handoff, eigenes Farbsystem
+
+Die Startseite wird auf den Handoff „KRNL Sales" gezogen: heller
+Chassis-Grund, dunkle eingelassene Anzeigen, Haarlinien-Rhythmus,
+Siebensegment nur für echte Zahlen. Dazu drei interaktive Stücke, die die
+These belegen statt sie zu behaupten — Prozessversion umschalten,
+Bestätigungstor im Sprachdialog, Kostenrechner.
+
+Entschieden: Die Seite bekommt ein **eigenes Farbsystem** in `start.css`
+statt der globalen Tokens und folgt damit **nicht** dem
+Hell/Dunkel-Umschalter des ERP. Eine Verkaufsseite hat genau ein Gesicht
+(dieselbe Begründung wie beim Boot-Splash). Die Tokens stehen in `start.css`
+und `einrichtung.css` doppelt — Absicht: start.css soll ohne den Rest in ein
+eigenes Deployment umziehen können, und zwei kurze Blöcke sind billiger als
+eine Abhängigkeit, die genau beim Herausziehen bricht.
+
+Der **Kostenrechner** bleibt mit ausdrücklich als Platzhalter markierten
+Annahmen (Lizenz je Nutzer, Beratungstage je Prozess, Schulungsanteil,
+Betrieb je Nutzer) im Code stehen, weil der Abschnitt die eigentliche
+Positionierung trägt — der Customizing-Block entfällt. Solange die Zahlen
+Hausnummern sind, ist die Disclaimer-Zeile Pflicht („Modellrechnung für
+Jahr 1. Kein Angebot"). Die Liste offener Platzhalter steht in
+[website.md](website.md).
+
+Nebenbei: `src/middleware.ts` heißt jetzt `src/proxy.ts` — Next 16 hat die
+Dateikonvention umbenannt und warnt beim Start. Verhalten unverändert.
+
 ## 2026-08-19 — Öffentliche Startseite vor dem Login (später eigenes Deployment)
 
 KRNL braucht für die Piloten-Ansprache eine Seite, die erklärt, was das

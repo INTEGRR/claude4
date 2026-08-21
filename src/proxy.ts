@@ -14,8 +14,12 @@ import type { NextRequest } from 'next/server'
  *
  * Zieht die Startseite später in ein eigenes Vercel-Deployment um, fällt
  * diese Datei ersatzlos weg.
+ *
+ * Dateiname: Next 16 hat die Konvention `middleware` in `proxy` umbenannt
+ * (die alte läuft noch, meldet aber eine Verwarnung). Funktion und Verhalten
+ * sind identisch — nur Datei- und Exportname ändern sich.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (!request.cookies.has('erp_session')) {
     return NextResponse.redirect(new URL('/start', request.url))
   }

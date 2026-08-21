@@ -36,3 +36,19 @@ export async function einrichtungAbschliessen(
 ): Promise<ActionResult> {
   return serverAktion('einstellungen.einrichtung_abschliessen', { parameter: { modus } })
 }
+
+export async function prozessAbnehmen(
+  code: string,
+  version: number,
+  notiz?: string,
+): Promise<ActionResult> {
+  return serverAktion('einstellungen.prozess_abnahme', {
+    parameter: { prozess_code: code, version, notiz },
+  })
+}
+
+export async function versionSchalten(code: string, version: number): Promise<ActionResult> {
+  return serverAktion('einstellungen.prozessversion_aktivieren', {
+    parameter: { prozess_code: code, version },
+  })
+}

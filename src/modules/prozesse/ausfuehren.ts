@@ -58,6 +58,8 @@ export const AUSFUEHRUNG = {
   'einstellungen.feld_loeschen': einstellungen.feldLoeschen,
   'einstellungen.benutzer_anlegen': einstellungen.benutzerAnlegen,
   'einstellungen.benutzer_rolle': einstellungen.benutzerRolle,
+  'einstellungen.registrierung_status': einstellungen.registrierungStatus,
+  'einstellungen.prozess_abnahme': einstellungen.prozessAbnahme,
   'einstellungen.benutzer_aktiv': einstellungen.benutzerAktiv,
   'einstellungen.benutzer_befugnisse': einstellungen.benutzerBefugnisse,
   'einstellungen.benutzer_passwort': einstellungen.benutzerPasswort,

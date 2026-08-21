@@ -67,6 +67,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/einstellungen', label: 'Einstellungen', area: 'einstellungen' },
   { href: '/einstellungen/benutzer', label: 'Benutzer verwalten', area: 'einstellungen' },
   { href: '/einstellungen/nutzung', label: 'Nutzungsbericht', area: 'einstellungen' },
+  { href: '/einstellungen/registrierungen', label: 'Registrierungen (Startseite)', area: 'einstellungen' },
   { href: '/tickets', label: 'Tickets', area: 'fehler' },
 ]
 
