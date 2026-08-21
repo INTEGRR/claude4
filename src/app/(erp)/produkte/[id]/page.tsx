@@ -287,11 +287,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field shrink">
               <span>Platzbedarf je Stück</span>
+              {/* min und step müssen zusammenpassen: der Browser lässt nur
+                  min + k·step zu. Mit min 0,01 und step 0,1 waren ausgerechnet
+                  1 und 0,5 ungültig ("die zwei nächsten Werte sind 0,91 und
+                  1,01") — also genau die beiden Werte, die im Hinweistext
+                  danebenstehen. Beides jetzt auf 0,001, wie die Spalte
+                  (numeric(8,3), > 0): 1, 0,5 und ein Drittel gehen. */}
               <input
                 type="number"
                 name="platzbedarf"
-                min={0.01}
-                step={0.1}
+                min={0.001}
+                step={0.001}
                 defaultValue={tpl.platzbedarf}
                 style={{ width: 90 }}
               />

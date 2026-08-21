@@ -46,11 +46,23 @@ function spur(text: string): void {
   if (process.env.CI) appendFileSync('prozess-harness.log', zeile)
 }
 
+/**
+ * Die ECHTE Basis-Adresse, festgehalten beim Laden des Moduls.
+ *
+ * harnessStart biegt danach process.env.DATABASE_URL auf die Testdatenbank um
+ * (damit der App-Client dorthin zeigt). Wer die Basis später erneut aus der
+ * Umgebung liest, bekommt deshalb die Wegwerf-Datenbank zurück — und genau
+ * das ist beim Aufräumen passiert: Die Verwaltungsverbindung öffnete
+ * ausgerechnet die Datenbank, die sie gleich verwerfen wollte
+ * („cannot drop the currently open database"). Der Fehler war durch ein
+ * .catch() stumm gestellt, die Wegwerf-Datenbanken blieben liegen.
+ */
+const BASIS_URL = process.env.DATABASE_URL
+
 function basisUrl(datenbank?: string): string {
-  const basis = process.env.DATABASE_URL
-  if (!basis) throw new Error('DATABASE_URL ist nicht gesetzt')
-  if (!datenbank) return basis
-  const u = new URL(basis)
+  if (!BASIS_URL) throw new Error('DATABASE_URL ist nicht gesetzt')
+  if (!datenbank) return BASIS_URL
+  const u = new URL(BASIS_URL)
   u.pathname = `/${datenbank}`
   return u.toString()
 }
@@ -132,8 +144,14 @@ export async function harnessEnde(h: Harness, datenbank: string): Promise<void> 
   await app.sql.end({ timeout: 5 }).catch(() => undefined)
 
   if (!h.staging) {
-    const admin = postgres(basisUrl(), { max: 1 })
-    await admin.unsafe(`drop database if exists ${datenbank} with (force)`).catch(() => undefined)
+    const admin = postgres(basisUrl(), { max: 1, connect_timeout: 30 })
+    try {
+      await admin.unsafe(`drop database if exists ${datenbank} with (force)`)
+    } catch (err) {
+      // Aufräumen darf einen grünen Lauf nicht rot machen — aber stumm
+      // scheitern darf es auch nicht mehr.
+      spur(`${datenbank}: konnte nicht verworfen werden — ${(err as Error).message}`)
+    }
     await admin.end()
   }
   spur(`${datenbank}: fertig`)
