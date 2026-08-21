@@ -3,7 +3,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { MengenWahl } from '@/components/mengen-wahl'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, qty, money } from '@/modules/shared/format'
+import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import Link from 'next/link'
 import {
   createOrderpoint,
@@ -99,9 +99,9 @@ export default async function BeschaffungPage() {
         subtitle="Meldebestände: Vorschläge entstehen, sobald die Prognose unter den Mindestbestand fällt"
       />
 
-      {regeln.some((r) => r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10)) && (
+      {regeln.some((r) => r.snoozed_until && r.snoozed_until >= isoDatum(new Date())) && (
         <div className="notice info">
-          {regeln.filter((r) => r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10)).length}{' '}
+          {regeln.filter((r) => r.snoozed_until && r.snoozed_until >= isoDatum(new Date())).length}{' '}
           Regel(n) schlummern und erscheinen deshalb nicht in den Vorschlägen. Sie stehen unten
           in der Regelliste und lassen sich dort wieder aufwecken.
         </div>
@@ -253,7 +253,7 @@ export default async function BeschaffungPage() {
                       {r.route === 'manufacture' ? 'Fertigen' : r.route === 'buy' ? 'Einkaufen' : 'aus Produktrouten'}
                     </td>
                     <td className="small nowrap">
-                      {r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10) ? (
+                      {r.snoozed_until && r.snoozed_until >= isoDatum(new Date()) ? (
                         <>
                           <span className="led off" />{' '}
                           <span className="mono muted">schlummert bis {date(r.snoozed_until)}</span>
@@ -264,7 +264,7 @@ export default async function BeschaffungPage() {
                     </td>
                     <td className="num">
                       <div className="actions" style={{ justifyContent: 'flex-end' }}>
-                        {r.snoozed_until && r.snoozed_until >= new Date().toISOString().slice(0, 10) && (
+                        {r.snoozed_until && r.snoozed_until >= isoDatum(new Date()) && (
                           <ActionButton className="small" action={wakeOrderpoint.bind(null, r.id)}>
                             Aufwecken
                           </ActionButton>

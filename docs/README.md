@@ -13,6 +13,15 @@ der [AGENTS.md](../AGENTS.md).
 - [vercel-supabase.md](vercel-supabase.md) — Deployment auf Vercel +
   Supabase, so läuft die Prod-Instanz.
 
+## Für Entwickler
+
+- [entwicklung.md](entwicklung.md) — die ersten Handgriffe: einrichten,
+  `npm run check`, wie man eine Aktion hinzufügt, wie man eine Migration
+  schreibt, wo die aktuelle Fassung einer SQL-Funktion steht, welche Wächter
+  es gibt.
+- [code-review.md](code-review.md) — Zustand der Codebasis (08/2026):
+  was gut ist, was behoben wurde, was zur Entscheidung ansteht.
+
 ## Konzepte & Architektur (in dieser Reihenfolge lesen)
 
 - [entscheidungen.md](entscheidungen.md) — **das Entscheidungslog**: jede
@@ -32,6 +41,14 @@ der [AGENTS.md](../AGENTS.md).
   `src/modules/ki/wissen.ts` (Prozess-Best-Practices für Werkstatt und
   Aufnahme, ebenfalls wächter-geprüft) — bewusst im Code versioniert,
   nicht als Doku-Datei.
+
+## Herkunft
+
+- [historie/plan-gruendung.md](historie/plan-gruendung.md) — der
+  abgearbeitete Gründungsplan (Arbeitstitel „Odoo-Nachbau"). Historisch, aber
+  aufschlussreich: er erklärt, warum die Statuswerte und Buchungsfunktionen
+  Odoo-Semantik tragen. Lag bis 08/2026 als PLAN.md im Wurzelverzeichnis und
+  wurde dort als aktuelle Anweisung missverstanden.
 
 ## Betrieb
 

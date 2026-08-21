@@ -6,7 +6,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { date, money, qty } from '@/modules/shared/format'
+import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { cancelBill, payBill, postBill, setBillChecked, setBillDate } from '../../actions'
 import { rechnungTeilzahlung, zahlungStornieren } from '../../../finanzen/actions'
 
@@ -303,7 +303,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
                   </label>
                   <label className="field shrink">
                     <span>Gezahlt am</span>
-                    <input type="date" name="gezahlt_am" defaultValue={new Date().toISOString().slice(0, 10)} />
+                    <input type="date" name="gezahlt_am" defaultValue={isoDatum(new Date())} />
                   </label>
                   <label className="field shrink">
                     <span>Bankkonto</span>

@@ -6,7 +6,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { date, money, qty } from '@/modules/shared/format'
+import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import {
   addPoLine,
   approvePo,
@@ -299,7 +299,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 name="eta"
                 defaultValue={
                   order.expected_arrival
-                    ? new Date(order.expected_arrival).toISOString().slice(0, 10)
+                    ? isoDatum(new Date(order.expected_arrival))
                     : ''
                 }
               />
@@ -311,7 +311,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 name="eta_bestaetigt"
                 defaultValue={
                   kopf.eta_confirmed
-                    ? new Date(kopf.eta_confirmed).toISOString().slice(0, 10)
+                    ? isoDatum(new Date(kopf.eta_confirmed))
                     : ''
                 }
               />
@@ -546,7 +546,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                     type="date"
                     name="verschifft_am"
                     defaultValue={zahlplan[0]?.verschifft_am
-                      ? new Date(zahlplan[0].verschifft_am).toISOString().slice(0, 10)
+                      ? isoDatum(new Date(zahlplan[0].verschifft_am))
                       : undefined}
                   />
                 </label>

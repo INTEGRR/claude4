@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, hours } from '@/modules/shared/format'
+import { date, hours, isoDatum } from '@/modules/shared/format'
 import { createShift, deleteShift } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -25,7 +25,7 @@ function montag(d: Date): Date {
 }
 
 function iso(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  return isoDatum(d)
 }
 
 export default async function SchichtplanPage({

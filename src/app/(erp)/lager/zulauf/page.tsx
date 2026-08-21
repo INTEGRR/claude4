@@ -1,7 +1,7 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader } from '@/components/ui'
-import { date as datum } from '@/modules/shared/format'
+import { date as datum, isoDatum } from '@/modules/shared/format'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -30,7 +30,6 @@ interface Eingang {
 
 const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
-const iso = (d: Date) => d.toISOString().slice(0, 10)
 
 function EingangsKarte({ e, heute }: { e: Eingang; heute: string }) {
   const ueberfaellig = e.termin != null && e.termin < heute
@@ -104,13 +103,13 @@ export default async function ZulaufPage({
   // Wochenraster: Montag der angezeigten Woche in UTC — dieselbe Basis, auf
   // der auch die Termine (date-Spalten) liegen.
   const jetzt = new Date()
-  const heute = iso(jetzt)
+  const heute = isoDatum(jetzt)
   const montag = new Date(jetzt)
   montag.setUTCDate(jetzt.getUTCDate() - ((jetzt.getUTCDay() + 6) % 7) + offset * 7)
   const tage = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(montag)
     d.setUTCDate(montag.getUTCDate() + i)
-    return iso(d)
+    return isoDatum(d)
   })
 
   const ueberfaellige = eingaenge.filter((e) => e.termin != null && e.termin < heute)

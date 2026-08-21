@@ -5,7 +5,7 @@ import { canWrite } from '@/modules/auth/permissions'
 import { ActionButton } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
-import { dateTime, money, qty } from '@/modules/shared/format'
+import { dateTime, money, pct, qty } from '@/modules/shared/format'
 import { refreshAnalytics } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,7 @@ function monat(iso: string): string {
 /** Prozent mit einer Nachkommastelle, robust gegen Division durch null. */
 function anteil(zaehler: number, nenner: number): string {
   if (!(nenner > 0)) return '—'
-  return `${((zaehler / nenner) * 100).toFixed(1)} %`
+  return pct(zaehler / nenner)
 }
 
 export default async function KennzahlenPage() {

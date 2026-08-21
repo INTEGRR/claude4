@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { date, dateTime } from '@/modules/shared/format'
+import { date, dateTime, isoDatum } from '@/modules/shared/format'
 import { decideAbsence, requestAbsence } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -60,8 +60,8 @@ export default async function AbwesenheitenPage() {
   const heute = antraege.filter(
     (a) =>
       a.state === 'approved' &&
-      a.starts_on <= new Date().toISOString().slice(0, 10) &&
-      a.ends_on >= new Date().toISOString().slice(0, 10),
+      a.starts_on <= isoDatum(new Date()) &&
+      a.ends_on >= isoDatum(new Date()),
   )
   const urlaubstage = antraege
     .filter((a) => a.state === 'approved' && a.kind === 'vacation')

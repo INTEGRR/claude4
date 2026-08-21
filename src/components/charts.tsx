@@ -1,4 +1,4 @@
-import { qty } from '@/modules/shared/format'
+import { pct, qty } from '@/modules/shared/format'
 import { Empty } from '@/components/ui'
 
 /**
@@ -377,7 +377,7 @@ export function ShareBar({
           <span
             key={p.label}
             style={{ width: `${(p.value / total) * 100}%`, background: SERIES_COLORS[i] }}
-            title={`${p.label}: ${format(p.value)} (${((p.value / total) * 100).toFixed(0)} %)`}
+            title={`${p.label}: ${format(p.value)} (${pct(p.value / total, 0)})`}
           />
         ))}
       </div>
@@ -385,13 +385,13 @@ export function ShareBar({
         {shown.map((p, i) => (
           <span key={p.label}>
             <span className="swatch" style={{ background: SERIES_COLORS[i] }} />
-            {p.label} · {((p.value / total) * 100).toFixed(0)} %
+            {p.label} · {pct(p.value / total, 0)}
           </span>
         ))}
         {/* Der Balken endet vor 100 % — die Lücke wird benannt. */}
         {verworfen > 0 && (
           <span>
-            +{verworfen} weitere · {(((total - gezeigt) / total) * 100).toFixed(0)} %
+            +{verworfen} weitere · {pct((total - gezeigt) / total, 0)}
           </span>
         )}
       </div>

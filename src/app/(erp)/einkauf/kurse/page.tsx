@@ -2,7 +2,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date } from '@/modules/shared/format'
+import { date, isoDatum } from '@/modules/shared/format'
 import { setExchangeRate } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -86,7 +86,7 @@ export default async function KursePage() {
             </label>
             <label className="field">
               <span>Gültig ab</span>
-              <input type="date" name="valid_from" defaultValue={new Date().toISOString().slice(0, 10)} required />
+              <input type="date" name="valid_from" defaultValue={isoDatum(new Date())} required />
             </label>
             <div className="shrink field">
               <button className="primary" type="submit">Speichern</button>

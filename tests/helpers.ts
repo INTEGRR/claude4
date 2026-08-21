@@ -17,6 +17,12 @@ export function db(): Sql {
     if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
     client = postgres(url, {
       max: 4,
+      // Dieselben Optionen wie src/db/client.ts — sonst laufen die Tests mit
+      // anderer Treiber-Semantik als die Produktion und ein Fehler rutscht
+      // gruen durch. prepare:false wegen Enum-Migrationen ("cache lookup
+      // failed for type"), transform wegen undefined-Parametern.
+      prepare: false,
+      transform: { undefined: null },
       types: {
         numeric: {
           to: 0,

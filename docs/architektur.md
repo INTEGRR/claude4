@@ -43,19 +43,45 @@ src/
       cron/                 # Reconciliation, Job-Runner
   components/               # Wiederverwendete UI-Bausteine
   modules/
-    auth/                   # Anmeldung, Sitzungen, Rollen
-    versand/                # DHL-Client, Label-/Tracking-Service
+    prozesse/               # DAS HERZSTÜCK (~9.000 Z.): Aktions-Registry,
+                            # Torwächter, Introspektion, Maskengenerierung,
+                            # Prozess-Fixtures
+    ki/                     # Chat-Agent (Anthropic), Sprachmodus (OpenAI
+                            # Realtime/Whisper), KI-Anlagekatalog
     integrationen/          # Shopify-Client, Import-Pipeline, Outbox-Runner, E-Mail
+    versand/                # DHL-Client, Label-/Tracking-Service, Versandregeln
+    demo/                   # Beispieldaten + Betriebshistorie
+    auth/                   # Anmeldung, Sitzungen, Rollen
+    lager/                  # Daten-TÜV (Invariantenprüfung)
     shared/                 # Formatierung, Barcode, Formularauswertung, Adressen
+    befehle.ts              # Katalog fürs Befehlsfeld
   db/
     client.ts
     migrations/             # Schema UND Fachlogik (Buchungsfunktionen, Trigger)
 ```
 
-Die fachlichen Module (Verkauf, Fertigung, Einkauf, Lager, Reparatur) leben
-vollständig in `db/migrations` (Logik) und `app/(erp)/<modul>` (Seiten +
-Server Actions) — sie brauchen keine eigene Zwischenschicht, weil die Actions
-direkt die Postgres-Funktionen aufrufen.
+### Wo liegt die Logik eines Fachmoduls?
+
+Es gibt bewusst KEIN `modules/verkauf/`. Die Fachbereiche verteilen sich nach
+Zuständigkeit auf drei Orte — das ist die wichtigste Regel für alle, die neu
+dazukommen:
+
+| Was | Wo | Beispiel |
+|---|---|---|
+| **Schreiben** | `modules/prozesse/registry/<bereich>.ts` (Katalog, DB-frei) + `<bereich>-ausfuehren.ts` (Ausführung) | `verkauf.bestaetigen` |
+| **Buchen** | `db/migrations/*.sql` — atomare Statusübergänge und Bestandsbuchungen | `confirm_sales_order()` |
+| **Lesen** | `app/(erp)/<bereich>/**/page.tsx` — Server Components fragen direkt ab | Auftragsliste |
+
+Jeder Schreibvorgang läuft über den **Torwächter**
+(`aktionAusfuehrenGeprueft`), nie über eine freie Server Action — siehe
+[prozesse.md](prozesse.md) und die Regel in [AGENTS.md](../AGENTS.md).
+Ein Wächter-Test (`tests/prozess-registry.test.ts`) erzwingt das; Ausnahmen
+stehen dort als geschlossene, nur schrumpfende Liste.
+
+Die aktuelle Fassung einer SQL-Funktion findet man mit
+`npm run funktion <name>` — Migrationen sind unveränderlich, deshalb liegen
+31 Funktionen in mehreren Fassungen vor und `grep` liefert überwiegend tote
+Treffer.
 
 ### 1b. Fachliche Fehler werden zurückgegeben, nicht geworfen
 

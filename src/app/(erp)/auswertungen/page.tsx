@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { type ColumnSeries, ColumnChart, HBars, ShareBar } from '@/components/charts'
-import { money, qty } from '@/modules/shared/format'
+import { isoDatum, money, pct, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -175,8 +175,8 @@ export default async function AuswertungenPage({
   const heute = new Date()
   const defaultVon = new Date(heute)
   defaultVon.setUTCMonth(defaultVon.getUTCMonth() - 6)
-  const von = params.von ?? defaultVon.toISOString().slice(0, 10)
-  const bis = params.bis ?? heute.toISOString().slice(0, 10)
+  const von = params.von ?? isoDatum(defaultVon)
+  const bis = params.bis ?? isoDatum(heute)
   const months = monthsBetween(von, bis)
 
   // --- Inventarwert aus der Bewertung (gleitender Durchschnitt, Migration 0018).
@@ -345,7 +345,7 @@ export default async function AuswertungenPage({
                       <td className="num">{qty(r.geliefert)}</td>
                       <td className="num">{qty(r.bestand)}</td>
                       <td className="num" style={summe}>
-                        {(quote * 100).toFixed(0)} %
+                        {pct(quote, 0)}
                       </td>
                       <td><Bar value={quote} max={1} /></td>
                       {months.map((m) => (

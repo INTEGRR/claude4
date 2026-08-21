@@ -6,7 +6,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { ActionForm } from '@/components/action-button'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { RecordComments } from '@/components/record-comments'
-import { date, money } from '@/modules/shared/format'
+import { date, isoDatum, money } from '@/modules/shared/format'
 import { vertragZahlen } from '../../actions'
 
 export const dynamic = 'force-dynamic'
@@ -176,7 +176,7 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
               <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <label className="field shrink">
                   <span>Gezahlt am</span>
-                  <input type="date" name="gezahlt_am" defaultValue={new Date().toISOString().slice(0, 10)} />
+                  <input type="date" name="gezahlt_am" defaultValue={isoDatum(new Date())} />
                 </label>
                 <label className="field shrink">
                   <span>Bankkonto</span>

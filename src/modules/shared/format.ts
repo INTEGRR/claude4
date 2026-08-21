@@ -37,6 +37,41 @@ export function money(value: number | string | null | undefined, currency = 'EUR
   return moneyFormat.format(Number(value))
 }
 
+/**
+ * Prozent mit deutschem Komma. Fehlte bisher — deshalb stand `12.3 %` (aus
+ * toFixed(), englischer Punkt) neben `12,5 %` (aus qty()) im selben System.
+ * Erwartet den ANTEIL (0.123), nicht den Prozentwert.
+ */
+export function pct(anteil: number | string | null | undefined, stellen = 1): string {
+  if (anteil === null || anteil === undefined) return '—'
+  const wert = Number(anteil)
+  if (!Number.isFinite(wert)) return '—'
+  return `${new Intl.NumberFormat('de-DE', {
+    minimumFractionDigits: stellen,
+    maximumFractionDigits: stellen,
+  }).format(wert * 100)} %`
+}
+
+/**
+ * Datum für <input type="date"> (YYYY-MM-DD). Klingt trivial, ist es nicht:
+ * timestamptz kommt als Date-Objekt aus dem Treiber, `date` je nach Spaltentyp
+ * schon als String — beides muss hier durch. Vorher stand
+ * `new Date(x).toISOString().slice(0, 10)` 17× im Repo verteilt, zweimal sogar
+ * als privater lokaler Helfer.
+ *
+ * Bewusst OHNE Zeitzonen-Verschiebung: toISOString() rechnet nach UTC, was
+ * bei einem reinen Datum in Mitteleuropa den Vortag liefern kann. Deshalb
+ * werden die lokalen Feldwerte genommen.
+ */
+export function isoDatum(wert: string | Date | null | undefined): string {
+  if (wert === null || wert === undefined) return ''
+  if (typeof wert === 'string') return wert.slice(0, 10)
+  const jahr = wert.getFullYear()
+  const monat = String(wert.getMonth() + 1).padStart(2, '0')
+  const tag = String(wert.getDate()).padStart(2, '0')
+  return `${jahr}-${monat}-${tag}`
+}
+
 /** Minuten als Stundenangabe, wie sie auf einem Stundenzettel steht: "7:45 h". */
 export function hours(minutes: number | string | null | undefined): string {
   const total = Math.round(Number(minutes ?? 0))

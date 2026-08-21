@@ -119,8 +119,11 @@ fertig melden → Lieferung wird versandbereit.
 | `npm run db:migrate` | Ausstehende Migrationen einspielen |
 | `npm run db:reset` | Schema verwerfen und neu aufbauen (nur Entwicklung) |
 | `npm run db:seed [-- --demo]` | Administrator anlegen, optional Beispieldaten |
-| `npm test` | Tests (brauchen eine erreichbare Datenbank) |
-| `npm run check` | Typprüfung + Tests |
+| `npm test` | 312 Tests (brauchen eine erreichbare Datenbank) |
+| `npm run test:prozesse` | 46 Prozessläufe end-to-end gegen eine Wegwerf-Datenbank |
+| `npm run lint` | Linter (Biome) |
+| `npm run check` | Linter + Typprüfung + Tests + Prozessläufe — läuft auch in der CI |
+| `npm run funktion <name>` | Aktuelle Fassung einer SQL-Funktion finden |
 
 ## Dokumente
 
@@ -143,7 +146,9 @@ src/
   app/(erp)/…      Seiten je Modul (Server Components + Server Actions)
   app/api/…        Webhooks, Cron, Barcode-Auflösung, Label-Auslieferung
   db/migrations/   SQL-Migrationen — Schema UND Fachlogik
-  modules/         auth, integrationen (Shopify), versand (DHL), shared
+  modules/prozesse/  Aktions-Registry + Torwächter — das Herzstück
+  modules/ki/        Chat-Agent, Sprachmodus, KI-Katalog
+  modules/           integrationen (Shopify), versand (DHL), demo, auth, lager, shared
 tests/             Tests gegen eine echte Postgres-Datenbank
 ```
 

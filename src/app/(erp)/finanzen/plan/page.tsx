@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { ColumnChart } from '@/components/charts'
-import { money } from '@/modules/shared/format'
+import { isoDatum, money } from '@/modules/shared/format'
 import { planVorschlaegeAktualisieren, planZeileSetzen } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -43,7 +43,7 @@ export default async function PlanSeite() {
   const vorjahr = (monat: string) => {
     const d = new Date(monat)
     d.setUTCFullYear(d.getUTCFullYear() - 1)
-    return ist.get(d.toISOString().slice(0, 10))
+    return ist.get(isoDatum(d))
   }
 
   const label = (monat: string) =>

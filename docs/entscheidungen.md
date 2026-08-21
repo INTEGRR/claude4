@@ -35,6 +35,43 @@ Testimonials — es steht nur da, was das System kann. Die Kontaktadresse
 ist ein sichtbar markierter Platzhalter (`KONTAKT_MAIL`), der vor dem
 Livegang gesetzt werden muss.
 
+## 2026-08-21 — Code-Review: Wächter scharf stellen statt umbauen
+
+Vollständiger Wartbarkeits-Review vor dem Pilotbetrieb (66.000 Zeilen, 373
+Dateien). Befund: **kein Spaghetti** — keine zirkulären Importe, ein
+durchgehaltenes Seitenskelett, saubere Server/Client-Grenze, Fachlogik in der
+Datenbank. Das eigentliche Problem lag woanders: **die Wächter-Tests, auf
+denen die Architektur ruht, waren teilweise blind und liefen in keiner CI.**
+
+Entscheidung: **nicht umbauen, sondern die Absicherung reparieren.** Konkret
+- Registry-Wächter scannte nur `actions.ts` und übersah 24 Server Actions,
+  die am Torwächter vorbeigehen (21 mit Schreib-SQL) — er meldete dabei grün.
+- Migrations-Wächter kannte `drop constraint/trigger/function` nicht; der
+  DESTRUKTIV-Marker kam in keiner der 65 Migrationen vor.
+- Kein Linter, keine CI auf Pull Requests — aber 25 wirkungslose
+  `eslint-disable`-Kommentare, die eine Prüfung vortäuschten.
+
+Statt die 24 Umgehungen sofort zu migrieren, stehen sie jetzt als begründete,
+**nur schrumpfende Liste** im Test: Schuld sichtbar machen schlägt Schuld
+verschweigen, und die Migration ist ein eigenes Arbeitspaket. Ebenso bewusst:
+Biome kommt mit **abgeschaltetem Formatter** (ein erzwungenes Format hätte
+311 Dateien angefasst und jede Codearchäologie zerstört) und einer
+Regelauswahl, die ab Tag 1 grün ist — ein roter Linter wird ignoriert.
+Die a11y-Regeln (40+ Befunde) sind vorerst aus und als eigenes Paket vermerkt.
+
+Nebenbei behoben: ein Produktionsfehler (Kommentarfunktion auf fünf
+Detailseiten kaputt, weil `model` ein freier String war), eine echte Race
+Condition in der Testsuite, und die Zeitzonenfalle in 17 kopierten
+`toISOString().slice(0,10)`-Stellen.
+
+Nicht gemacht und nicht empfohlen: Umstrukturierung nach Fachdomänen
+(`modules/verkauf/` …). Die Trennung Schreiben/Buchen/Lesen funktioniert und
+ist getestet — sie war nur nicht aufgeschrieben. Das erledigt
+[architektur.md](architektur.md) billiger als ein Umbau.
+
+Bericht mit allen Befunden: [code-review.md](code-review.md).
+Neue Entwickler-Anleitung: [entwicklung.md](entwicklung.md).
+
 ## 2026-08-19 — Verkauf komponiert; Herkunftsfelder für Bedingungen
 
 Der Verkauf bekommt die Lieferung als **Teilprozess** statt als

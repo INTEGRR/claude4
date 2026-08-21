@@ -1,3 +1,10 @@
+> **HISTORISCH — nicht mehr der aktuelle Stand.** Dies ist der Gründungsplan
+> von 2026-06 (Arbeitstitel: Odoo-Nachbau). Er ist vollständig abgearbeitet
+> und dokumentiert, WOHER das System kommt. Der heute leitende Ansatz ist
+> **Prozess First** — Abläufe sind Daten, nicht Code. Aktueller Stand:
+> [docs/prozesse.md](../prozesse.md), Begründungen:
+> [docs/entscheidungen.md](../entscheidungen.md).
+
 # Master-Umsetzungsplan: ERP-Eigenentwicklung (Odoo-Nachbau)
 
 **Ziel:** Die bei uns aktiv genutzten Odoo-Funktionen als eigene, schlanke Web-Anwendung nachbauen — Verkauf (mit Shopify-Import), Fertigung (Stücklisten mit Variantenlogik, druckbare Fertigungsaufträge), Einkauf (inkl. E-Mail-Versand und Lieferantenrechnungen), Lager (Bewegungs-Ledger, Inventur, Barcodes), Reparatur sowie **Versand direkt über DHL** (Label, Tracking, Retouren) mit eigener Fulfillment-/Tracking-Rückmeldung an Shopify. Sendcloud entfällt — dessen Funktionsumfang bauen wir selbst nach ([Vorlage](docs/api-referenz/sendcloud-shopify-funktionsumfang.md)).
