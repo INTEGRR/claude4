@@ -23,6 +23,57 @@ export const VERKAUF = {
     revalidate: ['/verkauf'],
   },
 
+  'verkauf.auftrag_fuer_neuen_kunden': {
+    label: 'Auftrag für neuen Kunden',
+    bereich: 'verkauf',
+    ki: true,
+    beschreibung:
+      'Legt Kontakt UND Angebot in einem Zug an — für den häufigsten Fall am Telefon: ' +
+      'der Kunde ist neu. Personen brauchen vorname und nachname, Firmen name mit ' +
+      'is_company = true. Ist der Kunde schon angelegt, stattdessen auftrag_anlegen nutzen.',
+    bindung: 'frei',
+    modell: 'sales_order',
+    uebergang: { von: [], nach: ['draft'] },
+    // Alternativer Einstieg in denselben Prozessschritt „anlegen": der Beleg
+    // landet in genau demselben Zustand (draft), nur entsteht der Kontakt
+    // eine Zeile vorher. Deshalb kein eigener Schritt im Diagramm.
+    prozessfrei: true,
+    schema: z
+      .object({
+        name: z.string().max(200).optional(),
+        vorname: z.string().max(100).optional(),
+        nachname: z.string().max(100).optional(),
+        is_company: z.boolean().default(false),
+        email: z.string().max(200).optional(),
+        phone: z.string().max(60).optional(),
+        street: z.string().max(200).optional(),
+        house_number: z.string().max(20).optional(),
+        zip: z.string().max(20).optional(),
+        city: z.string().max(100).optional(),
+        country_code: z.string().max(2).default('DE'),
+      })
+      .refine((k) => (k.is_company ? Boolean(k.name?.trim()) : Boolean(k.nachname?.trim())), {
+        message: 'Personen brauchen Vor- und Nachname, Firmen einen Firmennamen',
+        path: ['nachname'],
+      }),
+    zusammenfassung: (p) =>
+      `Neuer Kunde ${p.is_company ? (p.name ?? '') : `${p.vorname ?? ''} ${p.nachname ?? ''}`.trim()}`,
+    formdata: (fd) => ({
+      name: String(fd.get('name') ?? '').trim() || undefined,
+      vorname: String(fd.get('vorname') ?? '').trim() || undefined,
+      nachname: String(fd.get('nachname') ?? '').trim() || undefined,
+      is_company: fd.get('is_company') === 'on',
+      email: String(fd.get('email') ?? '').trim() || undefined,
+      phone: String(fd.get('phone') ?? '').trim() || undefined,
+      street: String(fd.get('street') ?? '').trim() || undefined,
+      house_number: String(fd.get('house_number') ?? '').trim() || undefined,
+      zip: String(fd.get('zip') ?? '').trim() || undefined,
+      city: String(fd.get('city') ?? '').trim() || undefined,
+      country_code: String(fd.get('country_code') ?? 'DE'),
+    }),
+    revalidate: ['/verkauf', '/kontakte'],
+  },
+
   'verkauf.bestaetigen': {
     label: 'Auftrag bestätigen',
     bereich: 'verkauf',

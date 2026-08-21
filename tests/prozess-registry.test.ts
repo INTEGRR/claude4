@@ -254,8 +254,6 @@ const UI_UMGEHUNGEN = new Set<string>([
   'produkte/konfiguration:createTax',
   'produkte/konfiguration:createPaymentTerm',
   'produkte/konfiguration:deleteTag',
-  // Kontakt anlegen — inkonsistent: kontakte.partner_aendern IST registriert
-  'kontakte:createPartner',
   // Integrationen: Outbox/Webhooks/Abgleich anstossen, Ersteinrichtung, Retry
   'integrationen:runJobs',
   'integrationen:processWebhooks',

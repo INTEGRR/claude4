@@ -35,6 +35,12 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
+export async function createOrderForNewCustomer(formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('verkauf.auftrag_fuer_neuen_kunden', { formData })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
+}
+
 export async function addLine(orderId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('verkauf.position_hinzufuegen', { recordId: orderId, formData })
 }

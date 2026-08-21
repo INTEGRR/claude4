@@ -2,6 +2,7 @@ import { sql, tx } from '@/db/client'
 import { REGISTRY } from './index.ts'
 import { JOB_KATALOG } from '../jobs-katalog.ts'
 import { EREIGNISSE } from '../ereignisse.ts'
+import { entwurfPruefen } from '../entwurf-pruefen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
@@ -251,9 +252,13 @@ export async function prozessEntwerfen(
   },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
-  // Struktur früh und verständlich prüfen — die harte Validierung (erreichbar,
-  // azyklisch, XOR-Regeln) sitzt in prozess_version_aktivieren und läuft erst,
-  // wenn ein Mensch den Entwurf aktiviert.
+  // Struktur früh und verständlich prüfen — MIT den Regeln, an denen die
+  // Aktivierung später scheitern würde (BUG/00015: die KI baute einen
+  // XOR-Schritt mit zwei bedingungslosen Kanten; der Entwurf entstand
+  // klaglos und ließ sich danach nie aktivieren). Ein Entwurf, der nicht
+  // aktivierbar ist, ist kein Entwurf — er ist eine Falle. Dieselben Regeln
+  // stehen hart in prozess_version_aktivieren; hier sagen sie es dem
+  // Entwerfenden (auch der KI, die daraufhin nachbessern kann).
   const starts = p.schritte.filter((s) => s.art === 'start').length
   if (starts !== 1) {
     throw new Error(`Ein Prozess braucht genau einen Startschritt (der Entwurf hat ${starts}).`)
@@ -316,6 +321,14 @@ export async function prozessEntwerfen(
       throw new Error(`Übergang ${u.von} → ${u.nach}: beide Enden müssen Schritt-Codes sein.`)
     }
   }
+
+  // Dieselben Strukturregeln, die prozess_version_aktivieren hart prüft —
+  // hier schon beim Entwurf (entwurf-pruefen.ts, pur und einzeln getestet).
+  const strukturfehler = entwurfPruefen(
+    p.schritte.map((s) => ({ code: s.code, art: s.art })),
+    p.uebergaenge.map((u) => ({ von: u.von, nach: u.nach, bedingung: u.bedingung })),
+  )
+  if (strukturfehler) throw new Error(strukturfehler)
 
   const version = await tx(async (t) => {
     const [vorhanden] = await t<{ id: string; modell: string | null }[]>`

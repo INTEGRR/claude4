@@ -24,6 +24,38 @@ export async function auftragAnlegen(p: { partner_id: string }): Promise<Aktions
   }
 }
 
+/**
+ * BUG/00012: Am Telefon ist der Kunde oft neu — dann scheiterte der Auftrag
+ * bisher daran, dass die Kontaktanlage eine andere Seite war. Kontakt und
+ * Angebot entstehen jetzt in EINER Aktion: eine Torwächter-Prüfung, ein
+ * Protokolleintrag, ein Weg. Die Kontaktanlage selbst bleibt die aus
+ * kontakte-ausfuehren — kein zweiter Dialekt.
+ */
+export async function auftragFuerNeuenKunden(
+  p: {
+    name?: string
+    vorname?: string
+    nachname?: string
+    is_company: boolean
+    email?: string
+    phone?: string
+    street?: string
+    house_number?: string
+    zip?: string
+    city?: string
+    country_code: string
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const { partnerAnlegen } = await import('./kontakte-ausfuehren.ts')
+  const kunde = await partnerAnlegen(
+    { ...p, is_customer: true, is_vendor: false, vat: undefined },
+    ctx,
+  )
+  const auftrag = await auftragAnlegen({ partner_id: kunde.recordId! })
+  return { ...auftrag, text: `${kunde.text} ${auftrag.text}` }
+}
+
 export async function bestaetigen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select confirm_sales_order(${ctx.recordId!}, ${ctx.actor})`
   return { recordId: ctx.recordId }

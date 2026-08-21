@@ -355,8 +355,8 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     assert.equal(fertig.state, 'erstattet')
   })
 
-  test('Unfug scheitert: unbekannte Aktion sofort, Strukturfehler bei der Aktivierung', async () => {
-    // Unbekannte Aktionsnamen fängt schon der Entwurf ab.
+  test('Unfug scheitert schon beim Entwurf — die Datenbank bleibt die letzte Instanz', async () => {
+    // Unbekannte Aktionsnamen fängt der Entwurf ab.
     await assert.rejects(
       aktionAusfuehrenGeprueft(
         'einstellungen.prozess_entwerfen',
@@ -374,23 +374,81 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
       /unbekannte Aktion/,
     )
 
-    // Ein nicht erreichbarer Schritt darf als Entwurf existieren — die harte
-    // Validierung sitzt im Aktivieren und lehnt ab.
-    await aktionAusfuehrenGeprueft(
-      'einstellungen.prozess_entwerfen',
-      {
-        parameter: {
-          ...ENTWURF,
-          code: 'kaputt',
-          name: 'Kaputter Entwurf',
-          schritte: ENTWURF.schritte.map((s) =>
-            s.code === 'annehmen' ? { ...s, params: { prozess_code: 'kaputt' } } : s,
-          ),
-          uebergaenge: ENTWURF.uebergaenge.filter((u) => u.nach !== 'erstatten'),
+    // BUG/00015: Strukturfehler galten früher erst beim Aktivieren — der
+    // Entwurf entstand klaglos und war danach eine Sackgasse. Jetzt lehnt
+    // schon der Entwurf ab, und zwar mit derselben Begründung.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            name: 'Kaputter Entwurf',
+            uebergaenge: ENTWURF.uebergaenge.filter((u) => u.nach !== 'erstatten'),
+          },
         },
-      },
-      admin,
+        admin,
+      ),
+      /erreichbar/,
     )
+
+    // Der Fall aus BUG/00015 selbst: eine Verzweigung mit zwei
+    // bedingungslosen Kanten. Der Kunde hatte den Verkaufsprozess so von der
+    // KI umbauen lassen und konnte ihn danach nie schalten.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            name: 'Zwei Standardwege',
+            schritte: [
+              ...ENTWURF.schritte,
+              { code: 'weiche', name: 'Erstatten?', art: 'xor' },
+            ],
+            uebergaenge: [
+              { von: 'start', nach: 'annehmen' },
+              { von: 'annehmen', nach: 'weiche' },
+              { von: 'weiche', nach: 'erstatten' },
+              { von: 'weiche', nach: 'ende' },
+              { von: 'erstatten', nach: 'ende' },
+            ],
+          },
+        },
+        admin,
+      ),
+      /höchstens eine bedingungslos/,
+    )
+
+    // Nichts davon hat einen Prozess hinterlassen.
+    const [kaputt] = await h.sql<{ n: number }[]>`
+      select count(*)::int as n from prozesse where code = 'kaputt'`
+    assert.equal(kaputt.n, 0, 'abgelehnte Entwürfe legen keinen Prozess an')
+  })
+
+  test('die Aktivierung bleibt die letzte Instanz — auch an prozess_entwerfen vorbei', async () => {
+    // Ein Entwurf, der NICHT über die Aktion entstand (Migration, Import,
+    // Handarbeit): dann greift nur noch der Wächter in der Datenbank. Genau
+    // dafür steht er dort — die Prüfung im Entwurf ist die frühe Warnung,
+    // nicht die Sicherung.
+    const [prozess] = await h.sql<{ id: string }[]>`
+      insert into prozesse (code, name, bereich, modell, aktiv)
+      values ('kaputt', 'Von Hand verbogen', 'verkauf', 'vorgang', false)
+      returning id`
+    const [version] = await h.sql<{ id: string }[]>`
+      insert into prozess_versionen (prozess_id, version, status, created_by)
+      values (${prozess.id}, 1, 'entwurf', 'test') returning id`
+    await h.sql`
+      insert into prozess_schritte (version_id, code, name, art, sequence)
+      values (${version.id}, 'start', 'Start', 'start', 0),
+             (${version.id}, 'insel', 'Unerreichbar', 'ende', 10),
+             (${version.id}, 'ende', 'Ende', 'ende', 20)`
+    await h.sql`
+      insert into prozess_uebergaenge (version_id, von_code, nach_code, sequence)
+      values (${version.id}, 'start', 'ende', 10)`
+
     await assert.rejects(
       aktionAusfuehrenGeprueft(
         'einstellungen.prozessversion_aktivieren',

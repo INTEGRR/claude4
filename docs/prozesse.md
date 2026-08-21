@@ -917,6 +917,40 @@ Einrichtung nur einen Hinweis. Wächter: tests/einrichtung.test.ts
 (Registry-Statik, Demodaten-Guard, Weichen-Heuristik) und
 tests/demodaten.test.ts (kein automatischer Beispieldaten-Pfad).
 
+## Strukturregeln eines Prozessentwurfs (BUG/00015)
+
+Drei Regeln entscheiden, ob eine Prozessversion geschaltet werden kann:
+
+1. **XOR-Default** — an einer Verzweigung darf höchstens EINE ausgehende
+   Kante ohne Bedingung sein (der Standardweg), und sie muss die LETZTE
+   sein. Sonst greift sie, bevor die Bedingungen geprüft werden.
+2. **Erreichbarkeit** — jeder Schritt braucht einen Weg von einem Start aus.
+3. **Azyklik** — Schleifen sind verboten; Wiederholungen bildet man als
+   eigenen Zustand oder als neuen Vorgang ab.
+
+Sie stehen an **zwei** Stellen, und das ist Absicht:
+
+- `prozess_version_aktivieren` (SQL) ist die **letzte Instanz** — Entwürfe
+  können auch per Migration oder Handarbeit entstehen.
+- `prozesse/entwurf-pruefen.ts` (pur, ohne Datenbank) prüft dieselben Regeln
+  schon in `einstellungen.prozess_entwerfen`. Grund: ein Entwurf, der nicht
+  aktivierbar ist, ist kein Entwurf, sondern eine Falle — und die KI
+  (`aufnahmeStrukturieren`, drei Runden) kann den Fehler nur beheben, wenn
+  sie ihn beim Entwerfen bekommt.
+
+Wächter: tests/entwurf.test.ts (die Regeln einzeln) und
+tests/prozesse/prozesse.test.ts (beide Ebenen: Entwurf lehnt ab, und an der
+Aktion vorbei greift der SQL-Wächter).
+
+**Bedingungsfelder**: Was in einer `bedingung` stehen darf, liefert
+`prozess_beleg_daten` — die Spalten des Belegs, `zusatz.*`, die
+`herkunft_*`-Felder (Migration 0065) und beim Verkaufsauftrag zusätzlich
+`fertigung_noetig` und `fertigung_automatisch` (Migration 0068). Der
+Unterschied zwischen beiden ist genau BUG/00014: fertigbar ist eine Position
+mit Stückliste und Route „fertigen"; automatisch angelegt wird nur, was
+zusätzlich „auf Bestellung fertigen" trägt. `sales_order_fertigungslage()`
+nennt die Lücke mit Grund, und der Auftrag zeigt sie an.
+
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 
 KRNL wird an mehrere Kunden ausgerollt, mit häufigen Feature-Updates. Der

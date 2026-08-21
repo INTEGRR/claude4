@@ -162,9 +162,13 @@ export const EINSTELLUNGEN = {
       "zustand), art 'dienst' einen job_kind aus dem Katalog, art 'ereignis' ein Topic, " +
       "art 'prozess' einen teilprozess (Kindprozess-Code; teilprozess_link nur wenn der " +
       'Kindbeleg über eine Fremdschlüsselspalte statt über origin hängt). Übergänge ' +
-      'verbinden Schritt-Codes (von/nach); Verzweigungen sind mehrere ausgehende ' +
-      'Übergänge, optional mit bedingung ({"feld","op","wert"}, Pfade wie zusatz.budget ' +
-      'erlaubt). Schleifen sind verboten.',
+      'verbinden Schritt-Codes (von/nach). Verzweigung = xor-Schritt mit mehreren ' +
+      'ausgehenden Übergängen: HÖCHSTENS EINER davon darf ohne bedingung sein (der ' +
+      'Standardweg), und dieser muss als LETZTER kommen — alle anderen brauchen eine ' +
+      'bedingung {"feld","op","wert"} auf einem Feld des Belegs (Pfade wie zusatz.budget ' +
+      'erlaubt; welche Felder es gibt, zeigt prozess_beleg_daten). Zwei bedingungslose ' +
+      'Kanten an derselben Verzweigung werden abgelehnt. Jeder Schritt muss vom Start ' +
+      'erreichbar sein; Schleifen sind verboten.',
     bindung: 'frei',
     schema: z.object({
       code: z

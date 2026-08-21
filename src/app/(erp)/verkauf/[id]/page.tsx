@@ -108,6 +108,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
            variant_display_name(mo.variant_id) as product
     from manufacturing_orders mo where mo.sales_order_id = ${id} order by mo.created_at`
 
+  // BUG/00014: „Keine Fertigung nötig" war eine Behauptung — auch dann, wenn
+  // eine Position sehr wohl eine Stückliste hat und nur die Route fehlt.
+  // sales_order_fertigungslage nennt genau diese Fälle mit Grund.
+  const fertigungslage = await sql<
+    { variant_id: string; bezeichnung: string; grund: string | null }[]
+  >`select variant_id, bezeichnung, grund from sales_order_fertigungslage(${id})
+    where grund is not null`
+
   const shipments = await sql<
     { id: string; shipment_number: string; state: string; tracking_url: string }[]
   >`
@@ -428,7 +436,30 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
         <Card title={`Fertigungsaufträge (${mos.length})`} tight>
           {mos.length === 0 ? (
-            <Empty>Keine Fertigung nötig.</Empty>
+            fertigungslage.length === 0 ? (
+              <Empty>Keine Fertigung nötig.</Empty>
+            ) : (
+              <div className="notice warn" style={{ margin: 12 }}>
+                <p style={{ marginTop: 0 }}>
+                  Es entsteht <strong>kein</strong> Fertigungsauftrag, obwohl diese
+                  Positionen fertigbar wären:
+                </p>
+                <ul style={{ margin: '0 0 8px', paddingLeft: 18 }}>
+                  {fertigungslage.map((f) => (
+                    <li key={f.variant_id}>
+                      <Link href={`/produkte/variante/${f.variant_id}`}>{f.bezeichnung}</Link>
+                      {' — '}
+                      {f.grund}
+                    </li>
+                  ))}
+                </ul>
+                <span className="muted small">
+                  Automatisch angelegt wird nur, was beide Routen trägt: „fertigen" und
+                  „auf Bestellung fertigen" — plus eine auflösbare Stückliste. Am Produkt
+                  ändern, dann den Auftrag erneut bestätigen.
+                </span>
+              </div>
+            )
           ) : (
             <TableWrap>
               <table>

@@ -9,6 +9,79 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-21 — Strukturregeln gelten schon beim Entwurf, nicht erst beim Schalten
+
+Aus dem Pilotbetrieb (BUG/00015): Der Kunde ließ den Verkaufsprozess von der
+KI umbauen. Sie baute einen XOR-Schritt „Fertigung nötig?" mit ZWEI
+bedingungslosen Kanten. Der Entwurf entstand klaglos — und ließ sich danach
+nie aktivieren, weil `prozess_version_aktivieren` genau das ablehnt
+(höchstens eine Default-Kante). Der Fehler kam also an der Stelle, an der
+niemand mehr etwas ändern konnte.
+
+Bisher war das Absicht: „die harte Validierung sitzt im Aktivieren". Diese
+Entscheidung wird revidiert. **Ein Entwurf, der nicht aktivierbar ist, ist
+kein Entwurf — er ist eine Falle.** Die drei Strukturregeln (XOR-Default,
+Erreichbarkeit, Azyklik) laufen jetzt schon in
+`einstellungen.prozess_entwerfen`, mit denselben Sätzen. Das trifft vor allem
+die KI: `aufnahmeStrukturieren` darf dreimal nachbessern — bekommt sie den
+Fehler sofort, korrigiert sie ihn in derselben Runde.
+
+Die Regeln liegen als PURES Modul `prozesse/entwurf-pruefen.ts` (kein
+Datenbank-Import) und sind einzeln getestet. In SQL bleiben sie unverändert
+stehen: **die Datenbank ist die letzte Instanz**, nicht die zweite Meinung —
+Entwürfe können auch per Migration oder Handarbeit entstehen. Der
+Prozesstest prüft jetzt beide Ebenen.
+
+Zusätzlich: Die Beschreibung von `prozess_entwerfen` sagte „Verzweigungen
+sind mehrere ausgehende Übergänge, **optional mit bedingung**" — das lud den
+Fehler geradezu ein. Sie benennt die Regel jetzt ausdrücklich.
+
+Und die Bedingung ließ sich für diesen Zweig gar nicht formulieren:
+`prozess_beleg_daten` liefert für einen Verkaufsauftrag nur dessen Spalten,
+ob eine Position gefertigt werden muss steht aber in den Positionen.
+Migration 0068 ergänzt zwei abgeleitete Felder — `fertigung_noetig`
+(fertigbare Position vorhanden) und `fertigung_automatisch` (entsteht bei
+der Bestätigung wirklich ein Auftrag).
+
+## 2026-08-21 — Kontakte: Vor- und Nachname sind Bestandteile, `name` bleibt die Wahrheit
+
+BUG/00013: Kontakte hatten genau ein Namensfeld. Für Personen ist das zu
+wenig — Anrede, Sortierung und der Shop (der first_name/last_name liefert)
+brauchen die Teile getrennt. Migration 0068 ergänzt `vorname`/`nachname`;
+`name` bleibt der Anzeigename und die eine Wahrheit für Belege, bei Personen
+zusammengesetzt aus den Teilen.
+
+Bestandsdaten werden NICHT geraten: „Müller GmbH & Co. KG" oder „Dr. Anna
+von Weiz" lassen sich nicht verlässlich zerlegen. Wer die Teile braucht,
+pflegt sie beim nächsten Anfassen nach.
+
+Im selben Zug (BUG/00012): `kontakte.partner_anlegen` ist jetzt eine
+Registry-Aktion — die Kontaktanlage war eine der UI-Umgehungen aus dem Code
+Review, die Liste schrumpft um einen Eintrag. Und weil am Telefon der Kunde
+oft neu ist, gibt es `verkauf.auftrag_fuer_neuen_kunden`: Kontakt und
+Angebot in einer Aktion, eine Torwächter-Prüfung, ein Protokolleintrag.
+Bewusst als alternativer Einstieg in denselben Prozessschritt „anlegen"
+(prozessfrei, weil der Beleg in genau demselben Zustand landet) statt als
+zweiter Startzweig im Diagramm.
+
+## 2026-08-21 — „Keine Fertigung nötig" darf nicht behauptet werden
+
+BUG/00014: Ein Verkaufsauftrag mit einem Produkt, das eine Stückliste hat,
+erzeugte keinen Fertigungsauftrag — und das System schrieb dazu „Keine
+Fertigung nötig." Das war schlicht falsch: die Automatik verlangt
+`route_manufacture` UND `route_mto` UND eine auflösbare Stückliste; am
+Produkt fehlten die Routen.
+
+Neu ist `sales_order_fertigungslage(order)`: sie nennt die Positionen, die
+fertigbar wären, mit dem Grund, warum kein Auftrag entsteht („Route ‚auf
+Bestellung fertigen' ist am Produkt nicht gesetzt"). Der Auftrag zeigt das
+statt der Behauptung.
+
+Die eigentliche Ursache im Pilotbestand war zusätzlich ein DOPPELTES Produkt
+gleichen Namens — eines mit Stückliste und Fertigungsroute, eines ohne; im
+Auftrag stand das ohne. Das ist ein Datenbefund, kein Codefehler, und bleibt
+Sache des Betriebs.
+
 ## 2026-08-21 — Registrierung: ein einziger Schreibweg ohne Sitzung
 
 Die Startseite bekommt ein Anmeldeformular („Erzählt uns euren Ablauf").

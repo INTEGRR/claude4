@@ -127,6 +127,7 @@ export const AUSFUEHRUNG = {
   'finanzen.ust_vorschlag_uebernehmen': finanzen.ustVorschlagUebernehmen,
   'finanzen.plan_setzen': finanzen.planSetzen,
   'finanzen.plan_vorschlag_uebernehmen': finanzen.planVorschlagUebernehmen,
+  'kontakte.partner_anlegen': kontakte.partnerAnlegen,
   'kontakte.partner_aendern': kontakte.partnerAendern,
   'kontakte.unterkontakt_anlegen': kontakte.unterkontaktAnlegen,
 
@@ -164,6 +165,7 @@ export const AUSFUEHRUNG = {
   'reparatur.details': reparatur.details,
 
   'verkauf.auftrag_anlegen': verkauf.auftragAnlegen,
+  'verkauf.auftrag_fuer_neuen_kunden': verkauf.auftragFuerNeuenKunden,
   'verkauf.bestaetigen': verkauf.bestaetigen,
   'verkauf.stornieren': verkauf.stornieren,
   'verkauf.zurueck_auf_angebot': verkauf.zurueckAufAngebot,

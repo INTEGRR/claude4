@@ -7,6 +7,10 @@ import type { ActionResult } from '@/modules/shared/action'
  * der Aktions-Registry (prozesse/registry/kontakte.ts).
  */
 
+export async function createPartner(formData: FormData): Promise<ActionResult> {
+  return serverAktion('kontakte.partner_anlegen', { formData })
+}
+
 export async function updatePartner(partnerId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('kontakte.partner_aendern', { recordId: partnerId, formData })
 }

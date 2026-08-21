@@ -18,8 +18,9 @@
  * je Testdatei).
  */
 import '../../scripts/env.ts'
-import { spawnSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
+import { promisify } from 'node:util'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 
@@ -86,15 +87,25 @@ export async function harnessStart(datenbank: string): Promise<Harness> {
 
     ziel = basisUrl(datenbank)
     spur(`${datenbank}: migrieren`)
-    const migration = spawnSync(
-      process.execPath,
-      ['--experimental-strip-types', 'scripts/migrate.ts'],
-      // loadEnvFile() überschreibt gesetzte Variablen nicht — die Umleitung
-      // auf die Testdatenbank gewinnt gegen die .env.
-      { encoding: 'utf8', env: { ...process.env, DATABASE_URL: ziel, DIRECT_URL: '' } },
-    )
-    if (migration.status !== 0) {
-      throw new Error(`Migration der Testdatenbank fehlgeschlagen:\n${migration.stderr}`)
+    try {
+      // Bewusst ASYNCHRON (früher spawnSync): spawnSync blockiert die
+      // Ereignisschleife des Testprozesses vollständig. node:test spricht
+      // aber über eine Pipe mit dem Elternprozess — ein blockierter Kind-
+      // prozess kann dort haken, ohne dass irgendetwas ausgegeben wird.
+      // Ein Testharness darf die Schleife nicht anhalten.
+      await promisify(execFile)(
+        process.execPath,
+        ['--experimental-strip-types', 'scripts/migrate.ts'],
+        {
+          // loadEnvFile() überschreibt gesetzte Variablen nicht — die
+          // Umleitung auf die Testdatenbank gewinnt gegen die .env.
+          env: { ...process.env, DATABASE_URL: ziel, DIRECT_URL: '' },
+          timeout: 120_000,
+        },
+      )
+    } catch (err) {
+      const e = err as { stderr?: string; message?: string }
+      throw new Error(`Migration der Testdatenbank fehlgeschlagen:\n${e.stderr ?? e.message}`)
     }
     spur(`${datenbank}: bereit`)
   }

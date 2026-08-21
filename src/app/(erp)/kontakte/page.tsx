@@ -1,39 +1,11 @@
 import Link from 'next/link'
-import { revalidatePath } from 'next/cache'
 import { sql } from '@/db/client'
-import { requireArea, requireWrite } from '@/modules/auth'
+import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { actionError } from '@/modules/shared/action'
+import { createPartner } from './actions'
 
 export const dynamic = 'force-dynamic'
-
-async function createPartner(formData: FormData) {
-  'use server'
-  await requireWrite('kontakte')
-  const name = String(formData.get('name') ?? '').trim()
-  if (!name) return actionError('Bitte einen Namen angeben')
-
-  await sql`
-    insert into partners (
-      name, is_company, is_customer, is_vendor, email, phone,
-      street, house_number, zip, city, country_code, vat)
-    values (
-      ${name},
-      ${formData.get('is_company') === 'on'},
-      ${formData.get('is_customer') === 'on'},
-      ${formData.get('is_vendor') === 'on'},
-      ${String(formData.get('email') ?? '') || null},
-      ${String(formData.get('phone') ?? '') || null},
-      ${String(formData.get('street') ?? '') || null},
-      ${String(formData.get('house_number') ?? '') || null},
-      ${String(formData.get('zip') ?? '') || null},
-      ${String(formData.get('city') ?? '') || null},
-      ${String(formData.get('country_code') ?? 'DE')},
-      ${String(formData.get('vat') ?? '') || null})`
-
-  revalidatePath('/kontakte')
-}
 
 export default async function KontaktePage({
   searchParams,
@@ -73,11 +45,25 @@ export default async function KontaktePage({
 
       <Card title="Neuer Kontakt">
         <ActionForm action={createPartner}>
+          {/* BUG/00013: Personen brauchen Vor- UND Nachname — daraus entsteht
+              der Anzeigename. Firmen tragen genau einen Namen. Welche Felder
+              zählen, entscheidet der Haken „Firma"; geprüft wird das in der
+              Registry-Aktion, nicht nur hier. */}
           <div className="row">
             <label className="field" style={{ flex: 2 }}>
-              <span>Name</span>
-              <input name="name" required />
+              <span>Firmenname</span>
+              <input name="name" placeholder="nur bei Firmen" />
             </label>
+            <label className="field">
+              <span>Vorname</span>
+              <input name="vorname" placeholder="bei Personen" />
+            </label>
+            <label className="field">
+              <span>Nachname</span>
+              <input name="nachname" placeholder="bei Personen" />
+            </label>
+          </div>
+          <div className="row">
             <label className="field">
               <span>E-Mail</span>
               <input type="email" name="email" placeholder="für Bestellungen nötig" />

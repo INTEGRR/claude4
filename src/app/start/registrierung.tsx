@@ -82,21 +82,10 @@ export function Registrierung() {
       <div className="anzeige">
         <p className="mono" style={{ color: '#FF5A1F', margin: '0 0 10px' }}>{'// Registriert'}</p>
         <h3 style={{ fontSize: 23, margin: '0 0 8px', color: '#f4f3ef' }}>Danke. Wir melden uns.</h3>
-        <p style={{ color: '#9a9c9f', margin: '0 0 18px' }}>
+        <p style={{ color: '#9a9c9f', margin: 0 }}>
           Ihr hört innerhalb von zwei Werktagen von uns — mit einem Terminvorschlag
           für die Prozessaufnahme.
         </p>
-        <button
-          type="button"
-          className="taste"
-          onClick={() => {
-            setWerte(LEER)
-            setFehler({})
-            setStatus('offen')
-          }}
-        >
-          Weitere Registrierung
-        </button>
       </div>
     )
   }

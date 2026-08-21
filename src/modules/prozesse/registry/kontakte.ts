@@ -3,6 +3,60 @@ import type { RegistrierteAktion } from './typen.ts'
 
 /** Aktionen der Kontakte: Stammdatenpflege — prozessfreie Werkzeuge. */
 export const KONTAKTE = {
+  'kontakte.partner_anlegen': {
+    label: 'Kontakt anlegen',
+    bereich: 'kontakte',
+    ki: true,
+    beschreibung:
+      'Legt einen Kontakt an (Kunde und/oder Lieferant). Bei Personen bitte vorname ' +
+      'UND nachname angeben — daraus entsteht der Anzeigename; bei Firmen genügt ' +
+      'name mit is_company = true.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z
+      .object({
+        name: z.string().max(200).optional(),
+        vorname: z.string().max(100).optional(),
+        nachname: z.string().max(100).optional(),
+        is_company: z.boolean().default(false),
+        is_customer: z.boolean().default(true),
+        is_vendor: z.boolean().default(false),
+        email: z.string().max(200).optional(),
+        phone: z.string().max(60).optional(),
+        street: z.string().max(200).optional(),
+        house_number: z.string().max(20).optional(),
+        zip: z.string().max(20).optional(),
+        city: z.string().max(100).optional(),
+        country_code: z.string().max(2).default('DE'),
+        vat: z.string().max(30).optional(),
+      })
+      // BUG/00013: Eine Person ohne Nachname ist kein Kontakt, sondern ein
+      // Merkzettel. Firmen haben dagegen genau einen Namen.
+      .refine((k) => (k.is_company ? Boolean(k.name?.trim()) : Boolean(k.nachname?.trim())), {
+        message: 'Personen brauchen Vor- und Nachname, Firmen einen Firmennamen',
+        path: ['nachname'],
+      }),
+    zusammenfassung: (p) =>
+      p.is_company ? (p.name ?? '') : `${p.vorname ?? ''} ${p.nachname ?? ''}`.trim(),
+    formdata: (fd) => ({
+      name: String(fd.get('name') ?? '').trim() || undefined,
+      vorname: String(fd.get('vorname') ?? '').trim() || undefined,
+      nachname: String(fd.get('nachname') ?? '').trim() || undefined,
+      is_company: fd.get('is_company') === 'on',
+      is_customer: fd.get('is_customer') === 'on',
+      is_vendor: fd.get('is_vendor') === 'on',
+      email: String(fd.get('email') ?? '').trim() || undefined,
+      phone: String(fd.get('phone') ?? '').trim() || undefined,
+      street: String(fd.get('street') ?? '').trim() || undefined,
+      house_number: String(fd.get('house_number') ?? '').trim() || undefined,
+      zip: String(fd.get('zip') ?? '').trim() || undefined,
+      city: String(fd.get('city') ?? '').trim() || undefined,
+      country_code: String(fd.get('country_code') ?? 'DE'),
+      vat: String(fd.get('vat') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/kontakte'],
+  },
+
   'kontakte.partner_aendern': {
     label: 'Kontakt ändern',
     bereich: 'kontakte',
@@ -11,6 +65,8 @@ export const KONTAKTE = {
     prozessfrei: true,
     schema: z.object({
       name: z.string().min(1, 'Bitte einen Namen angeben').max(200),
+      vorname: z.string().max(100).optional(),
+      nachname: z.string().max(100).optional(),
       is_company: z.boolean().default(false),
       is_customer: z.boolean().default(false),
       is_vendor: z.boolean().default(false),
@@ -34,6 +90,8 @@ export const KONTAKTE = {
     }),
     formdata: (fd) => ({
       name: String(fd.get('name') ?? '').trim(),
+      vorname: String(fd.get('vorname') ?? '').trim() || undefined,
+      nachname: String(fd.get('nachname') ?? '').trim() || undefined,
       is_company: fd.get('is_company') === 'on',
       is_customer: fd.get('is_customer') === 'on',
       is_vendor: fd.get('is_vendor') === 'on',

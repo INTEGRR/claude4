@@ -3,9 +3,65 @@ import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Kontakt-Aktionen — Fachlogik unverändert aus kontakte/actions.ts. */
 
+/**
+ * Anzeigename aus den Teilen: Firmen tragen genau einen Namen, Personen
+ * setzen sich aus Vor- und Nachname zusammen (BUG/00013). `name` bleibt die
+ * eine Wahrheit für Belege — die Teile sind das, woraus er entsteht.
+ */
+export function anzeigename(p: {
+  name?: string
+  vorname?: string
+  nachname?: string
+  is_company?: boolean
+}): string {
+  if (p.is_company) return (p.name ?? '').trim()
+  const zusammen = `${p.vorname ?? ''} ${p.nachname ?? ''}`.trim()
+  return zusammen || (p.name ?? '').trim()
+}
+
+export async function partnerAnlegen(
+  p: {
+    name?: string
+    vorname?: string
+    nachname?: string
+    is_company: boolean
+    is_customer: boolean
+    is_vendor: boolean
+    email?: string
+    phone?: string
+    street?: string
+    house_number?: string
+    zip?: string
+    city?: string
+    country_code: string
+    vat?: string
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const name = anzeigename(p)
+  const [zeile] = await sql<{ id: string }[]>`
+    insert into partners (
+      name, vorname, nachname, is_company, is_customer, is_vendor,
+      email, phone, street, house_number, zip, city, country_code, vat)
+    values (
+      ${name}, ${p.is_company ? null : (p.vorname ?? null)},
+      ${p.is_company ? null : (p.nachname ?? null)},
+      ${p.is_company}, ${p.is_customer}, ${p.is_vendor},
+      ${p.email ?? null}, ${p.phone ?? null}, ${p.street ?? null},
+      ${p.house_number ?? null}, ${p.zip ?? null}, ${p.city ?? null},
+      ${p.country_code}, ${p.vat ?? null})
+    returning id`
+
+  await sql`select log_event('partner', ${zeile.id}, 'state',
+    ${'Kontakt angelegt'}, ${ctx.actor})`
+  return { text: `Kontakt „${name}" angelegt.`, recordId: zeile.id, link: `/kontakte/${zeile.id}` }
+}
+
 export async function partnerAendern(
   p: {
     name: string
+    vorname?: string
+    nachname?: string
     is_company: boolean
     is_customer: boolean
     is_vendor: boolean
@@ -31,7 +87,9 @@ export async function partnerAendern(
 ): Promise<AktionsErgebnis> {
   await sql`
     update partners set
-      name = ${p.name},
+      name = ${anzeigename({ ...p, name: p.name })},
+      vorname = ${p.is_company ? null : (p.vorname ?? null)},
+      nachname = ${p.is_company ? null : (p.nachname ?? null)},
       is_company = ${p.is_company},
       is_customer = ${p.is_customer},
       is_vendor = ${p.is_vendor},
