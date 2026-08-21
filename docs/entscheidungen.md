@@ -9,6 +9,46 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-21 — Gefahrenzone in zwei Stufen: Betriebsdaten und Werkszustand
+
+Bisher gab es genau einen Knopf, „alle Daten löschen (Neustart)". Er tut das
+auch — aber nur für BETRIEBSdaten. Konfiguration, Konten, Firmendaten und vor
+allem das ganze Prozessmodell bleiben stehen. Das ist für den ursprünglichen
+Zweck richtig (Beispieldaten vor dem echten Betrieb entfernen), heißt aber
+nicht, was der Knopf verspricht.
+
+Für den Pilotbetrieb fehlte die Stufe darüber: Wer eine Woche lang Prozesse
+ausprobiert hat, sitzt sonst auf vier Versionen des Verkaufsprozesses, einer
+halb umgestellten Navigation und einer Ersteinrichtung, die nie wiederkommt.
+
+Zwei Stufen, beide über die Registry (der bisherige Knopf war eine der
+UI-Umgehungen aus dem Code Review — die Liste schrumpft um einen weiteren
+Eintrag), beide mit Tippbestätigung, **beide bewusst ohne KI-Freigabe**:
+
+- **Stufe 1 `einstellungen.betriebsdaten_loeschen`** — wie gehabt: Belege,
+  Produkte, Partner, Bestände, Buchungen, Protokolle; Nummernkreise auf 1.
+- **Stufe 2 `einstellungen.werkszustand`** — zusätzlich alles, was diese
+  Instanz zu DIESER Instanz gemacht hat: selbst gebaute Prozessversionen und
+  Entwürfe (der Auslieferungsstand aus den Migrationen bleibt), eigene
+  Felder, Laufzeit-Abschaltungen, die Paketwahl, alle Konten außer dem
+  ausführenden, die Firmendaten. Der settings-Schlüssel `einrichtung` fällt —
+  die Ersteinrichtung startet danach wieder von vorn.
+
+Bewusst NICHT angefasst: technische Konfiguration (DHL-Absender,
+Freigabe-Limits, Finanz-Quoten, Kartonagen, Versandregeln), Lagerorte,
+Einheiten, Steuern, Zahlungsbedingungen. Das ist Einrichtung des Betreibers,
+kein Datenbestand — und Zugangsdaten stehen ohnehin in Umgebungsvariablen.
+
+Das ausführende Konto überlebt Stufe 2 zwingend (die Funktion prüft, dass es
+existiert und Administrator ist). Ohne ein bleibendes Konto wäre die Instanz
+nach dem Reset für niemanden mehr erreichbar.
+
+Nebenbefund und mitbehoben: **Registrierungen** von der öffentlichen
+Startseite fielen bei Stufe 1 stillschweigend mit. Sie sind kein
+Betriebsdatum der Firma, sondern der Vertriebseingang des Betreibers, und es
+gibt keine zweite Quelle. Sie stehen jetzt auf der Erhalten-Liste — in beiden
+Stufen.
+
 ## 2026-08-21 — Strukturregeln gelten schon beim Entwurf, nicht erst beim Schalten
 
 Aus dem Pilotbetrieb (BUG/00015): Der Kunde ließ den Verkaufsprozess von der

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
-import { actionError, actionFail, actionInfo } from '@/modules/shared/action'
+import { type ActionResult, actionError, actionFail, actionInfo } from '@/modules/shared/action'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 
@@ -135,22 +135,19 @@ async function saveFinanzen(formData: FormData) {
   return actionInfo('Finanz-Einstellungen gespeichert — die Prognose rechnet ab sofort damit.')
 }
 
-async function demodatenLoeschen(formData: FormData) {
+/**
+ * Gefahrenzone, zwei Stufen — beide über den Torwächter (Registry), damit
+ * sie im Protokoll stehen wie jede andere Aktion. Bewusst KEINE
+ * KI-Freigabe: das hier drückt ein Mensch.
+ */
+async function betriebsdatenLoeschen(formData: FormData): Promise<ActionResult> {
   'use server'
-  await requireAdmin()
-  if (String(formData.get('bestaetigung') ?? '').trim() !== 'ALLES LÖSCHEN') {
-    return actionError('Zur Bestätigung muss im Feld exakt „ALLES LÖSCHEN" stehen.')
-  }
-  try {
-    await sql`select demodaten_loeschen()`
-  } catch (err) {
-    return actionFail(err)
-  }
-  revalidatePath('/', 'layout')
-  return actionInfo(
-    'Alle Belege, Produkte, Partner und Bestände sind gelöscht; Belegnummern starten wieder bei 1. ' +
-      'Beispieldaten kommen nie automatisch zurück — nur auf ausdrücklichen Befehl.',
-  )
+  return serverAktion('einstellungen.betriebsdaten_loeschen', { formData })
+}
+
+async function werkszustandHerstellen(formData: FormData): Promise<ActionResult> {
+  'use server'
+  return serverAktion('einstellungen.werkszustand', { formData })
 }
 
 /**
@@ -380,7 +377,11 @@ export default async function EinstellungenPage() {
         </p>
       </Card>
 
-      <Card title="Gefahrenzone: alle Daten löschen (Neustart)">
+      {/* Zwei Stufen, weil „alles löschen" zwei sehr verschiedene Dinge
+          heißen kann: die Beispieldaten loswerden — oder die Instanz auf den
+          Auslieferungsstand zurückdrehen. Die erste Stufe lässt die
+          Einrichtung stehen, die zweite holt sie zurück. */}
+      <Card title="Gefahrenzone · Stufe 1: Betriebsdaten löschen">
         <p style={{ marginTop: 0 }}>
           Löscht <strong>alle</strong> Belege, Produkte, Partner, Bestände, Buchungen und Protokolle —
           gedacht, um die Beispieldaten vor dem echten Betrieb restlos zu entfernen. Zurzeit im System:{' '}
@@ -389,8 +390,9 @@ export default async function EinstellungenPage() {
         </p>
         <p>
           Erhalten bleiben: Benutzerkonten (außer den Demo-Konten <span className="mono small">lager@example.com</span>{' '}
-          und <span className="mono small">fertigung@example.com</span>), Firmendaten, Lagerorte, Einheiten,
-          Steuern, Zahlungsbedingungen und die Shopify-/DHL-Konfiguration. Belegnummern starten wieder bei 1.
+          und <span className="mono small">fertigung@example.com</span>), Firmendaten, das komplette
+          Prozessmodell, Lagerorte, Einheiten, Steuern, Zahlungsbedingungen, die Shopify-/DHL-Konfiguration
+          und die Registrierungen der Startseite. Belegnummern starten wieder bei 1.
           Beispieldaten werden grundsätzlich nie automatisch eingespielt — sie kommen nur auf ausdrücklichen
           Befehl zurück (<span className="mono small">npm run db:seed -- --demo</span>).
         </p>
@@ -403,7 +405,7 @@ export default async function EinstellungenPage() {
           Das lässt sich nicht rückgängig machen. Zur Bestätigung unten exakt{' '}
           <strong>ALLES LÖSCHEN</strong> eintippen.
         </div>
-        <ActionForm action={demodatenLoeschen}>
+        <ActionForm action={betriebsdatenLoeschen}>
           <div className="row" style={{ alignItems: 'flex-end' }}>
             <label className="field">
               <span>Bestätigung</span>
@@ -411,6 +413,42 @@ export default async function EinstellungenPage() {
             </label>
             <div className="shrink field">
               <button className="danger" type="submit">Unwiderruflich löschen</button>
+            </div>
+          </div>
+        </ActionForm>
+      </Card>
+
+      <Card title="Gefahrenzone · Stufe 2: Werkszustand herstellen">
+        <p style={{ marginTop: 0 }}>
+          Dreht die Instanz auf den Stand zurück, den sie frisch nach der Provisionierung hatte —
+          <strong> die Ersteinrichtung startet danach wieder von vorn</strong>. Zusätzlich zu Stufe 1 fallen:
+        </p>
+        <ul>
+          <li>
+            alle selbst gebauten <strong>Prozessversionen und Entwürfe</strong> (der Auslieferungsstand
+            aus den Migrationen bleibt), dazu eigene Felder und abgeschaltete Schritte
+          </li>
+          <li>die Paketwahl — die Navigation zeigt danach wieder alle Prozesse</li>
+          <li>alle <strong>Benutzerkonten außer dem eigenen</strong> (sonst käme niemand mehr hinein)</li>
+          <li>die Firmendaten (zurück auf den Vorgabewert)</li>
+        </ul>
+        <p className="muted small">
+          Nicht angefasst: technische Konfiguration (DHL-Absender, Freigabe-Limits, Finanz-Quoten,
+          Kartonagen, Versandregeln), Lagerorte, Einheiten, Steuern, Zahlungsbedingungen — das ist
+          Einrichtung des Betreibers, kein Datenbestand. Und die Registrierungen der Startseite.
+        </p>
+        <div className="notice danger">
+          Härter als Stufe 1 und ebenfalls endgültig. Zur Bestätigung unten exakt{' '}
+          <strong>WERKSZUSTAND</strong> eintippen.
+        </div>
+        <ActionForm action={werkszustandHerstellen}>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field">
+              <span>Bestätigung</span>
+              <input className="mono" name="bestaetigung" placeholder="WERKSZUSTAND" autoComplete="off" />
+            </label>
+            <div className="shrink field">
+              <button className="danger" type="submit">Werkszustand herstellen</button>
             </div>
           </div>
         </ActionForm>

@@ -11,7 +11,8 @@
 import '../scripts/env.ts'
 import test, { after, before, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 
@@ -26,16 +27,21 @@ function url(datenbank?: string): string {
   return u.toString()
 }
 
-/** Wartungsskript gegen die Wegwerf-Datenbank ausführen. */
-function skript(name: string, ...argumente: string[]) {
-  return spawnSync(
+/**
+ * Wartungsskript gegen die Wegwerf-Datenbank ausführen — bewusst ASYNCHRON.
+ * spawnSync hält die Ereignisschleife des Testprozesses an, und node:test
+ * spricht über eine Pipe mit dem Elternprozess; ein blockierter Kindprozess
+ * kann dort haken, ohne etwas auszugeben.
+ */
+async function skript(name: string, ...argumente: string[]): Promise<void> {
+  await promisify(execFile)(
     process.execPath,
     ['--experimental-strip-types', name, ...argumente],
     {
-      encoding: 'utf8',
       // loadEnvFile() überschreibt gesetzte Variablen nicht — die Umleitung
       // auf die Testdatenbank gewinnt also gegen die .env.
       env: { ...process.env, DATABASE_URL: url(TESTDB), DIRECT_URL: '' },
+      timeout: 120_000,
     },
   )
 }
@@ -49,8 +55,7 @@ describe('Neustart: demodaten_loeschen', () => {
     await admin.unsafe(`create database ${TESTDB}`)
     await admin.end()
 
-    const migration = skript('scripts/migrate.ts')
-    assert.equal(migration.status, 0, `Migration fehlgeschlagen:\n${migration.stderr}`)
+    await skript('scripts/migrate.ts')
 
     sql = postgres(url(TESTDB), { max: 1 })
 
@@ -146,8 +151,7 @@ describe('Neustart: demodaten_loeschen', () => {
 
     // Exakt der Aufruf aus scripts/vorbereiten.ts (Vercel) und dem
     // Docker-Entrypoint ohne SEED_DEMO: nur der Administrator, sonst nichts.
-    const seed = skript('scripts/seed.ts')
-    assert.equal(seed.status, 0, `Seed fehlgeschlagen:\n${seed.stderr}`)
+    await skript('scripts/seed.ts')
 
     const [{ produkte }] = await sql<{ produkte: number }[]>`
       select count(*)::int as produkte from product_templates`
@@ -155,6 +159,83 @@ describe('Neustart: demodaten_loeschen', () => {
     const demoKonten = await sql<{ email: string }[]>`
       select email from users where email like '%@example.com' and email <> 'admin@example.com'`
     assert.equal(demoKonten.length, 0, 'Seed darf die Demo-Konten nicht neu anlegen')
+  })
+
+  test('Werkszustand: eigene Prozessversionen fallen, der Auslieferungsstand bleibt', async () => {
+    // Ausgangslage nachstellen: ein selbst gebauter Prozess mit Entwurf,
+    // eine zweite Version eines Auslieferungsprozesses, ein zweiter Nutzer,
+    // eigene Firmendaten und eine abgeschlossene Einrichtung.
+    const [admin] = await sql<{ id: string }[]>`
+      select id from users where email = 'admin@example.com'`
+    await sql`insert into users (email, name, password_hash, role)
+              values ('zweiter@example.com', 'Zweiter', 'x:y', 'mitarbeiter')`
+    const [eigen] = await sql<{ id: string }[]>`
+      insert into prozesse (code, name, bereich, modell, aktiv)
+      values ('selbstgebaut', 'Selbst gebaut', 'verkauf', 'vorgang', true) returning id`
+    await sql`insert into prozess_versionen (prozess_id, version, status, created_by)
+              values (${eigen.id}, 1, 'aktiv', 'Administrator')`
+    const [verkauf] = await sql<{ id: string }[]>`select id from prozesse where code = 'verkauf'`
+    await sql`insert into prozess_versionen (prozess_id, version, status, created_by)
+              values (${verkauf.id}, 99, 'entwurf', 'Administrator')`
+    await sql`update prozesse set aktiv = false where code = 'reparatur'`
+    await sql`update settings set value = '{"name":"Echte Firma GmbH"}'::jsonb where key = 'company'`
+    await sql`insert into settings (key, value) values ('einrichtung', '{"abgeschlossen": true}'::jsonb)
+              on conflict (key) do update set value = excluded.value`
+    await sql`insert into registrierungen (firma, ansprechpartner, email, ablauf)
+              values ('Nordwerk GmbH', 'Mira Kessler', 'm@nordwerk.de', 'Auftragsdurchlauf')`
+
+    await sql`select werkszustand_herstellen(${admin.id}::uuid, 'test')`
+
+    // Eigene Version weg, Auslieferungsstand da.
+    const [{ eigene }] = await sql<{ eigene: number }[]>`
+      select count(*)::int as eigene from prozess_versionen
+      where coalesce(created_by, '') not like 'migration:%' and coalesce(created_by, '') <> 'system'`
+    assert.equal(eigene, 0, 'selbst gebaute Versionen müssen fallen')
+    const [{ selbstgebaut }] = await sql<{ selbstgebaut: number }[]>`
+      select count(*)::int as selbstgebaut from prozesse where code = 'selbstgebaut'`
+    assert.equal(selbstgebaut, 0, 'ein komplett selbst gebauter Prozess verschwindet mit')
+    const [{ verkaufDa }] = await sql<{ verkaufDa: number }[]>`
+      select count(*)::int as "verkaufDa" from prozess_versionen v
+      join prozesse p on p.id = v.prozess_id where p.code = 'verkauf'`
+    assert.ok(verkaufDa > 0, 'der Auslieferungsstand des Verkaufsprozesses bleibt')
+
+    // Navigation zurück auf „alles aktiv".
+    const [{ inaktiv }] = await sql<{ inaktiv: number }[]>`
+      select count(*)::int as inaktiv from prozesse where not aktiv`
+    assert.equal(inaktiv, 0, 'ohne Paketwahl sind alle Prozesse aktiv')
+
+    // Konten, Firma, Einrichtung.
+    const benutzer = await sql<{ email: string }[]>`select email from users`
+    assert.deepEqual(benutzer.map((b) => b.email), ['admin@example.com'])
+    const [firma] = await sql<{ value: { name?: string } }[]>`
+      select value from settings where key = 'company'`
+    assert.equal(firma.value.name, 'Meine Firma GmbH', 'Firmendaten zurück auf Vorgabe')
+    const [{ offen }] = await sql<{ offen: number }[]>`
+      select count(*)::int as offen from settings where key = 'einrichtung'`
+    assert.equal(offen, 0, 'die Ersteinrichtung muss wieder erscheinen')
+
+    // Was NICHT fallen darf.
+    const [{ regs }] = await sql<{ regs: number }[]>`
+      select count(*)::int as regs from registrierungen`
+    assert.equal(regs, 1, 'Registrierungen der Startseite sind kein Betriebsdatum')
+    const [{ orte }] = await sql<{ orte: number }[]>`
+      select count(*)::int as orte from stock_locations`
+    assert.ok(orte > 0, 'Lagerorte bleiben')
+  })
+
+  test('Werkszustand verweigert sich ohne gültiges Admin-Konto', async () => {
+    const [mitarbeiter] = await sql<{ id: string }[]>`
+      insert into users (email, name, password_hash, role)
+      values ('dritter@example.com', 'Dritter', 'x:y', 'mitarbeiter') returning id`
+    await assert.rejects(
+      () => sql`select werkszustand_herstellen(${mitarbeiter.id}::uuid, 'test')`,
+      /Nur Administratoren/,
+    )
+    await assert.rejects(
+      () => sql`select werkszustand_herstellen(gen_random_uuid(), 'test')`,
+      /Unbekanntes Konto/,
+    )
+    await sql`delete from users where id = ${mitarbeiter.id}`
   })
 
   test('die Automatik ist wirklich tot: kein Startpfad reicht --demo weiter', async () => {

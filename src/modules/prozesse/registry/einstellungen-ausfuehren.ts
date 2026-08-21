@@ -601,3 +601,34 @@ export async function prozessAbnahme(
     recordId: p.prozess_code,
   }
 }
+
+// --- Gefahrenzone -----------------------------------------------------------
+
+export async function betriebsdatenLoeschen(
+  _p: { bestaetigung: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`select demodaten_loeschen()`
+  await sql`select log_event('system', gen_random_uuid(), 'state',
+    'Betriebsdaten gelöscht (Gefahrenzone Stufe 1)', ${ctx.actor})`
+  return {
+    text:
+      'Betriebsdaten gelöscht: Belege, Produkte, Partner, Bestände und Protokolle sind weg, ' +
+      'die Nummernkreise starten wieder bei 1.',
+  }
+}
+
+export async function werkszustand(
+  _p: { bestaetigung: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Die Funktion prüft selbst, dass das Konto existiert und Administrator
+  // ist — ohne ein bleibendes Konto wäre die Instanz nach dem Reset für
+  // niemanden mehr erreichbar.
+  await sql`select werkszustand_herstellen(${ctx.userId!}::uuid, ${ctx.actor})`
+  return {
+    text:
+      'Werkszustand hergestellt. Die Ersteinrichtung startet beim nächsten Aufruf neu — ' +
+      'alle anderen Konten und die selbst gebauten Prozessversionen sind entfernt.',
+  }
+}

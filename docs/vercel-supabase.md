@@ -138,11 +138,16 @@ geführte Strecke Instanz → Team → Aufnehmen → Zeichnen → Läuft, an der
 der erste eigene Prozess geschaltet ist — Details in
 [prozesse.md](prozesse.md), Abschnitt Onboarding.
 
-**Falls mit Beispieldaten getestet wurde:** Einstellungen → „Gefahrenzone:
-alle Daten löschen (Neustart)" entfernt vor dem echten Betrieb sämtliche
-Belege, Produkte, Partner, Bestände und Protokolle samt der beiden
-Demo-Konten; Benutzer, Firmendaten, Lagerorte und Konfiguration bleiben,
-Belegnummern starten wieder bei 1. Danach holt die Shopify-Erstübernahme
+**Falls mit Beispieldaten getestet wurde:** Einstellungen → Gefahrenzone,
+zwei Stufen. **Stufe 1 „Betriebsdaten löschen"** entfernt sämtliche Belege,
+Produkte, Partner, Bestände und Protokolle samt der beiden Demo-Konten;
+Benutzer, Firmendaten, das Prozessmodell, Lagerorte und Konfiguration
+bleiben, Belegnummern starten wieder bei 1. **Stufe 2 „Werkszustand
+herstellen"** geht weiter: zusätzlich fallen selbst gebaute
+Prozessversionen und Entwürfe, eigene Felder, die Paketwahl, alle Konten
+außer dem eigenen und die Firmendaten — die Ersteinrichtung startet danach
+wieder von vorn. Beide verlangen eine getippte Bestätigung; Registrierungen
+von der Startseite überleben beide. Danach holt die Shopify-Erstübernahme
 (Seite „Integrationen") Produkte, Kunden und Bestellungen aus dem Shop.
 
 ---

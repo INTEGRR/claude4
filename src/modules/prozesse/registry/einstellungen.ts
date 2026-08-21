@@ -140,6 +140,50 @@ export const EINSTELLUNGEN = {
     revalidate: ['/'],
   },
 
+  // --- Gefahrenzone: zwei Stufen ------------------------------------------
+
+  'einstellungen.betriebsdaten_loeschen': {
+    label: 'Betriebsdaten löschen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Löscht Belege, Produkte, Partner, Bestände, Buchungen und Protokolle und setzt die ' +
+      'Nummernkreise auf 1 — gedacht, um Beispieldaten vor dem echten Betrieb zu entfernen. ' +
+      'Konfiguration, Benutzerkonten, Firmendaten, das Prozessmodell und die Registrierungen ' +
+      'der Startseite bleiben. Bewusst NICHT für die KI freigegeben.',
+    bindung: 'frei',
+    schema: z.object({
+      bestaetigung: z.literal('ALLES LÖSCHEN', {
+        errorMap: () => ({ message: 'Zur Bestätigung muss im Feld exakt „ALLES LÖSCHEN" stehen.' }),
+      }),
+    }),
+    zusammenfassung: () => 'Betriebsdaten gelöscht',
+    formdata: (fd) => ({ bestaetigung: String(fd.get('bestaetigung') ?? '').trim() }),
+    revalidate: ['/'],
+  },
+
+  'einstellungen.werkszustand': {
+    label: 'Werkszustand herstellen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Zweite Stufe: zusätzlich zu den Betriebsdaten fallen die selbst gebauten ' +
+      'Prozessversionen, eigene Felder, Laufzeit-Abschaltungen, alle Benutzerkonten außer ' +
+      'dem eigenen und die Firmendaten. Die Ersteinrichtung erscheint danach wieder — die ' +
+      'Instanz ist wie frisch provisioniert. Bewusst NICHT für die KI freigegeben.',
+    bindung: 'frei',
+    schema: z.object({
+      bestaetigung: z.literal('WERKSZUSTAND', {
+        errorMap: () => ({ message: 'Zur Bestätigung muss im Feld exakt „WERKSZUSTAND" stehen.' }),
+      }),
+    }),
+    zusammenfassung: () => 'Werkszustand hergestellt',
+    formdata: (fd) => ({ bestaetigung: String(fd.get('bestaetigung') ?? '').trim() }),
+    revalidate: ['/'],
+  },
+
   // --- Prozessentwurf (Chamäleon: KI entwirft, Mensch aktiviert) ------------
 
   'einstellungen.prozess_entwerfen': {

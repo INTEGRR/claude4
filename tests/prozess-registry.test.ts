@@ -248,7 +248,6 @@ const UI_UMGEHUNGEN = new Set<string>([
   'einstellungen:savePolicies',
   'einstellungen:saveFreigaben',
   'einstellungen:saveFinanzen',
-  'einstellungen:demodatenLoeschen',
   // Stammdaten-Schnellanlage aus der Konfigurationsseite
   'produkte/konfiguration:createCategory',
   'produkte/konfiguration:createTax',
