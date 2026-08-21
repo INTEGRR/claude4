@@ -909,6 +909,15 @@ Schritt 03 sagt das offen und die Einrichtung lässt sich trotzdem
 abschließen — der erste Ablauf entsteht dann später in der Werkstatt. Kein
 Schritt ist eine Sackgasse.
 
+**Noch einmal ansehen**: Nach dem Abschluss ist `/einrichtung` zu. Mit
+`?erneut=1` kommen Administratoren wieder hinein (Einstellungen →
+„Einrichtung ansehen") — für Vorführungen und zum Prüfen. Der Durchlauf ist
+ECHT und nicht simuliert: was dort gespeichert wird, ist gespeichert. Die
+Kopfleiste sagt das auch. Wer nur schauen will, lässt die Karte
+„Geschäftsmodell" in Schritt 01 in Ruhe (sie schaltet Prozesse um) und
+nimmt in Schritt 03 einen Wegwerf-Ablauf auf — der Entwurf bleibt inaktiv,
+bis jemand in Schritt 05 bewusst schaltet.
+
 Der Abschluss (`einstellungen.einrichtung_abschliessen`) schreibt den
 settings-Schlüssel `einrichtung` — der überlebt auch die Gefahrenzone,
 die Weiche erscheint also nie wieder. Alle Aktionen sind nurAdmin,

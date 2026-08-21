@@ -206,6 +206,10 @@ export default async function EinstellungenPage() {
             <Link className="btn" href="/einstellungen/benutzer">Benutzer verwalten</Link>
             <Link className="btn" href="/einstellungen/nutzung">Nutzung</Link>
             <Link className="btn" href="/einstellungen/registrierungen">Registrierungen</Link>
+            {/* Die Einrichtung ist nach dem Abschluss zu — Administratoren
+                kommen mit ?erneut=1 noch einmal hinein (Vorführung, Prüfung).
+                Der Durchlauf ist echt, nicht simuliert. */}
+            <Link className="btn" href="/einrichtung?erneut=1">Einrichtung ansehen</Link>
           </>
         }
       />

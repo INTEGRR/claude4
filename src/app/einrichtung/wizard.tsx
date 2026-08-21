@@ -105,6 +105,18 @@ const ROLLEN = [
   { wert: 'admin', label: 'Geschäftsführung / Administrator' },
 ]
 
+/** Schrittarten in Kundensprache — „xor" sagt einem Kaufmann nichts. */
+const ART_TEXT: Record<string, string> = {
+  start: 'Auslöser',
+  aktion: 'Arbeitsschritt',
+  xor: 'Entscheidung',
+  dienst: 'Automatik',
+  ereignis: 'Warten auf Ereignis',
+  prozess: 'Teilprozess',
+  matching: 'Klärung',
+  ende: 'Abschluss',
+}
+
 const SPEICHER = 'krnl-einrichtung-runden'
 
 interface Runde {
@@ -148,6 +160,7 @@ export function Wizard({
   team,
   entwurf,
   kiBereit,
+  erneut = false,
 }: {
   adminId: string
   adminName: string
@@ -157,6 +170,8 @@ export function Wizard({
   team: Mitglied[]
   entwurf: EntwurfInfo | null
   kiBereit: boolean
+  /** Zweiter Durchlauf (?erneut=1) — die Einrichtung war schon abgeschlossen. */
+  erneut?: boolean
 }) {
   const router = useRouter()
   // Mit Entwurf steigen wir dort ein, wo er hingehört: geprüft wird das
@@ -318,6 +333,11 @@ export function Wizard({
           <span className="mono">Einrichtung</span>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
+          {erneut && (
+            <span className="mono" style={{ color: 'var(--kernel)' }}>
+              erneuter Durchlauf · Änderungen wirken sofort
+            </span>
+          )}
           <span className="mono">{instanz.host}</span>
           {typeof schritt === 'number' && (
             <span className="schrittstand">
@@ -685,7 +705,7 @@ export function Wizard({
                   Schritte, die nicht stimmen. Eure Freigabe hier ist die Abnahme —
                   kein Lastenheft.
                 </p>
-                <div className="diagramm" style={{ height: 420 }}>
+                <div className="diagramm">
                   <ProzessFlow d={entwurf.diagramm} />
                 </div>
                 <div className="karte" style={{ marginTop: 18 }}>
@@ -700,7 +720,7 @@ export function Wizard({
                         <span className={`punkt ${markiert.includes(s.name) ? 'jetzt' : ''}`} />
                         <span className="titel">
                           {s.name}
-                          <span className="zeile2">{s.art}</span>
+                          <span className="unterzeile">{ART_TEXT[s.art] ?? s.art}</span>
                         </span>
                         <button
                           type="button"

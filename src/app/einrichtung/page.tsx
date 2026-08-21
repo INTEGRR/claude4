@@ -25,14 +25,22 @@ export const maxDuration = 300
 export default async function EinrichtungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ entwurf?: string }>
+  searchParams: Promise<{ entwurf?: string; erneut?: string }>
 }) {
   const user = await currentUser()
   if (!user) redirect('/login')
 
+  const params = await searchParams
+  // Nach dem Abschluss ist die Einrichtung zu — mit einer Ausnahme:
+  // Administratoren dürfen sie mit ?erneut=1 noch einmal durchlaufen.
+  // Sonst gäbe es keine Möglichkeit, sie anzusehen oder vorzuführen, ohne
+  // eine Instanz wegzuwerfen. Der Durchlauf ist ECHT, nicht simuliert —
+  // was hier gespeichert wird, ist gespeichert; deshalb steht das auch so
+  // im Kopf der Seite.
+  const erneut = params.erneut === '1' && user.role === 'admin'
   const [fertig] = await sql<{ key: string }[]>`
     select key from settings where key = 'einrichtung'`
-  if (fertig) redirect('/')
+  if (fertig && !erneut) redirect('/')
 
   if (user.role !== 'admin') {
     return (
@@ -49,7 +57,7 @@ export default async function EinrichtungPage({
     )
   }
 
-  const [pakete, firmaZeile, nutzer, instanzZahlen, kopf, params] = await Promise.all([
+  const [pakete, firmaZeile, nutzer, instanzZahlen, kopf] = await Promise.all([
     sql<{ code: string; name: string; beschreibung: string | null }[]>`
       select code, name, beschreibung from prozess_pakete order by code`,
     sql<{ value: Record<string, string> }[]>`select value from settings where key = 'company'`,
@@ -59,7 +67,6 @@ export default async function EinrichtungPage({
       select (select count(*)::int from schema_migrations) as migrationen,
              (select count(distinct bereich)::int from prozesse) as module`,
     headers(),
-    searchParams,
   ])
 
   const entwurf = params.entwurf ? await entwurfLaden(params.entwurf) : null
@@ -81,6 +88,7 @@ export default async function EinrichtungPage({
       team={nutzer}
       entwurf={entwurf}
       kiBereit={aufnahmeKonfiguriert()}
+      erneut={erneut}
     />
   )
 }

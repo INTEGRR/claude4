@@ -261,6 +261,15 @@
 }
 .krnl-einrichtung .rolle-fuehrung { color: var(--kernel); }
 
+.krnl-einrichtung .unterzeile {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* Formularfelder */
 .krnl-einrichtung .feld { margin-bottom: 14px; }
 .krnl-einrichtung .feldreihe { display: flex; gap: 12px; flex-wrap: wrap; }
