@@ -1,6 +1,6 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { closeDb, db, expectError, makeProduct, stockUp, withRollback } from './helpers.ts'
+import { closeDb, db, expectError, makeProduct, makeUser, stockUp, withRollback } from './helpers.ts'
 import { suchworte, varianteSuchen, wortstamm } from '../src/modules/ki/produkt-suche.ts'
 import {
   ARGUMENTE,
@@ -149,7 +149,7 @@ describe('Sprechen: Werkzeugkatalog (DB-frei)', () => {
 
 describe('Sprechen: Protokoll + Sammlung (0062)', () => {
   async function protokollAnlegen(t: Parameters<Parameters<typeof withRollback>[0]>[0]) {
-    const [user] = await t<{ id: string }[]>`select id from users limit 1`
+    const user = await makeUser(t)
     const [p] = await t<{ id: string }[]>`
       insert into sprachprotokolle (user_id, modell) values (${user.id}, 'test') returning id`
     return p.id

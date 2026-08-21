@@ -34,7 +34,7 @@ jobs:
           POSTGRES_DB: erp
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -58,6 +58,14 @@ jobs:
 
       - name: Schema einspielen
         run: npm run db:migrate
+
+      # Genau wie das echte Deployment (scripts/vorbereiten.ts): nur der
+      # Administrator, keine Beispieldaten. Die Tests bringen ihre eigenen
+      # Voraussetzungen mit und laufen auch OHNE diesen Schritt durch —
+      # geprüft. Er steht hier, damit die CI dem Produktionszustand
+      # entspricht und nicht einem Sonderfall.
+      - name: Administrator anlegen
+        run: npm run db:seed
 
       - name: Linter
         run: npm run lint

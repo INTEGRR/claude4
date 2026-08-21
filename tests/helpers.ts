@@ -102,6 +102,27 @@ export async function operationTypeId(t: TransactionSql, kind: string): Promise<
 }
 
 /** Legt ein einfaches Produkt ohne Varianten an und liefert die Varianten-ID. */
+/**
+ * Ein Benutzer, auf den sich der Test verlassen kann. Vorher holten mehrere
+ * Tests einfach `select id from users limit 1` — das ging gut, solange lokal
+ * geseedet war, und brach in der CI gegen eine frisch migrierte Datenbank mit
+ * „Cannot read properties of undefined". Ein Test bringt seine Voraussetzungen
+ * selbst mit.
+ */
+export async function makeUser(
+  t: TransactionSql,
+  name = 'Testnutzer',
+): Promise<{ id: string; name: string }> {
+  const [vorhanden] = await t<{ id: string; name: string }[]>`
+    select id, name from users where name = ${name}`
+  if (vorhanden) return vorhanden
+  const [neu] = await t<{ id: string; name: string }[]>`
+    insert into users (email, name, password_hash, role)
+    values (${`${name.toLowerCase().replace(/\s+/g, '.')}@test.local`}, ${name}, 'x:y', 'admin')
+    returning id, name`
+  return neu
+}
+
 export async function makeProduct(
   t: TransactionSql,
   name: string,

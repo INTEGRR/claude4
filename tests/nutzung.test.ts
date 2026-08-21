@@ -1,6 +1,6 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { closeDb, withRollback } from './helpers.ts'
+import { closeDb, makeUser, withRollback } from './helpers.ts'
 
 after(closeDb)
 
@@ -40,8 +40,7 @@ describe('nutzungsbericht()', () => {
     await withRollback(async (t) => {
       const vorher = (await t<Zeile[]>`select * from nutzungsbericht(1)`)[0]
 
-      const [nutzer] = await t<{ id: string; name: string }[]>`
-        select id, name from users order by created_at limit 1`
+      const nutzer = await makeUser(t)
       const [partner] = await t<{ id: string }[]>`
         insert into partners (name, is_customer) values ('Nutzungstest', true) returning id`
       await t`insert into sales_orders (number, partner_id)
