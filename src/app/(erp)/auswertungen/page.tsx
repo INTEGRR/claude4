@@ -82,7 +82,7 @@ interface MonthRow {
 }
 
 /** Zeilen (variant × Monat) zu einer Tabelle Variante → Monatsspalten drehen. */
-function pivot(rows: MonthRow[], months: string[]) {
+function pivot(rows: MonthRow[], _months: string[]) {
   const byVariant = new Map<
     string,
     { product: string; sku: string | null; total: number; perMonth: Map<string, number> }

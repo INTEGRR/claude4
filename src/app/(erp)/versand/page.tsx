@@ -311,7 +311,7 @@ export default async function VersandPage({
                     <td className="num">
                       <div className="actions" style={{ justifyContent: 'flex-end' }}>
                         {s.hat_label && (
-                          <a className="btn small" href={`/api/label/${s.id}`} target="_blank">
+                          <a className="btn small" href={`/api/label/${s.id}`} target="_blank" rel="noopener">
                             Label
                           </a>
                         )}

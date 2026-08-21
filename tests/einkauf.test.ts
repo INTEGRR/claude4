@@ -5,7 +5,6 @@ import {
   assertLedgerConsistent,
   closeDb,
   expectError,
-  makeProduct,
   onHand,
   uomStueck,
   withRollback,

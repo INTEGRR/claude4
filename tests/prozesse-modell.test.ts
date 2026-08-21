@@ -6,7 +6,7 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import type { TransactionSql } from 'postgres'
-import { closeDb, db, expectError, withRollback } from './helpers.ts'
+import { closeDb, expectError, withRollback } from './helpers.ts'
 
 after(closeDb)
 

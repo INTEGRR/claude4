@@ -4,7 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { canAccess } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { date, dateTime, hours, money } from '@/modules/shared/format'
+import { date, dateTime, hours, } from '@/modules/shared/format'
 import { clockByBarcode, clockToggle, stopEntry } from '../personal/actions'
 
 export const dynamic = 'force-dynamic'

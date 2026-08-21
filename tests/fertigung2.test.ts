@@ -65,7 +65,7 @@ async function phantomScenario(t: TransactionSql) {
 }
 
 /** Bucht Bestand für alle Einzelteile und legt Einstandspreise fest. */
-async function stockComponents(t: TransactionSql, s: Szenario, cost: Record<string, number>) {
+async function stockComponents(t: TransactionSql, _s: Szenario, cost: Record<string, number>) {
   for (const [variant, preis] of Object.entries(cost)) {
     await t`
       update product_templates set standard_cost = ${preis}

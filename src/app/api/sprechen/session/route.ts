@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { currentUser } from '@/modules/auth'
 import { ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
-import { clientSecretErstellen, sprechenKonfiguriert, sprechenModell } from '@/modules/ki/sprechen'
+import { clientSecretErstellen, sprechenKonfiguriert, } from '@/modules/ki/sprechen'
 import {
   aufnahmeInstructions,
   aufnahmeWerkzeuge,

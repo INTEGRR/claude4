@@ -1,6 +1,6 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { closeDb, expectError, makeProduct, uomStueck, withRollback } from './helpers.ts'
+import { closeDb, expectError, makeProduct, withRollback } from './helpers.ts'
 
 after(closeDb)
 

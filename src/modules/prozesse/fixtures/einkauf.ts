@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import type { Sql } from 'postgres'
-import type { FixtureKontext, ProzessFixture } from './typen.ts'
+import type { ProzessFixture } from './typen.ts'
 
 /**
  * P6: Einkaufsbestellung (bis zur erzeugten Rechnung) und die

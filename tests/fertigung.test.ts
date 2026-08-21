@@ -33,7 +33,7 @@ async function keyboardScenario(t: TransactionSql) {
     values (${`Tastatur ${suffix}`}, ${uom}, true, true, true) returning id`
   const [attr] = await t<{ id: string }[]>`
     insert into product_attributes (name) values (${`Farbe ${suffix}`}) returning id`
-  const values = await t<{ id: string; name: string }[]>`
+  const _values = await t<{ id: string; name: string }[]>`
     insert into product_attribute_values (attribute_id, name)
     values (${attr.id}, 'Weiß'), (${attr.id}, 'Schwarz')
     returning id, name`

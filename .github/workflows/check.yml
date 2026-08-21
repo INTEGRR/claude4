@@ -1,0 +1,81 @@
+# Der Wächter über allen Wächtern.
+#
+# Vorher lief KEINE Prüfung automatisch: der einzige Workflow
+# (prozesse-staging.yml) startet nur von Hand oder bei Push auf `staging`.
+# Damit hingen Registry-Abdeckung, Migrations-Wächter, Doku-Wächter,
+# Daten-TÜV und Prozessvollständigkeit allein an der Disziplin des
+# Einzelnen — also genau an dem, was sie ersetzen sollten.
+#
+# Dieser Workflow führt `npm run check` (Linter + Typprüfung + Tests +
+# Prozessläufe) auf jedem Push und jedem Pull Request aus, gegen eine
+# frische Postgres-Instanz im Service-Container. Laufzeit ~2 Minuten.
+
+name: Prüfung
+
+on:
+  push:
+    branches-ignore: [staging]
+  pull_request:
+
+concurrency:
+  group: pruefung-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/erp
+      DIRECT_URL: ''
+      # Die Testsuite legt Wegwerf-Datenbanken an (demodaten, Prozess-Harness).
+      SEED_ADMIN_PASSWORD: ci-nur-fuer-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten
+        run: npm ci
+
+      - name: Schema einspielen
+        run: npm run db:migrate
+
+      - name: Linter
+        run: npm run lint
+
+      - name: Typprüfung
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Prozessläufe
+        run: npm run test:prozesse
+
+      # Der Build fängt, was die Tests nicht sehen: fehlerhafte Server/Client-
+      # Grenzen, kaputte Importe in Seiten, ungültige Route-Signaturen.
+      - name: Build
+        run: npm run build
+        env:
+          # Ohne Schlüssel — der Build darf davon nicht abhängen.
+          ANTHROPIC_API_KEY: ''
+          OPENAI_API_KEY: ''

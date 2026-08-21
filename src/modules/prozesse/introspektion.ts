@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { RegistrierteAktion } from './registry/typen.ts'
-import { REGISTRY, alleAktionen } from './registry/index.ts'
+import { alleAktionen } from './registry/index.ts'
 import { JOB_KATALOG } from './jobs-katalog.ts'
 import { EREIGNISSE } from './ereignisse.ts'
 

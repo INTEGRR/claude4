@@ -85,7 +85,7 @@ async function matchingAusfuehren(
 async function dienstAusfuehren(sql: Sql, prozess: string, schritt: Schritt): Promise<void> {
   assert.ok(schritt.job_kind, `${prozess}/${schritt.code}: Dienstschritt ohne Job`)
   const { runDueJobs } = await import('../../src/modules/integrationen/jobs.ts')
-  let runde
+  let runde: Awaited<ReturnType<typeof runDueJobs>>
   do {
     runde = await runDueJobs(20)
   } while (runde.ran > 0)
