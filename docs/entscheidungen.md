@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-22 — Ein Laufzeit-Prozess bekommt eigenen Menüpunkt und eigene Liste
+
+Bis hierher erzeugte ein aufgenommener Prozess nur die MASKE. Die Navigation
+war eine Projektion der aktiven Prozesse — aber nur der einprogrammierten;
+jeder selbst gebaute Ablauf landete im Sammelbecken `/vorgaenge`. Das ist die
+halbe Zusage: Wer seinen Prozess selbst aufnimmt, erwartet ihn auch im Menü.
+
+Entschieden:
+
+- Der Menüpunkt hängt **im Bereich des Prozesses** (Verkauf, Personal, …),
+  nicht in einer Sonderschublade „Meine Abläufe". Dort sucht ein Kaufmann
+  ihn. Nur Bereiche ohne eigene Gruppe sammeln sich unter „Abläufe".
+- Die Liste `/vorgaenge/prozess/[code]` baut sich aus dem Prozess: Zustände
+  aus der aktiven Version als Filter, Zusatzspalten aus `feld_definitionen`
+  (`sichtbar_in` enthält `'liste'`, sonst die ersten vier Formularfelder).
+  Kein Zähler am Menüpunkt — ein Vorgang hat keinen Erledigt-Zustand, die
+  Zahl würde nur wachsen.
+- `vorgang.anlegen` braucht ab jetzt einen `zustand` (den Einstiegszustand).
+  Ohne ihn startete der Vorgang auf dem Notnagel `neu` — außerhalb des
+  eigenen Diagramms; genau so entstand der erste Kundenprozess.
+
+Umgesetzt in `src/app/(erp)/layout.tsx`,
+`src/app/(erp)/vorgaenge/prozess/[code]/page.tsx`, `src/modules/befehle.ts`
+und `einstellungen.prozess_entwerfen`. Wächter: tests/navigation.test.ts,
+tests/prozesse/prozesse.test.ts. Dokumentiert in
+[prozesse.md](prozesse.md) („On-demand-Oberfläche").
+
 ## 2026-08-21 — jsonb schreibt man über den Treiber, nicht über JSON.stringify
 
 Befund aus dem Pilotbetrieb, gefunden an einem 404 auf einer Vorgangsseite:

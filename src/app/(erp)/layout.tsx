@@ -100,6 +100,17 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   )
   const prozessAktiv = (bereich: string) => prozessBereiche.has(bereich)
 
+  // …und die Projektion geht weiter: ein LAUFZEIT-Prozess (modell 'vorgang')
+  // bekommt einen eigenen Menüpunkt in SEINEM Bereich, mit eigener Liste.
+  // Vorher landete jeder neu aufgenommene Ablauf im Sammelbecken „Vorgänge"
+  // — die Maske entstand aus dem Prozess, die Navigation aber nicht.
+  // Bewusst OHNE Zähler: ein Vorgang hat (noch) keinen Erledigt-Zustand,
+  // eine Gesamtzahl würde nur wachsen und wäre kein Signal.
+  const laufzeitProzesse = await sql<{ code: string; name: string; bereich: string }[]>`
+    select code, name, bereich from prozesse
+    where aktiv and modell = 'vorgang'
+    order by name`
+
   const systemzustand =
     counts.fehler > 0
       ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
@@ -107,14 +118,14 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   // Befehlsfeld überall (Strg/Cmd+K): derselbe Katalog wie auf der Übersicht,
   // plus das Lern-Gedächtnis dieses Benutzers fürs Ranking.
-  const befehle = befehlsKatalog(user.role, prozessAktiv, user.befugnisse)
+  const befehle = befehlsKatalog(user.role, prozessAktiv, user.befugnisse, laufzeitProzesse)
   const nutzung = await sql<{ schluessel: string; anzahl: number }[]>`
     select schluessel, anzahl from nutzungs_zaehler
     where user_id = ${user.id} order by anzahl desc limit 40`
   const gewichte = Object.fromEntries(nutzung.map((n) => [n.schluessel, Number(n.anzahl)]))
 
   // Navigation als Datenstruktur: rollengefiltert hier, Aufklapp-Logik im Client.
-  const groups: NavGroup[] = [
+  const rohGruppen: NavGroup[] = [
     {
       label: null,
       items: [
@@ -248,7 +259,44 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           : []),
       ],
     },
-  ].filter((g) => g.items.length > 0)
+  ]
+
+  // Laufzeit-Prozesse hängen in der Gruppe ihres Bereichs — dort sucht ein
+  // Kaufmann seinen eigenen Ablauf, nicht in einer Sonderschublade. Bereiche
+  // ohne eigene Gruppe (Kontakte, Versand, …) sammeln sich unter „Abläufe";
+  // ganz ohne Zuhause wäre der Prozess unsichtbar.
+  const GRUPPE_JE_BEREICH: Partial<Record<Area, string>> = {
+    verkauf: 'Verkauf',
+    versand: 'Verkauf',
+    fertigung: 'Fertigung',
+    einkauf: 'Einkauf',
+    lager: 'Lager',
+    reparatur: 'Service',
+    personal: 'Personal',
+    zeiterfassung: 'Personal',
+    finanzen: 'Finanzen',
+    produkte: 'Stammdaten',
+    kontakte: 'Stammdaten',
+    auswertungen: 'Auswertungen',
+    fehler: 'System',
+    einstellungen: 'System',
+  }
+  for (const lp of laufzeitProzesse) {
+    const bereich = lp.bereich as Area
+    if (!sees(bereich)) continue
+    const punkt = { href: `/vorgaenge/prozess/${lp.code}`, label: lp.name }
+    const ziel = GRUPPE_JE_BEREICH[bereich]
+    const gruppe = ziel ? rohGruppen.find((g) => g.label === ziel) : undefined
+    if (gruppe) {
+      gruppe.items.push(punkt)
+    } else {
+      const abläufe = rohGruppen.find((g) => g.label === 'Abläufe')
+      if (abläufe) abläufe.items.push(punkt)
+      else rohGruppen.push({ label: 'Abläufe', items: [punkt] })
+    }
+  }
+
+  const groups: NavGroup[] = rohGruppen.filter((g) => g.items.length > 0)
 
   return (
     <>

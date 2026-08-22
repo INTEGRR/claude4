@@ -960,6 +960,47 @@ mit Stückliste und Route „fertigen"; automatisch angelegt wird nur, was
 zusätzlich „auf Bestellung fertigen" trägt. `sales_order_fertigungslage()`
 nennt die Lücke mit Grund, und der Auftrag zeigt sie an.
 
+## On-demand-Oberfläche: eigener Menüpunkt, eigene Liste (umgesetzt)
+
+Ein aufgenommener Ablauf bekam bisher nur die halbe Oberfläche: die **Maske**
+entstand aus den Schritten, die **Navigation** aber nicht. Jeder Laufzeit-
+Prozess (`modell = 'vorgang'`) landete im Sammelbecken `/vorgaenge`. Für den
+Kunden sah das aus wie „mein Prozess ist nicht wirklich da".
+
+Jetzt projiziert die Navigation auch die Laufzeit-Prozesse:
+
+- **Menüpunkt im Bereich des Prozesses** ((erp)/layout.tsx): ein
+  Personalablauf steht unter Personal, ein Verkaufsablauf unter Verkauf —
+  dort sucht ein Kaufmann ihn. Bereiche ohne eigene Gruppe (Kontakte,
+  Versand, …) sammeln sich unter **Abläufe**; ganz ohne Zuhause wäre der
+  Prozess unsichtbar. Bewusst OHNE Zähler: ein Vorgang hat keinen
+  Erledigt-Zustand, eine Gesamtzahl würde nur wachsen und wäre kein Signal.
+- **Eigene Liste** `/vorgaenge/prozess/[code]`: Zustandsfilter aus der
+  aktiven Version des Prozesses (mit Anzahl je Zustand), Zusatzspalten aus
+  den eigenen Feldern, Startformular für einen neuen Vorgang. Rechte prüft
+  `requireArea(prozess.bereich)` — nicht pauschal Verkauf.
+  Die Spalten wählt `sichtbar_in` (`'liste'`); solange das niemand gesetzt
+  hat, zeigt die Tabelle die ersten vier Formularfelder. Die Felder hängen
+  am Modell `vorgang`, gelten also für alle Laufzeit-Prozesse gemeinsam —
+  so ist das Chamäleon-Modell gebaut.
+- **Befehlsfeld** (befehle.ts): die Laufzeit-Seiten kommen zum statischen
+  Katalog dazu, sonst wäre der frisch aufgenommene Ablauf das Einzige, was
+  sich nicht tippen lässt.
+- Der Sammelblick `/vorgaenge` bleibt daneben bestehen — er zeigt alle
+  Laufzeit-Prozesse zusammen.
+
+**Pflicht am Anlage-Schritt**: `vorgang.anlegen` braucht einen `zustand` —
+er ist der Einstiegszustand des Vorgangs. Fehlt er, startet der Beleg auf dem
+Notnagel `neu`, einem Zustand, den sein eigener Prozess nicht kennt: das
+Panel findet keinen nächsten Schritt, die Liste keinen Filter. Genau so ist
+der erste selbst aufgenommene Kundenprozess entstanden.
+`einstellungen.prozess_entwerfen` weist das jetzt ab, und die
+Aktionsbeschreibung sagt es dem Agenten vorher.
+
+Wächter: tests/navigation.test.ts (Menü und Befehlsfeld bauen denselben
+Pfad, die Route existiert) und tests/prozesse/prozesse.test.ts
+(Entwurf ohne Einstiegszustand wird abgewiesen).
+
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 
 KRNL wird an mehrere Kunden ausgerollt, mit häufigen Feature-Updates. Der

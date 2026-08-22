@@ -48,6 +48,22 @@ describe('Befehlsfeld spiegelt die Navigation', () => {
     assert.deepEqual(tot, [], `Navigations-Pfade ohne page.tsx:\n${tot.join('\n')}`)
   })
 
+  test('Laufzeit-Prozesse: Menü und Befehlsfeld bauen denselben Pfad', () => {
+    // Diese Menüpunkte entstehen zur Laufzeit aus der Datenbank, tragen also
+    // ein Template-Literal statt eines Pfad-Literals — die Prüfungen oben
+    // sehen sie nicht. Was hier zählt: beide Kataloge bauen DENSELBEN Pfad,
+    // und dahinter liegt eine echte Route. Sonst führt genau der Menüpunkt
+    // ins Leere, den ein Kunde sich gerade selbst gebaut hat.
+    const MUSTER = '/vorgaenge/prozess/${'
+    for (const datei of ['src/app/(erp)/layout.tsx', 'src/modules/befehle.ts']) {
+      assert.ok(lies(datei).includes(MUSTER), `${datei} baut keinen Laufzeit-Prozess-Pfad mehr`)
+    }
+    assert.ok(
+      existsSync(`${WURZEL}src/app/(erp)/vorgaenge/prozess/[code]/page.tsx`),
+      'die Route /vorgaenge/prozess/[code] fehlt',
+    )
+  })
+
   test('Menüpunkte fehlen nicht im Befehlsfeld', () => {
     // Umgekehrte Richtung: was im Menü steht, soll auch tippbar sein.
     // Ausnahmen sind Ziele ohne eigenen Katalogeintrag — geschlossene Liste.

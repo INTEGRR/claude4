@@ -295,6 +295,16 @@ export async function prozessEntwerfen(
         `Schritt „${s.code}": unbekanntes Ereignis „${s.ereignis}" — der Katalog steht auf /prozesse (Ereignisse).`,
       )
     }
+    // Der Anlage-Schritt eines Vorgangs führt den EINSTIEGSZUSTAND. Fehlt
+    // er, startet der Beleg auf dem Notnagel 'neu' — einem Zustand, den der
+    // Prozess gar nicht kennt: das Panel kann den Vorgang dann nicht auf dem
+    // Diagramm verorten. Genau so ist der erste Kundenprozess entstanden.
+    if (s.aktion === 'vorgang.anlegen' && !s.zustand) {
+      throw new Error(
+        `Schritt „${s.code}": vorgang.anlegen braucht einen zustand — er ist der ` +
+          'Einstiegszustand des Vorgangs (und muss zu params.state passen, falls gesetzt).',
+      )
+    }
     if (s.art === 'prozess') {
       if (!s.teilprozess) {
         throw new Error(`Schritt „${s.code}": art=prozess braucht einen teilprozess (Kindprozess-Code).`)

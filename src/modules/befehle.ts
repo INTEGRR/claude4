@@ -75,6 +75,13 @@ export function befehlsKatalog(
   role: Role,
   prozessAktiv: (bereich: string) => boolean,
   befugnisse: readonly string[] = [],
+  /**
+   * Laufzeit-Prozesse (modell 'vorgang') aus der Datenbank — sie haben eine
+   * eigene Seite, stehen aber naturgemäß in keinem statischen Katalog. Ohne
+   * sie wäre der frisch aufgenommene Ablauf das Einzige, was sich nicht
+   * tippen lässt.
+   */
+  laufzeitProzesse: readonly { code: string; name: string; bereich: string }[] = [],
 ): { aktionen: BefehlsAktion[]; seiten: BefehlsSeite[] } {
   const aktionen = Object.entries(REGISTRY)
     .filter(([, a]) => a.bindung === 'frei' && aktionErlaubt(a, role, befugnisse))
@@ -84,5 +91,11 @@ export function befehlsKatalog(
       canAccess(role, p.area, befugnisse) &&
       (!p.prozess || p.prozess.some((b) => prozessAktiv(b))),
   ).map(({ href, label }) => ({ href, label }))
+
+  for (const lp of laufzeitProzesse) {
+    if (canAccess(role, lp.bereich as Area, befugnisse)) {
+      seiten.push({ href: `/vorgaenge/prozess/${lp.code}`, label: lp.name })
+    }
+  }
   return { aktionen, seiten }
 }

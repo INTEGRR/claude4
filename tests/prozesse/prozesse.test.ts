@@ -323,6 +323,31 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     )
   })
 
+  test('vorgang.anlegen ohne zustand wird abgewiesen', async () => {
+    // Der erste selbst aufgenommene Kundenprozess ließ den zustand am
+    // Anlage-Schritt weg. Der Vorgang startete dann auf dem Notnagel 'neu' —
+    // einem Zustand, den sein eigener Prozess nicht kennt: das Panel fand
+    // keinen nächsten Schritt, die Liste keinen Filter. Der Entwurf muss den
+    // Einstiegszustand nennen, sonst entsteht er gar nicht erst.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            name: 'Rücknahme ohne Einstiegszustand',
+            schritte: ENTWURF.schritte.map((s) =>
+              s.code === 'annehmen' ? { ...s, zustand: undefined } : s,
+            ),
+          },
+        },
+        admin,
+      ),
+      /braucht einen zustand/,
+    )
+  })
+
   test('jsonb-Felder liegen als OBJEKT in der Datenbank, nicht als String', async () => {
     // Der Treiber verpackt einen bereits serialisierten String noch einmal:
     // aus JSON.stringify(x)::jsonb wird ein JSON-STRING statt eines Objekts.

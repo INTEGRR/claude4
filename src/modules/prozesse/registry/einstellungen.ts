@@ -201,7 +201,8 @@ export const EINSTELLUNGEN = {
       "einreichen. NEUE Prozesse: modell 'vorgang' (Belege VG/… mit frei definierten " +
       "Zuständen) oder ohne modell (beleglose Assistenten). Schritte: genau ein start, " +
       "mindestens ein ende; art 'aktion' braucht eine registrierte Aktion (bei Vorgängen " +
-      'zuerst vorgang.anlegen mit params {"prozess_code": "<code>"}, danach ' +
+      'zuerst vorgang.anlegen mit params {"prozess_code": "<code>"} UND einem zustand ' +
+      '(dem Einstiegszustand, z. B. "aufgenommen"), danach ' +
       'vorgang.status_setzen mit params {"state": "<zustand>"} und demselben Wert als ' +
       "zustand), art 'dienst' einen job_kind aus dem Katalog, art 'ereignis' ein Topic, " +
       "art 'prozess' einen teilprozess (Kindprozess-Code; teilprozess_link nur wenn der " +
