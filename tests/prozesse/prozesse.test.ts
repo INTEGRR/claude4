@@ -323,6 +323,36 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     )
   })
 
+  test('jsonb-Felder liegen als OBJEKT in der Datenbank, nicht als String', async () => {
+    // Der Treiber verpackt einen bereits serialisierten String noch einmal:
+    // aus JSON.stringify(x)::jsonb wird ein JSON-STRING statt eines Objekts.
+    // Das ist unsichtbar, bis jemand das Feld benutzt — die Vorgangsmaske
+    // prüfte `'partner_id' in params` und lief auf einen TypeError, und
+    // bedingung_pruefen sah einen String statt einer Bedingung. Beides erst
+    // im Pilotbetrieb aufgefallen, an einem von der KI entworfenen Prozess.
+    const typen = await h.sql<{ code: string; typ: string }[]>`
+      select s.code, jsonb_typeof(s.params) as typ
+      from prozess_schritte s
+      join prozess_versionen v on v.id = s.version_id
+      join prozesse p on p.id = v.prozess_id
+      where p.code = 'ruecknahme'`
+    assert.ok(typen.length > 0, 'der Entwurf muss Schritte haben')
+    assert.deepEqual(
+      typen.filter((t) => t.typ !== 'object'),
+      [],
+      'params muss ein jsonb-Objekt sein',
+    )
+
+    // Und der Inhalt ist auch wirklich lesbar (nicht nur „irgendein Objekt").
+    const [anlegen] = await h.sql<{ prozess_code: string | null }[]>`
+      select s.params ->> 'prozess_code' as prozess_code
+      from prozess_schritte s
+      join prozess_versionen v on v.id = s.version_id
+      join prozesse p on p.id = v.prozess_id
+      where p.code = 'ruecknahme' and s.code = 'annehmen'`
+    assert.equal(anlegen.prozess_code, 'ruecknahme')
+  })
+
   test('nach der Aktivierung läuft der designte Prozess sofort', async () => {
     await aktionAusfuehrenGeprueft(
       'einstellungen.prozessversion_aktivieren',

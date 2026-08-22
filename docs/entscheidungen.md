@@ -9,6 +9,39 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-21 — jsonb schreibt man über den Treiber, nicht über JSON.stringify
+
+Befund aus dem Pilotbetrieb, gefunden an einem 404 auf einer Vorgangsseite:
+Jeder von der KI entworfene Prozess hatte seine jsonb-Felder **doppelt
+verpackt**. Gespeichert war ein JSON-STRING (`"{\"prozess_code\":\"x\"}"`)
+statt eines Objekts. Ursache war die Schreibweise
+`${JSON.stringify(wert)}::jsonb` in `einstellungen.prozess_entwerfen` — der
+Treiber verpackt einen bereits serialisierten String noch einmal.
+
+Der Fehler war doppelt unsichtbar: Er entsteht nur auf dem Entwurfsweg (die
+Migrationen schreiben ihr JSON direkt in SQL), und er fällt erst auf, wenn
+jemand das Feld BENUTZT:
+
+- `params` als String ließ die Vorgangsmaske auf einen TypeError laufen
+  („Cannot use 'in' operator") — die Detailseite eines Vorgangs war nicht
+  erreichbar.
+- `bedingung` als String bekam `bedingung_pruefen` nie als Bedingung zu
+  fassen — die XOR-Zweige aller KI-entworfenen Prozesse griffen nicht.
+  Das betraf auch den Verkaufsentwurf aus BUG/00015.
+
+Drei Ebenen, damit das nicht wiederkommt:
+
+1. **Code**: jsonb-Parameter gehen über `sql.json(…)` bzw. `t.json(…)`.
+   `JSON.stringify(…)::jsonb` ist in diesem Repo ein Fehler, kein Stil.
+2. **Datenbank**: Migration 0070 repariert den Bestand (`#>> '{}'` und
+   zurück-casten) und schreibt die Felder per CHECK-Constraint als Objekt
+   fest. Eine Fehlkodierung scheitert jetzt beim SCHREIBEN, nicht erst beim
+   Benutzen.
+3. **Test**: tests/prozesse/prozesse.test.ts prüft nach einem echten
+   Entwurf, dass `jsonb_typeof(params) = 'object'` ist UND dass der Inhalt
+   lesbar zurückkommt. Gegenprobe gemacht: mit der alten Schreibweise wird
+   der Test rot.
+
 ## 2026-08-21 — Gefahrenzone in zwei Stufen: Betriebsdaten und Werkszustand
 
 Bisher gab es genau einen Knopf, „alle Daten löschen (Neustart)". Er tut das

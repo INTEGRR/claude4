@@ -371,6 +371,14 @@ export async function prozessEntwerfen(
       values (${prozessId}, ${nr}, 'entwurf', ${ctx.actor})
       returning id`
 
+    // jsonb-Werte gehen über t.json(), NICHT über JSON.stringify(…)::jsonb.
+    // Der Treiber verpackt einen String noch einmal als JSON — gespeichert
+    // wird dann ein JSON-STRING statt eines Objekts ("{\"a\":1}" statt
+    // {"a":1}). Das ist unsichtbar, bis jemand das Feld benutzt: die
+    // Vorgangsmaske prüfte `'partner_id' in params` und bekam einen
+    // TypeError (die Detailseite lief auf einen Fehler), und
+    // bedingung_pruefen sah einen String statt einer Bedingung — die
+    // XOR-Zweige aller KI-entworfenen Prozesse griffen also nie.
     for (const [i, s] of p.schritte.entries()) {
       await t`
         insert into prozess_schritte (version_id, code, name, art, sequence, aktion,
@@ -379,16 +387,16 @@ export async function prozessEntwerfen(
         values (${v.id}, ${s.code}, ${s.name}, ${s.art}, ${i * 10}, ${s.aktion ?? null},
                 ${s.job_kind ?? null}, ${s.ereignis ?? null},
                 ${s.teilprozess ?? null},
-                ${s.teilprozess_link ? JSON.stringify(s.teilprozess_link) : null}::jsonb,
+                ${s.teilprozess_link ? t.json(s.teilprozess_link as never) : null},
                 ${s.zustand ?? null}, ${s.rollen ?? null}, ${s.befugnis ?? null},
-                ${JSON.stringify(s.params ?? {})}::jsonb, ${s.optional})`
+                ${t.json((s.params ?? {}) as never)}, ${s.optional})`
     }
     for (const [i, u] of p.uebergaenge.entries()) {
       await t`
         insert into prozess_uebergaenge (version_id, von_code, nach_code, sequence,
                                          bedingung, beschriftung)
         values (${v.id}, ${u.von}, ${u.nach}, ${(i + 1) * 10},
-                ${u.bedingung == null ? null : JSON.stringify(u.bedingung)}::jsonb,
+                ${u.bedingung == null ? null : t.json(u.bedingung as never)},
                 ${u.beschriftung ?? null})`
     }
     return nr
