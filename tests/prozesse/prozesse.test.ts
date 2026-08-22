@@ -3,6 +3,7 @@
  * gegen die aktive Prozessversion — ein Befehl beweist, dass die Kernprozesse
  * des Hauses durchgängig funktionieren (siehe laufen.ts).
  */
+import './spur.ts'
 import test, { after, before, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { alleFixtures, fixtureReihenfolge } from '../../src/modules/prozesse/fixtures/index.ts'

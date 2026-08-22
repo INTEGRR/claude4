@@ -19,31 +19,14 @@
  */
 import '../../scripts/env.ts'
 import { execFile } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
 import { promisify } from 'node:util'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
+import { spur } from './spur.ts'
 
 export interface Harness {
   sql: Sql
   staging: boolean
-}
-
-/**
- * Fortschrittsspur auf stderr. Klingt nach Kleinkram, ist aber der
- * Unterschied zwischen „hängt" und „hängt HIER": der Aufbau (Datenbank
- * wegwerfen, anlegen, migrieren) passiert VOR dem ersten Test, also bevor
- * der Test-Reporter irgendetwas ausgibt. Bleibt er stecken, sieht man ohne
- * diese Zeilen nur einen stummen Prozess — genau das ist in der CI passiert.
- */
-function spur(text: string): void {
-  const zeile = `[harness] ${text}\n`
-  process.stderr.write(zeile)
-  // In der CI zusätzlich in eine Datei: node:test sammelt die Ausgabe der
-  // Kindprozesse und gibt sie erst aus, wenn eine Testdatei FERTIG ist —
-  // bei einem Hänger also nie. Die Datei überlebt auch einen Abbruch und
-  // wird vom Workflow ausgegeben.
-  if (process.env.CI) appendFileSync('prozess-harness.log', zeile)
 }
 
 /**

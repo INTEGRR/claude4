@@ -11,6 +11,7 @@
  *  - Jeder aktive Prozess hat eine Fixture mit gültigen Pfaden — der
  *    Testdatensatz wächst zwangsläufig mit den Prozessen mit.
  */
+import './spur.ts'
 import test, { after, before, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { alleAktionen } from '../../src/modules/prozesse/registry/index.ts'

@@ -99,8 +99,25 @@ Sie sind der Grund, warum die Konventionen mitwachsen statt zu verrotten:
 | `tests/ki.test.ts` (Schema-Doku) | Jede Tabelle ist für die KI beschrieben oder begründet versteckt |
 | `tests/daten-tuev.test.ts` | Die Invariantenprüfung findet echte Korruption |
 | `tests/actions.test.ts` | Server Actions werfen nicht (Next schwärzt Fehler in Produktion) |
+| `tests/formularfelder.test.ts` | `min` ist ein Vielfaches von `step` — sonst sperrt der Browser glatte Werte |
+| `tests/prozesse/fakes.test.ts` (`after`) | Ein Test ohne Datenbank lässt keine Verbindung offen |
 
 Neue Konvention, die immer mitwachsen muss? Dann gehört ein Wächter dazu.
+
+### Wenn die Prozessläufe „hängen"
+
+`npm run test:prozesse` startet je Testdatei einen eigenen Prozess und läuft
+seriell (`--test-concurrency=1`). node:test gibt die Ausgabe einer Datei erst
+aus, wenn sie FERTIG ist — bleibt etwas stecken, sieht man deshalb gar
+nichts. Dafür gibt es `tests/prozesse/spur.ts`:
+
+    HARNESS_SPUR=1 npm run test:prozesse   # lokal; in der CI immer an
+    cat prozess-harness.log
+
+Die Spur nennt Datei, Aufbauschritt und Prozessende. Endet eine Datei nicht,
+schreibt der Wachhund alle 10 Sekunden die offenen Handles mit — ein
+`TCPSocketWrap` heißt: irgendetwas hat eine Datenbankverbindung geöffnet und
+nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
 
 ## Wo liegt was?
 

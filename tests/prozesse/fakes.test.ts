@@ -4,13 +4,32 @@
  * jede Signaturänderung den Fake sofort mitreißt. (Mail braucht keinen Fake:
  * ohne RESEND_API_KEY wird ohnehin nur protokolliert.)
  */
-import test, { describe } from 'node:test'
+import './spur.ts'
+import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
 // Die Weichen prüfen die Umgebung beim AUFRUF, nicht beim Import — die
 // Reihenfolge hier ist also unkritisch.
 process.env.SHOPIFY_FAKE = '1'
 process.env.DHL_FAKE = '1'
+
+/**
+ * KEINE Datenbank für diesen Test — und zwar erzwungen, nicht gehofft.
+ *
+ * Die Client-Module protokollieren jeden Aufruf über logTransaction, auch im
+ * Fake-Modus. Das Protokoll schluckt seine Fehler (fire-and-forget), also
+ * fiel nie auf, dass dieser reine Weichen-Test bei gesetzter DATABASE_URL
+ * eine echte Verbindung zur BASIS-Datenbank aufmacht und dort
+ * api_transactions-Zeilen hinterlässt. Lokal war das unsichtbar, weil diese
+ * Datei scripts/env.ts nicht lädt — in der CI steht DATABASE_URL dagegen in
+ * der Umgebung.
+ *
+ * Zwei Folgen, beide schlecht: der Test verschmutzt eine fremde Datenbank,
+ * und der Verbindungspool (ohne idle_timeout) hält den Testprozess offen.
+ * node:test wartet bei --test-concurrency=1 auf dessen Ende — das war der
+ * CI-Hänger: Datei 1 grün, danach fünf Minuten Stille bis zum Zeitlimit.
+ */
+delete process.env.DATABASE_URL
 
 const shopify = await import('../../src/modules/integrationen/shopify.ts')
 const dhl = await import('../../src/modules/versand/dhl.ts')
@@ -75,4 +94,16 @@ describe('Fake-Weichen', () => {
     assert.match(retoure.shipmentNumber, /^\d{20}$/)
     assert.notEqual(retoure.shipmentNumber, sendung.shipmentNumber)
   })
+})
+
+after(() => {
+  // Wächter statt Merkzettel: Sobald hier wieder etwas eine Verbindung
+  // aufmacht, endet der Prozess nicht mehr — und ein Hänger ohne Ausgabe ist
+  // das Teuerste, was eine Testsuite anrichten kann.
+  const offen = process.getActiveResourcesInfo().filter((r) => r.includes('TCP'))
+  assert.deepEqual(
+    offen,
+    [],
+    `Der Weichen-Test darf keine Verbindung offen lassen (${offen.join(', ')})`,
+  )
 })

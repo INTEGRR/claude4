@@ -9,6 +9,43 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-22 — Ein Test ohne Datenbank bekommt auch keine
+
+Der CI-Hänger der Prozessläufe ist gefunden: `tests/prozesse/fakes.test.ts`
+prüft nur die Fake-Weichen von Shopify und DHL — die Client-Module
+protokollieren aber JEDEN Aufruf über `logTransaction`, auch im Fake-Modus.
+Das Protokoll schluckt seine Fehler (fire-and-forget, aus gutem Grund), also
+fiel nie auf, dass dieser Test bei gesetzter `DATABASE_URL` eine echte
+Verbindung zur BASIS-Datenbank aufbaut und dort `api_transactions`-Zeilen
+hinterlässt.
+
+Zwei Folgen:
+
+- Der Test verschmutzt eine fremde Datenbank — in der CI die frisch
+  migrierte `erp`, im Staging-Lauf die Staging-Datenbank.
+- Der Verbindungspool (ohne `idle_timeout`) hält den Testprozess offen.
+  node:test wartet bei `--test-concurrency=1` auf dessen Ende: Datei 1 grün,
+  danach fünf Minuten Stille bis zum Zeitlimit.
+
+Lokal war beides unsichtbar, weil diese Datei `scripts/env.ts` nicht lädt —
+`DATABASE_URL` steht hier in `.env.local`, in der CI in der Umgebung. Genau
+dieser Unterschied hat drei Runden Ursachensuche gekostet.
+
+Entschieden: **Ein Test, der keine Datenbank braucht, bekommt auch keine** —
+`fakes.test.ts` löscht `DATABASE_URL` vor den Importen, statt darauf zu
+hoffen, dass keine gesetzt ist. Dazu ein Wächter im `after()`: bleibt ein
+TCP-Handle offen, wird der Test rot statt stumm.
+
+Nicht gewählt: `idle_timeout` im Produktions-Client. Das hätte den Hänger
+beseitigt und den eigentlichen Fehler (Test schreibt in fremde Datenbank)
+verdeckt.
+
+Dazu `tests/prozesse/spur.ts`: die Fortschrittsspur ist aus dem Harness
+herausgezogen, läuft ab dem ersten Import jeder Testdatei und trägt einen
+unref()-Wachhund, der alle 10 Sekunden `getActiveResourcesInfo()` mitschreibt.
+Er hat den Fehler benannt (`TCPSocketWrap, Timeout`) — und ist ab jetzt die
+Standardantwort auf „hängt", statt der nächsten Rateschleife.
+
 ## 2026-08-22 — Ein Laufzeit-Prozess bekommt eigenen Menüpunkt und eigene Liste
 
 Bis hierher erzeugte ein aufgenommener Prozess nur die MASKE. Die Navigation
