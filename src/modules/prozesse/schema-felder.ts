@@ -329,19 +329,31 @@ export function formularFelder(aktion: RegistrierteAktion): FormularFeld[] {
   const objekt = kern(aktion.schema)
   if (!(objekt instanceof z.ZodObject)) return []
 
-  return Object.entries(objekt.shape as Record<string, z.ZodTypeAny>).map(([name, roh]) => {
-    const innen = kern(roh)
-    const vorgabe =
-      roh instanceof z.ZodDefault
-        ? (roh._def.defaultValue as () => unknown)()
-        : undefined
-    return {
-      name,
-      label: roh.description ?? beschriftung(name),
-      pflicht: !(roh instanceof z.ZodOptional) && !(roh instanceof z.ZodDefault),
-      ...(vorgabe !== undefined ? { vorgabe } : {}),
-      hinweis: roh.description,
-      ...feldTyp(name, innen),
-    }
-  })
+  return Object.entries(objekt.shape as Record<string, z.ZodTypeAny>)
+    .filter(([name]) => {
+      /**
+       * Der rohe `zusatz`-Sack gehört NIE in eine generierte Maske. Er ist
+       * ein Record und würde als JSON-Textarea erscheinen — direkt neben den
+       * eigenen Feldern, die genau seinen Inhalt sauber erfassen
+       * (zusatz.<name>, aus feld_definitionen). Der Benutzer sah dadurch ein
+       * Kästchen „Eigene Felder (JSON)" mit einem `{}` darin und sollte
+       * offenbar von Hand JSON tippen. Andere Record-Felder (Ist-Mengen beim
+       * Reparaturabschluss) bleiben als JSON erfassbar — dort gibt es keine
+       * Felddefinitionen, die sie ersetzen.
+       */
+      return !(name === 'zusatz' && aktion.modell)
+    })
+    .map(([name, roh]) => {
+      const innen = kern(roh)
+      const vorgabe =
+        roh instanceof z.ZodDefault ? (roh._def.defaultValue as () => unknown)() : undefined
+      return {
+        name,
+        label: roh.description ?? beschriftung(name),
+        pflicht: !(roh instanceof z.ZodOptional) && !(roh instanceof z.ZodDefault),
+        ...(vorgabe !== undefined ? { vorgabe } : {}),
+        hinweis: roh.description,
+        ...feldTyp(name, innen),
+      }
+    })
 }

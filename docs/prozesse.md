@@ -1012,6 +1012,16 @@ rückwirkend ihre Spalten. Aufräumen ist ein bewusster eigener Schritt
 | `/prozesse/<code>` | Karte „Eigene Felder" — wer ein Diagramm abnimmt, nimmt auch ab, WAS erfasst wird. |
 | Onboarding Schritt 04 | „Erfasst wird: …" unter der Schrittliste, im selben Abnahmeblatt. |
 | Befehlsfeld / `/aktion/<name>` | Nur die modellweiten Felder — die eines bestimmten Ablaufs gehören in dessen Maske. |
+| Vorgangs-Detailseite | Alle Felder des Ablaufs, auch die noch leeren („noch offen") — ein Vorgang durchläuft mehrere Schritte, und man muss sehen, was insgesamt erfasst wird. |
+
+Der rohe `zusatz`-Sack erscheint dabei **nie** als Eingabefeld. Er steht als
+`z.record(...)` im Schema von `vorgang.anlegen`/`vorgang.status_setzen` und
+wurde deshalb als JSON-Textarea gerendert — ein Kästchen „Eigene Felder
+(JSON)" mit einem `{}` darin, direkt neben den sauber erfassten Feldern.
+`formularFelder()` lässt es weg, sobald die Aktion ein `modell` trägt; andere
+Record-Felder (Ist-Mengen beim Reparaturabschluss) bleiben als JSON
+erfassbar, weil sie keine Felddefinitionen haben, die sie ersetzen. Wächter:
+tests/schema-felder.test.ts.
 
 **Die KI fragt aktiv danach.** Wissensbasis (`ki/wissen.ts`) und
 Aufnahme-Strukturierung (`ki/prozess-aufnahme.ts`) führen die Leitfrage „Was

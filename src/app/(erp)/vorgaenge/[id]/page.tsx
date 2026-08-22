@@ -44,12 +44,22 @@ export default async function VorgangDetail({
     where v.id = ${id}`
   if (!v) notFound()
 
-  // Beschriftungen der eigenen Felder für die Anzeige.
+  // Die eigenen Felder DIESES Ablaufs (Migration 0071) — bewusst alle, auch
+  // die noch leeren: Der Vorgang durchläuft mehrere Schritte, und man muss
+  // sehen können, was der Ablauf insgesamt erfasst und was noch aussteht.
   const felder = await sql<{ name: string; label: string }[]>`
     select name, label from feld_definitionen
-    where modell = 'vorgang' order by sequence, name`
-  const beschriftung = new Map(felder.map((f) => [f.name, f.label]))
-  const zusatzEintraege = Object.entries(v.zusatz ?? {})
+    where modell = 'vorgang' and (prozess_code is null or prozess_code = ${v.prozess_code})
+    order by prozess_code nulls last, sequence, name`
+  const zusatz = v.zusatz ?? {}
+  const bekannt = new Set(felder.map((f) => f.name))
+  const zeilen = [
+    ...felder.map((f) => ({ name: f.name, label: f.label, wert: zusatz[f.name] })),
+    // Werte ohne Definition (Feld nachträglich entfernt) gehen nicht verloren.
+    ...Object.entries(zusatz)
+      .filter(([name]) => !bekannt.has(name))
+      .map(([name, wert]) => ({ name, label: name, wert })),
+  ]
 
   return (
     <>
@@ -77,18 +87,26 @@ export default async function VorgangDetail({
 
       <ProzessPanel prozessCode={v.prozess_code} recordId={v.id} rolle={user.role} befugnisse={user.befugnisse} />
 
-      {zusatzEintraege.length > 0 && (
+      {zeilen.length > 0 && (
         <Card title="Eigene Felder">
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {zusatzEintraege.map(([name, wert]) => (
-              <li key={name}>
+            {zeilen.map((z) => (
+              <li key={z.name}>
                 <span className="mono-label" style={{ marginRight: 8 }}>
-                  {beschriftung.get(name) ?? name}
+                  {z.label}
                 </span>
-                {String(wert)}
+                {z.wert === undefined || z.wert === null || z.wert === '' ? (
+                  <span className="muted">noch offen</span>
+                ) : (
+                  String(z.wert)
+                )}
               </li>
             ))}
           </ul>
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            Die Felder kommen aus der Prozessdefinition und werden im jeweiligen Schritt
+            erfasst — was hier „noch offen" steht, kommt weiter hinten im Ablauf.
+          </p>
         </Card>
       )}
 

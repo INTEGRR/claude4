@@ -52,6 +52,26 @@ describe('Maskengenerierung: schema-felder', () => {
     assert.equal(abschliessen.find((f) => f.name === 'mengen')!.typ, 'json')
   })
 
+  test('der rohe zusatz-Sack erscheint NIE in einer generierten Maske', () => {
+    // Er ist ein Record und wurde deshalb als JSON-Textarea gerendert: direkt
+    // neben den eigenen Feldern, die genau seinen Inhalt sauber erfassen
+    // (zusatz.<name> aus feld_definitionen). Der Benutzer sah ein Kästchen
+    // „Eigene Felder (JSON)" mit `{}` darin und sollte offenbar von Hand JSON
+    // tippen — im Pilotbetrieb aufgefallen, an einem selbst gebauten Prozess.
+    for (const [name, aktion] of alleAktionen()) {
+      if (!aktion.modell) continue
+      assert.equal(
+        formularFelder(aktion).some((f) => f.name === 'zusatz'),
+        false,
+        `${name}: das rohe zusatz-Feld gehört nicht in die Maske`,
+      )
+    }
+    // Gegenprobe: Die eigentliche Nutzlast ist trotzdem erreichbar — die
+    // Aktion nimmt zusatz weiterhin entgegen, nur eben feldweise.
+    const anlegen = registrierteAktion('vorgang.anlegen')!
+    assert.ok('zusatz' in (anlegen.schema as unknown as { shape: Record<string, unknown> }).shape)
+  })
+
   test('der KI-Katalog aus der Registry ist konsistent', () => {
     const katalog = kiKatalog()
     assert.ok(katalog.length >= 10, 'es müssen KI-freigegebene Aktionen existieren')
