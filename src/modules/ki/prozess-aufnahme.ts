@@ -38,7 +38,8 @@ export function aufnahmeSystem(wissen: string = PROZESS_WISSEN): string {
     'Es entsteht nur ein ENTWURF — nichts wird aktiv.\n\n' +
     'Regeln für Ist-Prozesse von Kunden: modell IMMER "vorgang" (frei ' +
     'definierte Zustände, kein Code nötig). Erster Schritt nach start: ' +
-    'vorgang.anlegen mit params {"prozess_code": "<code>"}. Jeder weitere ' +
+    'vorgang.anlegen mit params {"prozess_code": "<code>"} UND einem zustand ' +
+    '(dem Einstiegszustand). Jeder weitere ' +
     'Arbeitsschritt: art "aktion" mit vorgang.status_setzen, params ' +
     '{"state": "<zustand>"} und demselben Wert als zustand. Entscheidungen ' +
     'werden als xor-Schritt mit bedingten Übergängen abgebildet. Nimm die ' +
@@ -46,6 +47,13 @@ export function aufnahmeSystem(wissen: string = PROZESS_WISSEN): string {
     'Transkript nicht vorkommt — lieber weniger Schritte als erfundene. ' +
     'Wähle einen kurzen, sprechenden code (Kleinbuchstaben/Unterstriche) ' +
     'und den Bereich, der fachlich am besten passt.\n\n' +
+    'FELDER SIND PFLICHTTEIL DES ENTWURFS: Alles, was im Transkript als ' +
+    'erfasste Angabe vorkommt („wir notieren den Liefertermin", „dann trage ' +
+    'ich die Summe ein"), gehört als Feld nach felder[] — mit den schritten, ' +
+    'in denen es erfasst wird. Zwei bis drei davon bekommen in_liste, damit ' +
+    'der Kunde eine Zeile wiedererkennt. Ohne Felder entsteht eine Maske, in ' +
+    'der man nur einen Titel eintippen kann. Erfinde aber auch hier nichts: ' +
+    'nur Angaben, die im Gespräch genannt wurden.\n\n' +
     wissen +
     '\n\nMaßgeblich für Struktur und Pflichtfelder ist die folgende ' +
     'Aktionsbeschreibung:\n' +
@@ -67,6 +75,13 @@ const WERKZEUG: Anthropic.Messages.Tool = {
       modell: { type: 'string', description: "für Kunden-Ist-Prozesse: 'vorgang'" },
       schritte: { type: 'array', items: { type: 'object' } },
       uebergaenge: { type: 'array', items: { type: 'object' } },
+      felder: {
+        type: 'array',
+        description:
+          'Die Angaben, die der Ablauf erfasst — {name, label, typ, pflicht, ' +
+          'auswahl?, schritte?, in_liste?}. Sie sind die halbe Maske.',
+        items: { type: 'object' },
+      },
     },
     required: ['code', 'name', 'bereich', 'schritte', 'uebergaenge'],
   },

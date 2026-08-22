@@ -11,10 +11,13 @@ export const ANFRAGE: ProzessFixture = {
   prozess: 'anfrage',
   benoetigt: ['basis'],
   aufbauen: async (sql) => {
+    // prozess_code gesetzt: Das Budget gehört zur Anfrage, nicht zu jedem
+    // Vorgang (Migration 0071). Die Eindeutigkeit ist seitdem ein
+    // Ausdrucks-Index — ON CONFLICT braucht dieselbe Schreibweise.
     await sql`
-      insert into feld_definitionen (modell, name, label, typ)
-      values ('vorgang', 'budget', 'Budget (€)', 'nummer')
-      on conflict (modell, name) do nothing`
+      insert into feld_definitionen (modell, prozess_code, name, label, typ)
+      values ('vorgang', 'anfrage', 'budget', 'Budget (€)', 'nummer')
+      on conflict (modell, (coalesce(prozess_code, '')), name) do nothing`
   },
   laeufe: [
     {

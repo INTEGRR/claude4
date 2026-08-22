@@ -213,7 +213,14 @@ export const EINSTELLUNGEN = {
       'bedingung {"feld","op","wert"} auf einem Feld des Belegs (Pfade wie zusatz.budget ' +
       'erlaubt; welche Felder es gibt, zeigt prozess_beleg_daten). Zwei bedingungslose ' +
       'Kanten an derselben Verzweigung werden abgelehnt. Jeder Schritt muss vom Start ' +
-      'erreichbar sein; Schleifen sind verboten.',
+      'erreichbar sein; Schleifen sind verboten. ' +
+      'FELDER: Ein Ablauf besteht nicht nur aus Schritten, sondern auch aus den DATEN, ' +
+      'die er erfasst — die gehören in denselben Entwurf (felder[]). Jedes Feld nennt ' +
+      'name (technisch), label (Kundensprache), typ und die schritte, in deren Maske es ' +
+      'erscheint; in_liste macht daraus zusätzlich eine Spalte der Vorgangsliste. Die ' +
+      'Felder gehören dem Prozess, nicht dem Modell — zwei Abläufe dürfen dasselbe Feld ' +
+      'führen. In Bedingungen sind sie sofort als zusatz.<name> ansprechbar. Frage beim ' +
+      'Aufnehmen aktiv danach: „Was tragen Sie in diesem Schritt ein?"',
     bindung: 'frei',
     schema: z.object({
       code: z
@@ -309,10 +316,42 @@ export const EINSTELLUNGEN = {
         )
         .min(1)
         .max(60),
+      felder: z
+        .array(
+          z.object({
+            name: z
+              .string()
+              .min(1)
+              .max(40)
+              .regex(/^[a-z][a-z0-9_]*$/, 'Kleinbuchstaben, Ziffern und Unterstriche'),
+            label: z.string().min(1).max(80).describe('Beschriftung in der Maske, in Kundensprache'),
+            typ: z.enum(['text', 'nummer', 'schalter', 'auswahl', 'datum']),
+            pflicht: z.boolean().default(false),
+            auswahl: z.array(z.string()).optional().describe('Werte bei typ=auswahl'),
+            schritte: z
+              .array(z.string())
+              .optional()
+              .describe(
+                'Schritt-Codes, in deren Maske das Feld erscheint — leer = in jedem Schritt',
+              ),
+            in_liste: z
+              .boolean()
+              .default(false)
+              .describe('Zusätzlich als Spalte in der Vorgangsliste des Prozesses'),
+          }),
+        )
+        .max(40)
+        .optional()
+        .describe(
+          'Die Daten, die dieser Ablauf erfasst — sie entstehen MIT dem Prozess, ohne ' +
+            'Migration, und sind über Bedingungspfade zusatz.<name> sofort prozessfähig.',
+        ),
     }),
     zusammenfassung: (p) =>
       `${p.code} („${p.name}"): ${p.schritte.length} Schritte, ` +
-      `${p.uebergaenge.length} Übergänge — als Entwurf, aktiviert erst nach Prüfung`,
+      `${p.uebergaenge.length} Übergänge` +
+      (p.felder?.length ? `, ${p.felder.length} eigene Felder` : '') +
+      ' — als Entwurf, aktiviert erst nach Prüfung',
     revalidate: ['/prozesse', '/prozesse/:ergebnis'],
   },
 
@@ -371,11 +410,20 @@ export const EINSTELLUNGEN = {
     nurAdmin: true,
     prozessfrei: true,
     beschreibung:
-      'Legt ein eigenes Feld für ein Modell an (landet im zusatz-jsonb, erscheint in ' +
-      'generierten Masken, ist über Bedingungspfade zusatz.<name> prozessfähig).',
+      'Trägt ein einzelnes eigenes Feld nach (landet im zusatz-jsonb, erscheint in ' +
+      'generierten Masken, ist über Bedingungspfade zusatz.<name> prozessfähig). Der ' +
+      'REGELWEG ist prozess_entwerfen mit felder[] — dort entstehen die Felder MIT dem ' +
+      'Ablauf. Diese Aktion ist für den Nachtrag: prozess_code setzen = Feld gehört zu ' +
+      'genau diesem Ablauf, leer lassen = Feld gilt für ALLE Belege des Modells ' +
+      '(z. B. ein Feld an jedem Kontakt).',
     bindung: 'frei',
     schema: z.object({
       modell: z.string().min(1),
+      prozess_code: z
+        .string()
+        .max(40)
+        .optional()
+        .describe('Nur für diesen Prozess — leer = für alle Belege des Modells'),
       name: z
         .string()
         .min(1)
@@ -385,10 +433,16 @@ export const EINSTELLUNGEN = {
       typ: z.enum(['text', 'nummer', 'schalter', 'auswahl', 'datum']),
       pflicht: z.boolean().default(false),
       auswahl: z.array(z.string()).optional().describe('Werte für typ auswahl'),
+      schritte: z
+        .array(z.string())
+        .optional()
+        .describe('Schritt-Codes, in deren Maske das Feld erscheint — leer = in jedem'),
+      in_liste: z.boolean().default(false).describe('Zusätzlich als Spalte in der Vorgangsliste'),
     }),
-    zusammenfassung: (p) => `${p.modell}.${p.name} (${p.typ})`,
+    zusammenfassung: (p) => `${p.prozess_code ?? p.modell}.${p.name} (${p.typ})`,
     formdata: (fd) => ({
       modell: String(fd.get('modell') ?? ''),
+      prozess_code: String(fd.get('prozess_code') ?? '').trim() || undefined,
       name: String(fd.get('name') ?? '').trim(),
       label: String(fd.get('label') ?? '').trim(),
       typ: String(fd.get('typ') ?? 'text'),
@@ -398,6 +452,7 @@ export const EINSTELLUNGEN = {
           .split(/[,\n]/)
           .map((v) => v.trim())
           .filter(Boolean) || undefined,
+      in_liste: fd.get('in_liste') === 'on',
     }),
     revalidate: ['/prozesse'],
   },
@@ -412,6 +467,11 @@ export const EINSTELLUNGEN = {
     schema: z.object({
       modell: z.string().min(1),
       name: z.string().min(1),
+      prozess_code: z
+        .string()
+        .max(40)
+        .optional()
+        .describe('Feld dieses Prozesses — leer trifft das modellweite Feld gleichen Namens'),
     }),
     revalidate: ['/prozesse'],
   },

@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireArea } from '@/modules/auth'
+import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
-import { Card, PageHeader, TableWrap } from '@/components/ui'
+import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { ProzessFlow } from '@/components/prozess-flow'
 import { versionDiagramm } from '@/modules/prozesse/version-diagramm'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
@@ -37,6 +38,25 @@ export default async function ProzessDetailPage({
   const { prozess, versionen, gezeigt, schritte, diagramm } = daten
   const fixture = Object.values(FIXTURES).some((f) => f.prozess === code)
   const admin = user.role === 'admin'
+
+  // Die eigenen Felder dieses Ablaufs (Migration 0071). Sie gehören auf
+  // dasselbe Blatt wie die Schritte: Wer ein Diagramm abnimmt, nimmt auch ab,
+  // WAS erfasst wird — sonst ist die halbe Maske ungeprüft.
+  const felder = await sql<
+    {
+      name: string
+      label: string
+      typ: string
+      pflicht: boolean
+      auswahl: string[] | null
+      schritte: string[] | null
+      sichtbar_in: string[]
+    }[]
+  >`
+    select name, label, typ, pflicht, auswahl, schritte, sichtbar_in
+    from feld_definitionen
+    where prozess_code = ${code} order by sequence, name`
+  const schrittName = new Map(schritte.map((s) => [s.code, s.name]))
 
   const ART_TEXT: Record<string, string> = {
     start: 'Start',
@@ -158,6 +178,57 @@ export default async function ProzessDetailPage({
         <p className="muted small" style={{ padding: '8px 12px', margin: 0 }}>
           Overrides binden an den Schritt-Code und überleben Versionswechsel. Abgeschaltete
           optionale Schritte verschwinden aus „Als Nächstes möglich" — die Nachfolger rücken nach.
+        </p>
+      </Card>
+
+      <Card title={`Eigene Felder (${felder.length})`} tight>
+        {felder.length === 0 ? (
+          <Empty>
+            Dieser Ablauf erfasst noch keine eigenen Angaben — die Maske führt nur die
+            Standardfelder. Felder entstehen mit dem Entwurf (felder) oder lassen sich in der
+            Werkstatt nachtragen.
+          </Empty>
+        ) : (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Feld</th>
+                  <th>Art</th>
+                  <th>Pflicht</th>
+                  <th>Erscheint in</th>
+                  <th>In der Liste</th>
+                </tr>
+              </thead>
+              <tbody>
+                {felder.map((f) => (
+                  <tr key={f.name}>
+                    <td>
+                      {f.label} <span className="mono small muted">zusatz.{f.name}</span>
+                    </td>
+                    <td>
+                      <span className="badge neutral">{f.typ}</span>
+                      {f.auswahl?.length ? (
+                        <span className="muted small"> {f.auswahl.join(' · ')}</span>
+                      ) : null}
+                    </td>
+                    <td className="small">{f.pflicht ? 'ja' : '—'}</td>
+                    <td className="small">
+                      {f.schritte?.length
+                        ? f.schritte.map((c) => schrittName.get(c) ?? c).join(', ')
+                        : 'jedem Schritt'}
+                    </td>
+                    <td className="small">{f.sichtbar_in.includes('liste') ? 'Spalte' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+        <p className="muted small" style={{ padding: '8px 12px', margin: 0 }}>
+          Eigene Felder landen im <span className="mono">zusatz</span> des Belegs — ohne
+          Migration, und in Bedingungen sofort als <span className="mono">zusatz.name</span>{' '}
+          verwendbar. Sie hängen am Prozess und überleben Versionswechsel.
         </p>
       </Card>
 

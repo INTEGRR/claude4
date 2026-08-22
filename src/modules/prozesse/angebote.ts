@@ -19,6 +19,36 @@ export interface NaechsteSchritte {
   passiv: { code: string; name: string; art: string }[]
 }
 
+/**
+ * Die eigenen Felder, die in DIESER Maske erscheinen (Migration 0071).
+ *
+ * Drei Ebenen, absichtlich in dieser Reihenfolge:
+ *  - Felder des PROZESSES (prozess_code gesetzt) — sie entstehen mit dem
+ *    Entwurf und gehören nur zu diesem Ablauf.
+ *  - Felder des MODELLS (prozess_code null) — gelten für alle Belege der Art,
+ *    z. B. ein Feld an jedem Kontakt.
+ *  - Je Feld die Schrittliste: null/leer = überall, sonst nur dort.
+ *
+ * Ohne den Prozessbezug sähen alle Laufzeit-Prozesse dieselben Felder — sie
+ * teilen sich das Modell 'vorgang'.
+ */
+async function eigeneFelder(
+  modell: string,
+  prozessCode: string | null,
+  schrittCode: string | null,
+): Promise<{ name: string; label: string; typ: string; pflicht: boolean; auswahl: string[] | null }[]> {
+  return sql<
+    { name: string; label: string; typ: string; pflicht: boolean; auswahl: string[] | null }[]
+  >`
+    select name, label, typ, pflicht, auswahl from feld_definitionen
+    where modell = ${modell}
+      and 'formular' = any(sichtbar_in)
+      and (prozess_code is null or prozess_code = ${prozessCode})
+      and (schritte is null or cardinality(schritte) = 0
+           or ${schrittCode}::text = any(schritte))
+    order by prozess_code nulls last, sequence, name`
+}
+
 /** Auswahllisten der Verweisfelder — einmal je benötigter Quelle laden. */
 async function ladeOptionen(
   quellen: Set<string>,
@@ -59,6 +89,20 @@ export async function aktionsAngebot(name: string): Promise<SchrittAngebot | nul
   if (!eintrag || eintrag.bindung !== 'frei') return null
 
   const felder = formularFelder(eintrag)
+  // Ohne Prozesskontext nur die MODELLWEITEN eigenen Felder (prozess_code
+  // null) — die Felder eines bestimmten Ablaufs gehören in dessen Maske,
+  // nicht in eine Aktion, die ohne ihn aufgerufen wird.
+  if (eintrag.modell) {
+    for (const f of await eigeneFelder(eintrag.modell, null, null)) {
+      felder.push({
+        name: `zusatz.${f.name}`,
+        label: f.label,
+        typ: f.typ as SchrittAngebot['felder'][number]['typ'],
+        pflicht: f.pflicht,
+        ...(f.auswahl?.length ? { auswahl: f.auswahl } : {}),
+      })
+    }
+  }
   const quellen = new Set<string>()
   for (const feld of felder) {
     if (feld.typ === 'verweis' && feld.quelle) quellen.add(feld.quelle)
@@ -76,6 +120,71 @@ export async function aktionsAngebot(name: string): Promise<SchrittAngebot | nul
     aktionsName: name,
     felder,
     vorbelegung: {},
+    optionen,
+    erlaubt: true,
+  }
+}
+
+/**
+ * Das Startformular eines Laufzeit-Prozesses: die Maske des Schritts, der den
+ * Vorgang ANLEGT. `naechsteAngebote` kann das nicht liefern — dort gibt es
+ * noch keinen Beleg, an dem entlang traversiert würde.
+ *
+ * Damit trägt auch der erste Schritt die eigenen Felder des Prozesses. Vorher
+ * erschienen sie erst ab dem zweiten: Was der Kunde als „beim Anlegen erfasse
+ * ich X" beschrieben hatte, fiel genau dort unter den Tisch.
+ */
+export async function startAngebot(prozessCode: string): Promise<SchrittAngebot | null> {
+  const [schritt] = await sql<
+    { code: string; name: string; aktion: string; params: Record<string, unknown> | null }[]
+  >`
+    select code, name, aktion, params
+    from prozess_schritte
+    where version_id = prozess_aktive_version(${prozessCode})
+      and art = 'aktion' and aktion = 'vorgang.anlegen'
+    order by sequence limit 1`
+  if (!schritt) return null
+
+  const eintrag = registrierteAktion(schritt.aktion)
+  if (!eintrag) return null
+
+  const felder = formularFelder(eintrag)
+  if (eintrag.modell) {
+    for (const f of await eigeneFelder(eintrag.modell, prozessCode, schritt.code)) {
+      felder.push({
+        name: `zusatz.${f.name}`,
+        label: f.label,
+        typ: f.typ as SchrittAngebot['felder'][number]['typ'],
+        pflicht: f.pflicht,
+        ...(f.auswahl?.length ? { auswahl: f.auswahl } : {}),
+      })
+    }
+  }
+
+  // Der Prozess steht fest (die Seite gehört ihm) — auch wenn die Definition
+  // ihn in params vergessen hat.
+  const vorbelegung = { ...(schritt.params ?? {}), prozess_code: prozessCode }
+
+  const quellen = new Set<string>()
+  for (const feld of felder) {
+    if (feld.typ === 'verweis' && feld.quelle && !(feld.name in vorbelegung)) {
+      quellen.add(feld.quelle)
+    }
+  }
+  const geladen = await ladeOptionen(quellen)
+  const optionen: Record<string, { id: string; label: string }[]> = {}
+  for (const feld of felder) {
+    if (feld.typ === 'verweis' && feld.quelle && geladen[feld.quelle]) {
+      optionen[feld.name] = geladen[feld.quelle]
+    }
+  }
+
+  return {
+    code: schritt.code,
+    name: schritt.name,
+    aktionsName: schritt.aktion,
+    felder,
+    vorbelegung,
     optionen,
     erlaubt: true,
   }
@@ -127,16 +236,11 @@ export async function naechsteAngebote(
     if (!eintrag) continue
     const vorbelegung = s.params ?? {}
     const felder = formularFelder(eintrag)
-    // Chamäleon: eigene Felder des Modells (feld_definitionen) erscheinen im
-    // generierten Formular — als zusatz.<name>, das der Client verschachtelt.
+    // Chamäleon: die eigenen Felder dieses Prozesses und dieses Schritts
+    // erscheinen im generierten Formular — als zusatz.<name>, das der Client
+    // verschachtelt.
     if (eintrag.modell) {
-      const eigene = await sql<
-        { name: string; label: string; typ: string; pflicht: boolean; auswahl: string[] | null }[]
-      >`
-        select name, label, typ, pflicht, auswahl from feld_definitionen
-        where modell = ${eintrag.modell} and 'formular' = any(sichtbar_in)
-        order by sequence, name`
-      for (const f of eigene) {
+      for (const f of await eigeneFelder(eintrag.modell, prozessCode, s.code)) {
         felder.push({
           name: `zusatz.${f.name}`,
           label: f.label,

@@ -45,6 +45,8 @@ export interface EntwurfInfo {
   status: string
   abgenommen: boolean
   schritte: { code: string; name: string; art: string }[]
+  /** Die Angaben, die der Ablauf erfasst — die halbe Maske (Migration 0071). */
+  felder: { name: string; label: string; typ: string; in_liste: boolean }[]
   diagramm: FlowDiagramm
 }
 
@@ -738,6 +740,25 @@ export function Wizard({
                       </li>
                     ))}
                   </ul>
+                  {/* Was der Ablauf ERFASST — der zweite Teil der Abnahme. Ein
+                      Diagramm ohne die Felder abzunehmen hieße, die halbe
+                      Maske ungeprüft zu lassen. */}
+                  <p className="notiz" style={{ marginTop: 16 }}>
+                    {entwurf.felder.length === 0 ? (
+                      <>
+                        Dieser Ablauf erfasst außer einem Titel nichts. Wenn ihr Angaben
+                        festhaltet — Kunde, Betrag, Termin —, sagt es im nächsten Durchgang:
+                        daraus werden die Felder eurer Maske.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Erfasst wird:</strong>{' '}
+                        {entwurf.felder
+                          .map((f) => `${f.label}${f.in_liste ? ' (auch in der Liste)' : ''}`)
+                          .join(' · ')}
+                      </>
+                    )}
+                  </p>
                   <div className="tastenreihe">
                     {markiert.length === 0 ? (
                       <button

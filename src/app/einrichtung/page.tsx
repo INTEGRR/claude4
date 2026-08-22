@@ -111,6 +111,11 @@ async function entwurfLaden(code: string): Promise<EntwurfInfo | null> {
   const [abnahme] = await sql<{ abnahme_am: Date | null }[]>`
     select abnahme_am from prozess_versionen where id = ${daten.gezeigt.id}`
 
+  // Die eigenen Felder des Entwurfs — sie gehören mit in die Abnahme.
+  const felder = await sql<{ name: string; label: string; typ: string; sichtbar_in: string[] }[]>`
+    select name, label, typ, sichtbar_in from feld_definitionen
+    where prozess_code = ${code} order by sequence, name`
+
   return {
     code: daten.prozess.code,
     name: daten.prozess.name,
@@ -118,6 +123,12 @@ async function entwurfLaden(code: string): Promise<EntwurfInfo | null> {
     status: daten.gezeigt.status,
     abgenommen: Boolean(abnahme?.abnahme_am),
     schritte: daten.schritte.map((s) => ({ code: s.code, name: s.name, art: s.art })),
+    felder: felder.map((f) => ({
+      name: f.name,
+      label: f.label,
+      typ: f.typ,
+      in_liste: f.sichtbar_in.includes('liste'),
+    })),
     diagramm: daten.diagramm,
   }
 }

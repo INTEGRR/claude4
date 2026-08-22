@@ -83,7 +83,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **prozesse**: Prozesskopf (code z. B. 'einkauf_wareneingang_rechnung', name, bereich, aktiv). **prozess_versionen** (prozess_id, nr, aktiv) mit **prozess_schritte** (schluessel, art 'start'|'aktion'|'ende'|'teilprozess', aktion = Registry-Name, zustand, optional, befugnis) und **prozess_uebergaenge** (von/nach, bedingung).
 - **prozess_instanzen**: laufende Assistenten (prozess_id, schritt, status 'laeuft'|'fertig'|'abgebrochen', daten jsonb mit beleg_id, gestartet_von).
 - **prozess_modelle** (code → Tabelle, Statusspalte, Detailroute), **prozess_routen** (Einstiegsrouten), **prozess_pakete** (Prozess-Pakete fürs Geschäftsmodell, prozess_codes[]), **prozess_overrides** (Laufzeit-Anpassungen). Ist ein Schritt Teil des aktiven Ablaufs: prozessschritt_aktiv(code, schluessel).
-- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb). **feld_definitionen**: administrativ definierte Zusatzfelder je Modell (modell, feld, label, typ, pflicht, auswahl).
+- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb). **feld_definitionen**: eigene Zusatzfelder ohne Migration (modell, name, label, typ, pflicht, auswahl, sichtbar_in). Sie gehören zu einem PROZESS (prozess_code) und optional nur zu bestimmten Schritten (schritte text[]); prozess_code null = für alle Belege des Modells. Werte landen im zusatz-jsonb und sind in Bedingungen als zusatz.name ansprechbar.
 - **bug_reports**: Tickets (number 'BUG/…', titel, beschreibung, status 'offen'|'in_arbeit'|'behoben'|'geschlossen', schwere, seite, commit_sha).
 
 ### Versand-Extras & Shopify-Abgleich

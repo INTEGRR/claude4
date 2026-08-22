@@ -3,10 +3,10 @@ import { notFound } from 'next/navigation'
 import { requireArea } from '@/modules/auth'
 import type { Area } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
-import { ActionForm } from '@/components/action-button'
+import { startAngebot } from '@/modules/prozesse/angebote'
+import { ProzessAktionen } from '@/components/prozess-aktionen'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
-import { vorgangStarten } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,16 +48,20 @@ export default async function ProzessListe({
     where s.version_id = prozess_aktive_version(${code}) and s.zustand is not null
     order by s.zustand, s.sequence`
 
-  // Spalten aus den eigenen Feldern: wer `sichtbar_in` um 'liste' ergänzt,
-  // bestimmt die Tabelle selbst. Solange das niemand getan hat, zeigen wir die
-  // ersten vier Formularfelder — eine leere Tabelle wäre die schlechtere
-  // Vorgabe. Die Felder hängen am Modell 'vorgang', gelten also für alle
-  // Laufzeit-Prozesse gemeinsam (so ist das Chamäleon-Modell gebaut).
+  // Spalten aus den eigenen Feldern DIESES Prozesses (plus den modellweiten):
+  // `in_liste` im Entwurf setzt 'liste' in sichtbar_in. Hat niemand eine
+  // Spalte gewählt, zeigen wir die ersten vier Formularfelder — eine leere
+  // Tabelle wäre die schlechtere Vorgabe.
   const alleFelder = await sql<{ name: string; label: string; sichtbar_in: string[] }[]>`
     select name, label, sichtbar_in from feld_definitionen
-    where modell = 'vorgang' order by sequence, name`
+    where modell = 'vorgang' and (prozess_code is null or prozess_code = ${code})
+    order by prozess_code nulls last, sequence, name`
   const gewaehlt = alleFelder.filter((f) => f.sichtbar_in.includes('liste'))
   const felder = gewaehlt.length > 0 ? gewaehlt : alleFelder.slice(0, 4)
+
+  // Das Startformular ist die generierte Maske des Anlage-Schritts — damit
+  // trägt es die eigenen Felder des Prozesses und schreibt sie in den zusatz.
+  const start = await startAngebot(code)
 
   const vorgaenge = await sql<
     {
@@ -98,18 +102,14 @@ export default async function ProzessListe({
       />
 
       <Card title={`Neuer Vorgang: ${prozess.name}`}>
-        <ActionForm action={vorgangStarten}>
-          <input type="hidden" name="prozess_code" value={prozess.code} />
-          <div className="row">
-            <label className="field" style={{ flex: 2 }}>
-              <span>Titel</span>
-              <input name="titel" placeholder="worum geht es?" />
-            </label>
-            <div className="shrink field" style={{ alignSelf: 'end' }}>
-              <button className="primary" type="submit">Starten</button>
-            </div>
-          </div>
-        </ActionForm>
+        {start ? (
+          <ProzessAktionen schritte={[start]} sofortOffen={start.code} />
+        ) : (
+          <Empty>
+            Dieser Ablauf hat keinen Schritt, der einen Vorgang anlegt — der Entwurf braucht
+            eine Aktion <span className="mono">vorgang.anlegen</span>.
+          </Empty>
+        )}
       </Card>
 
       {zustaende.length > 0 && (

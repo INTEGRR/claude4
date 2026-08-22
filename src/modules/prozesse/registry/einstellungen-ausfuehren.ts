@@ -240,6 +240,22 @@ interface EntwurfSchritt {
   optional: boolean
 }
 
+/**
+ * Ein eigenes Feld, das MIT dem Prozess entsteht — der zweite Teil eines
+ * Ablaufs neben den Schritten. Ohne das hier bekäme ein Kunde, der seinen
+ * Prozess aufnimmt, zwar Maske und Navigation geschenkt, müsste die Daten
+ * darin aber von Hand nachtragen.
+ */
+export interface EntwurfFeld {
+  name: string
+  label: string
+  typ: 'text' | 'nummer' | 'schalter' | 'auswahl' | 'datum'
+  pflicht: boolean
+  auswahl?: string[]
+  schritte?: string[]
+  in_liste: boolean
+}
+
 export async function prozessEntwerfen(
   p: {
     code: string
@@ -249,6 +265,7 @@ export async function prozessEntwerfen(
     modell?: string
     schritte: EntwurfSchritt[]
     uebergaenge: { von: string; nach: string; bedingung?: unknown; beschriftung?: string }[]
+    felder?: EntwurfFeld[]
   },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
@@ -332,6 +349,27 @@ export async function prozessEntwerfen(
     }
   }
 
+  // Felder gegen die Schritte prüfen — ein Feld, das auf einen Schritt zeigt,
+  // den es nicht gibt, wäre in keiner Maske sichtbar und würde stumm fehlen.
+  const feldNamen = new Set<string>()
+  for (const f of p.felder ?? []) {
+    if (feldNamen.has(f.name)) {
+      throw new Error(`Feld „${f.name}" ist doppelt — Feldnamen müssen eindeutig sein.`)
+    }
+    feldNamen.add(f.name)
+    if (f.typ === 'auswahl' && !f.auswahl?.length) {
+      throw new Error(`Feld „${f.name}": typ=auswahl braucht die Werte in auswahl[].`)
+    }
+    for (const s of f.schritte ?? []) {
+      if (!codes.has(s)) {
+        throw new Error(
+          `Feld „${f.name}": Schritt „${s}" gibt es nicht — schritte[] nennt Schritt-Codes ` +
+            'dieses Entwurfs (leer lassen = in jedem Schritt sichtbar).',
+        )
+      }
+    }
+  }
+
   // Dieselben Strukturregeln, die prozess_version_aktivieren hart prüft —
   // hier schon beim Entwurf (entwurf-pruefen.ts, pur und einzeln getestet).
   const strukturfehler = entwurfPruefen(
@@ -344,6 +382,7 @@ export async function prozessEntwerfen(
     const [vorhanden] = await t<{ id: string; modell: string | null }[]>`
       select id, modell from prozesse where code = ${p.code}`
     let prozessId: string
+    let modell: string | null = p.modell ?? null
     if (vorhanden) {
       // Umbau eines bestehenden Prozesses (beliebiges Modell): die neue
       // Version erbt den Beleg — ein angegebenes modell muss dazu passen.
@@ -354,6 +393,7 @@ export async function prozessEntwerfen(
         )
       }
       prozessId = vorhanden.id
+      modell = vorhanden.modell
     } else {
       // Neue Prozesse: nur Laufzeit-Belege (vorgang) oder beleglos — an
       // Fachtabellen gebundene Prozesse entstehen nicht per Entwurf.
@@ -409,15 +449,45 @@ export async function prozessEntwerfen(
                 ${u.bedingung == null ? null : t.json(u.bedingung as never)},
                 ${u.beschriftung ?? null})`
     }
+
+    // Die Felder des Prozesses (Migration 0071). Sie hängen am PROZESS, nicht
+    // an der Version: die erfassten Werte stehen im zusatz-jsonb der Belege
+    // und überleben jeden Versionswechsel. Deshalb wird hier auch nur
+    // ergänzt/aktualisiert — ein Feld, das die neue Version nicht mehr nennt,
+    // bleibt stehen (sonst verlöre die Liste rückwirkend ihre Spalten).
+    // Aufräumen ist ein bewusster eigener Schritt: einstellungen.feld_loeschen.
+    if (p.felder?.length) {
+      if (!modell) {
+        throw new Error(
+          'Eigene Felder brauchen einen Beleg — ein belegloser Assistent hat nichts, ' +
+            "worin sie stehen könnten (modell 'vorgang' setzen oder felder weglassen).",
+        )
+      }
+      for (const [i, f] of p.felder.entries()) {
+        await t`
+          insert into feld_definitionen
+            (modell, prozess_code, name, label, typ, pflicht, auswahl, schritte,
+             sichtbar_in, sequence)
+          values (${modell}, ${p.code}, ${f.name}, ${f.label}, ${f.typ}, ${f.pflicht},
+                  ${f.auswahl?.length ? f.auswahl : null},
+                  ${f.schritte?.length ? f.schritte : null},
+                  ${f.in_liste ? ['formular', 'liste'] : ['formular']}, ${(i + 1) * 10})
+          on conflict (modell, (coalesce(prozess_code, '')), name) do update
+            set label = excluded.label, typ = excluded.typ, pflicht = excluded.pflicht,
+                auswahl = excluded.auswahl, schritte = excluded.schritte,
+                sichtbar_in = excluded.sichtbar_in, sequence = excluded.sequence`
+      }
+    }
     return nr
   })
 
+  const felderText = p.felder?.length ? `, ${p.felder.length} Felder` : ''
   await sql`select log_event('prozess', gen_random_uuid(), 'state',
-    ${`Prozessentwurf ${p.code} v${version} (${p.schritte.length} Schritte)`}, ${ctx.actor})`
+    ${`Prozessentwurf ${p.code} v${version} (${p.schritte.length} Schritte${felderText})`}, ${ctx.actor})`
   return {
     text:
-      `Entwurf gespeichert: ${p.code} Version ${version} — Diagramm prüfen und dann ` +
-      'bewusst aktivieren.',
+      `Entwurf gespeichert: ${p.code} Version ${version}${felderText} — Diagramm prüfen ` +
+      'und dann bewusst aktivieren.',
     recordId: p.code,
     link: `/prozesse/${p.code}?version=${version}`,
   }
@@ -457,27 +527,43 @@ export async function feldAnlegen(
     typ: string
     pflicht: boolean
     auswahl?: string[]
+    prozess_code?: string
+    schritte?: string[]
+    in_liste?: boolean
   },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Der Regelweg ist der Prozessentwurf (felder[] in prozess_entwerfen) — das
+  // hier ist der Nachtrag von Hand, für ein einzelnes Feld oder für Felder am
+  // ganzen Modell (prozess_code leer, z. B. ein Feld an ALLEN Kontakten).
   await sql`
-    insert into feld_definitionen (modell, name, label, typ, pflicht, auswahl)
-    values (${p.modell}, ${p.name}, ${p.label}, ${p.typ}, ${p.pflicht},
-            ${p.auswahl && p.auswahl.length ? p.auswahl : null})
-    on conflict (modell, name) do update
-      set label = excluded.label, typ = excluded.typ,
-          pflicht = excluded.pflicht, auswahl = excluded.auswahl`
+    insert into feld_definitionen
+      (modell, prozess_code, name, label, typ, pflicht, auswahl, schritte, sichtbar_in)
+    values (${p.modell}, ${p.prozess_code ?? null}, ${p.name}, ${p.label}, ${p.typ},
+            ${p.pflicht}, ${p.auswahl?.length ? p.auswahl : null},
+            ${p.schritte?.length ? p.schritte : null},
+            ${p.in_liste ? ['formular', 'liste'] : ['formular']})
+    on conflict (modell, (coalesce(prozess_code, '')), name) do update
+      set label = excluded.label, typ = excluded.typ, pflicht = excluded.pflicht,
+          auswahl = excluded.auswahl, schritte = excluded.schritte,
+          sichtbar_in = excluded.sichtbar_in`
+  const wo = p.prozess_code ? `${p.prozess_code}.${p.name}` : `${p.modell}.${p.name}`
   await sql`select log_event('feld_definition', gen_random_uuid(), 'state',
-    ${`Eigenes Feld: ${p.modell}.${p.name} (${p.typ})`}, ${ctx.actor})`
-  return { text: `Feld ${p.modell}.${p.name} angelegt.` }
+    ${`Eigenes Feld: ${wo} (${p.typ})`}, ${ctx.actor})`
+  return { text: `Feld ${wo} angelegt.` }
 }
 
 export async function feldLoeschen(p: {
   modell: string
   name: string
+  prozess_code?: string
 }): Promise<AktionsErgebnis> {
-  await sql`delete from feld_definitionen where modell = ${p.modell} and name = ${p.name}`
-  return { text: `Feld ${p.modell}.${p.name} entfernt — erfasste Werte bleiben im zusatz stehen.` }
+  await sql`
+    delete from feld_definitionen
+    where modell = ${p.modell} and name = ${p.name}
+      and coalesce(prozess_code, '') = ${p.prozess_code ?? ''}`
+  const wo = p.prozess_code ? `${p.prozess_code}.${p.name}` : `${p.modell}.${p.name}`
+  return { text: `Feld ${wo} entfernt — erfasste Werte bleiben im zusatz stehen.` }
 }
 
 // --- Benutzerverwaltung ------------------------------------------------------

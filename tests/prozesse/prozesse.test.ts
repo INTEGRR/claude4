@@ -288,6 +288,25 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
       { von: 'annehmen', nach: 'erstatten' },
       { von: 'erstatten', nach: 'ende' },
     ],
+    // Die Daten gehören in denselben Entwurf wie die Schritte (0071):
+    // ein Ablauf ist Schritte UND das, was in ihnen erfasst wird.
+    felder: [
+      {
+        name: 'ruecksendenummer',
+        label: 'Rücksendenummer',
+        typ: 'text',
+        pflicht: true,
+        schritte: ['annehmen'],
+        in_liste: true,
+      },
+      {
+        name: 'erstattungsbetrag',
+        label: 'Erstattungsbetrag',
+        typ: 'nummer',
+        schritte: ['erstatten'],
+      },
+      { name: 'kanal', label: 'Eingang über', typ: 'auswahl', auswahl: ['Shop', 'Telefon'] },
+    ],
   }
 
   after(async () => {
@@ -321,6 +340,55 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
         admin,
       ),
       /kein aktiver Vorgangs-Prozess/,
+    )
+  })
+
+  test('der Entwurf bringt die Felder mit — je Schritt und für die Liste', async () => {
+    // Kern des Chamäleon-Versprechens: Der Kunde beschreibt seinen Ablauf,
+    // und daraus entsteht die ganze Oberfläche — Navigation, Maske UND die
+    // Daten darin. Vorher kamen Felder nur über einen eigenen Handgriff, den
+    // niemand findet, und hingen am MODELL: alle Laufzeit-Prozesse teilten
+    // sich dieselben Felder.
+    const felder = await h.sql<
+      {
+        name: string
+        label: string
+        typ: string
+        pflicht: boolean
+        prozess_code: string | null
+        schritte: string[] | null
+        sichtbar_in: string[]
+      }[]
+    >`
+      select name, label, typ, pflicht, prozess_code, schritte, sichtbar_in
+      from feld_definitionen where prozess_code = 'ruecknahme' order by sequence`
+    assert.equal(felder.length, 3, 'alle drei Felder des Entwurfs müssen stehen')
+    assert.deepEqual(
+      felder.map((f) => f.name),
+      ['ruecksendenummer', 'erstattungsbetrag', 'kanal'],
+    )
+    assert.equal(felder[0].pflicht, true)
+    assert.deepEqual(felder[0].schritte, ['annehmen'])
+    assert.ok(felder[0].sichtbar_in.includes('liste'), 'in_liste macht eine Spalte daraus')
+    assert.equal(felder[1].sichtbar_in.includes('liste'), false)
+    assert.equal(felder[2].schritte, null, 'ohne schritte[] gilt das Feld überall')
+
+    // Ein Feld, das auf einen Schritt zeigt, den es nicht gibt, wäre in
+    // keiner Maske sichtbar — der Entwurf muss das melden, nicht schlucken.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            felder: [
+              { name: 'irgendwas', label: 'Irgendwas', typ: 'text', schritte: ['gibtsnicht'] },
+            ],
+          },
+        },
+        admin,
+      ),
+      /Schritt „gibtsnicht" gibt es nicht/,
     )
   })
 
@@ -409,6 +477,48 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     const [fertig] = await h.sql<{ state: string }[]>`
       select state from vorgaenge where id = ${vorgangId}`
     assert.equal(fertig.state, 'erstattet')
+  })
+
+  test('die Maske entsteht aus dem Prozess — je Schritt genau seine Felder', async () => {
+    const { startAngebot, naechsteAngebote } = await import('@/modules/prozesse/angebote')
+
+    // Startformular = Maske des Anlage-Schritts. Vorher fehlten die eigenen
+    // Felder hier komplett: Was der Kunde als „beim Anlegen erfasse ich X"
+    // beschrieben hatte, fiel genau an der Stelle unter den Tisch.
+    const start = await startAngebot('ruecknahme')
+    assert.ok(start, 'ein Laufzeit-Prozess muss ein Startformular haben')
+    const startFelder = start.felder.map((f) => f.name)
+    assert.ok(startFelder.includes('zusatz.ruecksendenummer'), 'Feld des Anlage-Schritts fehlt')
+    assert.ok(startFelder.includes('zusatz.kanal'), 'Feld ohne Schrittbindung gilt überall')
+    assert.equal(
+      startFelder.includes('zusatz.erstattungsbetrag'),
+      false,
+      'ein Feld des Erstatten-Schritts hat im Startformular nichts zu suchen',
+    )
+    assert.equal(start.vorbelegung.prozess_code, 'ruecknahme')
+
+    // Und im Folgeschritt genau umgekehrt.
+    const angelegt = await aktionAusfuehrenGeprueft(
+      'vorgang.anlegen',
+      {
+        parameter: {
+          prozess_code: 'ruecknahme',
+          titel: 'Maskenprobe',
+          zusatz: { ruecksendenummer: 'RS-42' },
+        },
+      },
+      admin,
+    )
+    const [gespeichert] = await h.sql<{ nummer: string | null }[]>`
+      select zusatz ->> 'ruecksendenummer' as nummer from vorgaenge where id = ${angelegt.recordId!}`
+    assert.equal(gespeichert.nummer, 'RS-42', 'die eigenen Felder landen im zusatz')
+
+    const { angebote } = await naechsteAngebote('ruecknahme', angelegt.recordId!, 'admin')
+    const erstatten = angebote.find((a) => a.code === 'erstatten')
+    assert.ok(erstatten, 'der Folgeschritt muss angeboten werden')
+    const folgeFelder = erstatten.felder.map((f) => f.name)
+    assert.ok(folgeFelder.includes('zusatz.erstattungsbetrag'))
+    assert.equal(folgeFelder.includes('zusatz.ruecksendenummer'), false)
   })
 
   test('Unfug scheitert schon beim Entwurf — die Datenbank bleibt die letzte Instanz', async () => {

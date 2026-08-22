@@ -960,6 +960,69 @@ mit Stückliste und Route „fertigen"; automatisch angelegt wird nur, was
 zusätzlich „auf Bestellung fertigen" trägt. `sales_order_fertigungslage()`
 nennt die Lücke mit Grund, und der Auftrag zeigt sie an.
 
+## Der Entwurf bringt die Felder mit (Migration 0071, umgesetzt)
+
+Das Chamäleon-Versprechen ist: der Kunde beschreibt seinen Ablauf, und daraus
+entsteht die Oberfläche. Bei den Schritten war das eingelöst, bei den DATEN
+nicht — und Daten sind die halbe Maske.
+
+**Was vorher fehlte.** `feld_definitionen` hing am MODELL. Alle
+Laufzeit-Prozesse teilen sich das Modell `vorgang`, also sahen sie
+zwangsläufig dieselben Felder: ein „Budget" für die Angebotsaufnahme
+erschien auch im Reklamations- und im Bewerbungsablauf. Ein zweiter Prozess
+konnte „budget" nicht einmal anlegen — `unique (modell, name)` stand im Weg.
+Und Felder entstanden ausschließlich über einen eigenen Handgriff
+(`einstellungen.feld_anlegen`), den ein Kunde nie findet: Wer seinen Prozess
+im Onboarding oder in der Werkstatt aufnahm, bekam Schritte und Zustände
+geschenkt und musste die Felder danach von Hand nachtragen.
+
+**Jetzt gehören Felder zum Prozess.** `prozess_entwerfen` nimmt sie als
+`felder[]` entgegen — im selben Entwurf wie Schritte und Übergänge:
+
+```json
+{ "name": "ruecksendenummer", "label": "Rücksendenummer", "typ": "text",
+  "pflicht": true, "schritte": ["annehmen"], "in_liste": true }
+```
+
+- **`prozess_code`** trennt die Abläufe: zwei Prozesse dürfen dasselbe Feld
+  führen (Eindeutigkeit ist jetzt `(modell, coalesce(prozess_code,''), name)`
+  — ein Ausdrucks-Index, `on conflict` braucht dieselbe Schreibweise).
+  `prozess_code` leer = das Feld gilt für ALLE Belege des Modells, etwa ein
+  Feld an jedem Kontakt.
+- **`schritte`** entscheidet, in welcher Maske das Feld auftaucht. Leer =
+  in jeder. So erfasst jeder Schritt genau das, was dort anfällt.
+- **`in_liste`** macht daraus zusätzlich eine Spalte der Vorgangsliste.
+- In Bedingungen sind die Felder sofort als `zusatz.<name>` ansprechbar —
+  ohne Migration, ohne Code.
+
+**Felder hängen am PROZESS, nicht an der Version.** Sie sind Datenstruktur,
+keine Ablaufdefinition: die erfassten Werte stehen im `zusatz`-jsonb der
+Belege und überleben jeden Versionswechsel. Ein Feld, das eine neue Version
+nicht mehr nennt, wird deshalb nicht gelöscht — sonst verlöre die Liste
+rückwirkend ihre Spalten. Aufräumen ist ein bewusster eigener Schritt
+(`einstellungen.feld_loeschen`). Expand-Contract auch hier.
+
+**Wo die Felder auftauchen:**
+
+| Ort | Was |
+|---|---|
+| Startformular `/vorgaenge/prozess/<code>` | Die generierte Maske des Anlage-Schritts — samt seiner Felder. Vorher fiel „beim Anlegen erfasse ich X" genau dort unter den Tisch. |
+| Prozess-Panel am Vorgang | Je Folgeschritt genau dessen Felder. |
+| Liste des Prozesses | Die Felder mit `in_liste` als Spalten. |
+| `/prozesse/<code>` | Karte „Eigene Felder" — wer ein Diagramm abnimmt, nimmt auch ab, WAS erfasst wird. |
+| Onboarding Schritt 04 | „Erfasst wird: …" unter der Schrittliste, im selben Abnahmeblatt. |
+| Befehlsfeld / `/aktion/<name>` | Nur die modellweiten Felder — die eines bestimmten Ablaufs gehören in dessen Maske. |
+
+**Die KI fragt aktiv danach.** Wissensbasis (`ki/wissen.ts`) und
+Aufnahme-Strukturierung (`ki/prozess-aufnahme.ts`) führen die Leitfrage „Was
+tragen Sie in diesem Schritt ein?"; ein Prozess ohne ein einziges Feld gilt
+als unvollständiges Interview. Erfunden wird trotzdem nichts — nur, was im
+Gespräch vorkam.
+
+Wächter: tests/prozesse/prozesse.test.ts (Entwurf mit Feldern → gespeichert
+je Schritt und Liste; Feld auf einen unbekannten Schritt wird abgelehnt;
+Startformular und Folgeschritt führen je genau ihre Felder).
+
 ## On-demand-Oberfläche: eigener Menüpunkt, eigene Liste (umgesetzt)
 
 Ein aufgenommener Ablauf bekam bisher nur die halbe Oberfläche: die **Maske**

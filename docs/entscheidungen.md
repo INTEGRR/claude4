@@ -9,6 +9,52 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-22 — Eigene Felder gehören zum Prozess, und der Entwurf bringt sie mit
+
+Prozesse zur Laufzeit in Formulare zu verwandeln ist der Kern von KRNL: Der
+Kunde beschreibt seinen Ablauf, daraus entsteht die Oberfläche. Bei den
+Schritten war das eingelöst — bei den Daten nicht, und Daten sind die halbe
+Maske.
+
+Zwei Fehler in der bisherigen Architektur:
+
+1. **Felder hingen am MODELL.** Alle Laufzeit-Prozesse teilen sich das Modell
+   `vorgang`, sahen also zwangsläufig dieselben Felder; und `unique (modell,
+   name)` verbot zwei Abläufen dasselbe Feld.
+2. **Der Entwurf kannte keine Felder.** Sie entstanden nur über einen eigenen
+   Handgriff (`einstellungen.feld_anlegen`) — eine Stelle, die ein Kunde nie
+   findet. Wer seinen Prozess aufnahm, bekam eine Maske, in der er außer
+   einem Titel nichts eintragen konnte.
+
+Entschieden, per Architektur statt per Code:
+
+- `feld_definitionen` bekommt `prozess_code` (null = modellweit, wie bisher)
+  und `schritte text[]` (leer = überall). Eindeutigkeit jetzt über
+  `(modell, coalesce(prozess_code,''), name)`.
+- `einstellungen.prozess_entwerfen` nimmt `felder[]` entgegen — Schritte,
+  Übergänge und Felder sind EIN Entwurf. Aufnahme und Werkstatt liefern sie
+  mit; die Wissensbasis führt die Leitfrage „Was tragen Sie in diesem Schritt
+  ein?".
+- Felder hängen am PROZESS, nicht an der Version: sie sind Datenstruktur, die
+  erfassten Werte stehen im `zusatz` und überleben Versionswechsel. Eine neue
+  Version, die ein Feld nicht mehr nennt, LÖSCHT es nicht — sonst verlöre die
+  Liste rückwirkend ihre Spalten. Aufräumen ist ein eigener Schritt
+  (Expand-Contract).
+- Das Startformular eines Laufzeit-Prozesses ist ab jetzt die generierte
+  Maske des Anlage-Schritts, nicht ein handgebautes Formular. Sonst fiele
+  „beim Anlegen erfasse ich X" genau dort unter den Tisch.
+
+Nicht gewählt: Felder an der Version zu führen. Das wäre sauberer im Modell
+und falsch in der Sache — ein Versionswechsel ist eine Ablaufänderung, keine
+Datenmigration.
+
+Umgesetzt in Migration 0071, `registry/einstellungen{,-ausfuehren}.ts`,
+`prozesse/angebote.ts` (neu: `startAngebot`), `(erp)/vorgaenge/prozess/[code]`,
+`(erp)/prozesse/[code]`, `einrichtung/`, `ki/wissen.ts`,
+`ki/prozess-aufnahme.ts`. Wächter: tests/prozesse/prozesse.test.ts.
+Dokumentiert in [prozesse.md](prozesse.md) („Der Entwurf bringt die Felder
+mit").
+
 ## 2026-08-22 — Ein Test ohne Datenbank bekommt auch keine
 
 Der CI-Hänger der Prozessläufe ist gefunden: `tests/prozesse/fakes.test.ts`
