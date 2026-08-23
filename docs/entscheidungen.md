@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-23 — Onboarding-Interview als eigene schlanke KI-Route, nicht als Chat-Agent
+
+Die vier starren Onboarding-Fragen (Auslöser, Schritte, Zuständigkeiten,
+Ausnahmen) erhoben nie Felder und ließen nichts nachfragen — die Erhebung
+war der Engpass des ganzen „Prozess rein, Maske raus"-Versprechens. Ersetzt
+durch ein **echtes Interview**: `interviewRunde` (ki/interview.ts) erzwingt
+je Runde das Werkzeug `naechste_frage {frage, optionen, fertig}` — EINE
+Frage, 2–4 anklickbare Kurzantworten (Chips), spätestens nach 10 Runden
+Schluss. Route `/api/aufnahme/interview` (nurAdmin-Schwelle wie
+prozess_entwerfen).
+
+Bewusst NICHT der Chat-Agent der Werkstatt: der hätte im Onboarding die
+falsche Werkzeugfläche (sql_abfrage, diagramm, aktion_vorschlagen) und die
+Latenz einer Agenten-Schleife. Der Abschluss bleibt deterministisch — die
+gesammelten Runden gehen unverändert an dieselbe Strukturierung wie das
+Sprach-Interview (`aufnahmeStrukturieren` → `prozess_entwerfen` im
+Torwächter); das Interview selbst entwirft nichts.
+
+Dazu repariert: Die **Korrekturrunde** aus Schritt 04 war eine Sackgasse
+(kein Eingabefeld) und hätte Duplikat-Prozesse erzeugt. Jetzt expliziter
+Korrektur-Zustand im Wizard, „Ergänzen (z. B. Felder)" auch ohne markierte
+Schritte, und `/api/aufnahme` nimmt ein optionales `code` —
+`aufnahmeStrukturieren(…, bestehenderCode)` reicht den Entwurf unter GENAU
+diesem Code neu ein: Version n+1 statt Duplikat. In der Abnahme (Schritt 04)
+steht die **echte Maskenvorschau** (`MaskenVorschau`, derselbe Renderer wie
+im Betrieb; `startAngebot` nimmt dafür die Entwurfs-Versions-ID, denn der
+Entwurf ist nicht aktiv) — abgenommen wird ab jetzt Diagramm UND Maske.
+
 ## 2026-08-23 — Standards vorschlagen statt abfragen (Revision von „erfinde nichts")
 
 Die Regel „erfinde nichts, was im Gespräch nicht vorkam" (Prozess-Aufnahme,

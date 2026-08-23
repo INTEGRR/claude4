@@ -102,6 +102,8 @@ export async function aufnahmeStrukturieren(
   transkript: string,
   titel: string,
   nutzer: User,
+  /** Korrekturrunde: unter GENAU diesem Code entsteht Version n+1 statt eines Duplikats. */
+  bestehenderCode?: string,
 ): Promise<{ text: string; code?: string }> {
   if (!aufnahmeKonfiguriert()) {
     return { text: 'Die Prozess-Aufnahme ist nicht konfiguriert (ANTHROPIC_API_KEY fehlt).' }
@@ -118,6 +120,12 @@ export async function aufnahmeStrukturieren(
       role: 'user',
       content:
         `Arbeitstitel des Prozesses: ${titel}\n\n` +
+        (bestehenderCode
+          ? `Bestehender Prozess: \u201e${bestehenderCode}\u201c — reiche den korrigierten Entwurf unter ` +
+            `GENAU diesem code ein (es entsteht die nächste Version, kein neuer Prozess). ` +
+            'Schlage den bisherigen Entwurf per sql-Wissen NICHT nach — das Transkript unten ' +
+            'enthält Aufnahme UND Korrekturen; reiche den VOLLSTÄNDIGEN Prozess neu ein.\n\n'
+          : '') +
         `Interview-Transkript (Nutzer = Berater/Kunde, Assistent = Interviewer):\n` +
         transkript.slice(0, 60_000),
     },

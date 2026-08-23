@@ -30,8 +30,9 @@ export async function POST(request: Request) {
 
   let paare: { frage: string; antwort: string }[]
   let titel: string
+  let code: string | undefined
   try {
-    const body = (await request.json()) as { runden?: unknown; titel?: unknown }
+    const body = (await request.json()) as { runden?: unknown; titel?: unknown; code?: unknown }
     if (!Array.isArray(body.runden) || body.runden.length === 0) throw new Error()
     paare = body.runden.slice(0, 20).map((r) => {
       const runde = r as { frage?: unknown; antwort?: unknown }
@@ -41,6 +42,12 @@ export async function POST(request: Request) {
     titel = typeof body.titel === 'string' && body.titel.trim()
       ? body.titel.trim().slice(0, 120)
       : 'Ablauf aus der Ersteinrichtung'
+    // Korrekturrunde: der Entwurf existiert schon — unter GENAU diesem Code
+    // entsteht die nächste Version, kein Duplikat-Prozess.
+    if (typeof body.code === 'string' && body.code.trim()) {
+      if (!/^[a-z][a-z0-9_]{0,39}$/.test(body.code.trim())) throw new Error()
+      code = body.code.trim()
+    }
   } catch {
     return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 })
   }
@@ -50,6 +57,6 @@ export async function POST(request: Request) {
     .map((p) => `Assistent: ${p.frage}\nNutzer: ${p.antwort}`)
     .join('\n\n')
 
-  const ergebnis = await aufnahmeStrukturieren(transkript, titel, user)
+  const ergebnis = await aufnahmeStrukturieren(transkript, titel, user, code)
   return NextResponse.json(ergebnis)
 }

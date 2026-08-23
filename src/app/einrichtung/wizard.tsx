@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { FlowDiagramm } from '@/modules/prozesse/flow-layout'
 import { ProzessFlow } from '@/components/prozess-flow'
+import { MaskenVorschau } from '@/components/masken-vorschau'
+import type { SchrittAngebot } from '@/components/prozess-aktionen'
+import { MikrofonKnopf } from '@/components/spracheingabe'
 import type { ActionResult } from '@/modules/shared/action'
 import {
   adminPasswort,
@@ -26,8 +29,9 @@ import {
  *                 Prozesse aktiv sind — ohne Wahl ist ALLES aktiv)
  *   02 Team       Personen und Rollen; Rollen entscheiden später, wer welchen
  *                 Prozessschritt sehen und buchen darf, auch per Sprache
- *   03 Aufnehmen  vier Fragen; die Antworten gehen als Transkript an dieselbe
- *                 Strukturierung wie das Sprach-Interview der Werkstatt
+ *   03 Aufnehmen  geführtes Interview: die KI stellt die jeweils nächste
+ *                 Frage (mit Antwort-Chips), die Runden gehen als Transkript
+ *                 an dieselbe Strukturierung wie das Sprach-Interview
  *   04 Zeichnen   das ECHTE Diagramm des Entwurfs; Schritte lassen sich als
  *                 falsch markieren, die Freigabe ist die protokollierte Abnahme
  *   05 Läuft      Version schalten — ab da ist der Ablauf das System
@@ -47,6 +51,8 @@ export interface EntwurfInfo {
   schritte: { code: string; name: string; art: string }[]
   /** Die Angaben, die der Ablauf erfasst — die halbe Maske (Migration 0071). */
   felder: { name: string; label: string; typ: string; in_liste: boolean }[]
+  /** Die generierte Maske des Anlage-Schritts — die ECHTE Vorschau zur Abnahme. */
+  maske: SchrittAngebot | null
   diagramm: FlowDiagramm
 }
 
@@ -72,32 +78,20 @@ const SCHRITTE = [
   { n: 5, titel: 'Läuft', meta: 'Version schalten' },
 ] as const
 
-const FRAGEN = [
-  {
-    frage: 'Welcher Ablauf soll zuerst laufen — und was löst ihn aus?',
-    hinweis: 'z. B. „Der Auftragsdurchlauf. Los geht es, wenn eine Bestellung im Shop eingeht."',
-    beispiel: 'Der Auftragsdurchlauf. Auslöser ist eine Bestellung aus dem Shop oder per Mail.',
-    erfasst: 'Auslöser',
-  },
-  {
-    frage: 'Welche Schritte kommen danach, bis er abgeschlossen ist?',
-    hinweis: 'Einfach der Reihe nach erzählen — die Reihenfolge sortieren wir.',
-    beispiel: 'Verfügbarkeit prüfen, dann kommissionieren, packen, und am Ende Versand melden.',
-    erfasst: 'Schritte',
-  },
-  {
-    frage: 'Wer ist für welchen Schritt zuständig?',
-    hinweis: 'Rollen genügen, keine Namen.',
-    beispiel:
-      'Prüfen macht der Einkauf, Kommissionieren und Packen das Lager, Versand meldet das Lager mit.',
-    erfasst: 'Zuständigkeiten',
-  },
-  {
-    frage: 'Was sind die häufigsten Ausnahmen oder Abbruchwege?',
-    hinweis: 'Genau die Fälle, die sonst in Excel landen.',
-    beispiel: 'Wenn etwas fehlt, gehen wir in Rückstand und melden dem Kunden eine Teillieferung.',
-    erfasst: 'Ausnahmen',
-  },
+/**
+ * Die erste Frage ist statisch (kein KI-Aufruf für einen leeren Bildschirm);
+ * ab der ersten Antwort stellt /api/aufnahme/interview die jeweils nächste.
+ */
+const STARTFRAGE = 'Welcher Ablauf soll zuerst laufen — und was löst ihn aus?'
+
+/** Die Themen, die das Interview abdeckt — Checkliste rechts neben dem Gespräch. */
+const THEMEN = [
+  'Auslöser',
+  'Schritte in Reihenfolge',
+  'Entscheidungen',
+  'Zuständigkeiten',
+  'Ausnahmen',
+  'Felder — was wird eingetragen?',
 ]
 
 const ROLLEN = [
@@ -186,8 +180,15 @@ export function Wizard({
   const [hinweis, setHinweis] = useState<string | null>(null)
 
   const [mitglieder, setMitglieder] = useState<Mitglied[]>(team)
-  const [qIndex, setQIndex] = useState(0)
-  const [antworten, setAntworten] = useState<string[]>([])
+  // Das Interview: gestellte Frage/Antwort-Paare, die aktuell offene Frage
+  // und ihre anklickbaren Kurzantworten. `korrektur` unterscheidet den
+  // zweiten Anlauf aus Schritt 04 — er endet unter demselben Prozess-Code.
+  const [runden, setRunden] = useState<Runde[]>([])
+  const [frage, setFrage] = useState(STARTFRAGE)
+  const [chips, setChips] = useState<string[]>([])
+  const [korrektur, setKorrektur] = useState(false)
+  const [fertigMeldung, setFertigMeldung] = useState<string | null>(null)
+  const [versionVorher, setVersionVorher] = useState<number | null>(null)
   const [eingabe, setEingabe] = useState('')
   const [markiert, setMarkiert] = useState<string[]>([])
   const [geschaltet, setGeschaltet] = useState(false)
@@ -221,9 +222,9 @@ export function Wizard({
     window.location.href = '/'
   }
 
-  // --- Schritt 03: Antworten strukturieren ---------------------------------
+  // --- Schritt 03: Interview führen, dann strukturieren ---------------------
 
-  async function aufnahmeAbschicken(alleRunden: Runde[]) {
+  async function aufnahmeAbschicken(alleRunden: Runde[], bestehenderCode?: string) {
     setBusy('aufnahme')
     setFehler(null)
     try {
@@ -233,6 +234,9 @@ export function Wizard({
         body: JSON.stringify({
           runden: alleRunden,
           titel: `${firma.name || 'Erster Ablauf'} — Ablauf aus der Ersteinrichtung`,
+          // Korrekturrunde: unter GENAU diesem Code entsteht die nächste
+          // Version — kein Duplikat-Prozess.
+          ...(bestehenderCode ? { code: bestehenderCode } : {}),
         }),
       })
       const daten = (await res.json()) as { text?: string; code?: string; error?: string }
@@ -244,7 +248,14 @@ export function Wizard({
         setFehler(daten.text ?? 'Es ist kein Entwurf entstanden — bitte ausführlicher erzählen.')
         return
       }
-      // Der Server kennt den Entwurf; die Seite lädt mit Diagramm neu.
+      // Der Server kennt den Entwurf; die Seite lädt mit Diagramm neu. Am
+      // Versionsstand erkennen wir, wann der frische Entwurf als Prop da ist.
+      setVersionVorher(entwurf?.version ?? 0)
+      setFertigMeldung(
+        bestehenderCode
+          ? 'Die Korrekturen sind eingearbeitet — der Entwurf ist neu gezeichnet.'
+          : 'Der Entwurf ist gezeichnet.',
+      )
       router.push(`/einrichtung?entwurf=${encodeURIComponent(daten.code)}`)
       router.refresh()
     } catch {
@@ -254,26 +265,89 @@ export function Wizard({
     }
   }
 
-  function antwortSenden() {
-    const text = eingabe.trim()
-    if (!text) return
-    const neueAntworten = [...antworten, text]
-    setAntworten(neueAntworten)
+  async function antwortSenden(roh: string) {
+    const text = roh.trim()
+    if (!text || busy !== null) return
+    const neueRunden = [...runden, { frage, antwort: text }]
+    setRunden(neueRunden)
+    rundenSchreiben(neueRunden)
     setEingabe('')
+    setChips([])
 
-    const istKorrektur = qIndex >= FRAGEN.length
-    const frage = istKorrektur
-      ? `Was stimmt an diesen Schritten nicht: ${markiert.join(', ')}?`
-      : FRAGEN[qIndex].frage
-    const runden = istKorrektur
-      ? [...rundenLesen(), { frage, antwort: text }]
-      : [...neueAntworten.map((a, i) => ({ frage: FRAGEN[i].frage, antwort: a }))]
-    rundenSchreiben(runden)
-    setQIndex(qIndex + 1)
-
-    if (istKorrektur || neueAntworten.length === FRAGEN.length) {
-      void aufnahmeAbschicken(runden)
+    // In der Korrektur gibt es keine Zwischenrunden: die Antwort beschreibt,
+    // was anders werden soll, und der Entwurf wird direkt neu gezeichnet.
+    if (korrektur) {
+      await aufnahmeAbschicken(neueRunden, entwurf?.code)
+      return
     }
+
+    setBusy('interview')
+    setFehler(null)
+    try {
+      const res = await fetch('/api/aufnahme/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runden: neueRunden }),
+      })
+      const daten = (await res.json()) as {
+        frage?: string
+        optionen?: string[]
+        fertig?: boolean
+        error?: string
+      }
+      if (!res.ok || daten.error || !daten.frage) {
+        setFehler(
+          daten.error ??
+            'Die nächste Frage kam nicht an — bitte erneut senden oder direkt zeichnen lassen.',
+        )
+        return
+      }
+      // Bei fertig=true ist die „Frage" die Ein-Satz-Zusammenfassung — sie
+      // bleibt als Bubble stehen, während der Entwurf gezeichnet wird.
+      setFrage(daten.frage)
+      setChips(daten.fertig ? [] : (daten.optionen ?? []))
+      if (daten.fertig) await aufnahmeAbschicken(neueRunden)
+    } catch {
+      setFehler('Keine Verbindung — bitte erneut versuchen.')
+    } finally {
+      setBusy((alt) => (alt === 'interview' ? null : alt))
+    }
+  }
+
+  /**
+   * Rückweg aus Schritt 04: Korrekturen oder Ergänzungen (z. B. Felder)
+   * aufnehmen. Grundlage ist das gespeicherte Interview; ist die
+   * sessionStorage leer (neuer Tab), beschreibt eine Ersatzrunde den
+   * bisherigen Entwurf — sonst würde die Strukturierung bei null anfangen.
+   */
+  function korrekturStarten() {
+    if (!entwurf) return
+    let basis = rundenLesen()
+    if (basis.length === 0) {
+      basis = [
+        {
+          frage: 'Wie sieht der bisherige Ablauf aus?',
+          antwort:
+            `Prozess „${entwurf.name}" mit den Schritten ${entwurf.schritte
+              .map((s) => s.name)
+              .join(', ')}. ` +
+            (entwurf.felder.length > 0
+              ? `Erfasste Felder: ${entwurf.felder.map((f) => f.label).join(', ')}.`
+              : 'Bisher ohne eigene Felder.'),
+        },
+      ]
+    }
+    setRunden(basis)
+    setFrage(
+      markiert.length > 0
+        ? `Was stimmt an diesen Schritten nicht: ${markiert.join(', ')}?`
+        : `Was soll am Entwurf „${entwurf.name}" ergänzt oder geändert werden — z. B. welche Angaben (Felder) die Maske noch erfassen soll?`,
+    )
+    setChips([])
+    setEingabe('')
+    setFertigMeldung(null)
+    setKorrektur(true)
+    setSchritt(3)
   }
 
   // --- Ansichtsteile --------------------------------------------------------
@@ -598,12 +672,14 @@ export function Wizard({
 
             {schritt === 3 && (
               <>
-                <p className="eyebrow">{'// Schritt 03 · Aufnehmen'}</p>
-                <h1>Erzählt euren Ablauf.</h1>
+                <p className="eyebrow">
+                  {korrektur ? '// Schritt 03 · Korrigieren' : '// Schritt 03 · Aufnehmen'}
+                </p>
+                <h1>{korrektur ? 'Was soll anders werden?' : 'Erzählt euren Ablauf.'}</h1>
                 <p className="lead">
-                  Kein Lastenheft, kein Formular-Marathon. Vier Fragen — Auslöser,
-                  Schritte, Zuständigkeiten, Ausnahmen — daraus entsteht die erste
-                  Prozessversion.
+                  {korrektur
+                    ? 'Beschreibt Korrekturen oder Ergänzungen — auch neue Felder. Daraus entsteht die nächste Version desselben Entwurfs, kein zweiter Prozess.'
+                    : 'Kein Lastenheft, kein Formular-Marathon. Ein kurzes Gespräch: der Assistent fragt nach, was er noch braucht, und schlägt Übliches gleich vor — ihr bestätigt oder streicht.'}
                 </p>
                 {!kiBereit && (
                   <div className="meldung">
@@ -615,81 +691,134 @@ export function Wizard({
                 <div className="zwei">
                   <div className="anzeige">
                     <div className="anzeige-kopf">
-                      <span className="mono">Prozessaufnahme · Diktat</span>
                       <span className="mono">
-                        {Math.min(qIndex + 1, FRAGEN.length)} / {FRAGEN.length}
+                        Prozessaufnahme · {korrektur ? 'Korrektur' : 'Interview'}
                       </span>
+                      <span className="mono">Runde {runden.length + 1}</span>
                     </div>
-                    {antworten.map((a, i) => (
-                      <div key={`runde-${i}-${a.slice(0, 12)}`}>
+                    {runden.map((r, i) => (
+                      <div key={`runde-${i}-${r.antwort.slice(0, 12)}`}>
                         <div className="blase krnl">
                           <span className="wer">KRNL</span>
-                          {FRAGEN[i]?.frage ?? 'Was stimmt an den markierten Schritten nicht?'}
+                          {r.frage}
                         </div>
                         <div className="blase nutzer">
                           <span className="wer">Ihr</span>
-                          {a}
+                          {r.antwort}
                         </div>
                       </div>
                     ))}
-                    {qIndex < FRAGEN.length ? (
+                    {fertigMeldung ? (
                       <>
                         <div className="blase krnl">
                           <span className="wer">KRNL</span>
-                          {FRAGEN[qIndex].frage}
-                        </div>
-                        <div className="feld" style={{ marginTop: 14, marginBottom: 0 }}>
-                          <textarea
-                            aria-label="Antwort"
-                            value={eingabe}
-                            placeholder={FRAGEN[qIndex].hinweis}
-                            onChange={(e) => setEingabe(e.target.value)}
-                          />
+                          {fertigMeldung}
                         </div>
                         <div className="tastenreihe">
-                          <button
-                            type="button"
-                            className="taste fuehrend"
-                            disabled={busy !== null || !eingabe.trim()}
-                            onClick={antwortSenden}
-                          >
-                            {busy === 'aufnahme' ? 'Strukturiert …' : 'Antwort senden'}
-                          </button>
-                          <button
-                            type="button"
-                            className="taste"
-                            onClick={() => setEingabe(FRAGEN[qIndex].beispiel)}
-                          >
-                            Beispiel einsetzen
-                          </button>
+                          {entwurf && entwurf.version !== versionVorher ? (
+                            <button
+                              type="button"
+                              className="taste fuehrend"
+                              onClick={() => {
+                                setFertigMeldung(null)
+                                setKorrektur(false)
+                                setMarkiert([])
+                                setSchritt(4)
+                              }}
+                            >
+                              Diagramm ansehen →
+                            </button>
+                          ) : (
+                            <span className="mono">Das Diagramm wird geladen …</span>
+                          )}
                         </div>
                       </>
                     ) : (
-                      <div className="blase krnl">
-                        <span className="wer">KRNL</span>
-                        {busy === 'aufnahme'
-                          ? 'Danke — ich baue daraus die erste Prozessversion …'
-                          : 'Aufnahme vollständig. Das Diagramm steht im nächsten Schritt.'}
-                      </div>
+                      <>
+                        <div className="blase krnl">
+                          <span className="wer">KRNL</span>
+                          {frage}
+                        </div>
+                        {busy === 'aufnahme' ? (
+                          <div className="blase krnl">
+                            <span className="wer">KRNL</span>
+                            Danke — ich zeichne daraus die Prozessversion …
+                          </div>
+                        ) : (
+                          <>
+                            {chips.length > 0 && (
+                              <div className="tastenreihe" style={{ marginTop: 4 }}>
+                                {chips.map((c) => (
+                                  <button
+                                    key={c}
+                                    type="button"
+                                    className="taste chip"
+                                    disabled={busy !== null}
+                                    onClick={() => void antwortSenden(c)}
+                                  >
+                                    {c}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <div className="feld" style={{ marginTop: 14, marginBottom: 0 }}>
+                              <textarea
+                                aria-label="Antwort"
+                                value={eingabe}
+                                placeholder={
+                                  korrektur
+                                    ? 'z. B. „Nach der Prüfung fehlt eine Freigabe — und wir notieren immer die Auftragsnummer."'
+                                    : runden.length === 0
+                                      ? 'z. B. „Der Auftragsdurchlauf. Los geht es, wenn eine Bestellung im Shop eingeht."'
+                                      : 'Einfach erzählen — Stichworte reichen.'
+                                }
+                                onChange={(e) => setEingabe(e.target.value)}
+                              />
+                            </div>
+                            <div className="tastenreihe">
+                              <button
+                                type="button"
+                                className="taste fuehrend"
+                                disabled={busy !== null || !eingabe.trim()}
+                                onClick={() => void antwortSenden(eingabe)}
+                              >
+                                {busy === 'interview' ? 'Liest …' : 'Antwort senden'}
+                              </button>
+                              <MikrofonKnopf
+                                onText={(t) =>
+                                  setEingabe((alt) => (alt.trim() ? `${alt.trim()} ${t}` : t))
+                                }
+                              />
+                              {!korrektur && runden.length >= 3 && (
+                                <button
+                                  type="button"
+                                  className="taste"
+                                  disabled={busy !== null}
+                                  onClick={() => void aufnahmeAbschicken(runden)}
+                                >
+                                  Jetzt zeichnen lassen →
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
 
                   <div className="karte">
-                    <h2>Was der Assistent erfasst</h2>
+                    <h2>Was das Gespräch erfasst</h2>
                     <ul className="erfassung">
-                      {FRAGEN.map((f, i) => {
-                        const zustand = i < antworten.length ? 'erfasst' : i === qIndex ? 'jetzt' : 'offen'
-                        return (
-                          <li key={f.erfasst}>
-                            <span className={`punkt ${zustand}`} />
-                            <span className="titel">{f.erfasst}</span>
-                            <span className="mono">{zustand}</span>
-                          </li>
-                        )
-                      })}
+                      {THEMEN.map((t) => (
+                        <li key={t}>
+                          <span className="punkt" />
+                          <span className="titel">{t}</span>
+                        </li>
+                      ))}
                     </ul>
                     <p className="feldhinweis" style={{ marginTop: 14 }}>
-                      Nichts davon wird programmiert. Alles davon wird eine
+                      Der Assistent hakt die Themen im Gespräch ab und fragt nach, was
+                      fehlt. Nichts davon wird programmiert: alles wird eine
                       Prozessversion — als Entwurf, der erst nach eurer Abnahme
                       geschaltet wird.
                     </p>
@@ -740,25 +869,30 @@ export function Wizard({
                       </li>
                     ))}
                   </ul>
-                  {/* Was der Ablauf ERFASST — der zweite Teil der Abnahme. Ein
-                      Diagramm ohne die Felder abzunehmen hieße, die halbe
+                  {/* Was der Ablauf ERFASST — der zweite Teil der Abnahme, als
+                      ECHTE Maskenvorschau (derselbe Renderer wie im Betrieb).
+                      Ein Diagramm ohne die Felder abzunehmen hieße, die halbe
                       Maske ungeprüft zu lassen. */}
-                  <p className="notiz" style={{ marginTop: 16 }}>
-                    {entwurf.felder.length === 0 ? (
-                      <>
-                        Dieser Ablauf erfasst außer einem Titel nichts. Wenn ihr Angaben
-                        festhaltet — Kunde, Betrag, Termin —, sagt es im nächsten Durchgang:
-                        daraus werden die Felder eurer Maske.
-                      </>
-                    ) : (
-                      <>
-                        <strong>Erfasst wird:</strong>{' '}
-                        {entwurf.felder
-                          .map((f) => `${f.label}${f.in_liste ? ' (auch in der Liste)' : ''}`)
-                          .join(' · ')}
-                      </>
-                    )}
-                  </p>
+                  <div style={{ marginTop: 16 }}>
+                    {entwurf.maske && <MaskenVorschau angebot={entwurf.maske} />}
+                    <p className="feldhinweis" style={{ marginTop: 10 }}>
+                      {entwurf.felder.length === 0 ? (
+                        <>
+                          Dieser Ablauf erfasst außer einem Titel nichts. Über
+                          „Ergänzen" sagt ihr in einer Minute, was ihr festhaltet —
+                          Kunde, Betrag, Termin — und daraus werden die Felder eurer
+                          Maske.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Erfasst wird:</strong>{' '}
+                          {entwurf.felder
+                            .map((f) => `${f.label}${f.in_liste ? ' (auch in der Liste)' : ''}`)
+                            .join(' · ')}
+                        </>
+                      )}
+                    </p>
+                  </div>
                   <div className="tastenreihe">
                     {markiert.length === 0 ? (
                       <button
@@ -783,14 +917,21 @@ export function Wizard({
                         type="button"
                         className="taste kern"
                         disabled={busy !== null || !kiBereit}
-                        onClick={() => {
-                          setAntworten([])
-                          setQIndex(FRAGEN.length)
-                          setEingabe('')
-                          setSchritt(3)
-                        }}
+                        onClick={korrekturStarten}
                       >
                         Korrekturen aufnehmen
+                      </button>
+                    )}
+                    {/* Ergänzen geht auch OHNE Markierung — der häufigste Fall
+                        sind fehlende Felder, nicht falsche Schritte. */}
+                    {markiert.length === 0 && (
+                      <button
+                        type="button"
+                        className="taste"
+                        disabled={busy !== null || !kiBereit}
+                        onClick={korrekturStarten}
+                      >
+                        Ergänzen (z. B. Felder)
                       </button>
                     )}
                     {markiert.length > 0 && (

@@ -367,3 +367,17 @@
   padding: 0 clamp(16px, 4vw, 32px);
 }
 .krnl-einrichtung .weiche .zwei { gap: 18px; }
+
+/* Antwort-Chips des Interviews — anklickbare Kurzantworten unter der Frage.
+   Steht bewusst NACH der .anzeige-Tastenregel, damit die Kapselform und der
+   Entscheidungs-Akzent (violett) auch im dunklen Anzeige-Kontext gewinnen. */
+.krnl-einrichtung .taste.chip,
+.krnl-einrichtung .anzeige .taste.chip {
+  border-radius: 999px;
+  font-size: 13px;
+  padding: 7px 13px;
+  border-color: rgb(124 90 255 / 0.55);
+  color: var(--kernel);
+}
+.krnl-einrichtung .taste.chip:hover,
+.krnl-einrichtung .anzeige .taste.chip:hover { border-color: var(--kernel); }

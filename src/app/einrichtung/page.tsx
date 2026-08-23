@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { currentUser } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { aufnahmeKonfiguriert } from '@/modules/ki/prozess-aufnahme'
+import { startAngebot } from '@/modules/prozesse/angebote'
 import { versionDiagramm } from '@/modules/prozesse/version-diagramm'
 import { type EntwurfInfo, Wizard } from './wizard'
 import './einrichtung.css'
@@ -116,6 +117,11 @@ async function entwurfLaden(code: string): Promise<EntwurfInfo | null> {
     select name, label, typ, sichtbar_in from feld_definitionen
     where prozess_code = ${code} order by sequence, name`
 
+  // Die generierte Maske des Anlage-Schritts — als Vorschau in der Abnahme.
+  // Zwingend mit der Versions-ID des ENTWURFS: er ist nicht aktiv, ohne sie
+  // käme null zurück.
+  const maske = await startAngebot(code, daten.gezeigt.id)
+
   return {
     code: daten.prozess.code,
     name: daten.prozess.name,
@@ -129,6 +135,7 @@ async function entwurfLaden(code: string): Promise<EntwurfInfo | null> {
       typ: f.typ,
       in_liste: f.sichtbar_in.includes('liste'),
     })),
+    maske,
     diagramm: daten.diagramm,
   }
 }

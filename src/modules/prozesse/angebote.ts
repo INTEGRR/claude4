@@ -134,13 +134,20 @@ export async function aktionsAngebot(name: string): Promise<SchrittAngebot | nul
  * erschienen sie erst ab dem zweiten: Was der Kunde als „beim Anlegen erfasse
  * ich X" beschrieben hatte, fiel genau dort unter den Tisch.
  */
-export async function startAngebot(prozessCode: string): Promise<SchrittAngebot | null> {
+export async function startAngebot(
+  prozessCode: string,
+  /**
+   * Maskenvorschau eines ENTWURFS: dessen Versions-ID — ohne sie zählt die
+   * aktive Version, und ein noch nicht aktivierter Entwurf hätte keine Maske.
+   */
+  versionId?: string,
+): Promise<SchrittAngebot | null> {
   const [schritt] = await sql<
     { code: string; name: string; aktion: string; params: Record<string, unknown> | null }[]
   >`
     select code, name, aktion, params
     from prozess_schritte
-    where version_id = prozess_aktive_version(${prozessCode})
+    where version_id = coalesce(${versionId ?? null}::uuid, prozess_aktive_version(${prozessCode}))
       and art = 'aktion' and aktion = 'vorgang.anlegen'
     order by sequence limit 1`
   if (!schritt) return null

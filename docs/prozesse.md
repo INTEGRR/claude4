@@ -885,8 +885,8 @@ Gegenseite:
 |---|---|---|---|
 | 01 | **Instanz** | Firmendaten und Geschäftsmodell-Paket. Rechts steht, was an der Instanz schon wahr ist: echter Host, Region, Anzahl eingespielter Migrationen, Rückholpunkt und Daten-TÜV. Keine erfundene Fortschrittsanzeige. | `einstellungen.firma_speichern`, `einstellungen.paket_aktivieren` |
 | 02 | **Team** | Personen und Rollen (Rollen entscheiden später, wer welchen Prozessschritt sehen und buchen darf — auch per Sprache), dazu das Ersetzen des Start-Passworts. | `einstellungen.benutzer_anlegen`, `einstellungen.benutzer_passwort` |
-| 03 | **Aufnehmen** | Vier Fragen (Auslöser, Schritte, Zuständigkeiten, Ausnahmen). Die Antworten gehen als Transkript an **dieselbe** Strukturierung wie das Sprach-Interview der Werkstatt (`/api/aufnahme` → `aufnahmeStrukturieren`) und enden in einem Entwurf. | `einstellungen.prozess_entwerfen` (aus der Strukturierung heraus) |
-| 04 | **Zeichnen** | Das **echte** Diagramm des Entwurfs (`versionDiagramm` + `ProzessFlow`, dieselbe Ansicht wie unter /prozesse). Jeder Schritt lässt sich als „stimmt nicht" markieren: dann geht es mit einer Korrekturrunde zurück nach 03. Ohne Markierung wird die Abnahme protokolliert. | `einstellungen.prozess_abnahme` |
+| 03 | **Aufnehmen** | Geführtes Interview: die erste Frage ist statisch, danach stellt `/api/aufnahme/interview` (→ `interviewRunde`, ki/interview.ts) die jeweils NÄCHSTE Frage — mit 2–4 anklickbaren Kurzantworten (Chips), Mikrofon-Diktat und „Jetzt zeichnen lassen" ab Runde 3; spätestens nach 10 Runden ist Schluss. Die Runden gehen als Transkript an **dieselbe** Strukturierung wie das Sprach-Interview der Werkstatt (`/api/aufnahme` → `aufnahmeStrukturieren`) und enden in einem Entwurf. | `einstellungen.prozess_entwerfen` (aus der Strukturierung heraus) |
+| 04 | **Zeichnen** | Das **echte** Diagramm des Entwurfs (`versionDiagramm` + `ProzessFlow`, dieselbe Ansicht wie unter /prozesse) — und darunter die **echte Maskenvorschau** (`MaskenVorschau` mit dem Betriebs-Renderer `FeldEingabe`; `startAngebot` bekommt dafür die Entwurfs-Versions-ID). Jeder Schritt lässt sich als „stimmt nicht" markieren, „Ergänzen (z. B. Felder)" geht auch ohne Markierung: beides führt in die Korrekturrunde nach 03, die den Entwurf unter GENAU demselben Code neu einreicht (Version n+1, kein Duplikat — `/api/aufnahme` mit `code`). Ohne Einwände wird die Abnahme protokolliert. | `einstellungen.prozess_abnahme` |
 | 05 | **Läuft** | Kennzahlen des Entwurfs (Schritte, Rollen, generierte Masken) und das Schalten der Version. Danach ist der Ablauf das System. | `einstellungen.prozessversion_aktivieren` |
 
 Das Paket in Schritt 01 ist weiterhin der folgenreichste Klick: ohne Wahl
@@ -900,9 +900,14 @@ der Aktivierung: aktiviert wird eine Version vielleicht mehrfach
 (Rückfall auf eine ältere), abgenommen wird sie einmal.
 
 Nach der Aufnahme lädt die Seite mit `?entwurf=<code>` neu — der Server
-kennt den Entwurf, der Assistent steigt in Schritt 04 ein. Die getippten
-Antworten überleben das in der `sessionStorage` (für Korrekturrunden);
-sie gehören weder in die Datenbank noch in die URL.
+kennt den Entwurf, der Assistent steigt in Schritt 04 ein. Die
+Interview-Runden überleben das in der `sessionStorage` (für
+Korrekturrunden); sie gehören weder in die Datenbank noch in die URL. Ist
+die sessionStorage leer (neuer Tab), beschreibt eine Ersatzrunde aus
+Schrittnamen und Feldern den bisherigen Entwurf, damit die Korrektur nicht
+bei null anfängt. Das Interview selbst entwirft nichts — es sammelt nur;
+warum es eine eigene Route und kein Chat-Agent ist:
+[Entscheidungslog 2026-08-23](entscheidungen.md).
 
 **Ohne KI-Schlüssel** bleiben die Schritte 01/02 vollständig nutzbar,
 Schritt 03 sagt das offen und die Einrichtung lässt sich trotzdem
@@ -1010,7 +1015,7 @@ rückwirkend ihre Spalten. Aufräumen ist ein bewusster eigener Schritt
 | Prozess-Panel am Vorgang | Je Folgeschritt genau dessen Felder. |
 | Liste des Prozesses | Die Felder mit `in_liste` als Spalten. |
 | `/prozesse/<code>` | Karte „Eigene Felder" — wer ein Diagramm abnimmt, nimmt auch ab, WAS erfasst wird. |
-| Onboarding Schritt 04 | „Erfasst wird: …" unter der Schrittliste, im selben Abnahmeblatt. |
+| Onboarding Schritt 04 | Die echte Maskenvorschau (`MaskenVorschau`) plus „Erfasst wird: …" unter der Schrittliste, im selben Abnahmeblatt. |
 | Befehlsfeld / `/aktion/<name>` | Nur die modellweiten Felder — die eines bestimmten Ablaufs gehören in dessen Maske. |
 | Vorgangs-Detailseite | Alle Felder des Ablaufs, auch die noch leeren („noch offen") — ein Vorgang durchläuft mehrere Schritte, und man muss sehen, was insgesamt erfasst wird. |
 
@@ -1023,11 +1028,13 @@ Record-Felder (Ist-Mengen beim Reparaturabschluss) bleiben als JSON
 erfassbar, weil sie keine Felddefinitionen haben, die sie ersetzen. Wächter:
 tests/schema-felder.test.ts.
 
-**Die KI fragt aktiv danach.** Wissensbasis (`ki/wissen.ts`) und
-Aufnahme-Strukturierung (`ki/prozess-aufnahme.ts`) führen die Leitfrage „Was
-tragen Sie in diesem Schritt ein?"; ein Prozess ohne ein einziges Feld gilt
-als unvollständiges Interview. Erfunden wird trotzdem nichts — nur, was im
-Gespräch vorkam.
+**Die KI fragt aktiv danach — und schlägt Standards vor.** Wissensbasis
+(`ki/wissen.ts`) und Aufnahme-Strukturierung (`ki/prozess-aufnahme.ts`)
+führen die Leitfrage „Was tragen Sie in diesem Schritt ein?"; ein Prozess
+ohne ein einziges Feld gilt als unvollständiges Interview. Felder dürfen
+dabei aus dem Branchenwissen ergänzt werden (Standard-Bausteine als Anker,
+gestrichen wird bei der Abnahme); Schritte werden weiterhin nicht frei
+erfunden — [Entscheidungslog 2026-08-23](entscheidungen.md).
 
 Wächter: tests/prozesse/prozesse.test.ts (Entwurf mit Feldern → gespeichert
 je Schritt und Liste; Feld auf einen unbekannten Schritt wird abgelehnt;
