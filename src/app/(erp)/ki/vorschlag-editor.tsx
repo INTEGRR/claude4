@@ -73,9 +73,20 @@ export function Zelle({
       />
     )
   }
+  // Arrays und Objekte in Zellen (rollen, auswahl, params, bedingung …)
+  // werden als Komma- bzw. JSON-String editierbar — sonst stünde da
+  // „[object Object]". Zurückverwandelt wird beim Absenden
+  // (normalisiereEntwurf), nicht bei jedem Tastendruck.
+  const anzeige = Array.isArray(wert)
+    ? wert.map((v) => String(v)).join(', ')
+    : wert !== null && typeof wert === 'object'
+      ? JSON.stringify(wert)
+      : wert === null || wert === undefined
+        ? ''
+        : String(wert)
   return (
     <input
-      value={wert === null || wert === undefined ? '' : String(wert)}
+      value={anzeige}
       onChange={(e) => onChange(e.target.value)}
       style={breit ? undefined : { minWidth: 90 }}
     />
@@ -89,6 +100,7 @@ function Feld({
   tiefe,
   onChange,
   onEntfernen,
+  vorlage,
 }: {
   name: string
   wert: Wert
@@ -96,69 +108,86 @@ function Feld({
   tiefe: number
   onChange: (pfad: (string | number)[], neu: Wert) => void
   onEntfernen: (pfad: (string | number)[], index: number) => void
+  /** Zeilen-Vorlage: macht auch eine LEERE Liste als Tabelle bedienbar. */
+  vorlage?: Record<string, Wert>
 }) {
-  // Objektlisten als Tabelle: eine Spalte je Schlüssel, jede Zelle editierbar.
-  if (istObjektliste(wert) && tiefe < 3) {
-    const spalten = [...new Set(wert.flatMap((z) => Object.keys(z)))]
+  // Objektlisten als Tabelle: eine Spalte je Schlüssel, jede Zelle
+  // editierbar. Mit Vorlage auch bei leerer Liste — vorher war ein
+  // fehlendes felder[] schlicht unsichtbar und damit unkorrigierbar.
+  const alsListe =
+    istObjektliste(wert) || (Array.isArray(wert) && wert.length === 0 && vorlage !== undefined)
+  if (alsListe && tiefe < 3) {
+    const zeilen = wert as Record<string, Wert>[]
+    const spalten = zeilen.length
+      ? [...new Set(zeilen.flatMap((z) => Object.keys(z)))]
+      : Object.keys(vorlage ?? {})
     return (
       <div style={{ margin: '8px 0' }}>
         <div className="mono-label" style={{ marginBottom: 4 }}>
-          {name} ({wert.length})
+          {name} ({zeilen.length})
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {spalten.map((s) => (
-                  <th key={s}>{s}</th>
-                ))}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {wert.map((zeile, i) => (
-                <tr key={i}>
+        {zeilen.length === 0 && name === 'felder' && (
+          <p className="muted small" style={{ margin: '0 0 4px' }}>
+            0 Felder — die Maske könnte nur einen Titel erfassen. „Zeile hinzufügen"
+            ergänzt ein Feld (oder unten per KI anweisen).
+          </p>
+        )}
+        {zeilen.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
                   {spalten.map((s) => (
-                    <td key={s}>
-                      {/* Verschachtelte Listen (Attribut → Werte) bekommen
-                          ihre eigene Tabelle, sonst eine Zelle. */}
-                      {istObjektliste(zeile[s]) && tiefe < 2 ? (
-                        <Feld
-                          name={s}
-                          wert={zeile[s]}
-                          pfad={[...pfad, i, s]}
-                          tiefe={tiefe + 1}
-                          onChange={onChange}
-                          onEntfernen={onEntfernen}
-                        />
-                      ) : (
-                        <Zelle
-                          wert={zeile[s]}
-                          onChange={(neu) => onChange([...pfad, i, s], neu)}
-                        />
-                      )}
-                    </td>
+                    <th key={s}>{s}</th>
                   ))}
-                  <td className="num">
-                    <button
-                      type="button"
-                      className="small danger"
-                      title="Zeile entfernen"
-                      onClick={() => onEntfernen(pfad, i)}
-                    >
-                      ×
-                    </button>
-                  </td>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {zeilen.map((zeile, i) => (
+                  <tr key={i}>
+                    {spalten.map((s) => (
+                      <td key={s}>
+                        {/* Verschachtelte Listen (Attribut → Werte) bekommen
+                            ihre eigene Tabelle, sonst eine Zelle. */}
+                        {istObjektliste(zeile[s]) && tiefe < 2 ? (
+                          <Feld
+                            name={s}
+                            wert={zeile[s]}
+                            pfad={[...pfad, i, s]}
+                            tiefe={tiefe + 1}
+                            onChange={onChange}
+                            onEntfernen={onEntfernen}
+                          />
+                        ) : (
+                          <Zelle
+                            wert={zeile[s]}
+                            onChange={(neu) => onChange([...pfad, i, s], neu)}
+                          />
+                        )}
+                      </td>
+                    ))}
+                    <td className="num">
+                      <button
+                        type="button"
+                        className="small danger"
+                        title="Zeile entfernen"
+                        onClick={() => onEntfernen(pfad, i)}
+                      >
+                        ×
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         <button
           type="button"
           className="small"
           style={{ marginTop: 4 }}
-          onClick={() => onChange([...pfad, wert.length], leereZeile(wert[0]))}
+          onClick={() => onChange([...pfad, zeilen.length], leereZeile(zeilen[0] ?? vorlage))}
         >
           Zeile hinzufügen
         </button>
@@ -205,9 +234,16 @@ function Feld({
 export function VorschlagEditor({
   parameter,
   onChange,
+  listenVorlagen,
 }: {
   parameter: Record<string, unknown>
   onChange: (neu: Record<string, unknown>) => void
+  /**
+   * Zeilen-Vorlagen je Listen-Schlüssel (z. B. felder beim Prozessentwurf):
+   * Der Schlüssel wird auch dann als bedienbare Tabelle gezeigt, wenn der
+   * Vorschlag ihn weggelassen hat — sonst wäre die Lücke unsichtbar.
+   */
+  listenVorlagen?: Record<string, Record<string, unknown>>
 }) {
   const setzen = (pfad: (string | number)[], neu: Wert) =>
     onChange(setzeIn(parameter, pfad, neu) as Record<string, unknown>)
@@ -219,6 +255,9 @@ export function VorschlagEditor({
   // zwei Tabellen.
   const skalare = eintraege.filter(([, v]) => v === null || typeof v !== 'object')
   const rest = eintraege.filter(([, v]) => v !== null && typeof v === 'object')
+  // Erwartete Listen, die der Vorschlag gar nicht mitbringt, erscheinen als
+  // leere Tabelle mit „Zeile hinzufügen".
+  const fehlend = Object.keys(listenVorlagen ?? {}).filter((k) => !(k in parameter))
 
   return (
     <div style={{ margin: '4px 0 10px' }}>
@@ -244,6 +283,19 @@ export function VorschlagEditor({
           tiefe={0}
           onChange={setzen}
           onEntfernen={entfernen}
+          vorlage={listenVorlagen?.[name]}
+        />
+      ))}
+      {fehlend.map((name) => (
+        <Feld
+          key={name}
+          name={name}
+          wert={[]}
+          pfad={[name]}
+          tiefe={0}
+          onChange={setzen}
+          onEntfernen={entfernen}
+          vorlage={listenVorlagen?.[name]}
         />
       ))}
     </div>

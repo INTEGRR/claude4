@@ -35,3 +35,18 @@ export async function versionAktivieren(
     parameter: { prozess_code: prozessCode, version },
   })
 }
+
+/** Feld-Editor auf /prozesse/[code] — das Formular liefert auch modell und prozess_code. */
+export async function feldSpeichern(formData: FormData): Promise<ActionResult> {
+  return serverAktion('einstellungen.feld_anlegen', { formData })
+}
+
+export async function feldLoeschen(
+  modell: string,
+  prozessCode: string,
+  name: string,
+): Promise<ActionResult> {
+  return serverAktion('einstellungen.feld_loeschen', {
+    parameter: { modell, prozess_code: prozessCode, name },
+  })
+}

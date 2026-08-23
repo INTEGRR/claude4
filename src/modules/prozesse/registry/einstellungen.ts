@@ -409,6 +409,9 @@ export const EINSTELLUNGEN = {
     bereich: 'einstellungen',
     nurAdmin: true,
     prozessfrei: true,
+    // KI-fähig: „lass uns noch ein Feld Liefertermin nachtragen" ist genau
+    // die Sorte Nacharbeit, für die der Werkstatt-Chat da ist.
+    ki: true,
     beschreibung:
       'Trägt ein einzelnes eigenes Feld nach (landet im zusatz-jsonb, erscheint in ' +
       'generierten Masken, ist über Bedingungspfade zusatz.<name> prozessfähig). Der ' +
@@ -440,20 +443,29 @@ export const EINSTELLUNGEN = {
       in_liste: z.boolean().default(false).describe('Zusätzlich als Spalte in der Vorgangsliste'),
     }),
     zusammenfassung: (p) => `${p.prozess_code ?? p.modell}.${p.name} (${p.typ})`,
-    formdata: (fd) => ({
-      modell: String(fd.get('modell') ?? ''),
-      prozess_code: String(fd.get('prozess_code') ?? '').trim() || undefined,
-      name: String(fd.get('name') ?? '').trim(),
-      label: String(fd.get('label') ?? '').trim(),
-      typ: String(fd.get('typ') ?? 'text'),
-      pflicht: fd.get('pflicht') === 'on',
-      auswahl:
-        String(fd.get('auswahl') ?? '')
-          .split(/[,\n]/)
-          .map((v) => v.trim())
-          .filter(Boolean) || undefined,
-      in_liste: fd.get('in_liste') === 'on',
-    }),
+    formdata: (fd) => {
+      // `[] || undefined` wäre IMMER das Array (leer ist truthy) — deshalb
+      // die length-Weiche: kein Wert soll auch kein Parameter sein.
+      const auswahl = String(fd.get('auswahl') ?? '')
+        .split(/[,\n]/)
+        .map((v) => v.trim())
+        .filter(Boolean)
+      const schritte = fd
+        .getAll('schritte')
+        .map((v) => String(v).trim())
+        .filter(Boolean)
+      return {
+        modell: String(fd.get('modell') ?? ''),
+        prozess_code: String(fd.get('prozess_code') ?? '').trim() || undefined,
+        name: String(fd.get('name') ?? '').trim(),
+        label: String(fd.get('label') ?? '').trim(),
+        typ: String(fd.get('typ') ?? 'text'),
+        pflicht: fd.get('pflicht') === 'on',
+        auswahl: auswahl.length ? auswahl : undefined,
+        schritte: schritte.length ? schritte : undefined,
+        in_liste: fd.get('in_liste') === 'on',
+      }
+    },
     revalidate: ['/prozesse'],
   },
 
@@ -472,6 +484,11 @@ export const EINSTELLUNGEN = {
         .max(40)
         .optional()
         .describe('Feld dieses Prozesses — leer trifft das modellweite Feld gleichen Namens'),
+    }),
+    formdata: (fd) => ({
+      modell: String(fd.get('modell') ?? ''),
+      name: String(fd.get('name') ?? '').trim(),
+      prozess_code: String(fd.get('prozess_code') ?? '').trim() || undefined,
     }),
     revalidate: ['/prozesse'],
   },

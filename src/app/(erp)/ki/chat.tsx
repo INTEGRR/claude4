@@ -3,6 +3,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
 import type { Diagramm } from '@/modules/ki/diagramm'
 import { money, qty as menge } from '@/modules/shared/format'
+import { normalisiereEntwurf } from '@/modules/ki/entwurf-normalisieren'
 import { gruppenSpalten, gruppiereVorschlaege } from '@/modules/ki/vorschlag-gruppen'
 import { MikrofonKnopf, SendenSymbol } from '@/components/spracheingabe'
 import { HexcoreMark } from '@/components/marke'
@@ -373,15 +374,29 @@ function ChartCard({ d }: { d: Diagramm }) {
 
 // --- Aktionsvorschlag ------------------------------------------------------
 
+/**
+ * Zeilen-Vorlage für felder[] beim Prozessentwurf: so bleibt die Liste auch
+ * dann bedienbar, wenn die KI sie leer lässt oder ganz weglässt.
+ */
+const ENTWURF_VORLAGEN: Record<string, Record<string, unknown>> = {
+  felder: { name: '', label: '', typ: 'text', pflicht: false, in_liste: false },
+}
+
 /** Ein Klick auf „Anlegen" — Server prüft Rechte und Felder erneut. */
 async function vorschlagAusfuehren(
   v: Vorschlag,
 ): Promise<NonNullable<Exclude<Vorschlag['ergebnis'], 'verworfen'>>> {
   try {
+    // Der Editor zeigt Arrays/Objekte als Komma- bzw. JSON-Strings — beim
+    // Prozessentwurf werden sie vor dem Absenden zurückverwandelt.
+    const parameter =
+      v.aktion === 'einstellungen.prozess_entwerfen'
+        ? normalisiereEntwurf(v.parameter)
+        : v.parameter
     const res = await fetch('/api/ki/aktion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ aktion: v.aktion, parameter: v.parameter }),
+      body: JSON.stringify({ aktion: v.aktion, parameter }),
     })
     const data = (await res.json()) as { text?: string; link?: string; error?: string }
     return res.ok
@@ -475,11 +490,16 @@ function AktionCard({
         {v.begruendung && <p className="muted small" style={{ margin: '0 0 8px' }}>{v.begruendung}</p>}
 
         {/* Die Felder stehen offen und editierbar da — wer den Vorschlag
-            prüft, soll ihn im selben Zug korrigieren können. */}
+            prüft, soll ihn im selben Zug korrigieren können. Beim
+            Prozessentwurf bekommt felder[] eine Zeilen-Vorlage: eine
+            fehlende Feldliste soll als Lücke SICHTBAR sein, nicht fehlen. */}
         {!erledigt && (
           <VorschlagEditor
             parameter={v.parameter}
             onChange={(neu) => onParameter(v.id, neu)}
+            listenVorlagen={
+              v.aktion === 'einstellungen.prozess_entwerfen' ? ENTWURF_VORLAGEN : undefined
+            }
           />
         )}
 

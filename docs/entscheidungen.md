@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-23 — Feldpflege gehört in die Oberfläche, nicht nur in die KI
+
+Eigene Felder waren nur über `prozess_entwerfen` (kompletter Entwurf) oder
+gar nicht pflegbar: `einstellungen.feld_anlegen` hatte kein `ki`-Flag, kein
+Formular, und sein formdata-Pfad war doppelt kaputt (schritte fehlten,
+`[] || undefined` ist immer das leere Array). Entschieden:
+
+- **Feld-Editor auf /prozesse/&lt;code&gt;** (Karte „Eigene Felder", nur
+  Admin, nur Modell-Prozesse): Entfernen je Zeile plus Upsert-Formular mit
+  Schritt-Checkboxen — die naheliegendste Stelle, denn dort wird auch
+  abgenommen, WAS erfasst wird. `feld_anlegen` ist jetzt `ki: true`, damit
+  „trag noch ein Feld Liefertermin nach" auch im Werkstatt-Chat geht.
+- **Werkstatt-Vorschau zeigt die halbe Maske**: `?code=` rendert neben dem
+  Diagramm die echte `MaskenVorschau` des Entwurfs (Versions-ID!) und die
+  Feldliste — 0 Felder sind dort ein sichtbarer Hinweis, keine stille Lücke.
+- **Editor-Vertrag statt Spezialformular**: Der generische Vorschlags-Editor
+  zeigt Arrays/Objekte als Komma-/JSON-Strings (editierbar statt
+  „[object Object]") und `felder[]` per Zeilen-Vorlage auch, wenn die KI
+  sie wegließ; `normalisiereEntwurf` verwandelt die Strings beim Absenden
+  zurück (pur, clientfähig — die harte Validierung bleibt beim Torwächter).
+  Wächter: tests/entwurf-normalisieren.test.ts.
+
 ## 2026-08-23 — Onboarding-Interview als eigene schlanke KI-Route, nicht als Chat-Agent
 
 Die vier starren Onboarding-Fragen (Auslöser, Schritte, Zuständigkeiten,

@@ -2,13 +2,19 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
-import { ActionButton } from '@/components/action-button'
+import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { ProzessFlow } from '@/components/prozess-flow'
 import { versionDiagramm } from '@/modules/prozesse/version-diagramm'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
 import { dateTime } from '@/modules/shared/format'
-import { prozessSchalten, schrittSchalten, versionAktivieren } from '../actions'
+import {
+  feldLoeschen,
+  feldSpeichern,
+  prozessSchalten,
+  schrittSchalten,
+  versionAktivieren,
+} from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +63,12 @@ export default async function ProzessDetailPage({
     from feld_definitionen
     where prozess_code = ${code} order by sequence, name`
   const schrittName = new Map(schritte.map((s) => [s.code, s.name]))
+  // Feldpflege nur für Administratoren und nur bei Prozessen mit Modell —
+  // ohne Modell gibt es keinen zusatz, in dem ein Feld landen könnte.
+  const feldPflege = admin && Boolean(prozess.modell)
+  // Masken entstehen an Start- und Aktionsschritten — nur dort ergibt die
+  // Schritt-Zuordnung eines Feldes Sinn.
+  const maskenSchritte = schritte.filter((s) => s.art === 'start' || s.art === 'aktion')
 
   const ART_TEXT: Record<string, string> = {
     start: 'Start',
@@ -185,8 +197,8 @@ export default async function ProzessDetailPage({
         {felder.length === 0 ? (
           <Empty>
             Dieser Ablauf erfasst noch keine eigenen Angaben — die Maske führt nur die
-            Standardfelder. Felder entstehen mit dem Entwurf (felder) oder lassen sich in der
-            Werkstatt nachtragen.
+            Standardfelder. Felder entstehen mit dem Entwurf (felder), im Formular hier unten
+            oder im Gespräch in der Werkstatt.
           </Empty>
         ) : (
           <TableWrap>
@@ -198,6 +210,7 @@ export default async function ProzessDetailPage({
                   <th>Pflicht</th>
                   <th>Erscheint in</th>
                   <th>In der Liste</th>
+                  {feldPflege && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -219,16 +232,87 @@ export default async function ProzessDetailPage({
                         : 'jedem Schritt'}
                     </td>
                     <td className="small">{f.sichtbar_in.includes('liste') ? 'Spalte' : '—'}</td>
+                    {feldPflege && (
+                      <td>
+                        <ActionButton
+                          className="small"
+                          action={feldLoeschen.bind(null, prozess.modell ?? '', code, f.name)}
+                          confirm={`Feld „${f.label}" entfernen? Bereits erfasste Werte bleiben im zusatz der Belege stehen.`}
+                        >
+                          Entfernen
+                        </ActionButton>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </TableWrap>
         )}
+        {feldPflege && (
+          <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+            {/* Upsert über (modell, prozess_code, name): derselbe Name ändert
+                das bestehende Feld — deshalb „hinzufügen ODER ändern". */}
+            <ActionForm action={feldSpeichern}>
+              <input type="hidden" name="modell" value={prozess.modell ?? ''} />
+              <input type="hidden" name="prozess_code" value={code} />
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <label className="field" style={{ minWidth: 160 }}>
+                  <span>Name (technisch)</span>
+                  <input
+                    name="name"
+                    required
+                    maxLength={40}
+                    pattern="[a-z][a-z0-9_]*"
+                    title="Kleinbuchstaben, Ziffern und Unterstriche"
+                    placeholder="liefertermin"
+                  />
+                </label>
+                <label className="field" style={{ flex: 1, minWidth: 180 }}>
+                  <span>Beschriftung</span>
+                  <input name="label" required maxLength={80} placeholder="Liefertermin" />
+                </label>
+                <label className="field" style={{ minWidth: 130 }}>
+                  <span>Art</span>
+                  <select name="typ" defaultValue="text">
+                    <option value="text">Text</option>
+                    <option value="nummer">Zahl</option>
+                    <option value="schalter">Ja/Nein</option>
+                    <option value="auswahl">Auswahl</option>
+                    <option value="datum">Datum</option>
+                  </select>
+                </label>
+                <label className="field" style={{ flex: 1, minWidth: 200 }}>
+                  <span>Auswahlwerte (bei Art „Auswahl", Komma)</span>
+                  <input name="auswahl" placeholder="klein, mittel, groß" />
+                </label>
+              </div>
+              <div className="row" style={{ flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+                <span className="muted small">Erscheint in:</span>
+                {maskenSchritte.map((s) => (
+                  <label key={s.code} className="small" style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
+                    <input type="checkbox" name="schritte" value={s.code} /> {s.name}
+                  </label>
+                ))}
+                <span className="muted small">(keins gewählt = in jedem Schritt)</span>
+              </div>
+              <div className="row" style={{ flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+                <label className="small" style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
+                  <input type="checkbox" name="pflicht" /> Pflichtfeld
+                </label>
+                <label className="small" style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
+                  <input type="checkbox" name="in_liste" /> Als Spalte in der Liste
+                </label>
+                <button className="primary small" type="submit">Feld speichern</button>
+              </div>
+            </ActionForm>
+          </div>
+        )}
         <p className="muted small" style={{ padding: '8px 12px', margin: 0 }}>
           Eigene Felder landen im <span className="mono">zusatz</span> des Belegs — ohne
           Migration, und in Bedingungen sofort als <span className="mono">zusatz.name</span>{' '}
-          verwendbar. Sie hängen am Prozess und überleben Versionswechsel.
+          verwendbar. Sie hängen am Prozess und überleben Versionswechsel; derselbe Name
+          überschreibt die bestehende Definition.
         </p>
       </Card>
 

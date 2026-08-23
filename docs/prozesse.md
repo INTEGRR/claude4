@@ -829,9 +829,20 @@ Entwürfe NUR über `aktion_vorschlagen` mit `einstellungen.prozess_entwerfen`).
 Der Kontext ist ein serverseitig geprüftes Enum (nur Admins), kein Freitext.
 Auf der Seite: die Entwurfsliste aller Prozesse, und per `?code=` die
 **Diagramm-Vorschau der neuesten Entwurfsversion** (React Flow, geteiltes
-Lese-Modul `version-diagramm.ts`) mit Sprung zur Detailseite — dort wird
-nach Sichtprüfung von Hand aktiviert. `werkstatt` ist als Prozess-Code
+Lese-Modul `version-diagramm.ts`) — bei Modell-Prozessen samt der **echten
+Maskenvorschau** (`MaskenVorschau` mit der Entwurfs-Versions-ID) und der
+Feldliste, bei 0 Feldern mit Hinweis — mit Sprung zur Detailseite, wo nach
+Sichtprüfung von Hand aktiviert wird. `werkstatt` ist als Prozess-Code
 reserviert (Routen-Kollision, per Schema-refine + Test abgesichert).
+
+Der **Vorschlags-Editor** des Chats zeigt beim Prozessentwurf `felder[]`
+auch dann als bedienbare Tabelle, wenn die KI die Liste weggelassen hat
+(Zeilen-Vorlage + Hinweis „0 Felder"); Arrays und verschachtelte Objekte
+stehen als Komma- bzw. JSON-Strings in den Zellen und werden beim Absenden
+von `normalisiereEntwurf` (ki/entwurf-normalisieren.ts, Wächter:
+tests/entwurf-normalisieren.test.ts) zurückverwandelt — vorher zeigten
+solche Zellen „[object Object]" und eine fehlende Feldliste war
+unsichtbar.
 
 ## Prozess-Aufnahme beim Kunden (Sprachinterview → Entwurf → Diagramm)
 
@@ -1014,7 +1025,7 @@ rückwirkend ihre Spalten. Aufräumen ist ein bewusster eigener Schritt
 | Startformular `/vorgaenge/prozess/<code>` | Die generierte Maske des Anlage-Schritts — samt seiner Felder. Vorher fiel „beim Anlegen erfasse ich X" genau dort unter den Tisch. |
 | Prozess-Panel am Vorgang | Je Folgeschritt genau dessen Felder. |
 | Liste des Prozesses | Die Felder mit `in_liste` als Spalten. |
-| `/prozesse/<code>` | Karte „Eigene Felder" — wer ein Diagramm abnimmt, nimmt auch ab, WAS erfasst wird. |
+| `/prozesse/<code>` | Karte „Eigene Felder" — wer ein Diagramm abnimmt, nimmt auch ab, WAS erfasst wird. Für Administratoren bedienbar: „Entfernen" je Zeile, darunter das Formular „Feld speichern" (Name, Beschriftung, Art, Auswahlwerte, Schritt-Checkboxen, Pflicht, Liste; derselbe Name überschreibt = Upsert). |
 | Onboarding Schritt 04 | Die echte Maskenvorschau (`MaskenVorschau`) plus „Erfasst wird: …" unter der Schrittliste, im selben Abnahmeblatt. |
 | Befehlsfeld / `/aktion/<name>` | Nur die modellweiten Felder — die eines bestimmten Ablaufs gehören in dessen Maske. |
 | Vorgangs-Detailseite | Alle Felder des Ablaufs, auch die noch leeren („noch offen") — ein Vorgang durchläuft mehrere Schritte, und man muss sehen, was insgesamt erfasst wird. |

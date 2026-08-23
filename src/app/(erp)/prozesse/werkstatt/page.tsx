@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
+import { MaskenVorschau } from '@/components/masken-vorschau'
 import { ProzessFlow } from '@/components/prozess-flow'
+import { startAngebot } from '@/modules/prozesse/angebote'
 import { KiChat } from '@/app/(erp)/ki/chat'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
@@ -57,6 +59,18 @@ export default async function WerkstattPage({
         )) ?? vorschau)
       : vorschau
 
+  // Die halbe Maske gehört zur Vorschau dazu: Felder und die generierte
+  // Maske des Anlage-Schritts. Zwingend mit der Versions-ID der Vorschau —
+  // Entwürfe sind nicht aktiv, ohne sie käme null zurück.
+  const vorschauFelder = vorschauEntwurf?.prozess.modell
+    ? await sql<{ name: string; label: string }[]>`
+        select name, label from feld_definitionen
+        where prozess_code = ${vorschauEntwurf.prozess.code} order by sequence, name`
+    : []
+  const vorschauMaske = vorschauEntwurf?.prozess.modell
+    ? await startAngebot(vorschauEntwurf.prozess.code, vorschauEntwurf.gezeigt.id)
+    : null
+
   return (
     <>
       <PageHeader
@@ -72,6 +86,22 @@ export default async function WerkstattPage({
           }`}
         >
           <ProzessFlow d={vorschauEntwurf.diagramm} />
+          {vorschauEntwurf.prozess.modell && (
+            <div style={{ padding: '0 12px 8px' }}>
+              {vorschauMaske && <MaskenVorschau angebot={vorschauMaske} />}
+              <p className="muted small" style={{ margin: '10px 0 0' }}>
+                {vorschauFelder.length === 0 ? (
+                  <>
+                    Dieser Entwurf erfasst außer einem Titel nichts — Felder entstehen im
+                    Gespräch („trag noch ein Feld Liefertermin nach") oder auf der
+                    Detailseite unter „Eigene Felder".
+                  </>
+                ) : (
+                  <>Erfasst wird: {vorschauFelder.map((f) => f.label).join(' · ')}</>
+                )}
+              </p>
+            </div>
+          )}
           <div className="actions" style={{ padding: '0 12px 12px' }}>
             <Link className="btn" href={`/prozesse/${vorschauEntwurf.prozess.code}?version=${Number(vorschauEntwurf.gezeigt.version)}`}>
               Zur Detailseite (prüfen &amp; aktivieren)
