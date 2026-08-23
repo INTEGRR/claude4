@@ -5,7 +5,7 @@ import { sql } from '@/db/client'
 import type { User } from '@/modules/auth'
 import { REGISTRY } from '@/modules/prozesse/registry'
 import { bestaetigteAktionAusfuehren } from './aktion-bestaetigt'
-import { PROZESS_WISSEN } from './wissen'
+import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
 
 /**
  * Prozess-Aufnahme beim Kunden: das Realtime-Modell führt das INTERVIEW
@@ -52,9 +52,20 @@ export function aufnahmeSystem(wissen: string = PROZESS_WISSEN): string {
     'ich die Summe ein"), gehört als Feld nach felder[] — mit den schritten, ' +
     'in denen es erfasst wird. Zwei bis drei davon bekommen in_liste, damit ' +
     'der Kunde eine Zeile wiedererkennt. Ohne Felder entsteht eine Maske, in ' +
-    'der man nur einen Titel eintippen kann. Erfinde aber auch hier nichts: ' +
-    'nur Angaben, die im Gespräch genannt wurden.\n\n' +
+    'der man nur einen Titel eintippen kann.\n\n' +
+    'VORSCHLAGEN STATT WEGLASSEN: Erkennst du einen bekannten Prozesstyp ' +
+    '(Standard-Bausteine unten), übernimm dessen Schritte und Felder als ' +
+    'Grundlage und passe sie ans Gespräch an. Branchenübliche Pflichtangaben ' +
+    '(z. B. Rechnungsnummer und Rechnungsdatum einer Eingangsrechnung) ' +
+    'gehören in den Entwurf, auch wenn sie im Gespräch nicht wörtlich fielen ' +
+    '— der Entwurf ist die Vorlage, gestrichen wird bei der Abnahme. ' +
+    'Erkennst du KEINEN Baustein, leite nach demselben Muster branchenübliche ' +
+    'Schritte und Felder für das Erzählte ab. Was der Kunde ausdrücklich ' +
+    'sagt, hat immer Vorrang; SCHRITTE erfindest du weiterhin nicht frei ' +
+    'dazu — nur Felder dürfen aus dem Branchenwissen ergänzt werden.\n\n' +
     wissen +
+    '\n\n## Standard-Bausteine (Vorlagen — anpassen, nicht abtippen)\n\n' +
+    bausteineAlsText() +
     '\n\nMaßgeblich für Struktur und Pflichtfelder ist die folgende ' +
     'Aktionsbeschreibung:\n' +
     beschreibung
@@ -112,6 +123,12 @@ export async function aufnahmeStrukturieren(
     },
   ]
 
+  // Ein Entwurf ohne Felder validiert fehlerfrei — deshalb bekäme das Modell
+  // nie einen Rückkanal für die häufigste Lücke. Einmal (und nur einmal)
+  // wird nachgefragt; die zweite Einreichung wird akzeptiert, denn manche
+  // Abläufe erfassen wirklich nichts.
+  let feldNachfrageGestellt = false
+
   for (let runde = 0; runde < MAX_RUNDEN; runde++) {
     let antwort: Anthropic.Messages.Message
     try {
@@ -134,6 +151,34 @@ export async function aufnahmeStrukturieren(
     )
     if (!toolUse) {
       return { text: 'Die Strukturierung hat keinen Entwurf geliefert — bitte erneut versuchen.' }
+    }
+
+    const eingabe = toolUse.input as { felder?: unknown }
+    if (
+      !feldNachfrageGestellt &&
+      (!Array.isArray(eingabe.felder) || eingabe.felder.length === 0) &&
+      transkript.trim().length > 600
+    ) {
+      feldNachfrageGestellt = true
+      messages.push({ role: 'assistant', content: antwort.content })
+      messages.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: toolUse.id,
+            content:
+              'Abgelehnt: Der Entwurf nennt keine Felder — die Maske könnte nur einen ' +
+              'Titel erfassen. Prüfe das Transkript gezielt auf erfasste Angaben und ' +
+              'nutze die Standard-Felder des erkannten Prozesstyps. Wenn der Ablauf ' +
+              'wirklich nichts erfasst, reiche denselben Entwurf unverändert erneut ein.',
+            is_error: true,
+          },
+        ],
+      })
+      // Zählt nicht als Ablehnungsrunde — die zweite Einreichung wird akzeptiert.
+      runde--
+      continue
     }
 
     try {

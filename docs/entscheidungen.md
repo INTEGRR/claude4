@@ -9,6 +9,35 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-23 — Standards vorschlagen statt abfragen (Revision von „erfinde nichts")
+
+Die Regel „erfinde nichts, was im Gespräch nicht vorkam" (Prozess-Aufnahme,
+seit 08/2026) ist an der Wirklichkeit gescheitert: Kein Kunde diktiert, dass
+eine Eingangsrechnung eine Rechnungsnummer braucht — das muss das System
+wissen. Ergebnis der alten Regel waren Prozesse ohne ein einziges Feld.
+
+Revidiert zu **„Vorschlagen statt Weglassen"**, mit klarer Grenze:
+
+- **Standard-Bausteine** (`STANDARD_BAUSTEINE` in ki/wissen.ts): sechs
+  branchenübliche Prozesstypen mit Schritten UND Feldern (Anfrage/Angebot,
+  Eingangsrechnung, Reklamation, Bewerbung, Wareneingang mit Prüfung,
+  Vier-Augen-Freigabe). Sie sind ANKER, keine geschlossene Liste: für
+  unbekannte Typen (Aufmaß, Baustellenbericht — was ein Handwerker eben
+  erzählt) leitet die KI nach demselben Muster ab.
+- **Felder** dürfen aus dem Branchenwissen ergänzt werden (als Vorschlag,
+  gestrichen wird bei der Abnahme); **Schritte** werden weiterhin nicht frei
+  erfunden. Was der Kunde ausdrücklich sagt, hat immer Vorrang.
+- Eingeflossen in alle drei Erhebungswege: aufnahmeSystem (Strukturierung),
+  werkstattSystemZusatz (Chat) und — im 2000-Zeichen-Budget — ein
+  DATEN-Absatz in den Realtime-Interview-Instructions.
+- **Rückkanal für die häufigste Lücke**: liefert die Strukturierung 0 Felder
+  bei substanziellem Transkript, fragt sie einmal nach; die zweite
+  Einreichung wird akzeptiert (manche Abläufe erfassen wirklich nichts).
+
+Wächter: tests/wissen.test.ts erzwingt ≥6 Bausteine mit je ≥3 Feldern,
+technischen Namen, Listen-Feld — und wörtlich das Nutzer-Kriterium:
+eingangsrechnung enthält rechnungsnummer UND rechnungsdatum als Pflicht.
+
 ## 2026-08-23 — Der stille Bastelweg ist zu: Modell- und Verkettbarkeits-Wächter
 
 Nach der Verkettung (0072) blieb ein stiller Weg offen: Fremde Beleg-Aktionen
