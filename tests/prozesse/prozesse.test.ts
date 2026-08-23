@@ -521,6 +521,55 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     assert.equal(folgeFelder.includes('zusatz.ruecksendenummer'), false)
   })
 
+  test('kopf_aendern pflegt Daten ohne Zustandswechsel — und koerziert die Typen', async () => {
+    // Die Detailseite ist jetzt eine Maske: Titel, Kunde und eigene Felder
+    // bleiben nach dem Anlegen änderbar, auch im Endzustand. Formulare
+    // liefern Strings — im jsonb müssen echte Typen liegen, sonst vergleicht
+    // bedingung_pruefen auf zusatz.betrag > 1000 später Text.
+    const angelegt = await aktionAusfuehrenGeprueft(
+      'vorgang.anlegen',
+      { parameter: { prozess_code: 'ruecknahme', titel: 'Tippfehler drin' } },
+      admin,
+    )
+    const id = angelegt.recordId!
+
+    await aktionAusfuehrenGeprueft(
+      'vorgang.kopf_aendern',
+      {
+        parameter: {
+          titel: 'Korrigiert',
+          zusatz: { erstattungsbetrag: '49,90', ruecksendenummer: 'RS-99', kanal: '' },
+        },
+        recordId: id,
+      },
+      admin,
+    )
+
+    const [nachher] = await h.sql<
+      { titel: string; state: string; typ: string; betrag: number; kanal: unknown }[]
+    >`
+      select titel, state,
+             jsonb_typeof(zusatz -> 'erstattungsbetrag') as typ,
+             (zusatz ->> 'erstattungsbetrag')::numeric as betrag,
+             zusatz -> 'kanal' as kanal
+      from vorgaenge where id = ${id}`
+    assert.equal(nachher.titel, 'Korrigiert')
+    assert.equal(nachher.state, 'angenommen', 'der Zustand bleibt unangetastet')
+    assert.equal(nachher.typ, 'number', 'Nummernfelder liegen als Zahl im jsonb')
+    assert.equal(Number(nachher.betrag), 49.9, 'deutsches Komma wird verstanden')
+    assert.equal(nachher.kanal, null, 'leeren löscht den Wert')
+
+    // Unlesbare Zahl scheitert verständlich statt Text zu speichern.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'vorgang.kopf_aendern',
+        { parameter: { zusatz: { erstattungsbetrag: 'viel' } }, recordId: id },
+        admin,
+      ),
+      /keine Zahl/,
+    )
+  })
+
   test('Unfug scheitert schon beim Entwurf — die Datenbank bleibt die letzte Instanz', async () => {
     // Unbekannte Aktionsnamen fängt der Entwurf ab.
     await assert.rejects(

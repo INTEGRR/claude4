@@ -1,6 +1,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { FeldEingabe } from '@/components/feld-eingabe'
 import type { FormularFeld } from '@/modules/prozesse/schema-felder'
 
 /**
@@ -38,101 +39,6 @@ function eingabeWert(feld: FormularFeld, roh: FormDataEntryValue | null): unknow
   return text
 }
 
-function Feld({ feld, optionen }: { feld: FormularFeld; optionen?: { id: string; label: string }[] }) {
-  const name = feld.name
-  const vorgabe = feld.vorgabe
-  switch (feld.typ) {
-    case 'schalter':
-      return (
-        <label className="field shrink" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <input type="checkbox" name={name} defaultChecked={vorgabe === true} />
-          <span>{feld.label}</span>
-        </label>
-      )
-    case 'nummer':
-      return (
-        <label className="field shrink">
-          <span>{feld.label}</span>
-          <input
-            type="number"
-            name={name}
-            step="any"
-            required={feld.pflicht}
-            defaultValue={typeof vorgabe === 'number' ? vorgabe : undefined}
-            style={{ width: 110 }}
-          />
-        </label>
-      )
-    case 'auswahl':
-      return (
-        <label className="field shrink">
-          <span>{feld.label}</span>
-          <select name={name} required={feld.pflicht} defaultValue={typeof vorgabe === 'string' ? vorgabe : ''}>
-            {!feld.pflicht && <option value="">—</option>}
-            {(feld.auswahl ?? []).map((wert) => (
-              <option key={wert} value={wert}>{wert}</option>
-            ))}
-          </select>
-        </label>
-      )
-    case 'verweis':
-      return (
-        <label className="field" style={{ minWidth: 220 }}>
-          <span>{feld.label}</span>
-          <select
-            name={name}
-            required={feld.pflicht}
-            defaultValue={typeof vorgabe === 'string' ? vorgabe : ''}
-          >
-            <option value="" disabled={feld.pflicht}>— auswählen —</option>
-            {(optionen ?? []).map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-      )
-    case 'datum':
-      return (
-        <label className="field shrink">
-          <span>{feld.label}</span>
-          <input
-            type="date"
-            name={name}
-            required={feld.pflicht}
-            defaultValue={typeof vorgabe === 'string' ? vorgabe.slice(0, 10) : undefined}
-          />
-        </label>
-      )
-    case 'mehrzeilig':
-      return (
-        <label className="field" style={{ flex: '1 1 100%' }}>
-          <span>{feld.label}</span>
-          <textarea
-            name={name}
-            rows={3}
-            required={feld.pflicht}
-            defaultValue={typeof vorgabe === 'string' ? vorgabe : undefined}
-          />
-        </label>
-      )
-    case 'json':
-      return (
-        <label className="field" style={{ flex: '1 1 100%' }}>
-          <span>{feld.label} <span className="muted small">(JSON)</span></span>
-          <textarea className="mono" name={name} rows={2} required={feld.pflicht} placeholder="{}" />
-        </label>
-      )
-    default:
-      return (
-        <label className="field">
-          <span>{feld.label}</span>
-          <input name={name} required={feld.pflicht}
-                 defaultValue={typeof vorgabe === 'string' ? vorgabe : undefined} />
-        </label>
-      )
-  }
-}
-
 export function ProzessAktionen({
   schritte,
   recordId,
@@ -150,7 +56,7 @@ export function ProzessAktionen({
   const router = useRouter()
   const [offen, setOffen] = useState<string | null>(sofortOffen ?? null)
   const [fehler, setFehler] = useState<string | null>(null)
-  const [meldung, setMeldung] = useState<string | null>(null)
+  const [meldung, setMeldung] = useState<{ text: string; link?: string } | null>(null)
   const [pending, startTransition] = useTransition()
 
   async function ausfuehren(schritt: SchrittAngebot, parameter: Record<string, unknown>) {
@@ -175,7 +81,9 @@ export function ProzessAktionen({
       return
     }
     setOffen(null)
-    if (daten.info) setMeldung(daten.info)
+    // Der Link zum Ergebnis (z. B. dem angelegten Auftrag) wandert in die
+    // Erfolgsmeldung — auf Belegseiten wurde er früher stumm verworfen.
+    if (daten.info) setMeldung({ text: daten.info, link: daten.link })
     // Im Assistenten bleiben (der nächste Schritt erscheint nach dem Refresh);
     // neu angelegte Belege sonst sofort öffnen.
     if (daten.link && recordId === undefined && instanzId === undefined) router.push(daten.link)
@@ -201,7 +109,7 @@ export function ProzessAktionen({
     try {
       for (const feld of schritt.felder) {
         if (feld.name in schritt.vorbelegung) continue
-        const wert = eingabeWert(feld, daten.get(feld.name))
+        const wert = eingabeWert(feld, daten.getAll(feld.name).at(-1) ?? null)
         if (wert === undefined) continue
         // Eigene Felder (zusatz.<name>) verschachtelt ablegen.
         if (feld.name.startsWith('zusatz.')) {
@@ -249,7 +157,7 @@ export function ProzessAktionen({
               {geoeffnet.felder
                 .filter((f) => !(f.name in geoeffnet.vorbelegung))
                 .map((f) => (
-                  <Feld key={f.name} feld={f} optionen={geoeffnet.optionen[f.name]} />
+                  <FeldEingabe key={f.name} feld={f} optionen={geoeffnet.optionen[f.name]} />
                 ))}
             </div>
             <div className="actions" style={{ marginTop: 8 }}>
@@ -272,7 +180,13 @@ export function ProzessAktionen({
       {meldung && (
         <div className="notice success" role="status" style={{ marginTop: 8, maxWidth: 460 }}>
           <span className="led ok" style={{ marginRight: 6 }} />
-          {meldung}
+          {meldung.text}
+          {meldung.link && (
+            <>
+              {' '}
+              <a href={meldung.link}>Öffnen →</a>
+            </>
+          )}
         </div>
       )}
     </div>

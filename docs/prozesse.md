@@ -1061,6 +1061,13 @@ Jetzt projiziert die Navigation auch die Laufzeit-Prozesse:
   sich nicht tippen lässt.
 - Der Sammelblick `/vorgaenge` bleibt daneben bestehen — er zeigt alle
   Laufzeit-Prozesse zusammen.
+- **Die Detailseite ist eine Maske** (seit 08/2026): editierbare
+  Details-Karte (Titel, Kunde, alle eigenen Felder mit Ist-Werten —
+  `vorgang.kopf_aendern`, ohne Zustandswechsel, auch im Endzustand),
+  „Als Nächstes möglich" als Arbeitskarte mit vorbefüllten Schrittformularen,
+  Zustands-Badge in Kundensprache (Schrittname), Rücklink zur Prozessliste;
+  das Diagramm liegt eingeklappt am Seitenende. Rechte über
+  `requireArea(prozess.bereich)`.
 
 **Pflicht am Anlage-Schritt**: `vorgang.anlegen` braucht einen `zustand` —
 er ist der Einstiegszustand des Vorgangs. Fehlt er, startet der Beleg auf dem

@@ -34,6 +34,51 @@ export const VORGANG = {
     revalidate: ['/vorgaenge'],
   },
 
+  'vorgang.kopf_aendern': {
+    label: 'Vorgangskopf ändern',
+    bereich: 'verkauf',
+    beschreibung:
+      'Ändert Titel, Kunde und eigene Felder eines Vorgangs — OHNE Zustandswechsel, ' +
+      'auch im Endzustand (Korrektur). zusatz wird gemerged, nie ersetzt; ein geleertes ' +
+      'Feld löscht seinen Wert. Titel/Kunde bleiben bei leerer Eingabe unverändert.',
+    bindung: 'beleg',
+    modell: 'vorgang',
+    // Korrektur-Aktion wie verkauf.kopf_aendern — kein Prozessschritt: sie
+    // bewegt den Ablauf nicht, sie pflegt seine Daten.
+    prozessfrei: true,
+    schema: z.object({
+      titel: z.string().max(200).optional(),
+      partner_id: z.string().optional(),
+      zusatz: z.record(z.unknown()).optional(),
+    }),
+    zusammenfassung: (p) => {
+      const teile = [
+        p.titel ? `Titel „${p.titel}"` : null,
+        p.partner_id ? 'Kunde' : null,
+        p.zusatz && Object.keys(p.zusatz).length ? `${Object.keys(p.zusatz).length} Felder` : null,
+      ].filter(Boolean)
+      return teile.length ? teile.join(', ') : 'Kopf geändert'
+    },
+    formdata: (fd) => {
+      // Eigene Felder kommen als zusatz.<name>; der LETZTE Wert eines Namens
+      // gewinnt (Schalter senden hidden "" + Checkbox "on"). Die Typ-
+      // Koerzierung (nummer/schalter) macht die Ausführung — sie kennt die
+      // feld_definitionen, das Formular nicht.
+      const zusatz: Record<string, unknown> = {}
+      for (const key of new Set(fd.keys())) {
+        if (!key.startsWith('zusatz.')) continue
+        const roh = fd.getAll(key).at(-1)
+        zusatz[key.slice('zusatz.'.length)] = typeof roh === 'string' ? roh : ''
+      }
+      return {
+        titel: String(fd.get('titel') ?? '').trim() || undefined,
+        partner_id: String(fd.get('partner_id') ?? '') || undefined,
+        ...(Object.keys(zusatz).length ? { zusatz } : {}),
+      }
+    },
+    revalidate: ['/vorgaenge/:id', '/vorgaenge'],
+  },
+
   'vorgang.status_setzen': {
     label: 'Vorgang weiterschalten',
     bereich: 'verkauf',

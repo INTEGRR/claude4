@@ -177,6 +177,7 @@ export const AUSFUEHRUNG = {
   'verkauf.position_entfernen': verkauf.positionEntfernen,
 
   'vorgang.anlegen': vorgang.anlegen,
+  'vorgang.kopf_aendern': vorgang.kopfAendern,
   'vorgang.status_setzen': vorgang.statusSetzen,
 
   'versand.label_erstellen': versand.labelErstellen,

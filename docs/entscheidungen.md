@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-23 — Die Vorgangsseite ist eine Maske, der Ablaufplan ist Kontext
+
+Befund aus dem Pilotbetrieb: Die Detailseite eines Vorgangs bestand aus einem
+280–560 px hohen Diagramm und einer read-only-Liste der eigenen Felder. Nichts
+war editierbar — Titel, Kunde und zusatz-Werte waren nach dem Anlegen
+eingefroren (kein `vorgang.kopf_aendern`; `status_setzen` verlangt zwingend
+einen Zustand), Schrittformulare zeigten Ist-Werte nicht, und die Seite lag
+mit `requireArea('verkauf')` hinter der falschen Schranke. Für einen
+LAUFENDEN Beleg ist der Ablaufplan aber Kontext, nicht Inhalt.
+
+Entschieden (Kanon der Fachbeleg-Seiten, Muster verkauf/[id]):
+
+- **`vorgang.kopf_aendern`** (bindung beleg, prozessfrei): Titel, Kunde und
+  eigene Felder ändern — ohne Zustandswechsel, auch im Endzustand. zusatz
+  wird gemerged; ein geleertes Feld löscht seinen Wert; die Ausführung
+  koerziert Formstrings typgerecht (nummer/schalter), sonst verglichen
+  Bedingungen später Text.
+- **Details-Karte** mit echtem Formular (Ist-Werte als defaultValue),
+  „Als Nächstes möglich" als eigene Arbeitskarte, das Diagramm eingeklappt
+  ans Seitenende (`<details>`, ProzessPanel-Prop `nurDiagramm`).
+- **Ist-Vorbelegung überall**: `naechsteAngebote` setzt die zusatz-Ist-Werte
+  als `vorgabe` an die Schrittfelder — niemand erfasst mehr blind gegen einen
+  unsichtbaren Bestand. Wirkt auf allen Panel-Seiten.
+- **Ein Feld-Renderer**: `components/feld-eingabe.tsx` (ohne 'use client',
+  unkontrollierte Eingaben) bedient Schrittformulare und Details-Karte —
+  eine Darstellung je Feldtyp statt zwei Dialekte.
+- Erfolgsmeldungen der Schrittformulare tragen jetzt den Ergebnis-Link
+  („Öffnen →") statt ihn auf Belegseiten zu verwerfen.
+
+Umgesetzt in registry/vorgang{,-ausfuehren}.ts, (erp)/vorgaenge/[id],
+components/feld-eingabe.tsx, prozess-aktionen.tsx, prozess-panel.tsx,
+prozesse/angebote.ts. Wächter: tests/prozesse/prozesse.test.ts
+(kopf_aendern merged/koerziert/lehnt Unlesbares ab).
+
 ## 2026-08-22 — Eigene Felder gehören zum Prozess, und der Entwurf bringt sie mit
 
 Prozesse zur Laufzeit in Formulare zu verwandeln ist der Kern von KRNL: Der

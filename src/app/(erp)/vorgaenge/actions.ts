@@ -8,3 +8,10 @@ export async function vorgangStarten(formData: FormData): Promise<ActionResult> 
   if (isActionError(ergebnis)) return ergebnis
   if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
+
+export async function vorgangKopfAendern(
+  recordId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  return serverAktion('vorgang.kopf_aendern', { recordId, formData })
+}

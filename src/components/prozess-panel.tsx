@@ -22,12 +22,19 @@ export async function ProzessPanel({
   recordId,
   rolle,
   befugnisse = [],
+  nurDiagramm = false,
 }: {
   prozessCode: string
   recordId: string
   rolle: Role
   /** Personengebundene Zusatzrechte des Betrachters (users.befugnisse). */
   befugnisse?: string[]
+  /**
+   * Nur das Diagramm (mit Standort), ohne den Schritte-Block — für Seiten,
+   * die „Als Nächstes möglich" selbst prominenter platzieren und den Ablauf
+   * als einklappbaren Kontext ans Ende stellen (Vorgangs-Detailseite).
+   */
+  nurDiagramm?: boolean
 }) {
   const [prozess] = await sql<{ id: string; name: string; beschreibung: string | null }[]>`
     select id, name, beschreibung from prozesse where code = ${prozessCode} and aktiv`
@@ -67,6 +74,15 @@ export async function ProzessPanel({
   }
 
   const diagramm = await flowLayout(schritte, kanten, standort?.schritt)
+
+  if (nurDiagramm) {
+    return (
+      <Card title={`Prozess: ${prozess.name}`}>
+        <ProzessFlow d={diagramm} />
+      </Card>
+    )
+  }
+
   const { angebote, passiv } = await naechsteAngebote(prozessCode, recordId, rolle, befugnisse)
 
   return (

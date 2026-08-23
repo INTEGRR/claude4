@@ -196,6 +196,21 @@ export async function naechsteAngebote(
   rolle: Role,
   befugnisse: string[] = [],
 ): Promise<NaechsteSchritte> {
+  // Ist-Werte des Belegs — die Schrittformulare zeigen sie als Vorbelegung.
+  // Vorher erfasste der Benutzer blind gegen einen unsichtbaren Bestand: ein
+  // Feld, das längst „5000" trug, stand im nächsten Schritt wieder leer da.
+  let zusatzIst: Record<string, unknown> = {}
+  const [prozess] = await sql<{ modell: string | null }[]>`
+    select modell from prozesse where code = ${prozessCode}`
+  if (prozess?.modell) {
+    const [beleg] = await sql<{ daten: Record<string, unknown> | null }[]>`
+      select prozess_beleg_daten(${prozess.modell}, ${recordId}) as daten`
+    const roh = beleg?.daten?.zusatz
+    if (roh && typeof roh === 'object' && !Array.isArray(roh)) {
+      zusatzIst = roh as Record<string, unknown>
+    }
+  }
+
   const naechste = await sql<
     {
       code: string
@@ -247,6 +262,7 @@ export async function naechsteAngebote(
           typ: f.typ as SchrittAngebot['felder'][number]['typ'],
           pflicht: f.pflicht,
           ...(f.auswahl?.length ? { auswahl: f.auswahl } : {}),
+          ...(zusatzIst[f.name] != null ? { vorgabe: zusatzIst[f.name] } : {}),
         })
       }
     }
