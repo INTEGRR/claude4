@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-23 — Der stille Bastelweg ist zu: Modell- und Verkettbarkeits-Wächter
+
+Nach der Verkettung (0072) blieb ein stiller Weg offen: Fremde Beleg-Aktionen
+ließen sich in Prozessschritte eintragen und mit beliebigen Beleg-IDs
+aufrufen — der Fehler zeigte sich erst zur Laufzeit, unverständlich oder gar
+nicht. Drei Wächter schließen ihn:
+
+1. **Torwächter-Modellprüfung**: Bei beleggebundenen Aktionen wird die
+   recordId gegen die Tabelle des Aktionsmodells geprüft
+   (`beleg_existiert`, ein PK-Exists). Modelle ohne prozess_modelle-Eintrag
+   sind nicht prüfbar und werden bewusst durchgelassen.
+2. **Fremdmodell-Wächter im Entwurf**: Ein art='aktion'-Schritt, dessen
+   Beleg-Aktion auf ein anderes Modell zeigt als der Prozess, wird
+   abgelehnt — fremde Belegaktionen gehören in einen Teilprozess.
+   Geschlossene Ausnahmen-Liste `FREMDMODELL_AUSNAHMEN` (heute leer).
+3. **Verkettbarkeits-Wächter im Entwurf** (TS-Spiegel der SQL-Prüfung aus
+   0072): beleglose Eltern/Kinder und Kindtabellen ohne origin-/Link-Spalte
+   scheitern schon in der Entwurfsrunde — dort, wo die KI nachbessern kann.
+   Dazu verallgemeinert: JEDE zustandsführende Vorgangs-Aktion braucht einen
+   zustand (nicht mehr nur vorgang.anlegen), und zustand ≙ params.state.
+
+Wächter: tests/prozesse/prozesse.test.ts (falsches Modell am Torwächter,
+Fremdaktion, belegloser Teilprozess, fehlender/widersprüchlicher zustand).
+
 ## 2026-08-23 — Verkettung über die Herkunft am Kind, nicht über einen zweiten Verweis
 
 Der Pilot brachte seinen Angebots-Vorgang bis „Vertrag abgeschlossen" — und das

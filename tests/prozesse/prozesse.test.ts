@@ -637,6 +637,104 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     )
   })
 
+  test('Torwächter prüft die Beleg-ID gegen das Modell der Aktion', async () => {
+    // Vorher genügte die UUID-Form: eine Fremdaktion mit der falschen ID
+    // lief bis in die Fachfunktion und scheiterte dort unverständlich.
+    const angelegt = await aktionAusfuehrenGeprueft(
+      'vorgang.anlegen',
+      { parameter: { prozess_code: 'ruecknahme', titel: 'Modellprobe' } },
+      admin,
+    )
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'verkauf.sperren',
+        { parameter: { locked: true }, recordId: angelegt.recordId! },
+        admin,
+      ),
+      /arbeitet auf sales_order/,
+    )
+  })
+
+  test('Verkettungs-Wächter: unbaubare Konstrukte scheitern schon beim Entwurf', async () => {
+    // Fremde Beleg-Aktion in einem Vorgangs-Schritt: die Oberfläche sendet
+    // immer die ID des eigenen Belegs — die Aktion bekäme die falsche.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            schritte: ENTWURF.schritte.map((s) =>
+              s.code === 'erstatten'
+                ? { ...s, aktion: 'verkauf.sperren', params: {}, zustand: 'erstattet' }
+                : s,
+            ),
+          },
+        },
+        admin,
+      ),
+      /gehören in einen Teilprozess/,
+    )
+
+    // Teilprozess auf einen beleglosen Prozess: kein Beleg, der am
+    // Elternbeleg hängen könnte — der Schritt würde für immer warten.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            schritte: [
+              ...ENTWURF.schritte,
+              { code: 'kind', name: 'Kind', art: 'prozess', teilprozess: 'artikel_anlegen' },
+            ],
+          },
+        },
+        admin,
+      ),
+      /ist beleglos/,
+    )
+
+    // Zustandsführende Vorgangs-Aktion ohne zustand = Sackgasse im Graph.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            schritte: ENTWURF.schritte.map((s) =>
+              s.code === 'erstatten' ? { ...s, zustand: undefined } : s,
+            ),
+          },
+        },
+        admin,
+      ),
+      /braucht einen zustand/,
+    )
+
+    // zustand und params.state müssen zusammenpassen — sonst verortet das
+    // Diagramm den Vorgang an einem Schritt, den er nie erreicht hat.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.prozess_entwerfen',
+        {
+          parameter: {
+            ...ENTWURF,
+            code: 'kaputt',
+            schritte: ENTWURF.schritte.map((s) =>
+              s.code === 'erstatten' ? { ...s, zustand: 'anders' } : s,
+            ),
+          },
+        },
+        admin,
+      ),
+      /widersprechen sich/,
+    )
+  })
+
   test('Unfug scheitert schon beim Entwurf — die Datenbank bleibt die letzte Instanz', async () => {
     // Unbekannte Aktionsnamen fängt der Entwurf ab.
     await assert.rejects(

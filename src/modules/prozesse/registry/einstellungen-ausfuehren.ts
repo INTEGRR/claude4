@@ -256,6 +256,14 @@ export interface EntwurfFeld {
   in_liste: boolean
 }
 
+/**
+ * Beleg-Aktionen mit fremdem Modell, die TROTZDEM in einem Schritt stehen
+ * dürfen — geschlossene, begründete Liste (Muster UI_UMGEHUNGEN). Heute leer:
+ * Der bekannte Weg über Belege hinweg ist der Teilprozess, nicht die
+ * Fremdaktion.
+ */
+const FREMDMODELL_AUSNAHMEN = new Set<string>([])
+
 export async function prozessEntwerfen(
   p: {
     code: string
@@ -287,6 +295,12 @@ export async function prozessEntwerfen(
   if (codes.size !== p.schritte.length) {
     throw new Error('Schritt-Codes müssen eindeutig sein.')
   }
+  // Effektives Modell: bei bestehenden Prozessen zählt der Bestand — das
+  // Feld modell wird beim Umbau meist weggelassen (und darf ohnehin nicht
+  // wechseln, siehe unten).
+  const [bestand] = await sql<{ modell: string | null }[]>`
+    select modell from prozesse where code = ${p.code}`
+  const effektivesModell = bestand ? bestand.modell : (p.modell ?? null)
   for (const s of p.schritte) {
     if (s.art === 'aktion' && !s.aktion) {
       throw new Error(`Schritt „${s.code}": art=aktion braucht eine registrierte Aktion.`)
@@ -312,15 +326,47 @@ export async function prozessEntwerfen(
         `Schritt „${s.code}": unbekanntes Ereignis „${s.ereignis}" — der Katalog steht auf /prozesse (Ereignisse).`,
       )
     }
-    // Der Anlage-Schritt eines Vorgangs führt den EINSTIEGSZUSTAND. Fehlt
-    // er, startet der Beleg auf dem Notnagel 'neu' — einem Zustand, den der
-    // Prozess gar nicht kennt: das Panel kann den Vorgang dann nicht auf dem
-    // Diagramm verorten. Genau so ist der erste Kundenprozess entstanden.
-    if (s.aktion === 'vorgang.anlegen' && !s.zustand) {
+    // Zustandsführende Vorgangs-Aktionen brauchen einen zustand. Ohne ihn
+    // landet der Beleg außerhalb des Diagramms (Notnagel 'neu' beim Anlegen,
+    // ein unbekannter state beim Weiterschalten) — das Panel kann den
+    // Vorgang dann nicht verorten, und die Traversierung läuft nie über
+    // Aktionsknoten hinweg: der Schritt wäre eine Sackgasse. Genau so ist
+    // der erste Kundenprozess entstanden. kopf_aendern ist bewusst außen
+    // vor: es pflegt Daten und bewegt nichts.
+    const ZUSTANDSFUEHREND = ['vorgang.anlegen', 'vorgang.status_setzen', 'vorgang.auftrag_anlegen']
+    if (s.aktion && ZUSTANDSFUEHREND.includes(s.aktion) && !s.zustand) {
       throw new Error(
-        `Schritt „${s.code}": vorgang.anlegen braucht einen zustand — er ist der ` +
-          'Einstiegszustand des Vorgangs (und muss zu params.state passen, falls gesetzt).',
+        `Schritt „${s.code}": ${s.aktion} braucht einen zustand — er verortet den ` +
+          'Vorgang auf dem Diagramm (und muss zu params.state passen, falls gesetzt).',
       )
+    }
+    const paramsState = (s.params as { state?: unknown } | undefined)?.state
+    if (s.zustand && typeof paramsState === 'string' && paramsState !== s.zustand) {
+      throw new Error(
+        `Schritt „${s.code}": zustand „${s.zustand}" und params.state „${paramsState}" ` +
+          'widersprechen sich — beide müssen denselben Wert tragen.',
+      )
+    }
+    // Fremde Beleg-Aktionen gehören in einen Teilprozess, nicht in einen
+    // Schritt: die Oberfläche sendet auf einer Belegseite IMMER die ID des
+    // eigenen Belegs — eine Aktion mit anderem Modell bekäme die falsche ID
+    // und scheiterte erst zur Laufzeit am Torwächter (Modellprüfung 0072).
+    if (s.art === 'aktion' && s.aktion) {
+      const eintrag = REGISTRY[s.aktion as keyof typeof REGISTRY] as
+        | { bindung?: string; modell?: string }
+        | undefined
+      if (
+        eintrag?.bindung === 'beleg' &&
+        eintrag.modell &&
+        eintrag.modell !== effektivesModell &&
+        !FREMDMODELL_AUSNAHMEN.has(s.aktion)
+      ) {
+        throw new Error(
+          `Schritt „${s.code}": „${s.aktion}" arbeitet auf ${eintrag.modell}, der Prozess ` +
+            `auf ${effektivesModell ?? 'keinem Beleg (beleglos)'} — fremde Belegaktionen ` +
+            "gehören in einen Teilprozess (art 'prozess'), nicht in einen Aktionsschritt.",
+        )
+      }
     }
     if (s.art === 'prozess') {
       if (!s.teilprozess) {
@@ -332,14 +378,53 @@ export async function prozessEntwerfen(
     }
   }
   // Teilprozess-Verweise gegen die Datenbank prüfen — verständlich hier,
-  // hart noch einmal in prozess_version_aktivieren.
+  // hart noch einmal in prozess_version_aktivieren (0072). Der TS-Spiegel
+  // existiert, damit die KI den Fehler schon in der Entwurfsrunde bekommt
+  // und nachbessern kann, statt dass die Aktivierung Tage später scheitert.
   for (const s of p.schritte) {
     if (s.art !== 'prozess' || !s.teilprozess) continue
-    const [kind] = await sql<{ code: string }[]>`
-      select code from prozesse where code = ${s.teilprozess}`
+    const [kind] = await sql<{ code: string; modell: string | null }[]>`
+      select code, modell from prozesse where code = ${s.teilprozess}`
     if (!kind) {
       throw new Error(
         `Schritt „${s.code}": Teilprozess „${s.teilprozess}" existiert nicht — die Liste steht auf /prozesse.`,
+      )
+    }
+    // Verkettbarkeit: teilprozess_stand findet Kindbelege über origin-Spalten
+    // oder die teilprozess_link-Spalte — fehlt beides, wartet der Schritt für
+    // immer. Die Fehlermeldung benennt, was einem Beleg zur Verkettbarkeit
+    // fehlt: so erklärt das System die Regel selbst.
+    if (!effektivesModell) {
+      throw new Error(
+        `Schritt „${s.code}": der Prozess ist beleglos — ohne Elternbeleg kann kein ` +
+          'Kindbeleg an ihm hängen (Teilprozesse brauchen ein modell).',
+      )
+    }
+    if (!kind.modell) {
+      throw new Error(
+        `Schritt „${s.code}": „${s.teilprozess}" ist beleglos — ein Teilprozess braucht ` +
+          'einen Beleg, der am Elternbeleg hängen kann.',
+      )
+    }
+    const linkSpalte = (s.teilprozess_link as { spalte?: unknown } | undefined)?.spalte
+    const [verkettbar] = await sql<{ ok: boolean }[]>`
+      select case
+        when ${typeof linkSpalte === 'string' ? linkSpalte : null}::text is not null then exists (
+          select 1 from pg_attribute
+          where attrelid = to_regclass((select tabelle from prozess_modelle where modell = ${kind.modell}))
+            and attname = ${typeof linkSpalte === 'string' ? linkSpalte : null} and not attisdropped)
+        else exists (
+          select 1 from pg_attribute
+          where attrelid = to_regclass((select tabelle from prozess_modelle where modell = ${kind.modell}))
+            and attname = 'origin_model' and not attisdropped)
+      end as ok`
+    if (!verkettbar?.ok) {
+      throw new Error(
+        typeof linkSpalte === 'string'
+          ? `Schritt „${s.code}": die Tabelle des Belegs „${kind.modell}" hat keine Spalte „${linkSpalte}" (teilprozess_link).`
+          : `Schritt „${s.code}": Belege „${s.teilprozess}" (${kind.modell}) können nicht am ` +
+              'Elternbeleg hängen — der Tabelle fehlen origin_model/origin_id, und ein ' +
+              'teilprozess_link {"spalte": …} ist nicht gesetzt.',
       )
     }
   }

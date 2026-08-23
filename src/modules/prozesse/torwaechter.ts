@@ -158,6 +158,23 @@ export async function aktionAusfuehrenGeprueft(
   const { AUSFUEHRUNG } = await import('./ausfuehren.ts')
   const { sql } = await import('@/db/client')
 
+  // Modellprüfung (0072): Gehört die Beleg-ID wirklich zum Modell der Aktion?
+  // Vorher genügte die UUID-Form — eine Fremdaktion mit der falschen ID lief
+  // bis in die Fachfunktion und scheiterte dort unverständlich („Verkaufs-
+  // auftrag nicht gefunden") oder, schlimmer, gar nicht. Ein PK-Exists je
+  // Ausführung; Modelle ohne prozess_modelle-Eintrag sind nicht prüfbar und
+  // werden bewusst durchgelassen (beleg_existiert liefert dann true).
+  if (aktion.bindung === 'beleg' && aktion.modell && recordId) {
+    const [pruefung] = await sql<{ ok: boolean }[]>`
+      select beleg_existiert(${aktion.modell}, ${recordId}::uuid) as ok`
+    if (!pruefung?.ok) {
+      throw new AktionsFehler(
+        `„${aktion.label}" arbeitet auf ${aktion.modell} — der übergebene Datensatz ` +
+          'ist keiner oder existiert nicht.',
+      )
+    }
+  }
+
   let ergebnis: AktionsErgebnis
   try {
     const fn = AUSFUEHRUNG[name as keyof typeof AUSFUEHRUNG]
