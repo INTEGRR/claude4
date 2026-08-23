@@ -34,6 +34,28 @@ export const VORGANG = {
     revalidate: ['/vorgaenge'],
   },
 
+  'vorgang.auftrag_anlegen': {
+    label: 'Auftrag aus Vorgang anlegen',
+    bereich: 'verkauf',
+    beschreibung:
+      'Erzeugt aus dem Vorgang einen Verkaufsauftrag mit Herkunft (origin_model=vorgang) ' +
+      'und schaltet den Vorgang auf den Zielzustand — damit läuft Auftrag & Lieferung als ' +
+      'Teilprozess in DEMSELBEN Diagramm weiter. Idempotent: existiert schon ein Auftrag ' +
+      'zum Vorgang, wird er verlinkt statt doppelt angelegt. Braucht einen Kunden am Vorgang.',
+    bindung: 'beleg',
+    modell: 'vorgang',
+    schema: z.object({
+      state: z.string().min(1).max(60).describe('Zielzustand des Vorgangs, z. B. "gewonnen"'),
+      vermerk: z.string().max(1000).optional(),
+    }),
+    zusammenfassung: (p) => `→ Verkaufsauftrag (Vorgang → ${p.state})`,
+    formdata: (fd) => ({
+      state: String(fd.get('state') ?? ''),
+      vermerk: String(fd.get('vermerk') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/vorgaenge/:id', '/vorgaenge', '/verkauf'],
+  },
+
   'vorgang.kopf_aendern': {
     label: 'Vorgangskopf ändern',
     bereich: 'verkauf',

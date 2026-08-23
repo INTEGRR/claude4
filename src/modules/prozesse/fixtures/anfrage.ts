@@ -21,8 +21,8 @@ export const ANFRAGE: ProzessFixture = {
   },
   laeufe: [
     {
-      name: 'Anfrage prüfen und anbieten — mit eigenem Feld',
-      pfad: ['anlegen', 'pruefen', 'angebot'],
+      name: 'Anfrage anbieten, Auftrag anlegen — die Kette zum Fachbeleg',
+      pfad: ['anlegen', 'pruefen', 'angebot', 'auftrag'],
       eingaben: {
         // prozess_code kommt aus den Schritt-params der Definition.
         anlegen: (ctx) => ({
@@ -31,13 +31,15 @@ export const ANFRAGE: ProzessFixture = {
           zusatz: { budget: 5000 },
         }),
       },
-      danachKeineSchritte: true,
+      // Nach „auftrag" wartet der Teilprozess „Auftrag & Lieferung" — der
+      // Lauf endet hier bewusst VOR der Abwicklung (die gehört dem
+      // Verkaufsprozess und seiner eigenen Fixture).
       pruefen: async (sql, _ctx, vorgangId) => {
         const [v] = await sql<
           { number: string; state: string; zusatz: { budget?: number } }[]
         >`select number, state, zusatz from vorgaenge where id = ${vorgangId}`
         assert.match(v.number, /^VG\//)
-        assert.equal(v.state, 'angeboten')
+        assert.equal(v.state, 'gewonnen', 'der Auftrag-Schritt schaltet den Vorgang')
         assert.equal(Number(v.zusatz.budget), 5000, 'das eigene Feld liegt im zusatz')
 
         // Das eigene Feld ist ohne Migration prozessfähig: die
@@ -48,6 +50,32 @@ export const ANFRAGE: ProzessFixture = {
             '{"feld": "zusatz.budget", "op": ">", "wert": 1000}'::jsonb
           ) as ok`
         assert.equal(bedingung.ok, true)
+
+        // Die Fuge zum Fachbeleg (0072): der Auftrag hängt über origin am
+        // Vorgang, trägt den Titel als Kundenreferenz — und teilprozess_stand
+        // findet ihn, also läuft „Auftrag & Lieferung" im selben Diagramm.
+        const [auftrag] = await sql<
+          { id: string; client_order_ref: string | null; origin_label: string | null }[]
+        >`
+          select id, client_order_ref, origin_label from sales_orders
+          where origin_model = 'vorgang' and origin_id = ${vorgangId}`
+        assert.ok(auftrag, 'der Auftrag muss über origin am Vorgang hängen')
+        assert.equal(auftrag.client_order_ref, 'Prozesstest Anfrage')
+        assert.equal(auftrag.origin_label, v.number)
+
+        const [stand] = await sql<{ gesamt: number; fertig: number }[]>`
+          select gesamt, fertig
+          from teilprozess_stand('verkauf', null, 'vorgang', ${vorgangId})`
+        assert.equal(Number(stand.gesamt), 1, 'teilprozess_stand findet den Auftrag')
+        assert.equal(Number(stand.fertig), 0, 'die Abwicklung steht noch aus')
+
+        // Höchstens EIN Auftrag je Vorgang — der partielle Unique-Index hält.
+        await assert.rejects(
+          sql`insert into sales_orders (number, partner_id, origin_model, origin_id)
+              select next_sequence('sale'), partner_id, 'vorgang', ${vorgangId}
+              from sales_orders where id = ${auftrag.id}`,
+          /duplicate key|ein_auftrag_je_vorgang/,
+        )
       },
     },
     {

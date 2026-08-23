@@ -43,11 +43,15 @@ export default async function VorgangDetail({
       partner: string | null
       partner_id: string | null
       zusatz: Record<string, unknown>
+      origin_model: string | null
+      origin_id: string | null
+      origin_label: string | null
       created_at: string
     }[]
   >`
     select v.id, v.number, v.prozess_code, p.name as prozess_name, p.bereich,
-           v.titel, v.state, pa.name as partner, v.partner_id, v.zusatz, v.created_at
+           v.titel, v.state, pa.name as partner, v.partner_id, v.zusatz,
+           v.origin_model, v.origin_id, v.origin_label, v.created_at
     from vorgaenge v
     join prozesse p on p.code = v.prozess_code
     left join partners pa on pa.id = v.partner_id
@@ -91,6 +95,25 @@ export default async function VorgangDetail({
   const partner = await sql<{ id: string; name: string }[]>`
     select id, name from partners order by name limit 500`
 
+  // Die Fuge zum Fachbeleg (0072): hängt ein Auftrag über origin am Vorgang,
+  // ist er von hier aus einen Klick entfernt — die eine Wahrheit ist die
+  // origin-Spalte am KIND, kein zweiter Verweis am Vorgang.
+  const [auftrag] = await sql<{ id: string; number: string }[]>`
+    select id, number from sales_orders
+    where origin_model = 'vorgang' and origin_id = ${v.id}`
+
+  // Herkunft dieses Vorgangs (falls er selbst Kind eines Belegs ist).
+  const HERKUNFT_ROUTE: Record<string, string> = {
+    vorgang: '/vorgaenge',
+    sales_order: '/verkauf',
+    repair_order: '/reparatur',
+    purchase_order: '/einkauf',
+  }
+  const herkunftHref =
+    v.origin_model && v.origin_id && HERKUNFT_ROUTE[v.origin_model]
+      ? `${HERKUNFT_ROUTE[v.origin_model]}/${v.origin_id}`
+      : null
+
   const { angebote, passiv } = await naechsteAngebote(
     v.prozess_code,
     v.id,
@@ -106,12 +129,27 @@ export default async function VorgangDetail({
           <>
             {v.prozess_name}
             {v.titel && <> · {v.titel}</>}
+            {v.origin_label && (
+              <>
+                {' '}· entstanden aus{' '}
+                {herkunftHref ? (
+                  <Link href={herkunftHref} className="mono">{v.origin_label}</Link>
+                ) : (
+                  <span className="mono">{v.origin_label}</span>
+                )}
+              </>
+            )}
             {' '}· angelegt <span className="mono">{dateTime(v.created_at)}</span>
           </>
         }
         actions={
           <>
             <span className="badge info">{zustandsSchritt?.name ?? v.state}</span>
+            {auftrag && (
+              <Link className="btn" href={`/verkauf/${auftrag.id}`}>
+                Auftrag {auftrag.number}
+              </Link>
+            )}
             <Link className="btn" href={`/vorgaenge/prozess/${v.prozess_code}`}>
               Alle „{v.prozess_name}"
             </Link>

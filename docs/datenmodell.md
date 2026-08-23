@@ -174,6 +174,9 @@ create table stock_pickings (                                -- Transfers (Odoo:
   scheduled_date    timestamptz,
   date_done         timestamptz,
   origin_model      text,                                    -- 'sales_order' | 'purchase_order' | 'repair_order' | …
+  -- Seit 0072 tragen auch sales_orders und vorgaenge origin_model/origin_id/
+  -- origin_label: die Herkunft am Kind ist die Grundlage der Teilprozess-
+  -- Verkettung (Angebots-Vorgang → Auftrag → Lieferung).
   origin_id         uuid,                                    -- Quellbeleg (Source Document)
   backorder_of_id   uuid references stock_pickings,
   return_of_id      uuid references stock_pickings,          -- Retoure zu erledigtem Transfer

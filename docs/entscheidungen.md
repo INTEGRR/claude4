@@ -9,6 +9,52 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-23 — Verkettung über die Herkunft am Kind, nicht über einen zweiten Verweis
+
+Der Pilot brachte seinen Angebots-Vorgang bis „Vertrag abgeschlossen" — und das
+war buchstäblich das Ende: ein Textzustand, aus dem nichts folgt. Die
+Teilprozess-Mechanik (0049) findet Kindbelege über origin-Spalten oder eine
+Link-Spalte; beides fehlte an `sales_orders` und `vorgaenge`. Ein
+Teilprozess-Schritt auf einen unverkettbaren Beleg ließ sich trotzdem klaglos
+aktivieren und fiel erst als SQL-Fehler im Panel des Kunden um.
+
+Entschieden (Migration 0072):
+
+- **origin_model/origin_id/origin_label an `sales_orders` UND `vorgaenge`**
+  (Muster stock_pickings). Die Herkunft am KIND ist die eine Wahrheit; der
+  Rückblick vom Vorgang auf „seinen" Auftrag ist ein indizierter Select —
+  bewusst keine Spiegel-Spalte (zweite Wahrheit, Sync-Pflicht). Mit origin an
+  `vorgaenge` sind auch Vorgang↔Vorgang und Fachbeleg↔Vorgang verkettbar —
+  jeder künftige Laufzeit-Prozess folgt demselben Muster, ohne Migration.
+- **Höchstens EIN Auftrag je Vorgang**, hart per partiellem Unique-Index —
+  `vorgang.auftrag_anlegen` ist damit idempotent (zweiter Klick verlinkt).
+- **`vorgang.auftrag_anlegen`** (Vorbild repair_create_quotation): legt den
+  Verkaufsauftrag mit Herkunft an (Kunde vom Vorgang, Titel als
+  Kundenreferenz, Lieferadresse vorbelegt), schaltet den Vorgang auf den
+  Zielzustand aus den Schritt-params — der Belegstatus bleibt die einzige
+  Zustandswahrheit. Ohne Kunden: verständlicher Fehler mit dem Weg dorthin.
+- **`prozess_version_aktivieren` prüft Verkettbarkeit**: ein
+  Teilprozess-Schritt, dessen Kindbeleg nicht am Elternbeleg hängen KANN
+  (keine origin-Spalten, keine teilprozess_link-Spalte, beleglos), wird beim
+  Aktivieren abgelehnt — mit einem Satz, der sagt, was fehlt.
+- **Muster-Kette am `anfrage`-Seed** (Version 2): angeboten → Auftrag
+  anlegen (gewonnen) → Teilprozess „verkauf" → Ende; daneben „Kein Auftrag"
+  (verloren). Da der Verkauf seit 0064 den Versand als Teilprozess führt,
+  steht Angebot → Auftrag → Lieferung in EINEM Diagramm. `prozesse.aktiv`
+  bleibt unangetastet — wo die Anfrage aus ist, bleibt sie aus.
+- Gratis dazu: `prozess_beleg_daten` reichert den Auftrag jetzt um
+  `herkunft_*` an — Verkaufs-Bedingungen können auf `herkunft_zusatz.<feld>`
+  des Angebots schauen.
+
+Folgeeffekt, bewusst: Pakete ziehen die Anfrage-Kette jetzt transitiv mit
+(werkstatt-Paket aktiviert verkauf + Versand) — ein aktiver Prozess
+referenziert nie einen abgeschalteten.
+
+Wächter: anfrage-Fixture spielt die Kette end-to-end (origin, Kundenreferenz,
+teilprozess_stand, Unique-Index); tests/prozesse/prozesse.test.ts
+(Kunde-Pflicht, weiche Idempotenz). Dokumentiert in
+[prozesse.md](prozesse.md), [datenmodell.md](datenmodell.md).
+
 ## 2026-08-23 — Die Vorgangsseite ist eine Maske, der Ablaufplan ist Kontext
 
 Befund aus dem Pilotbetrieb: Die Detailseite eines Vorgangs bestand aus einem

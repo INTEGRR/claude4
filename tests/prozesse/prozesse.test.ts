@@ -71,9 +71,13 @@ describe('Chamäleon: Paketwechsel', () => {
     assert.equal(aktiv.get('anfrage'), true)
     assert.equal(aktiv.get('artikel_anlegen'), true)
     assert.equal(aktiv.get('bug_ticket'), true, 'der Bug-Loop ist Infrastruktur')
+    // Seit 0072 führt die Anfrage den Teilprozess „verkauf" (Auftrag &
+    // Lieferung) — der Konsistenz-Wächter zieht die geschlossene Hülle mit:
+    // ein aktiver Prozess referenziert nie einen abgeschalteten.
+    assert.equal(aktiv.get('verkauf'), true, 'Teilprozess der Anfrage-Kette')
+    assert.equal(aktiv.get('shopify_bestellung_versand'), true, 'Teilprozess des Verkaufs')
     // Der Rest ist abgeschaltet — der Pivot weg vom Herstellen/Handeln.
     assert.equal(aktiv.get('fertigung'), false)
-    assert.equal(aktiv.get('shopify_bestellung_versand'), false)
     assert.equal(aktiv.get('einkauf_wareneingang_rechnung'), false)
   })
 
@@ -310,8 +314,11 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
   }
 
   after(async () => {
-    // Vorgänge zuerst (FK ohne Cascade), dann reißt der Prozess seine
+    // Aufträge aus der Ketten-Probe zuerst (origin zeigt auf die Vorgänge),
+    // dann Vorgänge (FK ohne Cascade), dann reißt der Prozess seine
     // Versionen, Schritte und Übergänge per Cascade mit.
+    await h.sql`delete from sales_orders where origin_model = 'vorgang'
+      and origin_id in (select id from vorgaenge where prozess_code in ('ruecknahme', 'kaputt'))`
     await h.sql`delete from vorgaenge where prozess_code in ('ruecknahme', 'kaputt')`
     await h.sql`delete from prozesse where code in ('ruecknahme', 'kaputt')`
   })
@@ -519,6 +526,66 @@ describe('Chamäleon: KI-Prozessentwurf', () => {
     const folgeFelder = erstatten.felder.map((f) => f.name)
     assert.ok(folgeFelder.includes('zusatz.erstattungsbetrag'))
     assert.equal(folgeFelder.includes('zusatz.ruecksendenummer'), false)
+  })
+
+  test('auftrag_anlegen: braucht einen Kunden, verkettet über origin, doppelt nie', async () => {
+    // Die Fuge Vorgang → Fachbeleg (0072) an einem Prozess, der den Schritt
+    // gar nicht führt — die Aktion ist beleggebunden und funktioniert auf
+    // jedem Vorgang; die Prozessdefinition entscheidet nur, WO sie angeboten
+    // wird.
+    const angelegt = await aktionAusfuehrenGeprueft(
+      'vorgang.anlegen',
+      { parameter: { prozess_code: 'ruecknahme', titel: 'Kettenprobe' } },
+      admin,
+    )
+    const id = angelegt.recordId!
+
+    // Ohne Kunden: verständlicher Fehler mit Handlungsanweisung.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'vorgang.auftrag_anlegen',
+        { parameter: { state: 'gewonnen' }, recordId: id },
+        admin,
+      ),
+      /braucht einen Kunden/,
+    )
+
+    // Kunde über die Details-Maske nachtragen — genau der Weg, den die
+    // Fehlermeldung nennt — dann entsteht der Auftrag mit Herkunft.
+    const [kunde] = await h.sql<{ id: string }[]>`select id from partners limit 1`
+    await aktionAusfuehrenGeprueft(
+      'vorgang.kopf_aendern',
+      { parameter: { partner_id: kunde.id }, recordId: id },
+      admin,
+    )
+    const erster = await aktionAusfuehrenGeprueft(
+      'vorgang.auftrag_anlegen',
+      { parameter: { state: 'gewonnen' }, recordId: id },
+      admin,
+    )
+    assert.match(erster.text ?? '', /Auftrag S\d+ angelegt/)
+
+    const [auftrag] = await h.sql<
+      { number: string; origin_label: string | null; client_order_ref: string | null }[]
+    >`
+      select number, origin_label, client_order_ref from sales_orders
+      where origin_model = 'vorgang' and origin_id = ${id}`
+    assert.ok(auftrag, 'der Auftrag hängt über origin am Vorgang')
+    assert.equal(auftrag.client_order_ref, 'Kettenprobe')
+    const [v] = await h.sql<{ state: string }[]>`select state from vorgaenge where id = ${id}`
+    assert.equal(v.state, 'gewonnen')
+
+    // Zweiter Klick doppelt nichts — er verlinkt den bestehenden Auftrag.
+    const zweiter = await aktionAusfuehrenGeprueft(
+      'vorgang.auftrag_anlegen',
+      { parameter: { state: 'gewonnen' }, recordId: id },
+      admin,
+    )
+    assert.match(zweiter.text ?? '', /existiert bereits/)
+    const [{ anzahl }] = await h.sql<{ anzahl: number }[]>`
+      select count(*)::int as anzahl from sales_orders
+      where origin_model = 'vorgang' and origin_id = ${id}`
+    assert.equal(Number(anzahl), 1)
   })
 
   test('kopf_aendern pflegt Daten ohne Zustandswechsel — und koerziert die Typen', async () => {

@@ -40,7 +40,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **currencies** / **exchange_rates**: Fremdwährung; Kurs zum Stichtag: exchange_rate_at(code, datum). purchase_orders.exchange_rate friert den Kurs bei Bestätigung ein.
 
 ### Verkauf
-- **sales_orders**: number ('S00001'), partner_id, state ('draft','sent','sale','cancel'), locked, delivery_status ('nothing','partial','full'), invoice_status, order_date, source ('manuell'|'shopify'), shopify_order_id/name, ship_*-Adressfelder. Summen: sales_order_total(order_id) → (net, tax, gross).
+- **sales_orders**: number ('S00001'), partner_id, state ('draft','sent','sale','cancel'), locked, delivery_status ('nothing','partial','full'), invoice_status, order_date, source ('manuell'|'shopify'), shopify_order_id/name, ship_*-Adressfelder, origin_model/origin_id/origin_label (Herkunftsbeleg, z. B. ein Vorgang — Grundlage der Teilprozess-Verkettung). Summen: sales_order_total(order_id) → (net, tax, gross).
 - **sales_order_lines**: order_id, variant_id, name, qty, qty_delivered, uom_id, price_unit, discount, tax_rate. Netto je Zeile: sale_line_subtotal(zeile).
 
 ### Fertigung
@@ -83,7 +83,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **prozesse**: Prozesskopf (code z. B. 'einkauf_wareneingang_rechnung', name, bereich, aktiv). **prozess_versionen** (prozess_id, nr, aktiv) mit **prozess_schritte** (schluessel, art 'start'|'aktion'|'ende'|'teilprozess', aktion = Registry-Name, zustand, optional, befugnis) und **prozess_uebergaenge** (von/nach, bedingung).
 - **prozess_instanzen**: laufende Assistenten (prozess_id, schritt, status 'laeuft'|'fertig'|'abgebrochen', daten jsonb mit beleg_id, gestartet_von).
 - **prozess_modelle** (code → Tabelle, Statusspalte, Detailroute), **prozess_routen** (Einstiegsrouten), **prozess_pakete** (Prozess-Pakete fürs Geschäftsmodell, prozess_codes[]), **prozess_overrides** (Laufzeit-Anpassungen). Ist ein Schritt Teil des aktiven Ablaufs: prozessschritt_aktiv(code, schluessel).
-- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb). **feld_definitionen**: eigene Zusatzfelder ohne Migration (modell, name, label, typ, pflicht, auswahl, sichtbar_in). Sie gehören zu einem PROZESS (prozess_code) und optional nur zu bestimmten Schritten (schritte text[]); prozess_code null = für alle Belege des Modells. Werte landen im zusatz-jsonb und sind in Bedingungen als zusatz.name ansprechbar.
+- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb, origin_model/origin_id/origin_label — ein Vorgang kann selbst aus einem anderen Beleg entstehen). **feld_definitionen**: eigene Zusatzfelder ohne Migration (modell, name, label, typ, pflicht, auswahl, sichtbar_in). Sie gehören zu einem PROZESS (prozess_code) und optional nur zu bestimmten Schritten (schritte text[]); prozess_code null = für alle Belege des Modells. Werte landen im zusatz-jsonb und sind in Bedingungen als zusatz.name ansprechbar.
 - **bug_reports**: Tickets (number 'BUG/…', titel, beschreibung, status 'offen'|'in_arbeit'|'behoben'|'geschlossen', schwere, seite, commit_sha).
 
 ### Versand-Extras & Shopify-Abgleich

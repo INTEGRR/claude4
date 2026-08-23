@@ -1081,6 +1081,32 @@ Wächter: tests/navigation.test.ts (Menü und Befehlsfeld bauen denselben
 Pfad, die Route existiert) und tests/prozesse/prozesse.test.ts
 (Entwurf ohne Einstiegszustand wird abgewiesen).
 
+## Verkettung Vorgang ↔ Fachbeleg (Migration 0072, umgesetzt)
+
+Ein Laufzeit-Prozess endet nicht mehr an einem Textzustand: über die
+Herkunft am KIND (`origin_model`/`origin_id`/`origin_label`, Muster
+stock_pickings) hängen Fachbelege an Vorgängen — und Vorgänge aneinander.
+
+- **`vorgang.auftrag_anlegen`** erzeugt aus dem Vorgang einen
+  Verkaufsauftrag (Kunde vom Vorgang, Titel als Kundenreferenz,
+  Lieferadresse vorbelegt, origin gesetzt) und schaltet den Vorgang auf den
+  Zielzustand des Schritts. Idempotent: höchstens ein Auftrag je Vorgang
+  (partieller Unique-Index); der zweite Klick verlinkt den bestehenden.
+- **Teilprozess-Schritt danach**: `art='prozess'` mit `teilprozess:
+  'verkauf'` — `teilprozess_stand` findet den Auftrag über origin, und weil
+  der Verkauf den Versand als Teilprozess führt (0064), steht **Angebot →
+  Auftrag → Lieferung in einem Diagramm**. Muster: der `anfrage`-Seed,
+  Version 2 (angeboten → Auftrag anlegen | Kein Auftrag → Ende).
+- **Verkettbarkeits-Wächter**: `prozess_version_aktivieren` lehnt
+  Teilprozess-Schritte ab, deren Kindbeleg nicht am Elternbeleg hängen kann
+  (keine origin-Spalten und keine `teilprozess_link`-Spalte, oder beleglos)
+  — mit einem Satz, der benennt, was der Tabelle fehlt. So sagt das System
+  selbst, was ein Beleg braucht, um verkettbar zu sein.
+- **Bedingungen über die Kette**: der Auftrag trägt `herkunft_*`-Felder aus
+  dem Vorgang (0068-Mechanik) — z. B. `herkunft_zusatz.budget`.
+- Die Vorgangsseite zeigt den verketteten Auftrag als Knopf im Kopf und die
+  eigene Herkunft („entstanden aus …") im Untertitel.
+
 ## Schutzschicht für den Kundenbetrieb (Entscheidung 08/2026)
 
 KRNL wird an mehrere Kunden ausgerollt, mit häufigen Feature-Updates. Der
