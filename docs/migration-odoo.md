@@ -78,6 +78,24 @@ Supabase zwingend der Session-Port, nicht der Transaction-Pooler.
 `--dry-run` fährt den kompletten Lauf in einer Transaktion und rollt am
 Ende zurück; der Report wird vorher erhoben und trotzdem ausgegeben.
 
+### Ausführung vom eigenen Rechner (Docker)
+
+Läufe gegen Supabase können NICHT aus einer Claude-Cloud-Session gefahren
+werden — deren Netz lässt nur HTTPS über einen Proxy zu, rohe
+Postgres-Verbindungen (Port 5432/6543) sind gesperrt. Für den Prod-Lauf
+gibt es deshalb `scripts/odoo-import-lokal.sh`: braucht nur Docker
+(Windows: in der Git Bash ausführen), zieht Staging-Postgres und Node aus
+Containern und fährt Migrationen + Grunddaten + Import in einem Zug:
+
+```bash
+scripts/odoo-import-lokal.sh <dump.zip> "<DIRECT_URL>" --dry-run   # Generalprobe
+scripts/odoo-import-lokal.sh <dump.zip> "<DIRECT_URL>" --lauf=prod-1
+```
+
+Die Staging-DB bleibt als Container `krnl-odoo-quelle` stehen und wird
+bei Wiederholungen weiterverwendet; ein frischer Dump wird mit
+`docker rm -f krnl-odoo-quelle` erzwungen.
+
 ## Die Phasen
 
 | # | Phase | Mechanik |
@@ -218,16 +236,17 @@ Entscheidungslog 2026-08-25, Phase 7).
    (FRUEH/SPAET/…, Seeds aus 0022) stehen nicht in der Behalten-Liste und
    werden mit abgeräumt — nach dem Leerräumen unter Personal → Schichten
    neu anlegen, falls gebraucht.
-5. **Import gegen Prod**: `DIRECT_URL` auf die Supabase-Session-Verbindung
-   (Port 5432, nicht der Transaction-Pooler), `SHOPIFY_*`-Variablen
-   ungesetzt lassen:
+5. **Import gegen Prod** — vom eigenen Rechner (siehe „Ausführung vom
+   eigenen Rechner"), Ziel ist das dedizierte Supabase-Projekt
+   `krnl-anvil` (Entscheidungslog 2026-08-25):
    ```bash
-   ODOO_QUELLE_URL=postgres://erp:erp@127.0.0.1:5433/odoo_quelle \
-   DIRECT_URL=postgres://…@…supabase.com:5432/postgres \
-     npm run odoo:import -- --lauf=cutover-JJJJ-MM-TT
+   scripts/odoo-import-lokal.sh dump.zip "<DIRECT_URL>" --dry-run
+   scripts/odoo-import-lokal.sh dump.zip "<DIRECT_URL>" --lauf=cutover-JJJJ-MM-TT
    ```
-   Erst `--dry-run`, dann der echte Lauf. Bricht eine Phase ab: Ursache
-   klären, Lauf einfach wiederholen (die Phasen sind idempotent).
+   Bricht eine Phase ab: Ursache klären, Lauf einfach wiederholen (die
+   Phasen sind idempotent). Schritt 2 entfällt dabei — das Skript lädt
+   den Dump selbst in seine Staging-DB (`docker rm -f krnl-odoo-quelle`
+   vor dem Stichtag nicht vergessen, damit der frische Dump zieht).
 6. **Abnahme**: Report „alle Zählungen stimmen" + Daten-TÜV ohne Befunde +
    Warnliste gegen die Referenzliste geprüft (siehe „Warnungen lesen").
    Sonst: Supabase-Restore auf den PITR-Punkt aus Schritt 3.

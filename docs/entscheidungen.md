@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-25 — Prod bekommt ein eigenes Supabase-Projekt; der Import läuft vom eigenen Rechner
+
+Zwei Betriebsentscheidungen aus der Cutover-Vorbereitung
+([migration-odoo.md](migration-odoo.md)):
+
+- **Eigenes Supabase-Projekt `krnl-anvil`** (eu-central-1) statt des
+  bisherigen Nebenschemas im Projekt einer anderen Anwendung. Grund:
+  Backups und Point-in-Time-Restore gelten je Projekt — der
+  Rollback-Pfad des Runbooks (Restore bei misslungenem Lauf) hätte die
+  fremde Anwendung mit zurückgedreht. Dazu getrennte Ressourcen und
+  Zugriffe. Das alte Nebenschema bleibt unangetastet, bis der Umstieg
+  stabil ist.
+- **Der Import läuft vom eigenen Rechner** (`scripts/odoo-import-lokal.sh`,
+  nur Docker nötig): Claude-Cloud-Umgebungen lassen ausgehend nur HTTPS
+  über einen Proxy zu, rohe Postgres-Verbindungen sind dort technisch
+  gesperrt. Probeläufe in der Session bleiben lokal gegen die
+  Session-DB; jeder Lauf gegen Supabase braucht einen Rechner mit
+  normalem Netzzugang.
+
 ## 2026-08-25 — Odoo-Übernahme Phase 7: Odoo ist die Wahrheit über offene Arbeit
 
 Beim Durchbuchen der offenen Belege (Details in
