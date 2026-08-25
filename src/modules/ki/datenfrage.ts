@@ -5,6 +5,7 @@ import { sql } from '@/db/client'
 import type { Role } from '@/modules/auth/permissions'
 import { canAccess } from '@/modules/auth/permissions'
 import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
+import { kiModell } from './modelle'
 import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 
 /**
@@ -15,7 +16,6 @@ import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
  * liest die Antwort danach nur vor.
  */
 
-const MODELL = process.env.DATENFRAGE_MODELL ?? 'claude-haiku-4-5-20251001'
 const MAX_RUNDEN = 4
 
 export function datenfrageKonfiguriert(): boolean {
@@ -34,13 +34,14 @@ export async function datenfrageBeantworten(
   const finanzen = canAccess(nutzer.role, 'finanzen', nutzer.befugnisse ?? [])
 
   const client = new Anthropic()
+  const modell = await kiModell(sql, 'datenfrage')
   const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: frage }]
 
   for (let runde = 0; runde < MAX_RUNDEN; runde++) {
     let antwort: Anthropic.Messages.Message
     try {
       antwort = await client.messages.create({
-        model: MODELL,
+        model: modell,
         max_tokens: 2000,
         system:
           'Du beantwortest EINE Datenfrage aus einem ERP für eine Sprachausgabe. ' +

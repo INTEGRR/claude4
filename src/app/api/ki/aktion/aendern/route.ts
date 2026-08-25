@@ -1,9 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
+import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { AKTIONEN, type AktionName, aktionPruefen } from '@/modules/ki/aktionen'
 import { kiConfigured } from '@/modules/ki/agent'
+import { kiModell } from '@/modules/ki/modelle'
 
 /**
  * Einen Vorschlag per Zuruf überarbeiten („die Kürzel für Grün auf GN").
@@ -15,7 +17,6 @@ import { kiConfigured } from '@/modules/ki/agent'
  * beim Anlegen, und ausgeführt wird weiterhin nur auf Klick.
  */
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5'
 
 export async function POST(request: Request) {
   const user = await currentUser()
@@ -101,9 +102,10 @@ export async function POST(request: Request) {
   }
 
   const client = new Anthropic()
+  const modell = await kiModell(sql, 'auswertung')
   const anfrage = (hinweis?: string) =>
     client.messages.create({
-      model: MODEL,
+      model: modell,
       max_tokens: 4000,
       system:
         'Du überarbeitest den Feldsatz eines Aktionsvorschlags in einem ERP. Du bekommst die ' +

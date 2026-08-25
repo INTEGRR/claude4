@@ -82,6 +82,55 @@ describe('KI: SQL-Werkzeug (Schutzmechanismen)', () => {
   })
 })
 
+describe('KI: Modellwahl je Ebene (Einstellung vor Env vor Standard)', () => {
+  test('gespeicherte Katalog-Modelle gewinnen', async () => {
+    const { modellAufloesen } = await import('../src/modules/ki/modelle.ts')
+    assert.equal(
+      modellAufloesen({ auswertung: 'claude-sonnet-5' }, 'auswertung', { ANTHROPIC_MODEL: 'x' }),
+      'claude-sonnet-5',
+    )
+  })
+
+  test('Tippfehler in der Einstellung fällt still auf Env bzw. Standard zurück', async () => {
+    const { modellAufloesen } = await import('../src/modules/ki/modelle.ts')
+    assert.equal(
+      modellAufloesen({ auswertung: 'gpt-99' }, 'auswertung', { ANTHROPIC_MODEL: 'notausgang' }),
+      'notausgang',
+    )
+    assert.equal(modellAufloesen({ auswertung: 'gpt-99' }, 'auswertung', {}), 'claude-opus-5')
+    assert.equal(modellAufloesen(null, 'datenfrage', {}), 'claude-haiku-4-5-20251001')
+  })
+
+  test('Env-Reihenfolge: AUFNAHME_MODELL vor ANTHROPIC_MODEL für Prozess-Ebene', async () => {
+    const { modellAufloesen } = await import('../src/modules/ki/modelle.ts')
+    assert.equal(
+      modellAufloesen(null, 'prozess', { AUFNAHME_MODELL: 'a', ANTHROPIC_MODEL: 'b' }),
+      'a',
+    )
+  })
+
+  test('Registry-Aktion existiert und lehnt Nicht-Katalog-Modelle ab', async () => {
+    const { REGISTRY } = await import('../src/modules/prozesse/registry/index.ts')
+    const aktion = REGISTRY['einstellungen.ki_modelle_setzen']
+    assert.ok(aktion)
+    assert.equal(aktion.nurAdmin, true)
+    const gut = aktion.schema.safeParse({
+      auswertung: 'claude-sonnet-5',
+      prozess: 'claude-opus-5',
+      interview: 'claude-opus-5',
+      datenfrage: 'claude-haiku-4-5-20251001',
+    })
+    assert.equal(gut.success, true)
+    const schlecht = aktion.schema.safeParse({
+      auswertung: 'irgendwas',
+      prozess: 'claude-opus-5',
+      interview: 'claude-opus-5',
+      datenfrage: 'claude-haiku-4-5-20251001',
+    })
+    assert.equal(schlecht.success, false)
+  })
+})
+
 // --- Diagramme und schreibende Aktionen (Ausbau) ---------------------------
 
 describe('Diagramm-Vorgaben des Agenten', () => {

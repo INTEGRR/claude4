@@ -101,10 +101,17 @@ auch die Werkzeug-Definitionen ab) und einen wandernden auf der jeweils
 letzten Nachricht. Jede Folgerunde liest Schema-Doku, Verlauf und alle
 bisherigen SQL-Ergebnisse zum Cache-Lesepreis (10 % des Eingabepreises)
 statt voll neu — bei bis zu 15 Runden je Frage der größte Kostenhebel.
-Interview und Prozess-Aufnahme cachen ihren Systemprompt genauso. Das
-Modell ist per `ANTHROPIC_MODEL` umstellbar (Standard: Opus; für reine
-Auswertungen reicht z. B. `claude-sonnet-5` zu deutlich geringerem
-Preis). Entscheidungslog 2026-08-25.
+Interview und Prozess-Aufnahme cachen ihren Systemprompt genauso.
+
+**Modellwahl je Ebene ist Betreiber-Einstellung** (Einstellungen →
+„KI-Modelle", Registry-Aktion `einstellungen.ki_modelle_setzen`,
+settings-Schlüssel `ki_modelle`): Auswertungen/SQL, Prozess-Aufnahme &
+-Entwurf, Onboarding-Interview und die schnelle Datenfrage lassen sich
+getrennt auf Opus 5, Sonnet 5 oder Haiku 4.5 stellen — nur Katalog-
+Modelle aus `src/modules/ki/modelle.ts` sind wählbar (Tippfehler-Schutz).
+Auflösungsreihenfolge: Einstellung → Env-Notausgang (`ANTHROPIC_MODEL`,
+`AUFNAHME_MODELL`, `DATENFRAGE_MODELL`) → Standard der Ebene.
+Entscheidungslog 2026-08-25.
 
 **2. `diagramm` — zeigen.** Der Agent liefert eine schmale Beschreibung
   (`src/modules/ki/diagramm.ts`): Art (`saeulen`, `balken`, `anteile`), Titel,

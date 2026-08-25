@@ -1,5 +1,10 @@
 import { z } from 'zod'
+import { MODELL_KATALOG, type ModellId } from '../../ki/modelle.ts'
 import type { RegistrierteAktion } from './typen.ts'
+
+// Nur geprüfte Katalog-Modelle sind wählbar — ein Freitextfeld wäre eine
+// stille Tippfehler-Falle, die erst beim nächsten KI-Aufruf explodiert.
+const kiModellEnum = z.enum(MODELL_KATALOG.map((m) => m.id) as [ModellId, ...ModellId[]])
 
 /**
  * Verwaltungsaktionen der Prozesse selbst — das Chamäleon-Stellwerk:
@@ -105,6 +110,33 @@ export const EINSTELLUNGEN = {
       phone: String(fd.get('phone') ?? ''),
     }),
     revalidate: ['/einstellungen', '/'],
+  },
+
+  'einstellungen.ki_modelle_setzen': {
+    label: 'KI-Modelle je Ebene festlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Legt fest, welches Sprachmodell jede KI-Ebene nutzt (Auswertungen, Prozess-Entwurf, ' +
+      'Onboarding-Interview, schnelle Datenfrage) — eine Kosten-/Qualitätsentscheidung des ' +
+      'Betreibers (settings.ki_modelle). Nur Modelle aus dem geprüften Katalog sind wählbar.',
+    bindung: 'frei',
+    schema: z.object({
+      auswertung: kiModellEnum,
+      prozess: kiModellEnum,
+      interview: kiModellEnum,
+      datenfrage: kiModellEnum,
+    }),
+    zusammenfassung: (p) =>
+      `Auswertung ${p.auswertung} · Prozess ${p.prozess} · Interview ${p.interview} · Datenfrage ${p.datenfrage}`,
+    formdata: (fd) => ({
+      auswertung: String(fd.get('auswertung') ?? ''),
+      prozess: String(fd.get('prozess') ?? ''),
+      interview: String(fd.get('interview') ?? ''),
+      datenfrage: String(fd.get('datenfrage') ?? ''),
+    }),
+    revalidate: ['/einstellungen'],
   },
 
   'einstellungen.demodaten_einspielen': {

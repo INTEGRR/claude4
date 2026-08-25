@@ -1,6 +1,8 @@
 import 'server-only'
 
 import Anthropic from '@anthropic-ai/sdk'
+import { sql } from '@/db/client'
+import { kiModell } from './modelle'
 import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
 
 /**
@@ -17,7 +19,6 @@ import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
  * erzwungenem Werkzeug, ~1 s statt einer Agenten-Schleife.
  */
 
-const MODELL = process.env.AUFNAHME_MODELL ?? process.env.ANTHROPIC_MODEL ?? 'claude-opus-5'
 const MAX_RUNDEN = 10
 
 export interface InterviewErgebnis {
@@ -91,7 +92,7 @@ export async function interviewRunde(
 
   const client = new Anthropic()
   const antwort = await client.messages.create({
-    model: MODELL,
+    model: await kiModell(sql, 'interview'),
     max_tokens: 700,
     // Prompt-Caching: derselbe Systemprompt über alle Interviewrunden —
     // ab der zweiten Runde nur noch Cache-Lesepreis.

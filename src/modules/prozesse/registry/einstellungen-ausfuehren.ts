@@ -26,6 +26,16 @@ export async function firmaSpeichern(
   return { text: `Firmendaten von „${p.name}" gespeichert.` }
 }
 
+export async function kiModelleSetzen(
+  p: { auswertung: string; prozess: string; interview: string; datenfrage: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value) values ('ki_modelle', ${sql.json(p)})
+    on conflict (key) do update set value = excluded.value`
+  return { text: 'KI-Modelle gespeichert — gilt ab der nächsten Anfrage.' }
+}
+
 export async function demodatenEinspielenAktion(
   _p: Record<string, never>,
   _ctx: AktionsKontext,

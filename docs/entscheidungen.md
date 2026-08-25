@@ -26,9 +26,14 @@ breites Abfrageergebnis den Verlauf dauerhaft aufblähte. Maßnahmen
 - **Größenkappung** der SQL-Ergebnisse (`ergebnisFuerModell()`, 30.000
   Zeichen) zusätzlich zur bestehenden 500-Zeilen-Grenze, mit Hinweis ans
   Modell, zu aggregieren.
-- Die Modellwahl bleibt per `ANTHROPIC_MODEL` konfigurierbar — für reine
-  Datenfragen ist ein günstigeres Modell als Opus legitim; die
-  Entscheidung liegt beim Betreiber, nicht im Code.
+- Die Modellwahl je KI-Ebene (Auswertungen, Prozess-Entwurf, Interview,
+  Datenfrage) ist eine **Betreiber-Einstellung in der App** geworden —
+  Einstellungen → „KI-Modelle", Registry-Aktion
+  `einstellungen.ki_modelle_setzen`, settings-Schlüssel `ki_modelle`,
+  wählbar nur aus einem geprüften Katalog. Env-Variablen bleiben als
+  Notausgang für den Betrieb (Reihenfolge: Einstellung → Env → Standard).
+  Begründung: Kosten/Qualität je Ebene ist eine Fachentscheidung, die der
+  Betreiber ohne Deployment treffen können muss.
 
 ## 2026-08-25 — Supabase-Data-API wird stillgelegt
 

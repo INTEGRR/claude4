@@ -9,6 +9,7 @@ import { aktionPruefen, aktionenTool } from './aktionen'
 import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { kiKatalog } from '@/modules/prozesse/introspektion'
+import { kiModell } from './modelle'
 import { werkstattSystemZusatz } from './wissen'
 
 /**
@@ -19,7 +20,6 @@ import { werkstattSystemZusatz } from './wissen'
  * API-Schlüssel) fern.
  */
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5'
 const MAX_ROUNDS = 15
 
 export function kiConfigured(): boolean {
@@ -125,6 +125,8 @@ export async function runAgent(
 ): Promise<void> {
   const client = new Anthropic()
   const requestId = randomUUID()
+  // Modellwahl je Ebene aus den Einstellungen (modelle.ts) — Betreiber-Sache.
+  const model = await kiModell(sql, 'auswertung')
 
   const frage = history.at(-1)?.text ?? ''
   await sql`select log_event('ki', ${requestId}, 'note', ${'Frage: ' + frage.slice(0, 500)}, ${actor})`
@@ -164,7 +166,7 @@ export async function runAgent(
   for (let round = 0; round < MAX_ROUNDS; round++) {
     ankerUmhaengen()
     const stream = client.messages.stream({
-      model: MODEL,
+      model,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
       system: [{ type: 'text', text: systemPrompt(rechte.finanzen, kontext), cache_control: CACHE }],

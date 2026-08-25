@@ -5,6 +5,7 @@ import { sql } from '@/db/client'
 import type { User } from '@/modules/auth'
 import { REGISTRY } from '@/modules/prozesse/registry'
 import { bestaetigteAktionAusfuehren } from './aktion-bestaetigt'
+import { kiModell } from './modelle'
 import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
 
 /**
@@ -20,7 +21,6 @@ import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
  * Modell den Fehler zurück und darf nachbessern (max. 3 Runden).
  */
 
-const MODELL = process.env.AUFNAHME_MODELL ?? process.env.ANTHROPIC_MODEL ?? 'claude-opus-5'
 const MAX_RUNDEN = 3
 
 export function aufnahmeKonfiguriert(): boolean {
@@ -137,11 +137,12 @@ export async function aufnahmeStrukturieren(
   // Abläufe erfassen wirklich nichts.
   let feldNachfrageGestellt = false
 
+  const modell = await kiModell(sql, 'prozess')
   for (let runde = 0; runde < MAX_RUNDEN; runde++) {
     let antwort: Anthropic.Messages.Message
     try {
       antwort = await client.messages.create({
-        model: MODELL,
+        model: modell,
         max_tokens: 8000,
         // Prompt-Caching: derselbe Systemprompt über alle Korrekturrunden —
         // ab der zweiten Runde nur noch Cache-Lesepreis.

@@ -5,6 +5,7 @@ import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { type ActionResult, actionError, actionFail, actionInfo } from '@/modules/shared/action'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
+import { KI_EBENEN, MODELL_KATALOG, modellAufloesen } from '@/modules/ki/modelle'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,13 @@ async function saveCompany(formData: FormData) {
   // Prozess First: die Firmendaten laufen wie alles über die Registry
   // (einstellungen.firma_speichern) — Torwächter prüft und auditiert.
   return serverAktion('einstellungen.firma_speichern', { formData })
+}
+
+async function saveKiModelle(formData: FormData) {
+  'use server'
+  // Prozess First: Modellwahl je KI-Ebene läuft über die Registry
+  // (einstellungen.ki_modelle_setzen) — Torwächter prüft und auditiert.
+  return serverAktion('einstellungen.ki_modelle_setzen', { formData })
 }
 
 async function saveDhl(formData: FormData) {
@@ -174,6 +182,7 @@ export default async function EinstellungenPage() {
   const sales = get<{ lock_confirmed?: boolean }>('sales')
   const purchase = get<{ lock_confirmed?: boolean }>('purchase')
   const freigaben = get<{ einkauf_limit?: number }>('freigaben')
+  const kiModelle = get<Record<string, unknown>>('ki_modelle')
   const finanzen = get<Record<string, number>>('finanzen')
 
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
@@ -283,6 +292,33 @@ export default async function EinstellungenPage() {
           Umgebungsvariablen gesetzt, nicht hier. Hinweis: Das Passwort des GKP-Systembenutzers läuft
           nach 365 Tagen ab.
         </div>
+      </Card>
+
+      <Card title="KI-Modelle (Kosten und Qualität je Ebene)">
+        <ActionForm action={saveKiModelle}>
+          <div className="row">
+            {KI_EBENEN.map((ebene) => (
+              <label key={ebene.key} className="field">
+                <span title={ebene.hinweis}>{ebene.label}</span>
+                <select name={ebene.key} defaultValue={modellAufloesen(kiModelle, ebene.key)}>
+                  {MODELL_KATALOG.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} — {m.hinweis}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            <div className="shrink field">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+          <div className="notice info" style={{ marginBottom: 0 }}>
+            Gilt sofort für neue Anfragen. Faustregel: Opus für den Prozess-Entwurf, Sonnet für
+            Auswertungen, Haiku für den Sprachmodus — so bleiben die Kosten im Rahmen, ohne
+            Qualität dort zu verlieren, wo sie zählt.
+          </div>
+        </ActionForm>
       </Card>
 
       <Card title="Belegverhalten">

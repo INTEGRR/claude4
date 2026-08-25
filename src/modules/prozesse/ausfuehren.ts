@@ -47,6 +47,7 @@ export const AUSFUEHRUNG = {
   'einkauf.wechselkurs_erfassen': einkauf.wechselkursErfassen,
 
   'einstellungen.firma_speichern': einstellungen.firmaSpeichern,
+  'einstellungen.ki_modelle_setzen': einstellungen.kiModelleSetzen,
   'einstellungen.demodaten_einspielen': einstellungen.demodatenEinspielenAktion,
   'einstellungen.einrichtung_abschliessen': einstellungen.einrichtungAbschliessen,
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,
