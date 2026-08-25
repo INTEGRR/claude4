@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { randomUUID } from 'node:crypto'
 import { sql } from '@/db/client'
 import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
-import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
+import { FINANZ_SPERRE, MAX_ROWS, ergebnisFuerModell, runReadOnlyQuery } from './sql-tool'
 import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
 import { aktionPruefen, aktionenTool } from './aktionen'
 import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
@@ -54,7 +54,7 @@ Regeln:
   Runde je Datensatz.
 - Namen und Kennungen (SKU, Kunde, IDs) vor einem Vorschlag mit sql_abfrage nachschlagen,
   statt sie zu raten.
-- Führe lieber mehrere kleine Abfragen aus als eine riesige. Ergebnisse werden bei ${MAX_ROWS} Zeilen gekappt — nutze aggregierende Abfragen und LIMIT.
+- Führe lieber mehrere kleine Abfragen aus als eine riesige. Ergebnisse werden bei ${MAX_ROWS} Zeilen gekappt, sehr große Antworten zusätzlich gekürzt — nutze aggregierende Abfragen, LIMIT und schmale Spaltenlisten.
 - Nutze die dokumentierten Hilfsfunktionen (on_hand_qty, variant_display_name, sales_order_total, …) statt Bestände selbst zusammenzurechnen.
 - Runde Geldwerte auf 2 Nachkommastellen; nenne die Kostenbasis, wenn du Werte bewertest.
 - Wenn eine Frage nicht aus den Daten beantwortbar ist, sage das ehrlich.
@@ -136,12 +136,38 @@ export async function runAgent(
     content: t.text,
   }))
 
+  // Prompt-Caching, zwei Anker: ein fester auf dem Systemprompt (deckt als
+  // Präfix auch die Werkzeug-Definitionen ab) und ein wandernder auf der
+  // jeweils letzten Nachricht — jede Folgerunde liest damit Schema-Doku,
+  // Verlauf und alle bisherigen SQL-Ergebnisse aus dem Cache (10 % des
+  // Eingabepreises), statt sie voll neu zu bezahlen. Der wandernde Anker
+  // wird je Runde umgehängt (Obergrenze: 4 Cache-Marken je Anfrage).
+  const CACHE: Anthropic.Messages.CacheControlEphemeral = { type: 'ephemeral' }
+  let cacheAnker: { cache_control?: Anthropic.Messages.CacheControlEphemeral | null } | null = null
+  const ankerUmhaengen = () => {
+    if (cacheAnker) delete cacheAnker.cache_control
+    cacheAnker = null
+    const letzte = messages.at(-1)
+    if (!letzte) return
+    if (typeof letzte.content === 'string') {
+      letzte.content = [{ type: 'text', text: letzte.content }]
+    }
+    const block = letzte.content.at(-1)
+    if (!block || typeof block === 'string') return
+    // Der Anker liegt immer auf der letzten Benutzer-Nachricht (Frage oder
+    // Tool-Ergebnis) — Denk-Blöcke des Assistenten tragen keinen Cache-Marker.
+    if (block.type !== 'text' && block.type !== 'tool_result') return
+    block.cache_control = CACHE
+    cacheAnker = block
+  }
+
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    ankerUmhaengen()
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      system: systemPrompt(rechte.finanzen, kontext),
+      system: [{ type: 'text', text: systemPrompt(rechte.finanzen, kontext), cache_control: CACHE }],
       tools: werkzeuge(rechte.admin ?? false),
       messages,
     })
@@ -265,13 +291,7 @@ export async function runAgent(
         query,
         rechte.finanzen ? undefined : FINANZ_SPERRE,
       )
-      const content = ergebnis.error
-        ? `Fehler: ${ergebnis.error}`
-        : JSON.stringify({
-            zeilen: ergebnis.rowCount,
-            ...(ergebnis.gekappt ? { hinweis: `auf ${MAX_ROWS} Zeilen gekappt` } : {}),
-            daten: ergebnis.rows,
-          })
+      const content = ergebnisFuerModell(ergebnis)
       results.push({
         type: 'tool_result',
         tool_use_id: block.id,

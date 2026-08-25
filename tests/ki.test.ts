@@ -1,6 +1,11 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { MAX_ROWS, runReadOnlyQuery } from '../src/modules/ki/sql-tool.ts'
+import {
+  MAX_ERGEBNIS_ZEICHEN,
+  MAX_ROWS,
+  ergebnisFuerModell,
+  runReadOnlyQuery,
+} from '../src/modules/ki/sql-tool.ts'
 import { produktAnlegen } from '../src/modules/ki/produkt-anlegen.ts'
 import { closeDb, db, withRollback } from './helpers.ts'
 
@@ -50,6 +55,30 @@ describe('KI: SQL-Werkzeug (Schutzmechanismen)', () => {
   test('Syntaxfehler kommen als Fehlermeldung zurück, nicht als Absturz', async () => {
     const result = await runReadOnlyQuery(db(), 'select kaputt from')
     assert.ok(result.error)
+  })
+
+  test('kleine Ergebnisse gehen unverändert ans Modell', () => {
+    const text = ergebnisFuerModell({ rows: [{ eins: 1 }], rowCount: 1 })
+    assert.deepEqual(JSON.parse(text), { zeilen: 1, daten: [{ eins: 1 }] })
+  })
+
+  test('sehr große Ergebnisse werden nach Zeichen gekürzt, mit Hinweis', () => {
+    // 500 breite Zeilen à ~400 Zeichen ≈ 200k Zeichen — real passiert mit
+    // den importierten Echtdaten (die 30-Euro-Auswertung).
+    const breit = Array.from({ length: MAX_ROWS }, (_, i) => ({
+      nr: i,
+      beschreibung: 'x'.repeat(400),
+    }))
+    const text = ergebnisFuerModell({ rows: breit, rowCount: MAX_ROWS, gekappt: false })
+    assert.ok(text.length <= MAX_ERGEBNIS_ZEICHEN, `zu groß: ${text.length}`)
+    const geparst = JSON.parse(text) as { zeilen: number; hinweis: string; daten: unknown[] }
+    assert.equal(geparst.zeilen, MAX_ROWS)
+    assert.ok(geparst.daten.length < MAX_ROWS)
+    assert.match(geparst.hinweis, /gekürzt|aggregieren/)
+  })
+
+  test('Fehler bleiben Fehlertext', () => {
+    assert.equal(ergebnisFuerModell({ error: 'kaputt' }), 'Fehler: kaputt')
   })
 })
 

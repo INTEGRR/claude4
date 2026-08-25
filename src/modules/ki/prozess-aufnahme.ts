@@ -143,7 +143,9 @@ export async function aufnahmeStrukturieren(
       antwort = await client.messages.create({
         model: MODELL,
         max_tokens: 8000,
-        system: aufnahmeSystem(),
+        // Prompt-Caching: derselbe Systemprompt über alle Korrekturrunden —
+        // ab der zweiten Runde nur noch Cache-Lesepreis.
+        system: [{ type: 'text', text: aufnahmeSystem(), cache_control: { type: 'ephemeral' } }],
         tools: [WERKZEUG],
         tool_choice: { type: 'tool', name: 'prozess_entwerfen' },
         messages,

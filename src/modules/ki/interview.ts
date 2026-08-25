@@ -93,7 +93,9 @@ export async function interviewRunde(
   const antwort = await client.messages.create({
     model: MODELL,
     max_tokens: 700,
-    system: interviewSystem(firma),
+    // Prompt-Caching: derselbe Systemprompt über alle Interviewrunden —
+    // ab der zweiten Runde nur noch Cache-Lesepreis.
+    system: [{ type: 'text', text: interviewSystem(firma), cache_control: { type: 'ephemeral' } }],
     tools: [WERKZEUG],
     tool_choice: { type: 'tool', name: 'naechste_frage' },
     messages: [

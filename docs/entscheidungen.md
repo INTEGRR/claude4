@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-25 — KI-Kosten: Prompt-Caching und Größenkappung statt Voll-Preis je Runde
+
+Vier Auswertungen über die frisch importierten Echtdaten kosteten ~30 €:
+Die API-Logs zeigten Anfragen, die Runde um Runde wuchsen (bis 110.000
+Eingabe-Tokens je Runde), weil der Agent je Runde den kompletten
+Systemprompt samt Schema-Doku UND den gesamten Verlauf inklusive aller
+bisherigen SQL-Ergebnisse voll bezahlt neu schickte — und ein einziges
+breites Abfrageergebnis den Verlauf dauerhaft aufblähte. Maßnahmen
+(docs/module/rollen-auswertungen-scanner-ki.md):
+
+- **Prompt-Caching** in `agent.ts` (fester Anker auf dem Systemprompt,
+  wandernder auf der letzten Nachricht) sowie auf den Systemprompts von
+  Interview und Prozess-Aufnahme — Folgerunden zahlen den Cache-Lesepreis
+  (10 %) statt des vollen Eingabepreises.
+- **Größenkappung** der SQL-Ergebnisse (`ergebnisFuerModell()`, 30.000
+  Zeichen) zusätzlich zur bestehenden 500-Zeilen-Grenze, mit Hinweis ans
+  Modell, zu aggregieren.
+- Die Modellwahl bleibt per `ANTHROPIC_MODEL` konfigurierbar — für reine
+  Datenfragen ist ein günstigeres Modell als Opus legitim; die
+  Entscheidung liegt beim Betreiber, nicht im Code.
+
 ## 2026-08-25 — Supabase-Data-API wird stillgelegt
 
 Der Security-Advisor des neuen Prod-Projekts meldete 101 Tabellen

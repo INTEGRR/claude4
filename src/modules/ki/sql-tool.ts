@@ -27,6 +27,40 @@ export interface SqlErgebnis {
   error?: string
 }
 
+/** Obergrenze für die Textgröße eines Tool-Ergebnisses (~8.000 Tokens). */
+export const MAX_ERGEBNIS_ZEICHEN = 30_000
+
+/**
+ * Serialisiert ein Abfrageergebnis für das Sprachmodell und kappt
+ * zusätzlich nach GRÖSSE: 500 schmale Zeilen sind harmlos, 500 breite
+ * Zeilen kosten schnell sechsstellige Tokenzahlen — und hängen danach in
+ * jeder Folgerunde des Agenten erneut im Kontext. Gekürzt wird
+ * zeilenweise mit Hinweis, damit das Modell aggregiert statt nachzuladen.
+ */
+export function ergebnisFuerModell(ergebnis: SqlErgebnis): string {
+  if (ergebnis.error) return `Fehler: ${ergebnis.error}`
+  let zeilen = ergebnis.rows ?? []
+  const bauen = (hinweis?: string) =>
+    JSON.stringify({
+      zeilen: ergebnis.rowCount,
+      ...(hinweis
+        ? { hinweis }
+        : ergebnis.gekappt
+          ? { hinweis: `auf ${MAX_ROWS} Zeilen gekappt` }
+          : {}),
+      daten: zeilen,
+    })
+  let text = bauen()
+  while (text.length > MAX_ERGEBNIS_ZEICHEN && zeilen.length > 1) {
+    zeilen = zeilen.slice(0, Math.max(1, Math.floor(zeilen.length / 2)))
+    text = bauen(
+      `Antwort zu groß — auf die ersten ${zeilen.length} von ${ergebnis.rowCount} Zeilen gekürzt. ` +
+        'Bitte aggregieren oder Spalten einschränken.',
+    )
+  }
+  return text
+}
+
 /** Führt eine Abfrage schreibgeschützt mit Timeout und Zeilenkappung aus. */
 export async function runReadOnlyQuery(
   client: Sql,

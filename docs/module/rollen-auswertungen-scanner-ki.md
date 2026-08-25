@@ -87,7 +87,24 @@ Drei Werkzeuge:
 
 **1. `sql_abfrage` — lesen.** Läuft in einer **Read-only-Transaktion**
   (Schreiben auf Datenbankebene ausgeschlossen) mit 10-Sekunden-Timeout und
-  Kappung bei 500 Zeilen (`src/modules/ki/sql-tool.ts`).
+  Kappung bei 500 Zeilen (`src/modules/ki/sql-tool.ts`). Zusätzlich kappt
+  `ergebnisFuerModell()` nach **Größe** (30.000 Zeichen ≈ 8.000 Tokens):
+  breite Ergebnisse werden zeilenweise gekürzt, mit Hinweis ans Modell,
+  zu aggregieren — sonst hängt ein Riesenergebnis in jeder Folgerunde
+  erneut im Kontext.
+
+### Kosten
+
+Der Agent nutzt **Prompt-Caching** (`cache_control: ephemeral`, zwei
+Anker in `agent.ts`): einen festen auf dem Systemprompt (deckt als Präfix
+auch die Werkzeug-Definitionen ab) und einen wandernden auf der jeweils
+letzten Nachricht. Jede Folgerunde liest Schema-Doku, Verlauf und alle
+bisherigen SQL-Ergebnisse zum Cache-Lesepreis (10 % des Eingabepreises)
+statt voll neu — bei bis zu 15 Runden je Frage der größte Kostenhebel.
+Interview und Prozess-Aufnahme cachen ihren Systemprompt genauso. Das
+Modell ist per `ANTHROPIC_MODEL` umstellbar (Standard: Opus; für reine
+Auswertungen reicht z. B. `claude-sonnet-5` zu deutlich geringerem
+Preis). Entscheidungslog 2026-08-25.
 
 **2. `diagramm` — zeigen.** Der Agent liefert eine schmale Beschreibung
   (`src/modules/ki/diagramm.ts`): Art (`saeulen`, `balken`, `anteile`), Titel,
