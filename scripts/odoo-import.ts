@@ -14,9 +14,14 @@ import './env.ts'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
 import { wartungsUrl } from './db-url.ts'
+import { datenTuev } from '../src/modules/lager/daten-tuev.ts'
 import {
   type Lauf,
+  phaseAbschluss,
   phaseBelege,
+  phaseBestand,
+  phaseBewertung,
+  phaseKosten,
   phaseProdukte,
   phaseRechnungen,
   phaseStammdaten,
@@ -30,6 +35,12 @@ const PHASEN: { name: string; fn: (lauf: Lauf) => Promise<void> }[] = [
   { name: 'produkte', fn: phaseProdukte },
   { name: 'belege', fn: phaseBelege },
   { name: 'rechnungen', fn: phaseRechnungen },
+  // Kosten ZWINGEND vor dem Bestand: move_done bewertet den Zugang sofort
+  // mit dem dann gültigen standard_cost.
+  { name: 'kosten', fn: phaseKosten },
+  { name: 'bestand', fn: phaseBestand },
+  { name: 'bewertung', fn: phaseBewertung },
+  { name: 'abschluss', fn: phaseAbschluss },
 ]
 
 function argument(name: string): string | null {
@@ -125,6 +136,17 @@ async function main() {
       }
       console.log('\n== Zählabgleich')
       console.log(await zaehlAbgleich(quelle, ziel))
+
+      // Harte Abnahme: die Ledger-Invarianten des Systems. Ein Befund heißt
+      // Korruption — der Lauf gilt als gescheitert (Exit ≠ 0).
+      console.log('\n== Daten-TÜV')
+      const tuev = await datenTuev(ziel)
+      for (const warnung of tuev.warnungen) console.log(`  ~ ${warnung}`)
+      if (tuev.befunde.length > 0) {
+        for (const befund of tuev.befunde) console.error(`  ✗ ${befund}`)
+        throw new Error(`Daten-TÜV: ${tuev.befunde.length} Befund(e) — Import nicht abnehmbar.`)
+      }
+      console.log(`  ${tuev.pruefungen} Prüfungen, keine Befunde.`)
     }
 
     if (warnungen.length > 0) {

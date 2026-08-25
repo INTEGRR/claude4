@@ -30,9 +30,11 @@ import {
   invoiceStatus,
   istShopifyRef,
   kgZuGramm,
+  kostenAuswahl,
   kundenGid,
   moState,
   nameTeilen,
+  nummernMaximum,
   purchaseState,
   repairState,
   saleState,
@@ -1489,4 +1491,174 @@ export async function phaseRechnungen(lauf: Lauf): Promise<void> {
     uebernommen++
   }
   lauf.meldung(`Eingangsrechnungen: ${uebernommen} von ${rechnungen.length} übernommen.`)
+}
+
+// --- Phase 5: Bestand -------------------------------------------------------
+
+/**
+ * Anfangsbestand über den einzigen legitimen Schreibweg: je Variante eine
+ * Inventurzählung auf WH/Stock (Odoos interne Orte konsolidiert) und
+ * `inventory_apply()` — das erzeugt den Move gegen die Inventurdifferenz
+ * und pflegt Quants über move_done. Idempotent: gezählt wird gegen den
+ * aktuellen KRNL-Bestand; stimmt er schon, passiert nichts.
+ */
+export async function phaseBestand(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+  const variantenKarte = await verweisKarte(ziel, 'product_product')
+  const [lagerort] = await ziel<{ id: string }[]>`
+    select id from stock_locations where full_path = 'WH/Stock'`
+
+  const bestaende = await quelle.bestandJeVariante(lauf.quelle)
+  let gebucht = 0
+  let unveraendert = 0
+  let negativ = 0
+  for (const bestand of bestaende) {
+    const variantId = variantenKarte.get(bestand.variant_id)
+    if (!variantId) {
+      warnen(lauf, `Bestand für Odoo-Variante ${bestand.variant_id}: keine Zuordnung — übersprungen.`)
+      continue
+    }
+    if (bestand.menge < 0) negativ++
+    const [aktuell] = await ziel<{ on_hand: number }[]>`
+      select coalesce((select on_hand from stock_quants
+                       where location_id = ${lagerort.id} and variant_id = ${variantId}), 0) as on_hand`
+    if (Math.abs(Number(aktuell.on_hand) - bestand.menge) < 0.0001) {
+      unveraendert++
+      continue
+    }
+    const [zaehlung] = await ziel<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+      values (${lagerort.id}, ${variantId}, ${bestand.menge}, ${Number(aktuell.on_hand)},
+              ${`Odoo-Übernahme (${lauf.label})`})
+      returning id`
+    await ziel`select inventory_apply(${zaehlung.id}, 'odoo-import')`
+    gebucht++
+  }
+  if (negativ > 0) {
+    warnen(lauf, `${negativ} Varianten mit negativem Odoo-Bestand übernommen — vor dem Stichtag in Odoo per Inventur bereinigen.`)
+  }
+  lauf.meldung(
+    `Bestand: ${gebucht} Varianten gebucht, ${unveraendert} unverändert (von ${bestaende.length} mit Odoo-Bestand).`,
+  )
+}
+
+// --- Phase 6a: Kosten (MUSS vor dem Bestand laufen) -------------------------
+
+/**
+ * Odoo fährt Standardpreis-Bewertung und pflegt sie lückenhaft — die
+ * Kosten kommen über die Fallback-Kette (Layer-Restwert → standard_price →
+ * jüngster EUR-Lieferantenpreis → 0 + Warnung) an die Vorlage. Zwingend
+ * VOR Phase „bestand": inventory_apply → move_done bewertet den Zugang
+ * sofort mit dem dann gültigen standard_cost — ein nachträglicher
+ * valuation_initialize() bewertet nur unbewertete Mengen, keine 0-Werte um.
+ */
+export async function phaseKosten(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+  const templateKarte = await verweisKarte(ziel, 'product_template')
+  const layerKosten = new Map(
+    (await quelle.layerKostenJeTemplate(lauf.quelle)).map((k) => [k.template_id, k]),
+  )
+  const templates = await quelle.templates(lauf.quelle)
+  const lieferantenpreise = await quelle.lieferantenpreise(lauf.quelle)
+  const varianten = await quelle.varianten(lauf.quelle)
+
+  // Jüngster EUR-Preis je Vorlage als letzte Kostenquelle.
+  const eurPreis = new Map<number, number>()
+  for (const preis of lieferantenpreise) {
+    if (preis.waehrung && preis.waehrung !== 'EUR') continue
+    if (!eurPreis.has(preis.template_id)) eurPreis.set(preis.template_id, preis.price)
+  }
+  // Erster gepflegter Odoo-Standardpreis je Vorlage.
+  const standardPreis = new Map<number, number>()
+  for (const variante of varianten) {
+    const wert = firmenwert(variante.standard_price)
+    if (wert && !standardPreis.has(variante.template_id)) {
+      standardPreis.set(variante.template_id, wert)
+    }
+  }
+
+  let ohneKosten = 0
+  for (const template of templates) {
+    const krnlId = templateKarte.get(template.id)
+    if (!krnlId) continue
+    if (!template.is_storable) continue // Dienstleistungen tragen keinen Bestandswert
+    const auswahl = kostenAuswahl({
+      layer: layerKosten.get(template.id)?.stueckkosten ?? null,
+      standardPreis: standardPreis.get(template.id) ?? null,
+      lieferant: eurPreis.get(template.id) ?? null,
+    })
+    if (auswahl.quelle === 'keine') {
+      ohneKosten++
+      warnen(lauf, `Produkt „${uebersetzung(template.name, String(template.id))}": keine Kostenquelle — standard_cost bleibt 0, Bestandswert fehlt.`)
+    }
+    await ziel`update product_templates set standard_cost = ${auswahl.wert} where id = ${krnlId}`
+  }
+  lauf.meldung(
+    `Kosten: standard_cost für ${templates.length} Vorlagen gesetzt` +
+      `${ohneKosten > 0 ? ` (${ohneKosten} ohne Kostenquelle → 0)` : ''}.`,
+  )
+}
+
+// --- Phase 6b: Bewertung ----------------------------------------------------
+
+/**
+ * `valuation_initialize()` bewertet, was Phase „bestand" noch unbewertet
+ * gelassen hat (idempotent — bereits bewertete Mengen bleiben unangetastet),
+ * danach der Wertabgleich gegen Odoos Schichten-Restwert.
+ */
+export async function phaseBewertung(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+  await ziel`select valuation_initialize(null, 'odoo-import')`
+
+  const zielWert = await ziel<{ summe: number }[]>`
+    select round(coalesce(sum(value), 0)::numeric, 2) as summe from stock_valuation_layers`
+  const quellWert = await quelle.bestandswertGesamt(lauf.quelle)
+  lauf.meldung(
+    `Bewertung: KRNL-Bestandswert ${Number(zielWert[0].summe).toFixed(2)} EUR ` +
+      `(Odoo-Restwert ${quellWert.toFixed(2)} EUR; Differenzen entstehen aus der ` +
+      'Kosten-Fallback-Kette).',
+  )
+}
+
+// --- Phase 8: Abschluss -----------------------------------------------------
+
+/**
+ * Nummernkreise über das Maximum der übernommenen Belegnummern ziehen
+ * (`sequences.next_number` — der 0026-Trigger hält die PG-Sequenz synchron),
+ * MO-Kreis auf das gewohnte WH/MO/-Bild angleichen, Analytik auffrischen.
+ * Der Daten-TÜV läuft danach im CLI als harte Abnahme.
+ */
+export async function phaseAbschluss(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+
+  const kreise: { code: string; praefix: string; tabelle: string }[] = [
+    { code: 'sale', praefix: 'S', tabelle: 'sales_orders' },
+    { code: 'purchase', praefix: 'P', tabelle: 'purchase_orders' },
+    { code: 'mo', praefix: 'WH/MO/', tabelle: 'manufacturing_orders' },
+  ]
+  // Das gewohnte Nummernbild der Fertigung bleibt WH/MO/ (Entscheidungslog).
+  await ziel`update sequences set prefix = 'WH/MO/' where code = 'mo'`
+  for (const kreis of kreise) {
+    const nummern = (
+      await ziel<{ number: string }[]>`
+        select number from ${ziel.unsafe(kreis.tabelle)}`
+    ).map((z) => z.number)
+    const maximum = nummernMaximum(nummern, kreis.praefix)
+    if (maximum > 0) {
+      await ziel`update sequences set next_number = ${maximum + 1} where code = ${kreis.code}`
+      lauf.meldung(`Nummernkreis ${kreis.code}: weiter bei ${kreis.praefix}${String(maximum + 1).padStart(5, '0')}.`)
+    }
+  }
+
+  // Beim Erstimport hängt keine Variante an Shopify — falls der Statement-
+  // Trigger auf einem Wiederholungslauf doch Jobs eingereiht hat, weg damit
+  // (der Abgleich läuft nach der Shopify-Kopplung ohnehin frisch).
+  const geloescht = await ziel`
+    delete from integration_jobs where status = 'pending' and kind = 'shopify_inventory_push'`
+  if (geloescht.count > 0) {
+    lauf.meldung(`${geloescht.count} wartende Inventar-Abgleich-Jobs entfernt.`)
+  }
+
+  await ziel`select refresh_analytics()`
+  lauf.meldung('Kennzahlen aufgefrischt.')
 }

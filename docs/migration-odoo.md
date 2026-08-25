@@ -87,8 +87,8 @@ Ende zurück; der Report wird vorher erhoben und trotzdem ausgegeben.
 | 2 | Produkte | Attribute → Vorlagen → `generate_variants()` → Varianten-Matching über Attributwertmengen → SKU/Barcode, Lieferantenpreise, Stücklisten, Arbeitsplätze, Meldebestände. |
 | 3 | Belege flach | Abgeschlossene Historie **im Endzustand, ohne Pickings/Moves**, Rückschreibefelder (`qty_delivered` …) direkt gesetzt, Original-Belegnummern. Offene Belege nur als Entwurf. |
 | 4 | Eingangsrechnungen | Die 4 `in_invoice` flach nach `vendor_bills`. |
-| 5 | Bestand | Je Variante Σ interner Odoo-Bestand → `inventory_counts` → `inventory_apply()` (der einzige legitime Bestands-Schreibweg). |
-| 6 | Bewertung | `standard_cost` über Fallback-Kette (Layer-Restwert → standard_price → Lieferantenpreis → 0 + Warnung), dann `valuation_initialize(null, 'odoo-import')`. |
+| 5 | Kosten | `standard_cost` je Vorlage über die Fallback-Kette (Layer-Restwert → standard_price → jüngster EUR-Lieferantenpreis → 0 + Warnung). **Zwingend vor dem Bestand**: `move_done` bewertet den Zugang sofort mit dem dann gültigen Satz. |
+| 6 | Bestand + Bewertung | Je Variante Σ interner Odoo-Bestand → `inventory_counts` → `inventory_apply()` (der einzige legitime Bestands-Schreibweg; idempotent gegen den Ist-Bestand), dann `valuation_initialize(null, 'odoo-import')` für Unbewertetes. Der KRNL-Bestandswert liegt ÜBER dem Odoo-Restwert: Odoo hatte durch das lückenhaft gepflegte Standardpreis-Verfahren große Bestände mit 0-Bewertung — KRNL bewertet konsistent. |
 | 7 | Offene durchbuchen | `confirm_purchase_order` / `confirm_sales_order` / `mo_confirm` / `repair_confirm` — es entstehen echte Lieferungen, Reservierungen und MTO-Fertigungsaufträge. |
 | 8 | Abschluss | Nummernkreise über `sequences.next_number` hochziehen, MO-Präfix auf `WH/MO/`, `refresh_analytics()`, **`datenTuev()` als harte Abnahme** (Befund = Exit ≠ 0). |
 

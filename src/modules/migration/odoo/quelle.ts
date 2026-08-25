@@ -715,3 +715,50 @@ export async function rechnungszeilen(sql: OdooSql): Promise<OdooRechnungszeile[
     where m.move_type = 'in_invoice' and l.display_type = 'product'
     order by l.move_id, l.id`
 }
+
+// --- Phasen 5–6: Bestand und Bewertung --------------------------------------
+
+export interface OdooBestand {
+  variant_id: number
+  /** Netto über ALLE internen Odoo-Orte (Input/Output/Packing konsolidiert). */
+  menge: number
+}
+
+export async function bestandJeVariante(sql: OdooSql): Promise<OdooBestand[]> {
+  return sql<OdooBestand[]>`
+    select q.product_id as variant_id, round(sum(q.quantity)::numeric, 3) as menge
+    from stock_quant q
+    join stock_location l on l.id = q.location_id
+    where l.usage = 'internal'
+    group by q.product_id
+    having abs(sum(q.quantity)) > 0.0001
+    order by q.product_id`
+}
+
+export interface OdooLayerKosten {
+  template_id: number
+  /** Bestandsgewichteter Restwert-Stückkostensatz über alle Varianten. */
+  stueckkosten: number | null
+  restwert: number
+}
+
+export async function layerKostenJeTemplate(sql: OdooSql): Promise<OdooLayerKosten[]> {
+  return sql<OdooLayerKosten[]>`
+    select p.product_tmpl_id as template_id,
+           case when sum(v.remaining_qty) > 0
+                then round((sum(v.remaining_value) / sum(v.remaining_qty))::numeric, 4)
+                else null end as stueckkosten,
+           round(coalesce(sum(v.remaining_value), 0)::numeric, 2) as restwert
+    from stock_valuation_layer v
+    join product_product p on p.id = v.product_id
+    group by p.product_tmpl_id
+    order by p.product_tmpl_id`
+}
+
+/** Gesamter Odoo-Bestandswert (Σ Restwerte) — die Zielgröße der Bewertung. */
+export async function bestandswertGesamt(sql: OdooSql): Promise<number> {
+  const [zeile] = await sql<{ summe: number }[]>`
+    select round(coalesce(sum(remaining_value), 0)::numeric, 2) as summe
+    from stock_valuation_layer`
+  return Number(zeile.summe)
+}
