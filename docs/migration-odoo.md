@@ -89,7 +89,7 @@ Ende zurück; der Report wird vorher erhoben und trotzdem ausgegeben.
 | 4 | Eingangsrechnungen | Die 4 `in_invoice` flach nach `vendor_bills`. |
 | 5 | Kosten | `standard_cost` je Vorlage über die Fallback-Kette (Layer-Restwert → standard_price → jüngster EUR-Lieferantenpreis → 0 + Warnung). **Zwingend vor dem Bestand**: `move_done` bewertet den Zugang sofort mit dem dann gültigen Satz. |
 | 6 | Bestand + Bewertung | Je Variante Σ interner Odoo-Bestand → `inventory_counts` → `inventory_apply()` (der einzige legitime Bestands-Schreibweg; idempotent gegen den Ist-Bestand), dann `valuation_initialize(null, 'odoo-import')` für Unbewertetes. Der KRNL-Bestandswert liegt ÜBER dem Odoo-Restwert: Odoo hatte durch das lückenhaft gepflegte Standardpreis-Verfahren große Bestände mit 0-Bewertung — KRNL bewertet konsistent. |
-| 7 | Offene durchbuchen | `confirm_purchase_order` / `confirm_sales_order` / `mo_confirm` / `repair_confirm` — es entstehen echte Lieferungen, Reservierungen und MTO-Fertigungsaufträge. |
+| 7 | Offene durchbuchen | In dieser Reihenfolge: offene Bestellungen (`confirm_purchase_order`, Zeilen vorher auf Restmenge gekürzt), offene Verkaufsaufträge (`confirm_sales_order` — erzeugt Lieferungen, Reservierungen und je MTO-Zeile einen Fertigungsauftrag), dann die offenen Odoo-MOs über den Auftragsbezug mit den auto-erzeugten verknüpfen (Rest per `create_manufacturing_order` + `mo_confirm`); **überzählige Auto-MTO-MOs werden per `mo_cancel` storniert** — Odoo ist die Wahrheit über offene Arbeit (Entscheidungslog 2026-08-25). Zuletzt offene Reparaturen (`repair_confirm`/`repair_start`). Jeder Beleg läuft in einem Savepoint — ein Einzelfehler bricht nicht die Phase. |
 | 8 | Abschluss | Nummernkreise über `sequences.next_number` hochziehen, MO-Präfix auf `WH/MO/`, `refresh_analytics()`, **`datenTuev()` als harte Abnahme** (Befund = Exit ≠ 0). |
 
 ### Zustands-Mapping und Klassifikation
@@ -132,30 +132,112 @@ Reservierungen und Folgebelege stimmen.
 
 ## Verifikation
 
-Nach jedem Lauf (auch Dry-Run) erzeugt `verifikation.ts` einen Report:
-Zählabgleich je Entität und Zustand, Bestandsmenge und -wert je Variante
-Odoo ↔ KRNL, offene Auftrags-/Bestellmengen, Umsatz je Monat als
-Plausibilitätskurve, Liste „bewusst ausgelassen". Harte Abnahme ist
-`datenTuev()` (Ledger-Invarianten). Probelauf-Choreografie lokal:
-`db:reset` → `db:migrate` → `db:seed` → Import `--dry-run` → echter Lauf →
-Report → zweiter Lauf (No-Op-Beweis) → erst dann Prod.
+Nach jedem Lauf (auch Dry-Run, vor dem Rollback) erzeugt `verifikation.ts`
+einen Report — nach einem **vollständigen** Lauf müssen ALLE Zeilen `ok`
+zeigen und die Schlusszeile „alle Zählungen stimmen" lauten:
+
+- **Zählabgleich** je Entität (Partner, Vorlagen, Varianten,
+  Lieferantenpreise, Stücklisten, Meldebestände, Verkaufsaufträge +
+  Zeilen, Bestellungen, Fertigungsaufträge, Reparaturen mit Produkt,
+  Eingangsrechnungen) — Quelle zählt Odoo-Zeilen, Ziel die
+  `odoo_verweise`-Zuordnungen.
+- **Bestand: Varianten mit Abweichung** — Σ interner Odoo-Quants je
+  Variante gegen KRNL-`on_hand` (nur interne/Transit-Orte, Toleranz
+  0,0001). Muss 0/0 sein.
+- **Offene Liefermenge** — Σ `qty − qty_delivered` bestätigter Aufträge
+  beidseitig; beweist, dass Phase 7 exakt die noch offene Arbeit
+  hinterlassen hat.
+- **Netto-Auftragssumme (EUR)** — Substanzprobe auf den Cent: die
+  Zählungen können stimmen und die Beträge trotzdem falsch sein.
+
+Der **Bestandswert** steht als Meldung in Phase „bewertung": der
+KRNL-Wert liegt ÜBER dem Odoo-Restwert (Referenzlauf: 72.022,83 € zu
+55.004,54 €) — das ist korrekt, Odoo hatte durch das lückenhaft gepflegte
+Standardpreis-Verfahren große Bestände mit 0-Bewertung, KRNL bewertet
+konsistent (siehe Phasen-Tabelle).
+
+Harte Abnahme ist `datenTuev()` (Ledger-Invarianten) direkt im
+Importskript — jeder Befund heißt Exit ≠ 0, der Lauf gilt als
+gescheitert.
+
+### Probelauf-Choreografie (lokal, vor jedem Prod-Gedanken)
+
+```bash
+npm run db:reset && npm run db:migrate && npm run db:seed   # frisches Ziel ohne Demo
+ODOO_QUELLE_URL=postgres://erp:erp@127.0.0.1:5433/odoo_quelle \
+  npm run odoo:import -- --dry-run                          # Generalprobe, rollt zurück
+ODOO_QUELLE_URL=… npm run odoo:import -- --lauf=probe-1     # echter Lauf
+ODOO_QUELLE_URL=… npm run odoo:import -- --lauf=probe-2     # No-Op-Beweis
+```
+
+Der zweite Lauf muss in Phase 7 durchgehend „0" melden (nichts erneut
+bestätigt) und denselben grünen Report liefern — erst dann ist der
+Importer für den Stichtag freigegeben. Achtung: `npm run check` erwartet
+eine frische DB (Seed-Schichtvorlagen, Sprach-Fixtures) — nach einem
+Probelauf für die Test-Suite erst `db:reset`/`db:seed` fahren, danach den
+Import bei Bedarf neu einspielen.
+
+### Warnungen lesen
+
+Der Lauf endet mit einer Warnliste (Referenzlauf: 25 Stück). Sie ist
+Dokumentation, kein Fehler — jede Zeile gehört vor dem finalen Lauf einmal
+gelesen und eingeordnet:
+
+- **erwartet und in Odoo unheilbar** (Reparaturen ohne Produktangabe,
+  leerer Rechnungsentwurf, Aufträge ohne Lieferstatus, Shopify-Kunden an
+  mehreren Odoo-Partnern, Mehrraten-Zahlungsbedingung): zur Kenntnis
+  nehmen.
+- **in Odoo heilbar** (Produkte ohne Kostenquelle → `standard_cost` 0,
+  negative Bestände): nach Möglichkeit VOR dem Stichtag in Odoo pflegen
+  (Standardpreis setzen, Inventur) — dann verschwinden sie im finalen
+  Lauf von selbst.
+- **neue, unbekannte Warnungen** im finalen Lauf: stoppen und klären,
+  bevor Shopify angekoppelt wird.
 
 ## Cutover-Runbook (Stichtag)
 
-Wird mit dem letzten Arbeitspaket der Umsetzung vervollständigt. Gerüst:
+Voraussetzung: die Probelauf-Choreografie oben ist lokal grün
+durchgelaufen (inklusive No-Op-Beweis). Der finale Lauf ist **immer ein
+kompletter Neulauf auf leergeräumter Prod** — kein Delta-Lauf (Begründung:
+Entscheidungslog 2026-08-25, Phase 7).
 
-1. Odoo einfrieren (Benutzer sperren, Shopify-Odoo-Anbindung deaktivieren;
-   der Shop läuft weiter — Bestellungen der Zwischenzeit holt später der
-   KRNL-Backfill).
-2. Frischen Dump ziehen, Staging neu laden (`dropdb` → `createdb` → `psql`).
-3. Supabase-Backup/PITR-Punkt setzen (Rollback-Pfad).
-4. KRNL-Prod leerräumen (`demodaten_loeschen()` — erhält Konfiguration,
-   Benutzer und Prozesse; räumt auch `odoo_verweise`). **Achtung:** Die
-   Schichtvorlagen (FRUEH/SPAET/…, Seeds aus 0022) stehen nicht in der
-   Behalten-Liste und werden mit abgeräumt — nach dem Leerräumen unter
-   Personal → Schichten neu anlegen, falls gebraucht.
-5. Import gegen Prod (`DIRECT_URL`), Shopify-Umgebungsvariablen ungesetzt.
-6. Report + `datenTuev()` grün — sonst Restore.
-7. Shopify-Kopplung: zuerst Produkt-Import (SKU-Match setzt
-   `shopify_variant_id`), dann Webhooks; Order-Backfill nur ab Stichtag.
-8. Benutzerkonten anlegen, Odoo auf lesend/Archiv.
+1. **Odoo einfrieren**: Benutzer sperren, Shopify-Odoo-Anbindung
+   deaktivieren. Der Shop läuft weiter — Bestellungen der Zwischenzeit
+   holt später der KRNL-Backfill (Schritt 7).
+2. **Frischen Dump ziehen** (Odoo.sh → Backups → Download, Variante ohne
+   Filestore genügt) und Staging neu laden:
+   ```bash
+   dropdb -h 127.0.0.1 -p 5433 -U erp odoo_quelle
+   createdb -h 127.0.0.1 -p 5433 -U erp odoo_quelle
+   psql -h 127.0.0.1 -p 5433 -U erp -d odoo_quelle -q -v ON_ERROR_STOP=0 -f dump.sql
+   ```
+3. **Rollback-Pfad sichern**: Supabase-Backup bzw. PITR-Punkt notieren.
+4. **KRNL-Prod leerräumen**: Einstellungen → Demodaten löschen
+   (`demodaten_loeschen()` — erhält Konfiguration, Benutzer und Prozesse;
+   räumt auch `odoo_verweise`, gewollt). **Achtung:** Die Schichtvorlagen
+   (FRUEH/SPAET/…, Seeds aus 0022) stehen nicht in der Behalten-Liste und
+   werden mit abgeräumt — nach dem Leerräumen unter Personal → Schichten
+   neu anlegen, falls gebraucht.
+5. **Import gegen Prod**: `DIRECT_URL` auf die Supabase-Session-Verbindung
+   (Port 5432, nicht der Transaction-Pooler), `SHOPIFY_*`-Variablen
+   ungesetzt lassen:
+   ```bash
+   ODOO_QUELLE_URL=postgres://erp:erp@127.0.0.1:5433/odoo_quelle \
+   DIRECT_URL=postgres://…@…supabase.com:5432/postgres \
+     npm run odoo:import -- --lauf=cutover-JJJJ-MM-TT
+   ```
+   Erst `--dry-run`, dann der echte Lauf. Bricht eine Phase ab: Ursache
+   klären, Lauf einfach wiederholen (die Phasen sind idempotent).
+6. **Abnahme**: Report „alle Zählungen stimmen" + Daten-TÜV ohne Befunde +
+   Warnliste gegen die Referenzliste geprüft (siehe „Warnungen lesen").
+   Sonst: Supabase-Restore auf den PITR-Punkt aus Schritt 3.
+7. **Shopify-Kopplung**: ZUERST der Produkt-Import (SKU-Match setzt
+   `shopify_variant_id` an den Bestandsdaten), dann Webhooks aktivieren;
+   Order-Backfill nur für den Zeitraum ab Stichtag — ältere Bestellungen
+   sind bereits über die Odoo-Übernahme da (GID-Dedupe greift).
+   Danach `integration_jobs` prüfen: der Import löscht wartende
+   Inventar-Push-Jobs, neue entstehen erst durch echte Bewegungen.
+8. **Betrieb**: Benutzerkonten anlegen (Odoo-Konten werden nicht
+   migriert), Nummernkreise stichprobenartig prüfen (nächster Auftrag muss
+   nahtlos hinter der letzten Odoo-Nummer weiterzählen), Odoo auf
+   lesend/Archiv stellen.

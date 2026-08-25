@@ -1662,3 +1662,212 @@ export async function phaseAbschluss(lauf: Lauf): Promise<void> {
   await ziel`select refresh_analytics()`
   lauf.meldung('Kennzahlen aufgefrischt.')
 }
+
+// --- Phase 7: Offene Belege durchbuchen -------------------------------------
+
+/**
+ * Was am Stichtag offen war, läuft durch die ECHTEN Buchungsfunktionen —
+ * nur so entstehen Lieferungen, Reservierungen und MTO-Fertigungsaufträge.
+ * Läuft NACH Bestand/Bewertung (confirm_sales_order reserviert gegen den
+ * Bestand). Je Beleg ein Savepoint: ein einzelner kaputter Beleg landet
+ * auf der Warnliste, statt die Phase zu reißen.
+ */
+async function geschuetzt(ziel: Ziel, fn: () => Promise<void>): Promise<string | null> {
+  const transaktion = ziel as TransactionSql
+  try {
+    if (typeof transaktion.savepoint === 'function') {
+      await transaktion.savepoint(() => fn())
+    } else {
+      await fn()
+    }
+    return null
+  } catch (fehler) {
+    return fehler instanceof Error ? fehler.message : String(fehler)
+  }
+}
+
+export async function phaseOffene(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+
+  // -- Offene Bestellungen: Restmengen kürzen, dann bestätigen -----------------
+  const bestellungen = await quelle.bestellungen(lauf.quelle)
+  const bestellzeilen = await quelle.bestellzeilen(lauf.quelle)
+  const poKarte = await verweisKarte(ziel, 'purchase_order')
+  const poZeilenKarte = await verweisKarte(ziel, 'purchase_order_line')
+  let poBestaetigt = 0
+  for (const bestellung of bestellungen) {
+    if (bestellung.state !== 'purchase' && bestellung.state !== 'done') continue
+    if (bestellung.voll_empfangen) continue
+    const krnlId = poKarte.get(bestellung.id)
+    if (!krnlId) continue
+    const [bestand] = await ziel<{ state: string }[]>`
+      select state from purchase_orders where id = ${krnlId}`
+    if (!bestand || bestand.state !== 'draft') continue // schon bestätigt (Wiederholungslauf)
+
+    const fehler = await geschuetzt(ziel, async () => {
+      // Bereits empfangene Mengen stecken im Phase-5-Bestand — der offene
+      // Beleg bestellt nur noch den Rest, sonst zählt der Zulauf doppelt.
+      for (const zeile of bestellzeilen.filter((z) => z.order_id === bestellung.id)) {
+        const krnlZeile = poZeilenKarte.get(zeile.id)
+        if (!krnlZeile) continue
+        const rest = zeile.qty - zeile.qty_received
+        if (rest <= 0) {
+          await ziel`delete from purchase_order_lines where id = ${krnlZeile}`
+        } else if (zeile.qty_received > 0) {
+          await ziel`update purchase_order_lines set qty = ${rest} where id = ${krnlZeile}`
+          warnen(
+            lauf,
+            `Bestellung ${bestellung.name}: Zeile auf Restmenge ${rest} gekürzt (${zeile.qty_received} von ${zeile.qty} waren in Odoo schon empfangen).`,
+          )
+        }
+      }
+      await ziel`select confirm_purchase_order(${krnlId}, 'odoo-import')`
+      await ziel`update purchase_orders
+        set confirmed_at = ${bestellung.date_approve ?? bestellung.date_order}
+        where id = ${krnlId}`
+    })
+    if (fehler) warnen(lauf, `Bestellung ${bestellung.name} nicht bestätigt: ${fehler}`)
+    else poBestaetigt++
+  }
+  lauf.meldung(`Offene Bestellungen bestätigt: ${poBestaetigt}.`)
+
+  // -- Offene Verkaufsaufträge -------------------------------------------------
+  const auftraege = await quelle.verkaufsauftraege(lauf.quelle)
+  const soKarte = await verweisKarte(ziel, 'sale_order')
+  let soBestaetigt = 0
+  for (const auftrag of auftraege) {
+    if (auftrag.state !== 'sale' || auftrag.delivery_status !== 'pending') continue
+    const krnlId = soKarte.get(auftrag.id)
+    if (!krnlId) continue
+    const [bestand] = await ziel<{ state: string }[]>`
+      select state from sales_orders where id = ${krnlId}`
+    if (!bestand || bestand.state !== 'draft') continue
+
+    const fehler = await geschuetzt(ziel, async () => {
+      await ziel`select confirm_sales_order(${krnlId}, 'odoo-import')`
+      // Die Funktion stempelt „jetzt" — der Beleg trägt die Odoo-Zeiten.
+      await ziel`update sales_orders
+        set order_date = ${auftrag.date_order ?? auftrag.create_date},
+            confirmed_at = ${auftrag.date_order ?? auftrag.create_date}
+        where id = ${krnlId}`
+    })
+    if (fehler) warnen(lauf, `Auftrag ${auftrag.name} nicht bestätigt: ${fehler}`)
+    else soBestaetigt++
+  }
+  lauf.meldung(`Offene Verkaufsaufträge bestätigt: ${soBestaetigt} (Lieferungen + MTO-Fertigung entstehen dabei).`)
+
+  // -- Offene Fertigungsaufträge -----------------------------------------------
+  const fertigungen = await quelle.fertigungsauftraege(lauf.quelle)
+  const variantenKarte = await verweisKarte(ziel, 'product_product')
+  const moKarte = await verweisKarte(ziel, 'mrp_production')
+  const soNachName = new Map(
+    (
+      await ziel<{ id: string; number: string }[]>`
+        select s.id, s.number from sales_orders s
+        where exists (select 1 from odoo_verweise v
+                      where v.krnl_tabelle = 'sales_orders' and v.krnl_id = s.id)`
+    ).map((s) => [s.number, s.id]),
+  )
+  let moVerknuepft = 0
+  let moAngelegt = 0
+  for (const mo of fertigungen) {
+    if (mo.state === 'done' || mo.state === 'cancel') continue
+    if (moKarte.has(mo.id)) continue // Wiederholungslauf
+    const soId = mo.origin ? (soNachName.get(mo.origin) ?? null) : null
+
+    // confirm_sales_order hat für MTO-Aufträge schon MOs erzeugt — die
+    // Odoo-MO wird dann verknüpft statt doppelt angelegt.
+    if (soId) {
+      const [autoMo] = await ziel<{ id: string }[]>`
+        select id from manufacturing_orders
+        where sales_order_id = ${soId} and state in ('draft', 'confirmed')
+          and not exists (select 1 from odoo_verweise v
+                          where v.krnl_tabelle = 'manufacturing_orders' and v.krnl_id = manufacturing_orders.id)
+        order by created_at limit 1`
+      if (autoMo) {
+        await ziel`update manufacturing_orders
+          set note = ${`Odoo: ${mo.name}`}, scheduled_date = ${mo.date_deadline ?? mo.date_start}
+          where id = ${autoMo.id}`
+        await merken(lauf, 'mrp_production', mo.id, 'manufacturing_orders', autoMo.id)
+        moVerknuepft++
+        continue
+      }
+    }
+
+    const variantId = variantenKarte.get(mo.variant_id)
+    if (!variantId) {
+      warnen(lauf, `Offene Fertigung ${mo.name}: Variante fehlt — übersprungen.`)
+      continue
+    }
+    const fehler = await geschuetzt(ziel, async () => {
+      const [neu] = await ziel<{ id: string }[]>`
+        select create_manufacturing_order(${variantId}, ${mo.qty > 0 ? mo.qty : 1},
+          ${soId}, ${mo.date_deadline ?? mo.date_start}, 'odoo-import') as id`
+      await ziel`select mo_confirm(${neu.id})`
+      await ziel`update manufacturing_orders set note = ${`Odoo: ${mo.name}`} where id = ${neu.id}`
+      await merken(lauf, 'mrp_production', mo.id, 'manufacturing_orders', neu.id)
+    })
+    if (fehler) warnen(lauf, `Offene Fertigung ${mo.name} nicht angelegt: ${fehler}`)
+    else moAngelegt++
+  }
+  lauf.meldung(`Offene Fertigung: ${moVerknuepft} mit MTO-Aufträgen verknüpft, ${moAngelegt} neu angelegt.`)
+
+  // confirm_sales_order legt für JEDE MTO-Zeile einen Fertigungsauftrag an —
+  // in Odoo existierten aber nur die 12 offenen (der Rest wird ab Lager
+  // bedient). Odoo ist die Wahrheit über offene Arbeit: überzählige
+  // Auto-MOs ohne Odoo-Gegenstück werden storniert.
+  const ueberzaehlige = await ziel<{ id: string; number: string }[]>`
+    select id, number from manufacturing_orders m
+    where m.state in ('draft', 'confirmed')
+      and not exists (select 1 from odoo_verweise v
+                      where v.krnl_tabelle = 'manufacturing_orders' and v.krnl_id = m.id)`
+  for (const mo of ueberzaehlige) {
+    const fehler = await geschuetzt(ziel, async () => {
+      await ziel`select mo_cancel(${mo.id}, 'odoo-import')`
+      await ziel`update manufacturing_orders
+        set note = 'Odoo-Übernahme: in Odoo war hierfür kein Fertigungsauftrag offen — Bedarf wird ab Lager bedient.'
+        where id = ${mo.id}`
+    })
+    if (fehler) warnen(lauf, `Auto-Fertigungsauftrag ${mo.number} nicht storniert: ${fehler}`)
+  }
+  if (ueberzaehlige.length > 0) {
+    lauf.meldung(`${ueberzaehlige.length} automatisch entstandene MTO-Fertigungsaufträge ohne Odoo-Gegenstück storniert.`)
+  }
+
+  // -- Offene Reparaturen ------------------------------------------------------
+  const reparaturen = await quelle.reparaturen(lauf.quelle)
+  const partnerKarte = await verweisKarte(ziel, 'res_partner')
+  const repKarte = await verweisKarte(ziel, 'repair_order')
+  let repAngelegt = 0
+  for (const rep of reparaturen) {
+    if (rep.state === 'done' || rep.state === 'cancel') continue
+    if (repKarte.has(rep.id)) continue
+    const partnerId = rep.partner_id ? partnerKarte.get(rep.partner_id) : undefined
+    const variantId = rep.variant_id ? variantenKarte.get(rep.variant_id) : undefined
+    if (!partnerId || !variantId) {
+      warnen(
+        lauf,
+        `Offene Reparatur ${rep.name}: ${variantId ? 'Partner' : 'keine Produktangabe in Odoo'} — nicht abbildbar, übersprungen.`,
+      )
+      continue
+    }
+    const fehler = await geschuetzt(ziel, async () => {
+      const [neu] = await ziel<{ id: string }[]>`
+        insert into repair_orders (number, partner_id, variant_id, qty, under_warranty,
+          state, scheduled_date, created_at)
+        values (${rep.name}, ${partnerId}, ${variantId}, ${rep.qty}, ${rep.under_warranty},
+          'new', ${rep.schedule_date}, ${rep.create_date})
+        returning id`
+      if (rep.state === 'confirmed' || rep.state === 'under_repair') {
+        await ziel`select repair_confirm(${neu.id}, 'odoo-import')`
+        if (rep.state === 'under_repair') {
+          await ziel`select repair_start(${neu.id}, 'odoo-import')`
+        }
+      }
+      await merken(lauf, 'repair_order', rep.id, 'repair_orders', neu.id)
+    })
+    if (fehler) warnen(lauf, `Offene Reparatur ${rep.name} nicht angelegt: ${fehler}`)
+    else repAngelegt++
+  }
+  lauf.meldung(`Offene Reparaturen angelegt: ${repAngelegt}.`)
+}

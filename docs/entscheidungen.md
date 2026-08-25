@@ -9,6 +9,22 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-25 — Odoo-Übernahme Phase 7: Odoo ist die Wahrheit über offene Arbeit
+
+Beim Durchbuchen der offenen Belege (Details in
+[migration-odoo.md](migration-odoo.md)) erzeugt `confirm_sales_order` je
+MTO-Zeile automatisch einen Fertigungsauftrag — nach 77 bestätigten
+Aufträgen standen 77 offene MOs im System, Odoo kannte aber nur 12: der
+Rest war dort längst ab Lager bedient oder anders erledigt. Entscheidung:
+**Odoo ist die Wahrheit über offene Arbeit.** Die auto-erzeugten MOs werden
+über den Verkaufsauftrags-Bezug mit den 12 echten offenen Odoo-MOs
+verknüpft (Odoo-Nummer in der Notiz); überzählige storniert der Importer
+per `mo_cancel` mit Begründungs-Notiz — nicht löschen, der Beleg bleibt
+nachvollziehbar. Zweite Konsequenz derselben Probe: der finale Lauf ist
+**immer ein kompletter Neulauf auf leergeräumter Prod** — Bestand und
+Bewertung sind nur im Leerzustand exakt reproduzierbar, ein Delta-Lauf
+über bereits durchgebuchte offene Belege hätte keine saubere Semantik.
+
 ## 2026-08-25 — Odoo-Datenübernahme: Wartungsskript, flacher Historien-Schnitt, eigener Mapping-Anker
 
 ANVIL zieht mit ALLEN Daten von Odoo 18 (Odoo.sh) nach KRNL um — Odoo läuft

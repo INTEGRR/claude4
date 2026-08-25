@@ -22,6 +22,7 @@ import {
   phaseBestand,
   phaseBewertung,
   phaseKosten,
+  phaseOffene,
   phaseProdukte,
   phaseRechnungen,
   phaseStammdaten,
@@ -40,6 +41,8 @@ const PHASEN: { name: string; fn: (lauf: Lauf) => Promise<void> }[] = [
   { name: 'kosten', fn: phaseKosten },
   { name: 'bestand', fn: phaseBestand },
   { name: 'bewertung', fn: phaseBewertung },
+  // Nach Bestand/Bewertung: confirm_sales_order reserviert gegen den Bestand.
+  { name: 'offene', fn: phaseOffene },
   { name: 'abschluss', fn: phaseAbschluss },
 ]
 

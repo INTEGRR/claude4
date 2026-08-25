@@ -4,8 +4,9 @@
  * Import (auch im Dry-Run, vor dem Rollback) — der Report ist die erste
  * Abnahme, der Daten-TÜV (Ledger-Invarianten) die zweite.
  *
- * Wächst mit den Phasen: aktuell Stammdaten + Produkte; Belege, Bestand
- * und Werte kommen mit den Phasen 3–8 dazu.
+ * Deckt alle Phasen ab: Zählungen je Entität, Bestandsmenge je Variante,
+ * offene Liefermenge und die Netto-Auftragssumme als Substanzprobe. Nach
+ * einem vollständigen Lauf müssen alle Zeilen ohne Hinweis exakt aufgehen.
  */
 
 import type { Sql, TransactionSql } from 'postgres'
@@ -129,7 +130,7 @@ export async function zaehlAbgleich(quelle: OdooSql, ziel: Ziel): Promise<string
     name: 'Fertigungsaufträge',
     quelle: await zahl(
       quelle,
-      quelle<{ n: number }[]>`select count(*)::int as n from mrp_production where state in ('done', 'cancel')`,
+      quelle<{ n: number }[]>`select count(*)::int as n from mrp_production`,
     ),
     ziel: await zahl(
       ziel,
@@ -138,18 +139,17 @@ export async function zaehlAbgleich(quelle: OdooSql, ziel: Ziel): Promise<string
     hinweis: 'offene entstehen erst in Phase 7',
   })
   zeilen.push({
-    name: 'Reparaturen (flach)',
+    name: 'Reparaturen (mit Produkt)',
     quelle: await zahl(
       quelle,
       quelle<{ n: number }[]>`
-        select count(*)::int as n from repair_order
-        where state in ('done', 'cancel') and product_id is not null`,
+        select count(*)::int as n from repair_order where product_id is not null`,
     ),
     ziel: await zahl(
       ziel,
       ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'repair_order'`,
     ),
-    hinweis: 'ohne Produktangabe nicht abbildbar',
+    hinweis: 'offene entstehen erst in Phase 7',
   })
   zeilen.push({
     name: 'Eingangsrechnungen',
@@ -163,6 +163,57 @@ export async function zaehlAbgleich(quelle: OdooSql, ziel: Ziel): Promise<string
       ziel,
       ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'account_move'`,
     ),
+  })
+
+  // Bestandsmenge je Variante: Σ interne Odoo-Quants ↔ KRNL on_hand.
+  const quellBestand = new Map(
+    (
+      await quelle<{ variant_id: number; menge: number }[]>`
+        select q.product_id as variant_id, round(sum(q.quantity)::numeric, 3) as menge
+        from stock_quant q join stock_location l on l.id = q.location_id
+        where l.usage = 'internal' group by q.product_id`
+    ).map((z) => [z.variant_id, Number(z.menge)]),
+  )
+  const zielBestand = new Map(
+    (
+      await ziel<{ odoo_id: number; menge: number }[]>`
+        select v.odoo_id, round(coalesce(sum(q.on_hand), 0)::numeric, 3) as menge
+        from odoo_verweise v
+        left join stock_quants q on q.variant_id = v.krnl_id
+          and q.location_id in (select id from stock_locations where type in ('internal', 'transit'))
+        where v.odoo_tabelle = 'product_product'
+        group by v.odoo_id`
+    ).map((z) => [Number(z.odoo_id), Number(z.menge)]),
+  )
+  let bestandAbweichungen = 0
+  for (const [variantId, menge] of quellBestand) {
+    if (Math.abs((zielBestand.get(variantId) ?? 0) - menge) > 0.0001) bestandAbweichungen++
+  }
+  for (const [variantId, menge] of zielBestand) {
+    if (!quellBestand.has(variantId) && Math.abs(menge) > 0.0001) bestandAbweichungen++
+  }
+  zeilen.push({
+    name: 'Bestand: Varianten mit Abweichung',
+    quelle: 0,
+    ziel: bestandAbweichungen,
+  })
+
+  // Offene Liefermenge (bestätigte, nicht voll gelieferte Aufträge).
+  const [offenQuelle] = await quelle<{ summe: number }[]>`
+    select coalesce(round(sum(l.product_uom_qty - coalesce(l.qty_delivered, 0))::numeric, 3), 0) as summe
+    from sale_order_line l join sale_order o on o.id = l.order_id
+    where o.state = 'sale' and l.display_type is null
+      and l.product_uom_qty > coalesce(l.qty_delivered, 0)`
+  const [offenZiel] = await ziel<{ summe: number }[]>`
+    select coalesce(round(sum(l.qty - l.qty_delivered)::numeric, 3), 0) as summe
+    from sales_order_lines l join sales_orders o on o.id = l.order_id
+    where o.state = 'sale' and l.display_type is null and l.qty > l.qty_delivered
+      and exists (select 1 from odoo_verweise v
+                  where v.krnl_tabelle = 'sales_orders' and v.krnl_id = o.id)`
+  zeilen.push({
+    name: 'Offene Liefermenge',
+    quelle: Number(offenQuelle.summe),
+    ziel: Number(offenZiel.summe),
   })
 
   // Substanzprobe: Netto-Zeilensumme aller nicht stornierten Aufträge — die
