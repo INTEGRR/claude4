@@ -19,6 +19,11 @@
 # Dump wird mit `docker rm -f krnl-odoo-quelle` erzwungen.
 set -euo pipefail
 
+# Git Bash unter Windows wandelt Argumente mit führendem „/" in
+# Windows-Pfade um und zerstört damit z. B. „-w /app" — abschalten
+# (auf Mac/Linux wirkungslos).
+export MSYS_NO_PATHCONV=1
+
 DUMP="${1:?Pfad zum Odoo-Dump (dump.zip oder dump.sql) fehlt}"
 ZIEL_URL="${2:?DIRECT_URL zur Ziel-Datenbank fehlt (Supabase Session-Pooler, Port 5432)}"
 shift 2
