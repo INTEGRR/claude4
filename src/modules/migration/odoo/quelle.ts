@@ -241,6 +241,7 @@ export interface OdooTemplate {
   active: boolean
   is_storable: boolean
   typ: string
+  tracking: string | null
   categ_id: number
   uom_id: number
   uom_po_id: number
@@ -253,10 +254,11 @@ export interface OdooTemplate {
   purchase_method: string | null
   hs_code: string | null
   country_of_origin_code: string | null
-  description: string | null
-  description_sale: string | null
-  description_purchase: string | null
-  description_picking: string | null
+  /** Übersetzbare HTML-Felder — jsonb, durch htmlZuText() ziehen. */
+  description: unknown
+  description_sale: unknown
+  description_purchase: unknown
+  description_picking: unknown
   print_on_mo: unknown
   out_of_stock_limit: unknown
   sale_tax_ids: number[] | null
@@ -267,7 +269,7 @@ export interface OdooTemplate {
 
 export async function templates(sql: OdooSql): Promise<OdooTemplate[]> {
   return sql<OdooTemplate[]>`
-    select t.id, t.name, t.active, t.is_storable, t.type as typ,
+    select t.id, t.name, t.active, t.is_storable, t.type as typ, t.tracking,
            t.categ_id, t.uom_id, t.uom_po_id,
            t.list_price, t.weight, t.sale_ok, t.purchase_ok, t.sale_delay,
            t.invoice_policy, t.purchase_method, t.hs_code,
@@ -453,16 +455,24 @@ export interface OdooMeldebestand {
   qty_multiple: number
   ausloeser: string
   snoozed_until: string | null
-  route_id: number | null
+  /** 'manufacture' | 'buy' — aus dem Routennamen abgeleitet. */
+  route_typ: string
   active: boolean
 }
 
 export async function meldebestaende(sql: OdooSql): Promise<OdooMeldebestand[]> {
   return sql<OdooMeldebestand[]>`
-    select id, product_id as variant_id, product_min_qty as min_qty,
-           product_max_qty as max_qty, coalesce(qty_multiple, 1) as qty_multiple,
-           trigger as ausloeser, snoozed_until::text as snoozed_until, route_id, active
-    from stock_warehouse_orderpoint order by id`
+    select o.id, o.product_id as variant_id, o.product_min_qty as min_qty,
+           o.product_max_qty as max_qty,
+           -- Odoo erlaubt 0 („kein Vielfaches"), der KRNL-Check verlangt > 0.
+           case when coalesce(o.qty_multiple, 0) <= 0 then 1 else o.qty_multiple end as qty_multiple,
+           o.trigger as ausloeser, o.snoozed_until::text as snoozed_until,
+           case when lower(coalesce(r.name::text, '')) like '%anufact%'
+                then 'manufacture' else 'buy' end as route_typ,
+           o.active
+    from stock_warehouse_orderpoint o
+    left join stock_route r on r.id = o.route_id
+    order by o.id`
 }
 
 /** Die Studio-BoM-Zuordnungstabellen müssen leer sein — sonst Abbruch mit Meldung. */

@@ -12,6 +12,7 @@
     "format": "biome format --write src tests scripts",
     "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
     "db:seed": "node --experimental-strip-types scripts/seed.ts",
+    "odoo:import": "node --experimental-strip-types scripts/odoo-import.ts",
     "db:reset": "node --experimental-strip-types scripts/reset.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:prozesse": "node --experimental-strip-types --import ./scripts/prozess-loader.mjs --test --test-concurrency=1 tests/prozesse/*.test.ts",

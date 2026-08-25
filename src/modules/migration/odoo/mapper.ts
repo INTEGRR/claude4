@@ -86,10 +86,13 @@ export function kgZuGramm(kg: number | null | undefined): number | null {
 }
 
 /**
- * Odoo-HTML-Felder (comment, note) → schlichter Text. Kein vollwertiger
- * Parser — Tags raus, die häufigsten Entities, Whitespace zusammenfalten.
+ * Odoo-HTML-Felder (comment, note, descriptions) → schlichter Text. Nimmt
+ * auch Übersetzungs-jsonb entgegen (die Beschreibungsfelder sind in Odoo 18
+ * übersetzbar). Kein vollwertiger Parser — Tags raus, die häufigsten
+ * Entities, Whitespace zusammenfalten.
  */
-export function htmlZuText(html: string | null | undefined): string | null {
+export function htmlZuText(roh: unknown): string | null {
+  const html = uebersetzung(roh, '')
   if (!html) return null
   const text = html
     .replace(/<br\s*\/?>/gi, '\n')

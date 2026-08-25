@@ -132,7 +132,10 @@ Wird mit dem letzten Arbeitspaket der Umsetzung vervollständigt. Gerüst:
 2. Frischen Dump ziehen, Staging neu laden (`dropdb` → `createdb` → `psql`).
 3. Supabase-Backup/PITR-Punkt setzen (Rollback-Pfad).
 4. KRNL-Prod leerräumen (`demodaten_loeschen()` — erhält Konfiguration,
-   Benutzer und Prozesse; räumt auch `odoo_verweise`).
+   Benutzer und Prozesse; räumt auch `odoo_verweise`). **Achtung:** Die
+   Schichtvorlagen (FRUEH/SPAET/…, Seeds aus 0022) stehen nicht in der
+   Behalten-Liste und werden mit abgeräumt — nach dem Leerräumen unter
+   Personal → Schichten neu anlegen, falls gebraucht.
 5. Import gegen Prod (`DIRECT_URL`), Shopify-Umgebungsvariablen ungesetzt.
 6. Report + `datenTuev()` grün — sonst Restore.
 7. Shopify-Kopplung: zuerst Produkt-Import (SKU-Match setzt
