@@ -58,6 +58,9 @@ der [AGENTS.md](../AGENTS.md).
 - [betrieb.md](betrieb.md) — Deployment-Varianten (Docker, VPN, Vercel),
   Netzwerk, Secrets. Backup/PITR und Update-Ringe: siehe „Schutzschicht"
   in [prozesse.md](prozesse.md).
+- [migration-odoo.md](migration-odoo.md) — die Datenübernahme aus Odoo 18
+  (ANVIL): Architektur des Importers, Phasen, Verzichtsliste,
+  Cutover-Runbook.
 
 ## Module (Fachdoku der Gründungsphase, je Bereich)
 

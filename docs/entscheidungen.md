@@ -9,6 +9,43 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-25 — Odoo-Datenübernahme: Wartungsskript, flacher Historien-Schnitt, eigener Mapping-Anker
+
+ANVIL zieht mit ALLEN Daten von Odoo 18 (Odoo.sh) nach KRNL um — Odoo läuft
+bis zum Stichtag weiter, der Import ist deshalb wiederholbar gebaut
+(Probeläufe lokal, finaler Lauf = frischer Dump auf die leergeräumte
+Prod-Instanz). Die Grundsatzentscheidungen, Details in
+[migration-odoo.md](migration-odoo.md):
+
+- **Wartungsskript, keine Registry-Aktion.** `scripts/odoo-import.ts` läuft
+  vor dem Betrieb gegen die Wartungsverbindung — wie seed/reset, deren
+  Direkt-SQL der etablierte Präzedenzfall ist. Niemand klickt „Odoo
+  importieren" in der Oberfläche; die Abnahme-Instanz ist der Daten-TÜV
+  (Ledger-Invarianten), nicht der Torwächter.
+- **Flacher Schnitt für die Historie.** Abgeschlossene Belege werden im
+  Endzustand eingefügt (inkl. selbst gesetzter Rückschreibefelder und
+  Original-Belegnummern), OHNE Pickings/Moves — Präzedenzfall ist die
+  Shopify-Erstübernahme. Offene Belege dagegen laufen als Entwurf durch
+  die echten Buchungsfunktionen, damit Reservierungen und Folgebelege
+  entstehen. Bestand über `inventory_apply()`, Bewertung über
+  `valuation_initialize()`; `stock_quants`/`stock_valuation_layers`
+  schreibt der Importer nie direkt. Die Eröffnungs-Wertschichten tragen
+  ehrlich das Importdatum — nicht rückdatiert.
+- **Mapping-Anker `odoo_verweise`** (0073) statt `zusatz->>'odoo_id'`:
+  den zusatz-Sack gibt es nur an vier Tabellen, und nur eine echte Tabelle
+  liefert den Unique-Constraint für Upsert-Idempotenz und Delta-Joins.
+  Primärschlüssel ist der natürliche Odoo-Schlüssel (tabelle, id) — die
+  Tabelle IST die Übersetzung, ein uuid-Kunstschlüssel hätte keinen
+  Nutzen. Shopify-IDs (aus Odoo-Studio-Feldern) gehen zusätzlich als GIDs
+  in die dedizierten Spalten, damit der Shopify-Sync Bestandsdaten
+  wiedererkennt statt Duplikate anzulegen.
+- **Bewusste Verzichte:** Produktbilder/Anhänge (kein Zielmodell, Shopify
+  bleibt Bildquelle), 935 automatische Journalbuchungen und die eine
+  Ausgangsrechnung (kein Zielmodell), Benutzerkonten (manuell),
+  historische Arbeitsgänge/Ausschussbuchungen, das Studio-Alert-Log.
+  Odoos mehrstufige Lagerorte (Input/Output/Packing) werden auf
+  `WH/Stock` konsolidiert — sie sind Routen-Artefakte, KRNL ist einstufig.
+
 ## 2026-08-23 — Feldpflege gehört in die Oberfläche, nicht nur in die KI
 
 Eigene Felder waren nur über `prozess_entwerfen` (kompletter Entwurf) oder
