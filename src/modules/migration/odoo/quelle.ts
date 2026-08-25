@@ -483,3 +483,235 @@ export async function studioBomRelZeilen(sql: OdooSql): Promise<number> {
          + (select count(*)::int from x_mrp_bom_line_product_template_rel_1) as summe`
   return zeile.summe
 }
+
+// --- Phasen 3–4: Belege -----------------------------------------------------
+
+export interface OdooSaleOrder {
+  id: number
+  name: string
+  state: string
+  locked: boolean
+  partner_id: number
+  date_order: string | null
+  create_date: string
+  client_order_ref: string | null
+  shopify_order_name: string | null
+  delivery_status: string | null
+  invoice_status: string | null
+  note: unknown
+  origin: string | null
+  payment_term_id: number | null
+  commitment_date: string | null
+  validity_date: string | null
+  waehrung: string | null
+}
+
+export async function verkaufsauftraege(sql: OdooSql): Promise<OdooSaleOrder[]> {
+  return sql<OdooSaleOrder[]>`
+    select o.id, o.name, o.state, coalesce(o.locked, false) as locked, o.partner_id,
+           o.date_order::text as date_order, o.create_date::text as create_date,
+           o.client_order_ref, o.x_studio_shopify_order_number as shopify_order_name,
+           o.delivery_status, o.invoice_status, o.note, o.origin,
+           o.payment_term_id, o.commitment_date::text as commitment_date,
+           o.validity_date::text as validity_date, c.name as waehrung
+    from sale_order o
+    left join res_currency c on c.id = o.currency_id
+    order by o.id`
+}
+
+export interface OdooSaleZeile {
+  id: number
+  order_id: number
+  sequence: number
+  product_id: number | null
+  display_type: string | null
+  name: unknown
+  qty: number
+  uom_id: number | null
+  price_unit: number
+  discount: number | null
+  qty_delivered: number
+  qty_invoiced: number
+  qty_to_invoice: number
+  customer_lead: number | null
+  invoice_status: string | null
+  tax_id: number | null
+  tax_amount: number | null
+}
+
+export async function verkaufszeilen(sql: OdooSql): Promise<OdooSaleZeile[]> {
+  return sql<OdooSaleZeile[]>`
+    select l.id, l.order_id, coalesce(l.sequence, 10) as sequence, l.product_id,
+           l.display_type, l.name, coalesce(l.product_uom_qty, 0) as qty,
+           l.product_uom as uom_id, coalesce(l.price_unit, 0) as price_unit,
+           l.discount, coalesce(l.qty_delivered, 0) as qty_delivered,
+           coalesce(l.qty_invoiced, 0) as qty_invoiced,
+           coalesce(l.qty_to_invoice, 0) as qty_to_invoice, l.customer_lead,
+           l.invoice_status,
+           (select min(r.account_tax_id) from account_tax_sale_order_line_rel r
+            where r.sale_order_line_id = l.id) as tax_id,
+           (select t.amount from account_tax t
+            where t.id = (select min(r.account_tax_id) from account_tax_sale_order_line_rel r
+                          where r.sale_order_line_id = l.id)) as tax_amount
+    from sale_order_line l
+    order by l.order_id, l.sequence, l.id`
+}
+
+export interface OdooPurchaseOrder {
+  id: number
+  name: string
+  state: string
+  partner_id: number
+  partner_ref: string | null
+  date_order: string | null
+  date_approve: string | null
+  date_planned: string | null
+  create_date: string
+  invoice_status: string | null
+  origin: string | null
+  notes: unknown
+  waehrung: string | null
+  /** Alle Warenzeilen vollständig empfangen → Historie flach. */
+  voll_empfangen: boolean
+}
+
+export async function bestellungen(sql: OdooSql): Promise<OdooPurchaseOrder[]> {
+  return sql<OdooPurchaseOrder[]>`
+    select o.id, o.name, o.state, o.partner_id, o.partner_ref,
+           o.date_order::text as date_order, o.date_approve::text as date_approve,
+           o.date_planned::text as date_planned, o.create_date::text as create_date,
+           o.invoice_status, o.origin, o.notes, c.name as waehrung,
+           coalesce((select bool_and(coalesce(l.qty_received, 0) >= l.product_qty)
+                     from purchase_order_line l
+                     where l.order_id = o.id and l.display_type is null), true) as voll_empfangen
+    from purchase_order o
+    left join res_currency c on c.id = o.currency_id
+    order by o.id`
+}
+
+export interface OdooPurchaseZeile {
+  id: number
+  order_id: number
+  sequence: number
+  product_id: number | null
+  display_type: string | null
+  name: unknown
+  qty: number
+  uom_id: number | null
+  price_unit: number
+  discount: number | null
+  qty_received: number
+  qty_invoiced: number
+  date_planned: string | null
+  tax_amount: number | null
+}
+
+export async function bestellzeilen(sql: OdooSql): Promise<OdooPurchaseZeile[]> {
+  return sql<OdooPurchaseZeile[]>`
+    select l.id, l.order_id, coalesce(l.sequence, 10) as sequence, l.product_id,
+           l.display_type, l.name, coalesce(l.product_qty, 0) as qty,
+           l.product_uom as uom_id, coalesce(l.price_unit, 0) as price_unit, l.discount,
+           coalesce(l.qty_received, 0) as qty_received,
+           coalesce(l.qty_invoiced, 0) as qty_invoiced,
+           l.date_planned::text as date_planned,
+           (select t.amount from account_tax t
+            where t.id = (select min(r.account_tax_id) from account_tax_purchase_order_line_rel r
+                          where r.purchase_order_line_id = l.id)) as tax_amount
+    from purchase_order_line l
+    order by l.order_id, l.sequence, l.id`
+}
+
+export interface OdooFertigung {
+  id: number
+  name: string
+  state: string
+  variant_id: number
+  bom_id: number | null
+  qty: number
+  qty_producing: number | null
+  uom_id: number
+  date_start: string | null
+  date_finished: string | null
+  date_deadline: string | null
+  create_date: string
+  origin: string | null
+}
+
+export async function fertigungsauftraege(sql: OdooSql): Promise<OdooFertigung[]> {
+  return sql<OdooFertigung[]>`
+    select id, name, state, product_id as variant_id, bom_id,
+           coalesce(product_qty, 0) as qty, qty_producing, product_uom_id as uom_id,
+           date_start::text as date_start, date_finished::text as date_finished,
+           date_deadline::text as date_deadline, create_date::text as create_date, origin
+    from mrp_production
+    order by id`
+}
+
+export interface OdooReparatur {
+  id: number
+  name: string
+  state: string
+  partner_id: number | null
+  variant_id: number
+  qty: number
+  under_warranty: boolean
+  schedule_date: string | null
+  create_date: string
+  sale_order_id: number | null
+}
+
+export async function reparaturen(sql: OdooSql): Promise<OdooReparatur[]> {
+  return sql<OdooReparatur[]>`
+    select id, name, state, partner_id, product_id as variant_id,
+           coalesce(product_qty, 1) as qty, coalesce(under_warranty, false) as under_warranty,
+           schedule_date::text as schedule_date, create_date::text as create_date,
+           sale_order_id
+    from repair_order
+    order by id`
+}
+
+export interface OdooEingangsrechnung {
+  id: number
+  name: string
+  state: string
+  payment_state: string | null
+  partner_id: number
+  invoice_date: string | null
+  invoice_date_due: string | null
+  ref: string | null
+  invoice_origin: string | null
+  create_date: string
+}
+
+export async function eingangsrechnungen(sql: OdooSql): Promise<OdooEingangsrechnung[]> {
+  return sql<OdooEingangsrechnung[]>`
+    select id, name, state, payment_state, partner_id,
+           invoice_date::text as invoice_date, invoice_date_due::text as invoice_date_due,
+           ref, invoice_origin, create_date::text as create_date
+    from account_move
+    where move_type = 'in_invoice'
+    order by id`
+}
+
+export interface OdooRechnungszeile {
+  id: number
+  move_id: number
+  name: unknown
+  qty: number
+  price_unit: number
+  purchase_line_id: number | null
+  tax_amount: number | null
+}
+
+export async function rechnungszeilen(sql: OdooSql): Promise<OdooRechnungszeile[]> {
+  return sql<OdooRechnungszeile[]>`
+    select l.id, l.move_id, l.name, coalesce(l.quantity, 0) as qty,
+           coalesce(l.price_unit, 0) as price_unit, l.purchase_line_id,
+           (select t.amount from account_tax t
+            where t.id = (select min(r.account_tax_id) from account_move_line_account_tax_rel r
+                          where r.account_move_line_id = l.id)) as tax_amount
+    from account_move_line l
+    join account_move m on m.id = l.move_id
+    where m.move_type = 'in_invoice' and l.display_type = 'product'
+    order by l.move_id, l.id`
+}

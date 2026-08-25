@@ -95,6 +95,97 @@ export async function zaehlAbgleich(quelle: OdooSql, ziel: Ziel): Promise<string
     ),
   })
 
+  zeilen.push({
+    name: 'Verkaufsaufträge',
+    quelle: await zahl(quelle, quelle<{ n: number }[]>`select count(*)::int as n from sale_order`),
+    ziel: await zahl(
+      ziel,
+      ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'sale_order'`,
+    ),
+  })
+  zeilen.push({
+    name: 'Auftragszeilen',
+    quelle: await zahl(
+      quelle,
+      quelle<{ n: number }[]>`select count(*)::int as n from sale_order_line`,
+    ),
+    ziel: await zahl(
+      ziel,
+      ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'sale_order_line'`,
+    ),
+  })
+  zeilen.push({
+    name: 'Bestellungen',
+    quelle: await zahl(
+      quelle,
+      quelle<{ n: number }[]>`select count(*)::int as n from purchase_order`,
+    ),
+    ziel: await zahl(
+      ziel,
+      ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'purchase_order'`,
+    ),
+  })
+  zeilen.push({
+    name: 'Fertigungsaufträge',
+    quelle: await zahl(
+      quelle,
+      quelle<{ n: number }[]>`select count(*)::int as n from mrp_production where state in ('done', 'cancel')`,
+    ),
+    ziel: await zahl(
+      ziel,
+      ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'mrp_production'`,
+    ),
+    hinweis: 'offene entstehen erst in Phase 7',
+  })
+  zeilen.push({
+    name: 'Reparaturen (flach)',
+    quelle: await zahl(
+      quelle,
+      quelle<{ n: number }[]>`
+        select count(*)::int as n from repair_order
+        where state in ('done', 'cancel') and product_id is not null`,
+    ),
+    ziel: await zahl(
+      ziel,
+      ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'repair_order'`,
+    ),
+    hinweis: 'ohne Produktangabe nicht abbildbar',
+  })
+  zeilen.push({
+    name: 'Eingangsrechnungen',
+    quelle: await zahl(
+      quelle,
+      quelle<{ n: number }[]>`
+        select count(*)::int as n from account_move
+        where move_type = 'in_invoice' and partner_id is not null`,
+    ),
+    ziel: await zahl(
+      ziel,
+      ziel<{ n: number }[]>`select count(*)::int as n from odoo_verweise where odoo_tabelle = 'account_move'`,
+    ),
+  })
+
+  // Substanzprobe: Netto-Zeilensumme aller nicht stornierten Aufträge — die
+  // Zählungen können stimmen und die Beträge trotzdem falsch sein.
+  const [umsatzQuelle] = await quelle<{ summe: number }[]>`
+    select coalesce(round(sum(l.price_unit * l.product_uom_qty
+             * (1 - coalesce(l.discount, 0) / 100))::numeric, 2), 0) as summe
+    from sale_order_line l
+    join sale_order o on o.id = l.order_id
+    where o.state <> 'cancel' and l.display_type is null`
+  const [umsatzZiel] = await ziel<{ summe: number }[]>`
+    select coalesce(round(sum(l.price_unit * l.qty * (1 - coalesce(l.discount, 0) / 100))::numeric, 2), 0) as summe
+    from sales_order_lines l
+    join sales_orders o on o.id = l.order_id
+    where o.state <> 'cancel' and l.display_type is null
+      and exists (select 1 from odoo_verweise v
+                  where v.krnl_tabelle = 'sales_orders' and v.krnl_id = o.id)`
+  zeilen.push({
+    name: 'Netto-Auftragssumme (EUR)',
+    quelle: Number(umsatzQuelle.summe),
+    ziel: Number(umsatzZiel.summe),
+  })
+
   const breite = Math.max(...zeilen.map((z) => z.name.length))
   const report = zeilen.map((z) => {
     const status = z.quelle === z.ziel ? 'ok' : z.hinweis ? `≠ (${z.hinweis})` : 'ABWEICHUNG'

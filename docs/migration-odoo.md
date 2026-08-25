@@ -92,6 +92,24 @@ Ende zurück; der Report wird vorher erhoben und trotzdem ausgegeben.
 | 7 | Offene durchbuchen | `confirm_purchase_order` / `confirm_sales_order` / `mo_confirm` / `repair_confirm` — es entstehen echte Lieferungen, Reservierungen und MTO-Fertigungsaufträge. |
 | 8 | Abschluss | Nummernkreise über `sequences.next_number` hochziehen, MO-Präfix auf `WH/MO/`, `refresh_analytics()`, **`datenTuev()` als harte Abnahme** (Befund = Exit ≠ 0). |
 
+### Zustands-Mapping und Klassifikation
+
+Die Enums decken sich weitgehend (KRNL ist als Odoo-Nachbau gebaut) — die
+Abweichungen: `to invoice → to_invoice` (Leerzeichen), einkaufsseitig
+`no/to invoice/invoiced → nothing/waiting/fully_billed`, Reparatur
+`draft → new`, `done → repaired`, Rechnung `posted + in_payment/paid →
+paid`. Unbekannte Werte brechen den Lauf ab, statt still gemappt zu werden.
+
+Klassifikation je Beleg (Phase 3): Verkauf `sale` + Lieferstatus
+`full`/leer → flach erledigt (leer = nur nicht-lagergeführte Zeilen,
+Warnhinweis); `sale` + `pending` → Entwurf für Phase 7; Storno → flach
+`cancel` (ohne `cancel_sales_order` — es gab nie Logistik dazu). Einkauf:
+`purchase`/`done` voll empfangen → flach, sonst Entwurf für Phase 7.
+Fertigung/Reparatur: nur `done`/`cancel` flach, Offenes macht Phase 7 über
+die echten Funktionen. Bewusst nicht abbildbar: die vier abgeschlossenen
+Odoo-Reparaturen ohne Produktangabe (in KRNL Pflicht) und der leere
+Rechnungsentwurf ohne Lieferant — beides steht auf der Warnliste.
+
 **Warum flach + durchbuchen statt alles nachbuchen:** Bestände,
 Wertschichten, Belegstatus und Kennzahlen leiten sich in KRNL voneinander
 ab. 1.834 historische Lieferungen einzeln nachzubuchen wäre langsam und

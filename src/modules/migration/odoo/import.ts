@@ -18,14 +18,24 @@ import type { Sql, TransactionSql } from 'postgres'
 import { splitStreet } from '../../shared/address.ts'
 import {
   attributAnzeige,
+  bestellGid,
+  billBezahlt,
+  billState,
+  billingStatus,
   bomTyp,
   bomVerbrauch,
   faelligkeitsTyp,
   firmenwert,
   htmlZuText,
+  invoiceStatus,
+  istShopifyRef,
   kgZuGramm,
   kundenGid,
+  moState,
   nameTeilen,
+  purchaseState,
+  repairState,
+  saleState,
   uebersetzung,
   uomRatio,
   variantenSchluessel,
@@ -942,4 +952,541 @@ export async function phaseProdukte(lauf: Lauf): Promise<void> {
     await merken(lauf, 'stock_warehouse_orderpoint', punkt.id, 'stock_orderpoints', zeile.id)
   }
   lauf.meldung(`Meldebestände: ${meldebestaende.length} übernommen.`)
+}
+
+// --- Phase 3: Belege flach (Historie) ---------------------------------------
+
+/**
+ * Der flache Schnitt (Entscheidungslog 2026-08-25): Abgeschlossenes wird im
+ * Endzustand eingefügt — inklusive der Rückschreibefelder, die sonst die
+ * Buchungs-Trigger pflegen würden, und OHNE Pickings/Moves. Offene Belege
+ * entstehen hier nur als Entwurf mit Zeilen; Phase 7 bucht sie über die
+ * echten Funktionen durch. Original-Belegnummern bleiben erhalten,
+ * created_at/confirmed_at kommen direkt aus Odoo.
+ */
+export async function phaseBelege(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+  const partnerKarte = await verweisKarte(ziel, 'res_partner')
+  const variantenKarte = await verweisKarte(ziel, 'product_product')
+  const uomKarte = await verweisKarte(ziel, 'uom_uom')
+  const steuerKarte = await verweisKarte(ziel, 'account_tax')
+  const paymentKarte = await verweisKarte(ziel, 'account_payment_term')
+
+  // Lieferadressen werden am Beleg eingefroren — aus dem KRNL-Partner.
+  const partnerDetails = new Map(
+    (
+      await ziel<
+        {
+          id: string
+          name: string
+          street: string | null
+          house_number: string | null
+          street2: string | null
+          zip: string | null
+          city: string | null
+          country_code: string | null
+          phone: string | null
+          email: string | null
+        }[]
+      >`select id, name, street, house_number, street2, zip, city, country_code, phone, email
+        from partners`
+    ).map((p) => [p.id, p]),
+  )
+
+  // -- Verkauf -----------------------------------------------------------------
+  const auftraege = await quelle.verkaufsauftraege(lauf.quelle)
+  const zeilen = await quelle.verkaufszeilen(lauf.quelle)
+  const zeilenJeAuftrag = new Map<number, quelle.OdooSaleZeile[]>()
+  for (const zeile of zeilen) {
+    const liste = zeilenJeAuftrag.get(zeile.order_id) ?? []
+    liste.push(zeile)
+    zeilenJeAuftrag.set(zeile.order_id, liste)
+  }
+  const soKarte = await verweisKarte(ziel, 'sale_order')
+  const soZeilenKarte = await verweisKarte(ziel, 'sale_order_line')
+  /** Odoo-Belegname (S00013) → KRNL-id — für MO-/Reparatur-Verknüpfungen. */
+  const soNameKarte = new Map<string, string>()
+  let soFlach = 0
+  let soOffen = 0
+
+  // Mehrere Odoo-Aufträge zur selben Shopify-Bestellung (Storno + Neuanlage):
+  // die unique GID bekommt deterministisch der nicht-stornierte bzw. jüngste.
+  const orderGidBesitzer = new Map<string, number>()
+  for (const auftrag of auftraege) {
+    if (!istShopifyRef(auftrag.client_order_ref)) continue
+    const ref = (auftrag.client_order_ref as string).trim()
+    const bisherId = orderGidBesitzer.get(ref)
+    const bisher = auftraege.find((a) => a.id === bisherId)
+    const gewinnt =
+      bisher === undefined ||
+      (auftrag.state !== 'cancel' && bisher.state === 'cancel') ||
+      ((auftrag.state === 'cancel') === (bisher.state === 'cancel') && auftrag.id > bisher.id)
+    if (gewinnt) orderGidBesitzer.set(ref, auftrag.id)
+  }
+
+  for (const auftrag of auftraege) {
+    // Klassifikation: erledigt/storniert = flach, offen = Entwurf für Phase 7.
+    const art =
+      auftrag.state === 'cancel'
+        ? 'cancel'
+        : auftrag.state === 'sale'
+          ? auftrag.delivery_status === 'pending'
+            ? 'offen'
+            : 'flach'
+          : 'entwurf'
+    if (auftrag.state === 'sale' && auftrag.delivery_status === null) {
+      warnen(
+        lauf,
+        `Auftrag ${auftrag.name} ohne Lieferstatus (nur nicht-lagergeführte Zeilen) — flach als erledigt übernommen.`,
+      )
+    }
+    const partnerId = partnerKarte.get(auftrag.partner_id)
+    if (!partnerId) {
+      warnen(lauf, `Auftrag ${auftrag.name}: Partner ${auftrag.partner_id} fehlt — übersprungen.`)
+      continue
+    }
+    const versand = partnerDetails.get(partnerId)
+    const istShopify = istShopifyRef(auftrag.client_order_ref)
+    // Die unique GID nur an den Besitzer — source bleibt für alle 'shopify'.
+    const shopify =
+      istShopify && orderGidBesitzer.get((auftrag.client_order_ref as string).trim()) === auftrag.id
+    const kopf = {
+      number: auftrag.name,
+      state: art === 'flach' || art === 'offen' ? (art === 'flach' ? 'sale' : 'draft') : saleState(auftrag.state),
+      locked: art === 'flach' ? auftrag.locked : false,
+      partner_id: partnerId,
+      order_date: auftrag.date_order ?? auftrag.create_date,
+      confirmed_at: art === 'flach' ? (auftrag.date_order ?? auftrag.create_date) : null,
+      delivery_status: art === 'flach' ? 'full' : 'pending',
+      invoice_status: art === 'flach' ? invoiceStatus(auftrag.invoice_status ?? 'no') : 'no',
+      source: istShopify ? 'shopify' : 'manual',
+      shopify_order_id: shopify ? bestellGid(auftrag.client_order_ref as string) : null,
+      shopify_order_name: auftrag.shopify_order_name,
+      client_order_ref: auftrag.client_order_ref,
+      currency: auftrag.waehrung ?? 'EUR',
+      note: htmlZuText(auftrag.note),
+      origin: auftrag.origin,
+      payment_term_id: auftrag.payment_term_id
+        ? (paymentKarte.get(auftrag.payment_term_id) ?? null)
+        : null,
+      commitment_date: auftrag.commitment_date,
+      validity_date: auftrag.validity_date,
+      created_at: auftrag.create_date,
+    }
+
+    let krnlId = soKarte.get(auftrag.id)
+    if (krnlId) {
+      const [bestand] = await ziel<{ state: string }[]>`
+        select state from sales_orders where id = ${krnlId}`
+      if (art === 'offen' && bestand && bestand.state !== 'draft') {
+        // Schon von Phase 7 bestätigt — hier nicht mehr anfassen.
+        soNameKarte.set(auftrag.name, krnlId)
+        soOffen++
+        continue
+      }
+      await ziel`update sales_orders set
+        state = ${kopf.state}, locked = ${kopf.locked}, partner_id = ${kopf.partner_id},
+        order_date = ${kopf.order_date}, confirmed_at = ${kopf.confirmed_at},
+        delivery_status = ${kopf.delivery_status}, invoice_status = ${kopf.invoice_status},
+        source = ${kopf.source}, shopify_order_id = ${kopf.shopify_order_id},
+        shopify_order_name = ${kopf.shopify_order_name}, client_order_ref = ${kopf.client_order_ref},
+        currency = ${kopf.currency}, note = ${kopf.note}, origin = ${kopf.origin},
+        payment_term_id = ${kopf.payment_term_id}, commitment_date = ${kopf.commitment_date},
+        validity_date = ${kopf.validity_date}
+        where id = ${krnlId}`
+    } else {
+      const [neu] = await ziel<{ id: string }[]>`
+        insert into sales_orders (number, state, locked, partner_id, order_date, confirmed_at,
+          delivery_status, invoice_status, source, shopify_order_id, shopify_order_name,
+          client_order_ref, currency, note, origin, payment_term_id, commitment_date,
+          validity_date, created_at,
+          ship_name, ship_street, ship_house_number, ship_street2, ship_zip, ship_city,
+          ship_country_code, ship_phone, ship_email)
+        values (${kopf.number}, ${kopf.state}, ${kopf.locked}, ${kopf.partner_id},
+          ${kopf.order_date}, ${kopf.confirmed_at}, ${kopf.delivery_status},
+          ${kopf.invoice_status}, ${kopf.source}, ${kopf.shopify_order_id},
+          ${kopf.shopify_order_name}, ${kopf.client_order_ref}, ${kopf.currency},
+          ${kopf.note}, ${kopf.origin}, ${kopf.payment_term_id}, ${kopf.commitment_date},
+          ${kopf.validity_date}, ${kopf.created_at},
+          ${versand?.name ?? null}, ${versand?.street ?? null}, ${versand?.house_number ?? null},
+          ${versand?.street2 ?? null}, ${versand?.zip ?? null}, ${versand?.city ?? null},
+          ${versand?.country_code ?? null}, ${versand?.phone ?? null}, ${versand?.email ?? null})
+        returning id`
+      krnlId = neu.id
+      soKarte.set(auftrag.id, krnlId)
+      await merken(lauf, 'sale_order', auftrag.id, 'sales_orders', krnlId)
+    }
+    soNameKarte.set(auftrag.name, krnlId)
+    if (art === 'flach') soFlach++
+    if (art === 'offen') soOffen++
+
+    for (const zeile of zeilenJeAuftrag.get(auftrag.id) ?? []) {
+      const variantId = zeile.product_id ? (variantenKarte.get(zeile.product_id) ?? null) : null
+      const istStruktur = zeile.display_type === 'line_section' || zeile.display_type === 'line_note'
+      if (!istStruktur && zeile.product_id && !variantId) {
+        warnen(lauf, `Auftragszeile ${zeile.id} (${auftrag.name}): Variante ${zeile.product_id} fehlt — übersprungen.`)
+        continue
+      }
+      const w = {
+        order_id: krnlId,
+        sequence: zeile.sequence,
+        display_type: istStruktur ? (zeile.display_type === 'line_section' ? 'section' : 'note') : null,
+        variant_id: istStruktur ? null : variantId,
+        name: uebersetzung(zeile.name, '—'),
+        qty: zeile.qty,
+        uom_id: zeile.uom_id ? (uomKarte.get(zeile.uom_id) ?? null) : null,
+        price_unit: zeile.price_unit,
+        discount: zeile.discount ?? 0,
+        tax_rate: zeile.tax_amount ?? 0,
+        tax_id: zeile.tax_id ? (steuerKarte.get(zeile.tax_id) ?? null) : null,
+        qty_delivered: art === 'flach' ? zeile.qty_delivered : 0,
+        qty_invoiced: art === 'flach' ? zeile.qty_invoiced : 0,
+        qty_to_invoice: art === 'flach' ? zeile.qty_to_invoice : 0,
+        invoice_status: art === 'flach' ? invoiceStatus(zeile.invoice_status ?? 'no') : 'no',
+        customer_lead: zeile.customer_lead ?? 0,
+      }
+      const zeileVorhanden = soZeilenKarte.get(zeile.id)
+      if (zeileVorhanden) {
+        await ziel`update sales_order_lines set
+          sequence = ${w.sequence}, display_type = ${w.display_type},
+          variant_id = ${w.variant_id}, name = ${w.name}, qty = ${w.qty},
+          uom_id = ${w.uom_id}, price_unit = ${w.price_unit}, discount = ${w.discount},
+          tax_rate = ${w.tax_rate}, tax_id = ${w.tax_id},
+          qty_delivered = ${w.qty_delivered}, qty_invoiced = ${w.qty_invoiced},
+          qty_to_invoice = ${w.qty_to_invoice}, invoice_status = ${w.invoice_status},
+          customer_lead = ${w.customer_lead}
+          where id = ${zeileVorhanden}`
+      } else {
+        const [neueZeile] = await ziel<{ id: string }[]>`
+          insert into sales_order_lines (order_id, sequence, display_type, variant_id,
+            name, qty, uom_id, price_unit, discount, tax_rate, tax_id, qty_delivered,
+            qty_invoiced, qty_to_invoice, invoice_status, customer_lead)
+          values (${w.order_id}, ${w.sequence}, ${w.display_type}, ${w.variant_id},
+            ${w.name}, ${w.qty}, ${w.uom_id}, ${w.price_unit}, ${w.discount},
+            ${w.tax_rate}, ${w.tax_id}, ${w.qty_delivered}, ${w.qty_invoiced},
+            ${w.qty_to_invoice}, ${w.invoice_status}, ${w.customer_lead})
+          returning id`
+        soZeilenKarte.set(zeile.id, neueZeile.id)
+        await merken(lauf, 'sale_order_line', zeile.id, 'sales_order_lines', neueZeile.id)
+      }
+    }
+  }
+  lauf.meldung(
+    `Verkauf: ${auftraege.length} Aufträge (${soFlach} flach erledigt, ${soOffen} offen als Entwurf für Phase 7).`,
+  )
+
+  // -- Einkauf -----------------------------------------------------------------
+  const bestellungen = await quelle.bestellungen(lauf.quelle)
+  const bestellzeilen = await quelle.bestellzeilen(lauf.quelle)
+  const zeilenJeBestellung = new Map<number, quelle.OdooPurchaseZeile[]>()
+  for (const zeile of bestellzeilen) {
+    const liste = zeilenJeBestellung.get(zeile.order_id) ?? []
+    liste.push(zeile)
+    zeilenJeBestellung.set(zeile.order_id, liste)
+  }
+  const poKarte = await verweisKarte(ziel, 'purchase_order')
+  const poZeilenKarte = await verweisKarte(ziel, 'purchase_order_line')
+  const poNameKarte = new Map<string, string>()
+  let poOffen = 0
+
+  for (const bestellung of bestellungen) {
+    const art =
+      bestellung.state === 'cancel'
+        ? 'cancel'
+        : bestellung.state === 'purchase' || bestellung.state === 'done'
+          ? bestellung.voll_empfangen
+            ? 'flach'
+            : 'offen'
+          : 'entwurf'
+    const vendorId = partnerKarte.get(bestellung.partner_id)
+    if (!vendorId) {
+      warnen(lauf, `Bestellung ${bestellung.name}: Lieferant fehlt — übersprungen.`)
+      continue
+    }
+    const kopf = {
+      number: bestellung.name,
+      state: art === 'flach' ? purchaseState(bestellung.state) : art === 'cancel' ? 'cancel' : 'draft',
+      vendor_id: vendorId,
+      vendor_reference: bestellung.partner_ref,
+      order_deadline: bestellung.date_order,
+      expected_arrival: bestellung.date_planned,
+      confirmed_at: art === 'flach' ? (bestellung.date_approve ?? bestellung.date_order) : null,
+      billing_status: art === 'flach' ? billingStatus(bestellung.invoice_status ?? 'no') : 'nothing',
+      currency: bestellung.waehrung ?? 'EUR',
+      note: htmlZuText(bestellung.notes),
+      origin: bestellung.origin,
+      created_at: bestellung.create_date,
+    }
+    let krnlId = poKarte.get(bestellung.id)
+    if (krnlId) {
+      const [bestand] = await ziel<{ state: string }[]>`
+        select state from purchase_orders where id = ${krnlId}`
+      if (art === 'offen' && bestand && bestand.state !== 'draft') {
+        poNameKarte.set(bestellung.name, krnlId)
+        poOffen++
+        continue
+      }
+      await ziel`update purchase_orders set
+        state = ${kopf.state}, vendor_id = ${kopf.vendor_id},
+        vendor_reference = ${kopf.vendor_reference}, order_deadline = ${kopf.order_deadline},
+        expected_arrival = ${kopf.expected_arrival}, confirmed_at = ${kopf.confirmed_at},
+        billing_status = ${kopf.billing_status}, currency = ${kopf.currency},
+        note = ${kopf.note}, origin = ${kopf.origin}
+        where id = ${krnlId}`
+    } else {
+      const [neu] = await ziel<{ id: string }[]>`
+        insert into purchase_orders (number, state, vendor_id, vendor_reference,
+          order_deadline, expected_arrival, confirmed_at, billing_status, currency,
+          note, origin, created_at)
+        values (${kopf.number}, ${kopf.state}, ${kopf.vendor_id}, ${kopf.vendor_reference},
+          ${kopf.order_deadline}, ${kopf.expected_arrival}, ${kopf.confirmed_at},
+          ${kopf.billing_status}, ${kopf.currency}, ${kopf.note}, ${kopf.origin},
+          ${kopf.created_at})
+        returning id`
+      krnlId = neu.id
+      poKarte.set(bestellung.id, krnlId)
+      await merken(lauf, 'purchase_order', bestellung.id, 'purchase_orders', krnlId)
+    }
+    poNameKarte.set(bestellung.name, krnlId)
+    if (art === 'offen') poOffen++
+
+    for (const zeile of zeilenJeBestellung.get(bestellung.id) ?? []) {
+      if (zeile.display_type) continue // Struktur-/Notizzeilen kennt der KRNL-Einkauf nicht
+      const variantId = zeile.product_id ? (variantenKarte.get(zeile.product_id) ?? null) : null
+      if (!variantId) {
+        warnen(lauf, `Bestellzeile ${zeile.id} (${bestellung.name}): Variante fehlt — übersprungen.`)
+        continue
+      }
+      const w = {
+        order_id: krnlId,
+        sequence: zeile.sequence,
+        variant_id: variantId,
+        name: uebersetzung(zeile.name, '—'),
+        qty: zeile.qty > 0 ? zeile.qty : 1,
+        uom_id: zeile.uom_id ? (uomKarte.get(zeile.uom_id) ?? null) : null,
+        price_unit: zeile.price_unit,
+        discount: zeile.discount ?? 0,
+        tax_rate: zeile.tax_amount ?? 0,
+        qty_received: art === 'flach' ? zeile.qty_received : 0,
+        qty_billed: art === 'flach' ? zeile.qty_invoiced : 0,
+        date_planned: zeile.date_planned,
+      }
+      const zeileVorhanden = poZeilenKarte.get(zeile.id)
+      if (zeileVorhanden) {
+        await ziel`update purchase_order_lines set
+          sequence = ${w.sequence}, variant_id = ${w.variant_id}, name = ${w.name},
+          qty = ${w.qty}, uom_id = ${w.uom_id}, price_unit = ${w.price_unit},
+          discount = ${w.discount}, tax_rate = ${w.tax_rate},
+          qty_received = ${w.qty_received}, qty_billed = ${w.qty_billed},
+          date_planned = ${w.date_planned}
+          where id = ${zeileVorhanden}`
+      } else {
+        const [neueZeile] = await ziel<{ id: string }[]>`
+          insert into purchase_order_lines (order_id, sequence, variant_id, name, qty,
+            uom_id, price_unit, discount, tax_rate, qty_received, qty_billed, date_planned)
+          values (${w.order_id}, ${w.sequence}, ${w.variant_id}, ${w.name}, ${w.qty},
+            ${w.uom_id}, ${w.price_unit}, ${w.discount}, ${w.tax_rate}, ${w.qty_received},
+            ${w.qty_billed}, ${w.date_planned})
+          returning id`
+        poZeilenKarte.set(zeile.id, neueZeile.id)
+        await merken(lauf, 'purchase_order_line', zeile.id, 'purchase_order_lines', neueZeile.id)
+      }
+    }
+  }
+  lauf.meldung(`Einkauf: ${bestellungen.length} Bestellungen (${poOffen} offen für Phase 7).`)
+
+  // -- Fertigung (nur abgeschlossene/stornierte — offene macht Phase 7) --------
+  const fertigungen = await quelle.fertigungsauftraege(lauf.quelle)
+  const moKarte = await verweisKarte(ziel, 'mrp_production')
+  const bomKarte = await verweisKarte(ziel, 'mrp_bom')
+  let moFlach = 0
+  let moOffen = 0
+  for (const mo of fertigungen) {
+    if (mo.state !== 'done' && mo.state !== 'cancel') {
+      moOffen++
+      continue
+    }
+    const variantId = variantenKarte.get(mo.variant_id)
+    if (!variantId) {
+      warnen(lauf, `Fertigung ${mo.name}: Variante fehlt — übersprungen.`)
+      continue
+    }
+    const w = {
+      number: mo.name,
+      variant_id: variantId,
+      bom_id: mo.bom_id ? (bomKarte.get(mo.bom_id) ?? null) : null,
+      qty_to_produce: mo.qty > 0 ? mo.qty : 1,
+      qty_produced: mo.state === 'done' ? mo.qty : 0,
+      uom_id: uomKarte.get(mo.uom_id) ?? null,
+      state: moState(mo.state),
+      scheduled_date: mo.date_deadline ?? mo.date_start,
+      date_start: mo.date_start,
+      date_done: mo.date_finished,
+      sales_order_id: mo.origin ? (soNameKarte.get(mo.origin) ?? null) : null,
+      origin: mo.origin,
+      created_at: mo.create_date,
+    }
+    const vorhanden = moKarte.get(mo.id)
+    if (vorhanden) {
+      await ziel`update manufacturing_orders set
+        variant_id = ${w.variant_id}, bom_id = ${w.bom_id},
+        qty_to_produce = ${w.qty_to_produce}, qty_produced = ${w.qty_produced},
+        uom_id = ${w.uom_id}, state = ${w.state}, scheduled_date = ${w.scheduled_date},
+        date_start = ${w.date_start}, date_done = ${w.date_done},
+        sales_order_id = ${w.sales_order_id}, origin = ${w.origin}
+        where id = ${vorhanden}`
+    } else {
+      const [neu] = await ziel<{ id: string }[]>`
+        insert into manufacturing_orders (number, variant_id, bom_id, qty_to_produce,
+          qty_produced, uom_id, state, scheduled_date, date_start, date_done,
+          sales_order_id, origin, created_at)
+        values (${w.number}, ${w.variant_id}, ${w.bom_id}, ${w.qty_to_produce},
+          ${w.qty_produced}, ${w.uom_id}, ${w.state}, ${w.scheduled_date},
+          ${w.date_start}, ${w.date_done}, ${w.sales_order_id}, ${w.origin},
+          ${w.created_at})
+        returning id`
+      await merken(lauf, 'mrp_production', mo.id, 'manufacturing_orders', neu.id)
+    }
+    moFlach++
+  }
+  lauf.meldung(`Fertigung: ${moFlach} flach übernommen, ${moOffen} offen für Phase 7.`)
+
+  // -- Reparatur (abgeschlossene flach; Quelle führt keine Teile-Moves) --------
+  const reparaturen = await quelle.reparaturen(lauf.quelle)
+  const repKarte = await verweisKarte(ziel, 'repair_order')
+  let repFlach = 0
+  let repOffen = 0
+  for (const rep of reparaturen) {
+    if (rep.state !== 'done' && rep.state !== 'cancel') {
+      repOffen++
+      continue
+    }
+    const partnerId = rep.partner_id ? partnerKarte.get(rep.partner_id) : undefined
+    const variantId = rep.variant_id ? variantenKarte.get(rep.variant_id) : undefined
+    if (!partnerId || !variantId) {
+      // ANVILs abgeschlossene Odoo-Reparaturen tragen kein Produkt — in KRNL
+      // ist es Pflicht; ohne Produkt und ohne Teile gibt es nichts abzubilden.
+      warnen(
+        lauf,
+        `Reparatur ${rep.name}: ${variantId ? 'Partner' : 'keine Produktangabe in Odoo'} — nicht abbildbar, übersprungen.`,
+      )
+      continue
+    }
+    const soId = rep.sale_order_id
+      ? (soKarte.get(rep.sale_order_id) ?? null)
+      : null
+    const w = {
+      number: rep.name,
+      partner_id: partnerId,
+      variant_id: variantId,
+      qty: rep.qty,
+      under_warranty: rep.under_warranty,
+      state: repairState(rep.state),
+      scheduled_date: rep.schedule_date,
+      sales_order_id: soId,
+      created_at: rep.create_date,
+    }
+    const vorhanden = repKarte.get(rep.id)
+    if (vorhanden) {
+      await ziel`update repair_orders set
+        partner_id = ${w.partner_id}, variant_id = ${w.variant_id}, qty = ${w.qty},
+        under_warranty = ${w.under_warranty}, state = ${w.state},
+        scheduled_date = ${w.scheduled_date}, sales_order_id = ${w.sales_order_id}
+        where id = ${vorhanden}`
+    } else {
+      const [neu] = await ziel<{ id: string }[]>`
+        insert into repair_orders (number, partner_id, variant_id, qty, under_warranty,
+          state, scheduled_date, sales_order_id, created_at)
+        values (${w.number}, ${w.partner_id}, ${w.variant_id}, ${w.qty},
+          ${w.under_warranty}, ${w.state}, ${w.scheduled_date}, ${w.sales_order_id},
+          ${w.created_at})
+        returning id`
+      await merken(lauf, 'repair_order', rep.id, 'repair_orders', neu.id)
+    }
+    repFlach++
+  }
+  lauf.meldung(`Reparatur: ${repFlach} flach übernommen, ${repOffen} offen für Phase 7.`)
+}
+
+// --- Phase 4: Eingangsrechnungen --------------------------------------------
+
+/**
+ * Die vier echten Eingangsrechnungen — flach per Insert, bewusst NICHT über
+ * create_vendor_bill/post_vendor_bill: qty_billed an den Bestellzeilen
+ * steht schon aus Phase 3, die Funktionen würden es doppelt fortschreiben.
+ */
+export async function phaseRechnungen(lauf: Lauf): Promise<void> {
+  const { ziel } = lauf
+  const partnerKarte = await verweisKarte(ziel, 'res_partner')
+  const poZeilenKarte = await verweisKarte(ziel, 'purchase_order_line')
+  const billKarte = await verweisKarte(ziel, 'account_move')
+
+  const poNachName = new Map(
+    (
+      await ziel<{ id: string; number: string }[]>`
+        select p.id, p.number from purchase_orders p
+        where exists (select 1 from odoo_verweise v
+                      where v.krnl_tabelle = 'purchase_orders' and v.krnl_id = p.id)`
+    ).map((p) => [p.number, p.id]),
+  )
+
+  const rechnungen = await quelle.eingangsrechnungen(lauf.quelle)
+  const zeilen = await quelle.rechnungszeilen(lauf.quelle)
+
+  let uebernommen = 0
+  for (const rechnung of rechnungen) {
+    const vendorId = rechnung.partner_id ? partnerKarte.get(rechnung.partner_id) : undefined
+    if (!vendorId) {
+      warnen(
+        lauf,
+        `Eingangsrechnung ${rechnung.name ?? `#${rechnung.id}`}: leerer Entwurf ohne Lieferant — übersprungen.`,
+      )
+      continue
+    }
+    const bezahlt = rechnung.state === 'posted' && billBezahlt(rechnung.payment_state)
+    const w = {
+      number: rechnung.name,
+      vendor_id: vendorId,
+      purchase_order_id: rechnung.invoice_origin
+        ? (poNachName.get(rechnung.invoice_origin.trim()) ?? null)
+        : null,
+      state: bezahlt ? 'paid' : billState(rechnung.state),
+      bill_date: rechnung.invoice_date,
+      due_date: rechnung.invoice_date_due,
+      vendor_bill_reference: rechnung.ref,
+      paid_at: bezahlt ? (rechnung.invoice_date ?? rechnung.create_date) : null,
+      created_at: rechnung.create_date,
+    }
+    let krnlId = billKarte.get(rechnung.id)
+    if (krnlId) {
+      await ziel`update vendor_bills set
+        vendor_id = ${w.vendor_id}, purchase_order_id = ${w.purchase_order_id},
+        state = ${w.state}, bill_date = ${w.bill_date}, due_date = ${w.due_date},
+        vendor_bill_reference = ${w.vendor_bill_reference}, paid_at = ${w.paid_at}
+        where id = ${krnlId}`
+      await ziel`delete from vendor_bill_lines where bill_id = ${krnlId}`
+    } else {
+      const [neu] = await ziel<{ id: string }[]>`
+        insert into vendor_bills (number, vendor_id, purchase_order_id, state, bill_date,
+          due_date, vendor_bill_reference, paid_at, created_at)
+        values (${w.number}, ${w.vendor_id}, ${w.purchase_order_id}, ${w.state},
+          ${w.bill_date}, ${w.due_date}, ${w.vendor_bill_reference}, ${w.paid_at},
+          ${w.created_at})
+        returning id`
+      krnlId = neu.id
+      billKarte.set(rechnung.id, krnlId)
+      await merken(lauf, 'account_move', rechnung.id, 'vendor_bills', krnlId)
+    }
+
+    for (const zeile of zeilen.filter((z) => z.move_id === rechnung.id)) {
+      await ziel`
+        insert into vendor_bill_lines (bill_id, po_line_id, name, qty, price_unit, tax_rate)
+        values (${krnlId},
+          ${zeile.purchase_line_id ? (poZeilenKarte.get(zeile.purchase_line_id) ?? null) : null},
+          ${uebersetzung(zeile.name, '—')}, ${zeile.qty}, ${zeile.price_unit},
+          ${zeile.tax_amount ?? 0})`
+    }
+    uebernommen++
+  }
+  lauf.meldung(`Eingangsrechnungen: ${uebernommen} von ${rechnungen.length} übernommen.`)
 }

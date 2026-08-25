@@ -16,7 +16,9 @@ import type { Sql, TransactionSql } from 'postgres'
 import { wartungsUrl } from './db-url.ts'
 import {
   type Lauf,
+  phaseBelege,
   phaseProdukte,
+  phaseRechnungen,
   phaseStammdaten,
   phaseVorbedingung,
 } from '../src/modules/migration/odoo/import.ts'
@@ -26,6 +28,8 @@ const PHASEN: { name: string; fn: (lauf: Lauf) => Promise<void> }[] = [
   { name: 'vorbedingung', fn: phaseVorbedingung },
   { name: 'stammdaten', fn: phaseStammdaten },
   { name: 'produkte', fn: phaseProdukte },
+  { name: 'belege', fn: phaseBelege },
+  { name: 'rechnungen', fn: phaseRechnungen },
 ]
 
 function argument(name: string): string | null {
