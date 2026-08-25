@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-25 — Supabase-Data-API wird stillgelegt
+
+Der Security-Advisor des neuen Prod-Projekts meldete 101 Tabellen
+„rls_disabled_in_public": Supabase stellt neben Postgres automatisch eine
+öffentliche REST-Schnittstelle (PostgREST) bereit und vergibt
+Default-Grants an deren Rollen `anon`/`authenticated` — KRNL nutzt aber
+bewusst kein RLS, die Anwendung selbst ist die einzige Zugriffsschicht.
+Entscheidung: die Data-API wird **zweifach geschlossen** — im Dashboard
+deaktiviert UND per Migration 0074 alle Rechte der API-Rollen entzogen
+(versioniert, damit auch der Stichtags-Neuaufbau automatisch dicht ist;
+auf Instanzen ohne Supabase-Rollen ein No-Op). Die verbleibenden
+Advisor-Warnungen (`function_search_path_mutable`) sind ohne erreichbare
+API nicht extern ausnutzbar und bleiben bekannter Zustand.
+
+Abgrenzung Netzwerkzugang: ein „nur per VPN"-Zugang wäre bei Vercel erst
+im Enterprise-Tarif nativ (Trusted IPs). Bewusst nicht jetzt; notierte
+Alternativen, falls später gewünscht: Cloudflare Access vor einer
+eigenen Domain oder Self-Hosting per Docker im Firmennetz. Bis dahin
+gilt das Odoo.sh-Modell: öffentliche URL, Zugriff ausschließlich über
+den Anwendungs-Login mit starken Passwörtern.
+
 ## 2026-08-25 — Prod bekommt ein eigenes Supabase-Projekt; der Import läuft vom eigenen Rechner
 
 Zwei Betriebsentscheidungen aus der Cutover-Vorbereitung

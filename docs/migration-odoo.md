@@ -250,6 +250,11 @@ Entscheidungslog 2026-08-25, Phase 7).
 6. **Abnahme**: Report „alle Zählungen stimmen" + Daten-TÜV ohne Befunde +
    Warnliste gegen die Referenzliste geprüft (siehe „Warnungen lesen").
    Sonst: Supabase-Restore auf den PITR-Punkt aus Schritt 3.
+   Sicherheits-Check dazu: Supabase **Data API ist deaktiviert**
+   (Project Settings → Data API; Migration 0074 entzieht zusätzlich die
+   Rechte) und das **Admin-Passwort ist geändert** (der Seed legt
+   admin@example.com/erp-admin an — ein bekanntes Standardpasswort darf
+   keinen Tag auf Prod überleben).
 7. **Shopify-Kopplung**: ZUERST der Produkt-Import (SKU-Match setzt
    `shopify_variant_id` an den Bestandsdaten), dann Webhooks aktivieren;
    Order-Backfill nur für den Zeitraum ab Stichtag — ältere Bestellungen
