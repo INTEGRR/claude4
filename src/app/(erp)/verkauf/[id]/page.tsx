@@ -5,7 +5,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { date, money, qty } from '@/modules/shared/format'
+import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { TagEditor } from '@/components/tag-editor'
 import {
   addLine,
@@ -61,8 +61,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const kopf = (order as unknown) as {
     user_id: string | null
     client_order_ref: string | null
-    commitment_date: string | null
-    validity_date: string | null
+    // Der Treiber liefert timestamptz/date als Date-Objekt — isoDatum()
+    // verträgt beides (BUG/00002: .slice auf einem Date stürzte ab).
+    commitment_date: string | Date | null
+    validity_date: string | Date | null
     payment_term_id: string | null
     incoterm_code: string | null
     incoterm_location: string | null
@@ -258,7 +260,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <input
                 type="date"
                 name="commitment_date"
-                defaultValue={kopf.commitment_date?.slice(0, 10) ?? ''}
+                defaultValue={isoDatum(kopf.commitment_date)}
                 disabled={!editable}
               />
             </label>
@@ -267,7 +269,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <input
                 type="date"
                 name="validity_date"
-                defaultValue={kopf.validity_date?.slice(0, 10) ?? ''}
+                defaultValue={isoDatum(kopf.validity_date)}
                 disabled={!editable}
               />
             </label>

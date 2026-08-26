@@ -738,6 +738,41 @@ export function KiChat({
   const startGesendet = useRef(false)
   const letzteFrage = useRef('')
 
+  // BUG/00001: Der Verlauf überlebt das Wegnavigieren — Ablage je Tab
+  // (sessionStorage), getrennt je Einsatzort. Nicht bei Direktfragen
+  // (?frage=…): die wollen ein frisches, zielgerichtetes Gespräch.
+  const ablage = kontext ? `ki-chat-${kontext}` : 'ki-chat'
+  useEffect(() => {
+    if (startFrage) return
+    try {
+      const roh = sessionStorage.getItem(ablage)
+      if (!roh) return
+      const alt = JSON.parse(roh) as Msg[]
+      if (Array.isArray(alt) && alt.length > 0) setMsgs(alt)
+    } catch {
+      // Ablage unlesbar oder gesperrt — dann eben ein frischer Chat.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (busy) return
+    try {
+      if (msgs.length === 0) sessionStorage.removeItem(ablage)
+      else sessionStorage.setItem(ablage, JSON.stringify(msgs.slice(-40)))
+    } catch {
+      // Speichergrenze erreicht — der Chat läuft ohne Ablage weiter.
+    }
+  }, [msgs, busy, ablage])
+
+  /** Bewusster Neuanfang: Verlauf UND Ablage leeren. */
+  function neuesGespraech() {
+    if (busy) return
+    setMsgs([])
+    setStatus(null)
+    setAbbruch(null)
+    letzteFrage.current = ''
+  }
+
   /**
    * Liest man gerade weiter oben, darf die laufende Antwort die Position
    * nicht klauen (BUG/00009) — gescrollt wird nur, wenn man ohnehin (fast)
@@ -1076,6 +1111,13 @@ export function KiChat({
             Verbindung unterbrochen — die bisherige Antwort bleibt stehen.{' '}
             <button type="button" className="small" onClick={wiederholen}>
               Erneut fragen
+            </button>
+          </div>
+        )}
+        {msgs.length > 0 && !busy && (
+          <div className="actions" style={{ justifyContent: 'center', marginTop: 4 }}>
+            <button type="button" className="small" onClick={neuesGespraech}>
+              Neues Gespräch
             </button>
           </div>
         )}
