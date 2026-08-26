@@ -41,6 +41,17 @@ export function dhlConfigured(): boolean {
   return Boolean(c.apiKey && c.user && c.password && c.billingNumber)
 }
 
+/**
+ * Welche Pflicht-Variablen fehlen — nur die NAMEN, nie Werte. „Nicht
+ * konfiguriert" ohne Grund kostet den Betreiber sonst eine Rätselrunde
+ * je Tippfehler im Variablennamen.
+ */
+export function dhlFehlendeVariablen(): string[] {
+  if (process.env.DHL_FAKE === '1') return []
+  return (['DHL_API_KEY', 'DHL_GKP_USER', 'DHL_GKP_PASSWORD', 'DHL_BILLING_NUMBER'] as const)
+    .filter((name) => !process.env[name])
+}
+
 export class DhlError extends Error {
   // Keine Parameter-Properties: die Prozesstests laden dieses Modul unter
   // node --experimental-strip-types, und der kann nur löschbare Syntax.

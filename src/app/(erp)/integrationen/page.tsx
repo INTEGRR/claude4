@@ -6,7 +6,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
-import { dhlConfigured } from '@/modules/versand/dhl'
+import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
@@ -342,7 +342,11 @@ export default async function IntegrationenPage() {
         <Stat
           label="DHL"
           value={<Verbindung ok={dhlConfigured()} />}
-          hint="Parcel DE Shipping API v2"
+          hint={
+            dhlConfigured()
+              ? 'Parcel DE Shipping API v2'
+              : `es fehlt: ${dhlFehlendeVariablen().join(', ') || 'Redeploy nach dem Setzen der Variablen'}`
+          }
         />
         <Stat
           label="Warteschlange"
