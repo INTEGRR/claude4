@@ -19,6 +19,9 @@ REST-Nachfolger des alten SOAP-„Geschäftskundenversands" (die Alt-Schnittstel
 - **Auth:**
   - **OAuth2 (ROPC, empfohlen):** Token-Endpoint `…/parcel/de/account/auth/ropc/v1/token`, `grant_type=password`, `username`/`password` = GKP-Systemuser, `client_id`/`client_secret` = API-Key/Secret
   - Legacy Basic Auth + `dhl-api-key`-Header ist **deprecated** — direkt mit OAuth2 bauen.
+  - **Nie beides mischen:** Mit Bearer-Token darf der `dhl-api-key`-Header NICHT
+    mitgeschickt werden — DHL lehnt die Kombination mit 401 ab („Use EITHER
+    Bearer Token or (Apikey and Basic Auth)"; Sandbox-Befund 2026-08-27).
 
 ## 2. Label erstellen
 

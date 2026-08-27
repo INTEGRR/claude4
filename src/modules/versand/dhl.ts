@@ -126,12 +126,14 @@ async function accessToken(): Promise<string> {
 async function dhlFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const c = dhlConfig()
   const token = await accessToken()
+  // NUR der Bearer-Token, ohne dhl-api-key-Header: DHL lehnt die
+  // Kombination aus beidem ab („Use EITHER Bearer Token or (Apikey and
+  // Basic Auth)", 401 im Sandbox-Test 2026-08-27).
   return fetch(`${c.base}${path}`, {
     ...init,
     headers: {
       ...init.headers,
       Authorization: `Bearer ${token}`,
-      'dhl-api-key': c.apiKey,
       Accept: 'application/json',
     },
   })
@@ -245,7 +247,11 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
   )
 
   const json = (await res.json().catch(() => null)) as {
+    // Fehler kommen je nach Schicht verschachtelt (status.detail) ODER
+    // flach (title/detail direkt am Wurzelobjekt, z. B. Gateway-401er).
     status?: { title?: string; detail?: string }
+    title?: string
+    detail?: string
     items?: {
       shipmentNo?: string
       sstatus?: { title?: string; detail?: string }
@@ -265,7 +271,7 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
     })
 
   if (!res.ok || !json) {
-    const message = `DHL lehnte die Sendung ab (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? 'unbekannter Fehler'}`
+    const message = `DHL lehnte die Sendung ab (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'}`
     await logCreate(false, message)
     throw new DhlError(message, res.status, json)
   }
@@ -419,11 +425,13 @@ export async function createReturnLabel(
     qrLabel?: { b64?: string }
     qrLink?: string
     status?: { detail?: string; title?: string }
+    title?: string
+    detail?: string
   } | null
 
   if (!res.ok || !json?.shipmentNo) {
     const message =
-      `Retourenlabel abgelehnt (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? 'unbekannter Fehler'}. ` +
+      `Retourenlabel abgelehnt (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'}. ` +
       `Voraussetzung ist ein Retouren-Vertrag mit im GKP angelegtem Retourenempfänger.`
     await protokoll({
       kind: 'return_label', reference, ok: false, statusCode: res.status,
