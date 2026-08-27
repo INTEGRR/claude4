@@ -1623,10 +1623,15 @@ export async function phaseBewertung(lauf: Lauf): Promise<void> {
 // --- Phase 8: Abschluss -----------------------------------------------------
 
 /**
- * Nummernkreise über das Maximum der übernommenen Belegnummern ziehen
- * (`sequences.next_number` — der 0026-Trigger hält die PG-Sequenz synchron),
+ * Nummernkreise über das Maximum der übernommenen Belegnummern ziehen,
  * MO-Kreis auf das gewohnte WH/MO/-Bild angleichen, Analytik auffrischen.
  * Der Daten-TÜV läuft danach im CLI als harte Abnahme.
+ *
+ * Wichtig: gestellt werden BEIDE Seiten — sequences.next_number (nur noch
+ * Startwert) UND die PG-Sequenz seq_<code>, aus der next_sequence() seit
+ * 0026 tatsächlich zieht. Der sequences-Trigger synchronisiert nur bei
+ * INSERT; ohne setval stünde die nächste Belegnummer mitten im Altbestand
+ * und der erste neue Beleg kollidierte mit der Unique-Constraint.
  */
 export async function phaseAbschluss(lauf: Lauf): Promise<void> {
   const { ziel } = lauf
@@ -1646,6 +1651,7 @@ export async function phaseAbschluss(lauf: Lauf): Promise<void> {
     const maximum = nummernMaximum(nummern, kreis.praefix)
     if (maximum > 0) {
       await ziel`update sequences set next_number = ${maximum + 1} where code = ${kreis.code}`
+      await ziel`select setval(${`seq_${kreis.code}`}, ${maximum}, true)`
       lauf.meldung(`Nummernkreis ${kreis.code}: weiter bei ${kreis.praefix}${String(maximum + 1).padStart(5, '0')}.`)
     }
   }

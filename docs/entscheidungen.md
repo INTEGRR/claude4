@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-27 — Nummernkreis-Reparatur: Backing-Sequenz gehört zur Angleichung
+
+Der Odoo-Import zog die Nummernkreise nur über `sequences.next_number`
+hoch — seit Migration 0026 ist die Tabelle aber nur der Startwert, vergeben
+wird aus der PG-Sequenz `seq_<code>` (der Trigger synchronisiert nur bei
+INSERT). Folge auf der importierten Prod-Instanz: der nächste Auftrag hätte
+S00001 gezogen und wäre an der Unique-Constraint gescheitert; lokal ließ
+derselbe Zustand die Unit-Tests reihenweise mit Duplikat-Nummern platzen.
+Dreifache Schließung nach dem Wächter-Prinzip:
+
+- Migration `0076_nummernkreise_angleichen.sql` stellt die Sequenzen von
+  sale/purchase/mo vorwärts-idempotent auf den höchsten vorhandenen Beleg
+  (No-Op auf frischen Instanzen, nie rückwärts).
+- `phaseAbschluss` des Odoo-Imports setzt ab jetzt beide Seiten
+  (`next_number` UND `setval` auf die Sequenz).
+- Neuer Daten-TÜV-**Befund** „Nummernkreise vor dem Belegbestand": die
+  nächste vergebene Nummer je Kreis muss über dem höchsten Beleg liegen —
+  damit fällt diese Fehlerklasse künftig in der Import-Abnahme und im
+  nächtlichen Lauf auf, nicht erst beim ersten neuen Beleg.
+
+Doku: [migration-odoo.md](migration-odoo.md).
+
 ## 2026-08-25 — KI-Kosten: Prompt-Caching und Größenkappung statt Voll-Preis je Runde
 
 Vier Auswertungen über die frisch importierten Echtdaten kosteten ~30 €:

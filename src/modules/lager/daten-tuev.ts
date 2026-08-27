@@ -151,6 +151,49 @@ const PRUEFUNGEN: Pruefung[] = [
     },
   },
   {
+    // Belegnummern kommen seit 0026 aus PG-Sequenzen (seq_<kreis>). Steht
+    // eine Sequenz hinter den vorhandenen Belegen (Import, Handeingriff),
+    // crasht der NÄCHSTE neue Beleg mit einer Duplikat-Nummer — auf der
+    // Odoo-importierten Instanz genau so passiert (seq_sale bei 1, Belege
+    // bis S01877). Die nächste vergebene Nummer muss je Kreis über dem
+    // höchsten Beleg liegen, der dem Muster des Kreises entspricht.
+    name: 'Nummernkreise vor dem Belegbestand',
+    art: 'befund',
+    async lauf(client) {
+      const kreise = [
+        { code: 'sale', tabelle: 'sales_orders' },
+        { code: 'purchase', tabelle: 'purchase_orders' },
+        { code: 'mo', tabelle: 'manufacturing_orders' },
+      ]
+      const treffer: string[] = []
+      for (const k of kreise) {
+        const [zeile] = (await client.unsafe(`
+          with stand as (
+            select prefix, padding, next_number from sequence_state()
+            where code = '${k.code}')
+          select s.prefix, s.padding, s.next_number::text as naechste,
+                 coalesce(max((regexp_match(t.number,
+                   '^' || s.prefix || '([0-9]+)$'))[1]::bigint), 0)::text as max_nr
+          from stand s
+          left join ${k.tabelle} t on t.number like s.prefix || '%'
+          group by s.prefix, s.padding, s.next_number`)) as {
+          prefix: string
+          padding: number
+          naechste: string
+          max_nr: string
+        }[]
+        if (!zeile) continue
+        if (Number(zeile.max_nr) >= Number(zeile.naechste)) {
+          const pad = (n: string) => zeile.prefix + n.padStart(zeile.padding, '0')
+          treffer.push(
+            `${k.code}: nächste Nummer wäre ${pad(zeile.naechste)}, höchster Beleg ist ${pad(zeile.max_nr)}`,
+          )
+        }
+      }
+      return treffer
+    },
+  },
+  {
     // Physisch kann ein Regal nicht weniger als nichts enthalten. Fachlich
     // erlaubt das System Überbuchung (liefern, was gleich ankommt) — deshalb
     // Warnung, nicht Befund: der Zustand heißt „Inventur nötig".
