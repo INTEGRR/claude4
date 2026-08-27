@@ -52,6 +52,38 @@ export const FERTIGUNG = {
     revalidate: ['/fertigung/:id'],
   },
 
+  'fertigung.zettel_drucken': {
+    label: 'Fertigungszettel drucken (Auswahl)',
+    bereich: 'fertigung',
+    beschreibung:
+      'Reiht die Fertigungszettel der ausgewählten Aufträge an der Druckbrücke ein ' +
+      '(Ziel „zetteldrucker"). Ohne konfigurierte Druckbrücke öffnet stattdessen der ' +
+      'Sammeldruck im Browser.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      ids: z.array(z.string().uuid()).min(1).describe('Fertigungsauftrags-IDs'),
+    }),
+    formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
+    revalidate: ['/fertigung', '/integrationen'],
+  },
+
+  'fertigung.massenstart': {
+    label: 'Produktion starten (Auswahl)',
+    bereich: 'fertigung',
+    beschreibung:
+      'Startet die ausgewählten bestätigten Fertigungsaufträge in einem Zug. Aufträge, ' +
+      'die inzwischen nicht mehr startbar sind (Material nicht vollständig reserviert, ' +
+      'Status verändert), werden übersprungen und namentlich gemeldet.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      ids: z.array(z.string().uuid()).min(1).describe('Fertigungsauftrags-IDs'),
+    }),
+    formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
+    revalidate: ['/fertigung'],
+  },
+
   'fertigung.verfuegbarkeit_pruefen': {
     label: 'Verfügbarkeit prüfen',
     bereich: 'fertigung',

@@ -18,6 +18,13 @@
  *   Eigenes Kommando über DRUCK_KOMMANDO, z. B.:
  *     DRUCK_KOMMANDO='SumatraPDF.exe -print-to "Zebra GK420d" {datei}'
  *
+ * Mehrere Drucker/PCs: EIN Agent bedient EINEN Drucker. DRUCK_ZIELE nennt
+ * die Auftrags-Ziele, die dieser Agent zieht (z. B. "labeldrucker" am
+ * Packtisch, "zetteldrucker" am Werkstatt-PC); ohne DRUCK_ZIELE zieht er
+ * alles (Ein-PC-Aufbau). Für zwei Drucker am selben PC laufen zwei
+ * Agenten mit unterschiedlichen DRUCK_ZIELE/DRUCKER. DRUCK_AGENT_NAME
+ * benennt den Agenten auf der Integrationen-Seite (Standard: die Ziele).
+ *
  * Einrichtung Schritt für Schritt: docs/module/versand.md → „Druckbrücke".
  */
 import { execFile } from 'node:child_process'
@@ -29,6 +36,8 @@ import { promisify } from 'node:util'
 const KRNL_URL = process.env.KRNL_URL?.replace(/\/$/, '')
 const TOKEN = process.env.DRUCK_AGENT_TOKEN
 const DRUCKER = process.env.DRUCKER ?? ''
+const ZIELE = (process.env.DRUCK_ZIELE ?? '').trim()
+const NAME = (process.env.DRUCK_AGENT_NAME ?? '').trim()
 const INTERVALL_MS = Number(process.env.DRUCK_INTERVALL_MS ?? 3000)
 
 if (!KRNL_URL || !TOKEN) {
@@ -69,7 +78,11 @@ interface Auftrag {
 }
 
 async function runde(): Promise<number> {
-  const res = await fetch(`${KRNL_URL}/api/druck/abholen`, {
+  const params = new URLSearchParams()
+  if (ZIELE) params.set('ziele', ZIELE)
+  if (NAME) params.set('name', NAME)
+  const query = params.size > 0 ? `?${params}` : ''
+  const res = await fetch(`${KRNL_URL}/api/druck/abholen${query}`, {
     headers: { authorization: `Bearer ${TOKEN}` },
   })
   if (!res.ok) {
@@ -102,7 +115,9 @@ async function runde(): Promise<number> {
   return jobs.length
 }
 
-console.log(`Druckbrücke aktiv — ${KRNL_URL}, Kommando: ${KOMMANDO}`)
+console.log(
+  `Druckbrücke aktiv — ${KRNL_URL}, Ziele: ${ZIELE || 'alle'}, Kommando: ${KOMMANDO}`,
+)
 let stoerungGemeldet = false
 for (;;) {
   try {

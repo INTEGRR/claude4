@@ -241,15 +241,17 @@ export default async function IntegrationenPage() {
   const [syncState] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`
 
-  // Druckbrücke: lebt der Agent (letzter Abruf), und hängt etwas fest?
-  const [druck] = await sql<
-    { letzter_abruf: string | null; offen: number; fehler: number }[]
-  >`
+  // Druckbrücke: welche Agenten leben (letzter Abruf je Agent), und hängt
+  // etwas fest?
+  const [druck] = await sql<{ agenten: Record<string, string> | null; offen: number; fehler: number }[]>`
     select
-      (select value ->> 'letzter_abruf' from settings where key = 'druckbruecke') as letzter_abruf,
+      (select value -> 'agenten' from settings where key = 'druckbruecke') as agenten,
       (select count(*) from druckauftraege where status = 'offen')::int as offen,
       (select count(*) from druckauftraege where status = 'fehler'
         and created_at > now() - interval '7 days')::int as fehler`
+  const druckAgenten = Object.entries(druck.agenten ?? {}).sort(
+    (a, b) => (a[1] < b[1] ? 1 : -1),
+  )
 
   const events = await sql<
     { id: string; topic: string; status: string; error: string | null; received_at: string; order_id: string | null }[]
@@ -367,8 +369,13 @@ export default async function IntegrationenPage() {
               'DRUCK_AGENT_TOKEN setzen — bis dahin öffnet das Label als Tab'
             ) : (
               <>
-                Letzter Abruf:{' '}
-                <span className="mono">{druck.letzter_abruf ? dateTime(druck.letzter_abruf) : 'nie'}</span>
+                {druckAgenten.length === 0
+                  ? 'Noch kein Agent gemeldet'
+                  : druckAgenten.map(([name, zeit]) => (
+                      <span key={name}>
+                        {name}: <span className="mono">{dateTime(zeit)}</span>{' '}
+                      </span>
+                    ))}
                 {druck.offen > 0 && <> · {druck.offen} offen</>}
                 {druck.fehler > 0 && <> · {druck.fehler} Fehler (7 Tage)</>}
               </>

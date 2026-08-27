@@ -2,19 +2,22 @@ import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
-import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, qty } from '@/modules/shared/format'
+import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { createMo } from './actions'
+import { FertigungBulk } from './bulk'
 
 export const dynamic = 'force-dynamic'
 
 export default async function FertigungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; produkt?: string; material?: string }>
 }) {
   await requireArea('fertigung')
-  const { status } = await searchParams
+  const { status, produkt: produktRoh, material } = await searchParams
+  // Das GET-Formular schickt produkt= auch leer mit — ''::uuid wäre ein 500.
+  const produkt = produktRoh || undefined
+  const nurStartbare = material === 'bereit'
 
   const rows = await sql<
     {
@@ -39,10 +42,17 @@ export default async function FertigungPage({
     from manufacturing_orders mo
     left join sales_orders so on so.id = mo.sales_order_id
     where (${status ?? null}::text is null or mo.state = ${status ?? null}::mo_state)
+      and (${produkt ?? null}::uuid is null or mo.variant_id = ${produkt ?? null}::uuid)
     order by
       case mo.state when 'progress' then 0 when 'confirmed' then 1 when 'draft' then 2 else 3 end,
       mo.scheduled_date
     limit 200`
+
+  // „Nur startbare": bestätigt UND Material vollständig reserviert — die
+  // Auswahlmenge des Bulk-Starts (BUG/00003).
+  const gefiltert = nurStartbare
+    ? rows.filter((r) => r.state === 'confirmed' && r.missing === 0)
+    : rows
 
   const products = await sql<{ id: string; label: string }[]>`
     select distinct pv.id, coalesce(pv.display_name, pt.name) as label
@@ -97,67 +107,48 @@ export default async function FertigungPage({
 
       <Card tight>
         {/* Filter: der aktive Zustand wird von der LED getragen, nicht von einer
-            orangen Fläche — der Akzent bleibt der Primärtaste vorbehalten. */}
-        <div className="actions" style={{ padding: 12 }}>
-          {filters.map((f) => (
-            <Link
-              key={f.label}
-              href={f.key ? `/fertigung?status=${f.key}` : '/fertigung'}
-              className="btn small"
-              aria-current={status === f.key ? 'page' : undefined}
-            >
-              <span className={`led ${status === f.key ? 'on' : 'off'}`} />
-              {f.label}
-            </Link>
-          ))}
+            orangen Fläche — der Akzent bleibt der Primärtaste vorbehalten.
+            Produkt/Material bleiben in den Status-Links erhalten. */}
+        <div className="actions" style={{ padding: 12, flexWrap: 'wrap' }}>
+          {filters.map((f) => {
+            const params = new URLSearchParams()
+            if (f.key) params.set('status', f.key)
+            if (produkt) params.set('produkt', produkt)
+            if (nurStartbare) params.set('material', 'bereit')
+            const query = params.toString()
+            return (
+              <Link
+                key={f.label}
+                href={query ? `/fertigung?${query}` : '/fertigung'}
+                className="btn small"
+                aria-current={status === f.key ? 'page' : undefined}
+              >
+                <span className={`led ${status === f.key ? 'on' : 'off'}`} />
+                {f.label}
+              </Link>
+            )
+          })}
+          <form method="get" className="actions" style={{ gap: 8 }}>
+            {status && <input type="hidden" name="status" value={status} />}
+            <select name="produkt" defaultValue={produkt ?? ''} aria-label="Nach Produkt filtern">
+              <option value="">Alle Produkte</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+            <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <input type="checkbox" name="material" value="bereit" defaultChecked={nurStartbare} />
+              <span>nur startbare</span>
+            </label>
+            <button className="small" type="submit">Filtern</button>
+          </form>
         </div>
 
-        {rows.length === 0 ? (
-          <Empty>Keine Fertigungsaufträge.</Empty>
+        {gefiltert.length === 0 ? (
+          <Empty>Keine Fertigungsaufträge{nurStartbare ? ' mit vollständigem Material' : ''}.</Empty>
         ) : (
           <TableWrap>
-            <table>
-              <thead>
-                <tr>
-                  <th>Nummer</th>
-                  <th>Produkt</th>
-                  <th className="num">Menge</th>
-                  <th>Status</th>
-                  <th>Material</th>
-                  <th>Auftrag</th>
-                  <th>Termin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className="mono"><Link href={`/fertigung/${r.id}`}>{r.number}</Link></td>
-                    <td>{r.product}</td>
-                    <td className="num mono">
-                      {qty(r.qty_produced)} / {qty(r.qty_to_produce)}
-                    </td>
-                    <td><Badge state={r.state} kind="mo" /></td>
-                    <td>
-                      {r.state === 'done' || r.state === 'cancel' ? (
-                        <span className="muted small">—</span>
-                      ) : r.missing > 0 ? (
-                        <span className="badge warn">{r.missing} fehlt</span>
-                      ) : (
-                        <span className="badge success">vollständig</span>
-                      )}
-                    </td>
-                    <td className="mono">
-                      {r.sales_order_id ? (
-                        <Link href={`/verkauf/${r.sales_order_id}`}>{r.sales_order_number}</Link>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td className="mono nowrap">{date(r.scheduled_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <FertigungBulk rows={gefiltert} />
           </TableWrap>
         )}
       </Card>

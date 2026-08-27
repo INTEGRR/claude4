@@ -130,12 +130,22 @@ startet direkt das nächste Paket.
 
 ## Druckbrücke (stiller Labeldruck am Packtisch)
 
-Die App (Vercel) erreicht den LAN-Drucker nie — deshalb ein
-**Pull-Modell**: `versand.packtisch_abschliessen` reiht das Label als
-Druckauftrag ein (Tabelle `druckauftraege`, idempotent solange einer
-offen ist), und ein kleiner Agent auf dem Packtisch-PC holt ab, druckt
-und quittiert. Kein Benutzer-Login auf dem Gerät; authentifiziert wird
-über das gemeinsame Token.
+Die App (Vercel) erreicht die LAN-Drucker nie — deshalb ein
+**Pull-Modell**: Aktionen reihen Druckaufträge ein (Tabelle
+`druckauftraege`, idempotent solange einer offen ist), und kleine Agenten
+auf den Arbeitsplatz-PCs holen ab, drucken und quittieren. Kein
+Benutzer-Login auf den Geräten; authentifiziert wird über das gemeinsame
+Token.
+
+Die Brücke ist **mehrstationig** (Migration 0078): jeder Auftrag trägt
+eine Art (`label` = DHL-Label vom Packtisch-Abschluss, `zettel` =
+Fertigungszettel aus dem Bulk-Druck) und ein **Ziel** (`labeldrucker`
+bzw. `zetteldrucker`). Ein Agent bedient EINEN Drucker und nennt per
+`DRUCK_ZIELE` die Ziele, die er zieht — beliebig viele Agenten und PCs;
+für zwei Drucker am selben PC laufen zwei Agenten. Ohne `DRUCK_ZIELE`
+zieht ein Agent alles (Ein-PC-Aufbau). Labels kommen aus der
+gespeicherten Sendung, Zettel werden beim Abholen frisch als PDF
+gerendert (src/modules/fertigung/zettel-pdf.tsx).
 
 **Einrichtung:**
 
@@ -149,7 +159,9 @@ und quittiert. Kein Benutzer-Login auf dem Gerät; authentifiziert wird
    ```powershell
    $env:KRNL_URL = "https://<instanz>.vercel.app"
    $env:DRUCK_AGENT_TOKEN = "<dasselbe Token>"
-   $env:DRUCKER = "Zebra GK420d"     # optional, sonst Standarddrucker
+   $env:DRUCKER = "Zebra GK420d"       # optional, sonst Standarddrucker
+   $env:DRUCK_ZIELE = "labeldrucker"   # optional: nur diese Ziele ziehen
+   $env:DRUCK_AGENT_NAME = "packtisch" # optional: Name auf der Integrationen-Karte
    node druck-agent.ts
    ```
 
@@ -159,13 +171,14 @@ und quittiert. Kein Benutzer-Login auf dem Gerät; authentifiziert wird
    `DRUCK_KOMMANDO` mit den Platzhaltern `{datei}` und `{drucker}`.
 
 Der Agent fragt alle 3 Sekunden (`DRUCK_INTERVALL_MS`) nach den ältesten
-offenen Aufträgen (`GET /api/druck/abholen`, Bearer-Token; liefert die
-PDFs base64), druckt und meldet je Auftrag ok/fehler
-(`POST /api/druck/quittieren`). Solange Aufträge kommen, zieht er ohne
-Pause weiter (Fließband). Diagnose auf der Integrationen-Seite: Karte
-„Druckbrücke" mit letztem Abruf des Agenten, offenen Aufträgen und
-Fehlern der letzten 7 Tage. Ein Auftrag ohne gespeichertes Label-PDF
-wird serverseitig sofort als Fehler quittiert.
+offenen Aufträgen seiner Ziele (`GET /api/druck/abholen?ziele=…&name=…`,
+Bearer-Token; liefert die PDFs base64), druckt und meldet je Auftrag
+ok/fehler (`POST /api/druck/quittieren`). Solange Aufträge kommen, zieht
+er ohne Pause weiter (Fließband). Diagnose auf der Integrationen-Seite:
+Karte „Druckbrücke" mit letztem Abruf **je Agent**, offenen Aufträgen und
+Fehlern der letzten 7 Tage. Ein Label-Auftrag ohne gespeichertes PDF wird
+serverseitig sofort als Fehler quittiert, ein Zettel-Auftrag ebenso, wenn
+sein Rendern scheitert.
 
 ## Massendruck (Fließband am Packtisch)
 

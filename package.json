@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
+    "@react-pdf/renderer": "^4.8.1",
     "@xyflow/react": "^12.11.3",
     "bwip-js": "^4.5.1",
     "elkjs": "^0.12.0",

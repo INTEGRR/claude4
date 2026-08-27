@@ -69,9 +69,13 @@ Formular: Variante, BoM (auto), Menge, optionaler Ursprungs-MO, Quell-/Ziellager
 
 ## Drucken
 
-Umgesetzt als HTML-Druckansicht (`/fertigung/<id>/druck`, `window.print()`)
-mit serverseitigen SVG-Barcodes (bwip-js) — bewusst kein PDF-Renderer und
-keine Datei-Ablage, der Beleg entsteht bei jedem Aufruf frisch:
+Der Zettel existiert in zwei Ausgaben aus EINER Datenquelle
+(`src/modules/fertigung/zettel-daten.ts`): als HTML-Druckansicht
+(`/fertigung/<id>/druck`, `window.print()`; Sammeldruck mehrerer Zettel:
+`/fertigung/druck?ids=…`) und als PDF für die **Druckbrücke**
+(react-pdf, Ziel „zetteldrucker" — docs/module/versand.md). Barcodes
+serverseitig über bwip-js (SVG im HTML, PNG im PDF); keine Datei-Ablage,
+der Beleg entsteht bei jedem Aufruf frisch:
 
 - Kopf: **zwei beschriftete Code-128-Barcodes** — `FERTIGUNG` (MO-Nummer,
   schließt am Scanner die Produktion ab) und `VERSAND` (Nummer der
@@ -87,6 +91,28 @@ keine Datei-Ablage, der Beleg entsteht bei jedem Aufruf frisch:
   zum Packtisch (Ablauf: docs/module/versand.md).
 - Für Lieferungen ohne Fertigung gibt es das Gegenstück **Packzettel**
   (`/lager/<id>/druck`, docs/module/versand.md).
+
+## Bulk: Zettel drucken → Produktion starten (BUG/00003)
+
+Serienfertigung ohne Einzelklicks: `/fertigung` filtert nach Status,
+**Produkt** und „**nur startbare**" (bestätigt + Material vollständig
+reserviert); startbare Aufträge sind anhakbar, „Alle auswählen" nimmt die
+gefilterte Liste. Der Abschluss ist eine **2-Stufen-Maske**:
+
+1. **Zettel drucken** (`fertigung.zettel_drucken`): reiht die
+   Fertigungszettel an der Druckbrücke ein (Ziel „zetteldrucker",
+   idempotent je Auftrag). Ohne konfigurierte Druckbrücke öffnet
+   stattdessen der Sammeldruck `/fertigung/druck?ids=…` im Tab.
+2. **Druck ok → Produktion starten** (`fertigung.massenstart`) — erst
+   nach Stufe 1 frei; jede Änderung der Auswahl setzt zurück auf Stufe 1.
+   Gestartet wird je Auftrag einzeln (`mo_start`); was inzwischen nicht
+   mehr startbar ist (Status verändert, Material nicht mehr vollständig
+   reserviert), wird übersprungen und **namentlich gemeldet** — ein
+   Einzelfehler bricht den Lauf nicht ab.
+
+Beides sind prozessfreie Registry-Werkzeuge durch den Torwächter (wie der
+Label-Massendruck im Versand): Bulk ist Bedienkomfort über den
+bestehenden Einzelaktionen, kein zweiter Statusweg.
 
 ## Abnahmekriterien
 

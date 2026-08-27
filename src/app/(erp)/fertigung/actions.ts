@@ -27,6 +27,14 @@ export async function checkAvailability(moId: string): Promise<ActionResult> {
   return serverAktion('fertigung.verfuegbarkeit_pruefen', { recordId: moId })
 }
 
+export async function bulkZettel(formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.zettel_drucken', { formData })
+}
+
+export async function bulkStart(formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.massenstart', { formData })
+}
+
 export async function produceMo(moId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('fertigung.fertig_melden', { recordId: moId, formData })
 }

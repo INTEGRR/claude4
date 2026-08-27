@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-27 — Bulk-Fertigung über die Druckbrücke; ein Agent je Drucker (BUG/00003)
+
+Bestätigte Fertigungsaufträge mit vollständigem Material sollen als Serie
+laufen: auswählen (Filter Status/Produkt/„nur startbare"), Zettel drucken,
+nach Druckbestätigung im Bulk starten. Entscheidungen:
+
+- **Zwei prozessfreie Registry-Werkzeuge** statt neuer Prozessschritte:
+  `fertigung.zettel_drucken` und `fertigung.massenstart` (Muster
+  Label-Massendruck) — Bulk ist Bedienkomfort über den Einzelaktionen,
+  kein zweiter Statusweg. Die 2-Stufen-Maske erzwingt die Reihenfolge
+  Drucken → Starten in der Oberfläche; Konfliktfälle werden übersprungen
+  und namentlich gemeldet, nie der ganze Lauf abgebrochen.
+- **Die Druckbrücke wird mehrstationig** (Migration 0078): Aufträge
+  tragen Art (`label`|`zettel`) und **Ziel** (`labeldrucker`|
+  `zetteldrucker`); ein Agent = ein Drucker, Agenten ziehen nur ihre
+  Ziele (`DRUCK_ZIELE`), beliebig viele PCs. Damit revidiert sich die
+  Packtisch-Entscheidung „Zettel nur per Browser-Druck" vom selben Tag —
+  der Betreiber wollte ausdrücklich beide Auftragsarten über die Brücke
+  und mehrere Geräte.
+- **Der Zettel bekommt eine PDF-Ausgabe** (react-pdf, Barcodes als
+  bwip-js-PNG) aus derselben Datenquelle wie die HTML-Druckseite
+  (`zettel-daten.ts`) — zwei Ausgaben, eine Wahrheit; der
+  Browser-Sammeldruck (`/fertigung/druck?ids=…`) bleibt der Fallback
+  ohne konfigurierte Brücke.
+
+Doku: [module/fertigung.md](module/fertigung.md) (Bulk + Drucken),
+[module/versand.md](module/versand.md) (Druckbrücke mehrstationig).
+
 ## 2026-08-27 — Packtisch: ein Prozessschritt, Harness-Ausnahme, Druckbrücke im Pull-Modell
 
 ANVILs Versandablauf am Packtisch (Zettel scannen → Artikel gegenscannen →

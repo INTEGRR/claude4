@@ -73,6 +73,8 @@ export const AUSFUEHRUNG = {
   'fertigung.auftrag_anlegen': fertigung.auftragAnlegen,
   'fertigung.bestaetigen': fertigung.bestaetigen,
   'fertigung.beginnen': fertigung.beginnen,
+  'fertigung.zettel_drucken': fertigung.zettelDrucken,
+  'fertigung.massenstart': fertigung.massenstart,
   'fertigung.verfuegbarkeit_pruefen': fertigung.verfuegbarkeitPruefen,
   'fertigung.fertig_melden': fertigung.fertigMelden,
   'fertigung.stornieren': fertigung.stornieren,

@@ -1,4 +1,5 @@
 import { sql } from '@/db/client'
+import { druckbrueckeKonfiguriert, zettelDruckEinreihen } from '@/modules/versand/druckbruecke'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Fertigungs-Aktionen — Fachlogik unverändert aus fertigung/actions.ts. */
@@ -24,6 +25,81 @@ export async function bestaetigen(_p: object, ctx: AktionsKontext): Promise<Akti
 export async function beginnen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select mo_start(${ctx.recordId!}, ${ctx.actor})`
   return { recordId: ctx.recordId }
+}
+
+/**
+ * Bulk-Zettel: Druckaufträge fürs Ziel „zetteldrucker" einreihen. Ohne
+ * konfigurierte Druckbrücke gibt es stattdessen den Link auf den
+ * Browser-Sammeldruck — der Knopf tut dann sichtbar das Nächstbeste.
+ */
+export async function zettelDrucken(p: { ids: string[] }): Promise<AktionsErgebnis> {
+  if (!druckbrueckeKonfiguriert()) {
+    return {
+      text: 'Druckbrücke nicht konfiguriert — Sammeldruck im Browser geöffnet.',
+      link: `/fertigung/druck?ids=${p.ids.join(',')}`,
+    }
+  }
+  const eingereiht = await zettelDruckEinreihen(p.ids)
+  const doppelt = p.ids.length - eingereiht
+  return {
+    text:
+      `${eingereiht} Zettel an der Druckbrücke eingereiht` +
+      (doppelt > 0 ? ` (${doppelt} warteten dort schon)` : '') +
+      '.',
+  }
+}
+
+/**
+ * Bulk-Start (BUG/00003): jeden Auftrag einzeln starten — startbar ist,
+ * was bestätigt ist und dessen Material vollständig reserviert wurde.
+ * Wer zwischen Druck und Start herausgefallen ist, wird übersprungen und
+ * namentlich gemeldet; ein Einzelfehler bricht den Lauf nicht ab.
+ */
+export async function massenstart(
+  p: { ids: string[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const kandidaten = await sql<{ id: string; number: string; state: string; missing: number }[]>`
+    select mo.id, mo.number, mo.state,
+           (select count(*) from stock_moves m
+             where m.production_id = mo.id and m.state not in ('done', 'cancel')
+               and m.reserved_qty < m.qty)::int as missing
+    from manufacturing_orders mo
+    where mo.id = any(${p.ids})`
+
+  const gestartet: string[] = []
+  const uebersprungen: string[] = []
+  for (const mo of kandidaten) {
+    if (mo.state !== 'confirmed') {
+      uebersprungen.push(`${mo.number} (Status ${mo.state})`)
+      continue
+    }
+    if (mo.missing > 0) {
+      uebersprungen.push(`${mo.number} (Material nicht vollständig reserviert)`)
+      continue
+    }
+    try {
+      await sql`select mo_start(${mo.id}, ${ctx.actor})`
+      gestartet.push(mo.number)
+    } catch (err) {
+      uebersprungen.push(
+        `${mo.number} (${(err instanceof Error ? err.message : String(err)).replace(/^error: /, '')})`,
+      )
+    }
+  }
+
+  if (gestartet.length === 0) {
+    throw new Error(
+      uebersprungen.length > 0
+        ? `Kein Auftrag gestartet — übersprungen: ${uebersprungen.join(', ')}.`
+        : 'Keiner der ausgewählten Aufträge wurde gefunden.',
+    )
+  }
+  return {
+    text:
+      `${gestartet.length} Fertigungsauftrag/-aufträge gestartet.` +
+      (uebersprungen.length > 0 ? ` Übersprungen: ${uebersprungen.join(', ')}.` : ''),
+  }
 }
 
 export async function verfuegbarkeitPruefen(
