@@ -1,5 +1,5 @@
 import { sql } from '@/db/client'
-import { druckbrueckeKonfiguriert, zettelDruckEinreihen } from '@/modules/versand/druckbruecke'
+import { druckbrueckeAktiv, zettelDruckEinreihen } from '@/modules/versand/druckbruecke'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Fertigungs-Aktionen — Fachlogik unverändert aus fertigung/actions.ts. */
@@ -33,9 +33,9 @@ export async function beginnen(_p: object, ctx: AktionsKontext): Promise<Aktions
  * Browser-Sammeldruck — der Knopf tut dann sichtbar das Nächstbeste.
  */
 export async function zettelDrucken(p: { ids: string[] }): Promise<AktionsErgebnis> {
-  if (!druckbrueckeKonfiguriert()) {
+  if (!(await druckbrueckeAktiv())) {
     return {
-      text: 'Druckbrücke nicht konfiguriert — Sammeldruck im Browser geöffnet.',
+      text: 'PDF-Modus — Sammeldruck im Browser geöffnet (umstellen: Einstellungen → Druckbrücke).',
       link: `/fertigung/druck?ids=${p.ids.join(',')}`,
     }
   }

@@ -7,7 +7,7 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
-import { druckbrueckeKonfiguriert } from '@/modules/versand/druckbruecke'
+import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
@@ -252,6 +252,8 @@ export default async function IntegrationenPage() {
   const druckAgenten = Object.entries(druck.agenten ?? {}).sort(
     (a, b) => (a[1] < b[1] ? 1 : -1),
   )
+  const druckKonfig = await druckbrueckeKonfig()
+  const brueckeAktiv = druckKonfig.modus === 'bruecke' && Boolean(druckKonfig.token)
 
   const events = await sql<
     { id: string; topic: string; status: string; error: string | null; received_at: string; order_id: string | null }[]
@@ -363,10 +365,10 @@ export default async function IntegrationenPage() {
         />
         <Stat
           label="Druckbrücke"
-          value={<Verbindung ok={druckbrueckeKonfiguriert()} />}
+          value={<Verbindung ok={brueckeAktiv} />}
           hint={
-            !druckbrueckeKonfiguriert() ? (
-              'DRUCK_AGENT_TOKEN setzen — bis dahin öffnet das Label als Tab'
+            !brueckeAktiv ? (
+              'PDF-Modus — Labels/Zettel öffnen im Browser (Einstellungen → Druckbrücke)'
             ) : (
               <>
                 {druckAgenten.length === 0

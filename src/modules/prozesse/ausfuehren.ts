@@ -48,6 +48,7 @@ export const AUSFUEHRUNG = {
 
   'einstellungen.firma_speichern': einstellungen.firmaSpeichern,
   'einstellungen.ki_modelle_setzen': einstellungen.kiModelleSetzen,
+  'einstellungen.druckbruecke_setzen': einstellungen.druckbrueckeSetzen,
   'einstellungen.demodaten_einspielen': einstellungen.demodatenEinspielenAktion,
   'einstellungen.einrichtung_abschliessen': einstellungen.einrichtungAbschliessen,
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,

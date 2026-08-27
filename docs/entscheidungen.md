@@ -9,6 +9,23 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-27 — Druckweg ist eine Einstellung, keine Env-Variable
+
+Der Betreiber wollte zum Testen erst PDFs im Browser und lehnte die
+Env-Konfiguration ab („solche Settings bitte nicht in envs — das sind
+Einstellungen"). Konsequenz, nach dem Muster der KI-Modellwahl vom
+25.08.: Der Druckweg (PDF im Browser vs. Druckbrücke) und das
+Agent-Token wandern in die App — Einstellungen → „Druckbrücke",
+Registry-Aktion `einstellungen.druckbruecke_setzen`, settings-Schlüssel
+`druckbruecke` (dort liegen auch die Agenten-Herzschläge). Standard ist
+**PDF im Browser** (kein Setup nötig); beim Umstellen auf die Brücke
+erzeugt die App das Token automatisch, Umschalten wirkt sofort ohne
+Redeploy. `DRUCK_AGENT_TOKEN` bleibt als Env-Notausgang für den Betrieb
+(Reihenfolge: Einstellung → Env → Standard). Faustregel ab jetzt:
+**Betreiber-Entscheidungen sind settings, Env ist nur für
+Infrastruktur-Geheimnisse und Notausgänge.**
+Doku: [module/versand.md](module/versand.md).
+
 ## 2026-08-27 — Bulk-Fertigung über die Druckbrücke; ein Agent je Drucker (BUG/00003)
 
 Bestätigte Fertigungsaufträge mit vollständigem Material sollen als Serie

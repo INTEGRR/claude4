@@ -102,8 +102,10 @@ Schreibrechte im Versand nötig) — dieselbe Scan-Maschine wie der
 Scanner-Arbeitsplatz (Dauerfokus-Feld, Beeps, Leuchten), aber ohne
 Teilmengen: ein Paket ist erst dann ein Paket, wenn alles drin ist.
 
-1. **VERSAND-Code scannen** (vom Fertigungs- oder Packzettel; tippbar sind
-   auch Liefer-, Auftrags- oder Shopify-Nummer). `/api/packtisch/lookup`
+1. **VERSAND-Code scannen** (vom Fertigungs- oder Packzettel). Ohne
+   Scanner gibt es ein sichtbares Eingabefeld für Liefer-, Auftrags-
+   oder Shopify-Nummer — nach dem Öffnen springt der Fokus zurück ans
+   Scanfeld für die Artikel-Scans. `/api/packtisch/lookup`
    liefert die Sendung mit Auftrag, Kunde, Lieferadresse, den Positionen
    (je Variante aggregiert, mit SKU/Barcode) und dem Regelvorschlag für
    Gewicht und DHL-Produkt. Wächter mit Klartext statt stummem Fehler:
@@ -147,11 +149,24 @@ zieht ein Agent alles (Ein-PC-Aufbau). Labels kommen aus der
 gespeicherten Sendung, Zettel werden beim Abholen frisch als PDF
 gerendert (src/modules/fertigung/zettel-pdf.tsx).
 
-**Einrichtung:**
+**Der Druckweg ist eine Betreiber-Einstellung**, keine Env-Variable
+(Einstellungen → „Druckbrücke", Registry-Aktion
+`einstellungen.druckbruecke_setzen`, settings-Schlüssel `druckbruecke`;
+Reihenfolge wie bei den KI-Modellen: Einstellung → Env-Notausgang
+`DRUCK_AGENT_TOKEN` → Standard):
 
-1. In Vercel die Env-Variable `DRUCK_AGENT_TOKEN` setzen (langer
-   Zufallswert, z. B. `openssl rand -hex 32`) und redeployen. Ohne die
-   Variable gilt weiter der Tab-Fallback.
+- **„PDF im Browser"** (Standard): Labels und Zettel öffnen als Tab und
+  laufen über den Browser-Druckdialog — zum Testen und für Aufbauten
+  ohne Agenten, kein Setup nötig.
+- **„Druckbrücke"**: Aufträge gehen in die Warteschlange und die Agenten
+  drucken still. Beim ersten Umstellen erzeugt die App das Agent-Token
+  automatisch; es steht in der Karte zum Kopieren. Gilt sofort, kein
+  Redeploy.
+
+**Einrichtung der Agenten (nur für den Brücken-Modus):**
+
+1. Einstellungen → „Druckbrücke" auf **Druckbrücke** stellen und das
+   Token aus der Karte kopieren.
 2. Auf dem Packtisch-PC: Node ≥ 22 installieren, die Datei
    `scripts/druck-agent.ts` aus dem Repo kopieren (sie ist bewusst
    abhängigkeitsfrei — kein `npm install` nötig) und starten:

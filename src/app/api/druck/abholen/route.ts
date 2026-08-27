@@ -21,7 +21,7 @@ import { agentBerechtigt, zieleAusAnfrage } from '@/modules/versand/druckbruecke
  */
 
 export async function GET(request: Request) {
-  if (!agentBerechtigt(request)) {
+  if (!(await agentBerechtigt(request))) {
     return NextResponse.json({ error: 'Kein gültiges Agent-Token' }, { status: 401 })
   }
 
@@ -29,12 +29,14 @@ export async function GET(request: Request) {
   const ziele = zieleAusAnfrage(url.searchParams.get('ziele'))
   const agent = (url.searchParams.get('name') ?? '').trim() || (ziele?.join('+') ?? 'agent')
 
+  // Herzschlag je Agent — der Schlüssel trägt auch die Betreiber-Konfig
+  // (modus/token), deshalb mergen statt ersetzen.
   await sql`
     insert into settings (key, value)
     values ('druckbruecke', jsonb_build_object('agenten', jsonb_build_object(${agent}::text, now())))
     on conflict (key) do update set value = jsonb_set(
-      case when settings.value ? 'agenten' then settings.value
-           else jsonb_build_object('agenten', '{}'::jsonb) end,
+      settings.value || jsonb_build_object(
+        'agenten', coalesce(settings.value -> 'agenten', '{}'::jsonb)),
       array['agenten', ${agent}::text], to_jsonb(now()))`
 
   const jobs = await sql<

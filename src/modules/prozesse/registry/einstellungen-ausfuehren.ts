@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { sql, tx } from '@/db/client'
 import { REGISTRY } from './index.ts'
 import { JOB_KATALOG } from '../jobs-katalog.ts'
@@ -34,6 +35,37 @@ export async function kiModelleSetzen(
     insert into settings (key, value) values ('ki_modelle', ${sql.json(p)})
     on conflict (key) do update set value = excluded.value`
   return { text: 'KI-Modelle gespeichert — gilt ab der nächsten Anfrage.' }
+}
+
+/**
+ * Druckweg als Betreiber-Einstellung (kein Env-Deployment nötig): „pdf"
+ * zum Testen im Browser, „bruecke" für den stillen Druck. Beim ersten
+ * Umstellen auf die Brücke entsteht das Agent-Token automatisch; die
+ * Agenten-Herzschläge im selben Settings-Schlüssel bleiben erhalten.
+ */
+export async function druckbrueckeSetzen(
+  p: { modus: 'pdf' | 'bruecke'; token?: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [vorhanden] = await sql<{ token: string | null }[]>`
+    select value ->> 'token' as token from settings where key = 'druckbruecke'`
+  const token =
+    p.token ??
+    vorhanden?.token ??
+    (p.modus === 'bruecke' ? randomBytes(24).toString('hex') : null)
+
+  await sql`
+    insert into settings (key, value)
+    values ('druckbruecke', ${sql.json({ modus: p.modus, token })})
+    on conflict (key) do update set value =
+      settings.value || ${sql.json({ modus: p.modus, token })}::jsonb`
+
+  return {
+    text:
+      p.modus === 'pdf'
+        ? 'PDF-Modus aktiv — Labels und Fertigungszettel öffnen im Browser.'
+        : 'Druckbrücke aktiv — Agenten mit dem Token aus der Karte starten (Anleitung: docs/module/versand.md).',
+  }
 }
 
 export async function demodatenEinspielenAktion(

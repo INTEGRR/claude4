@@ -112,6 +112,29 @@ export const EINSTELLUNGEN = {
     revalidate: ['/einstellungen', '/'],
   },
 
+  'einstellungen.druckbruecke_setzen': {
+    label: 'Druckbrücke umstellen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Betreiber-Einstellung für den Labeldruck (settings.druckbruecke): „pdf" öffnet Labels ' +
+      'und Fertigungszettel als PDF im Browser (zum Testen und ohne Agenten), „bruecke" reiht ' +
+      'sie als Druckaufträge für die Agenten an den Arbeitsplatz-PCs ein. Beim Umstellen auf ' +
+      'die Brücke wird ohne vorhandenes Token automatisch eines erzeugt.',
+    bindung: 'frei',
+    schema: z.object({
+      modus: z.enum(['pdf', 'bruecke']).describe('pdf = im Browser öffnen, bruecke = stiller Druck'),
+      token: z.string().max(200).optional().describe('Agent-Token (leer = behalten bzw. erzeugen)'),
+    }),
+    zusammenfassung: (p) => `Modus ${p.modus}`,
+    formdata: (fd) => ({
+      modus: String(fd.get('modus') ?? 'pdf'),
+      token: String(fd.get('token') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/einstellungen', '/integrationen'],
+  },
+
   'einstellungen.ki_modelle_setzen': {
     label: 'KI-Modelle je Ebene festlegen',
     bereich: 'einstellungen',

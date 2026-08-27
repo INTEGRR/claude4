@@ -9,7 +9,7 @@ import { agentBerechtigt } from '@/modules/versand/druckbruecke'
  */
 
 export async function POST(request: Request) {
-  if (!agentBerechtigt(request)) {
+  if (!(await agentBerechtigt(request))) {
     return NextResponse.json({ error: 'Kein gültiges Agent-Token' }, { status: 401 })
   }
 

@@ -36,6 +36,13 @@ async function saveKiModelle(formData: FormData) {
   return serverAktion('einstellungen.ki_modelle_setzen', { formData })
 }
 
+async function saveDruckbruecke(formData: FormData) {
+  'use server'
+  // Prozess First: Druckweg-Umschaltung läuft über die Registry
+  // (einstellungen.druckbruecke_setzen) — Torwächter prüft und auditiert.
+  return serverAktion('einstellungen.druckbruecke_setzen', { formData })
+}
+
 async function saveDhl(formData: FormData) {
   'use server'
   await requireAdmin()
@@ -183,6 +190,8 @@ export default async function EinstellungenPage() {
   const purchase = get<{ lock_confirmed?: boolean }>('purchase')
   const freigaben = get<{ einkauf_limit?: number }>('freigaben')
   const kiModelle = get<Record<string, unknown>>('ki_modelle')
+  const druckbruecke = get<{ modus?: string; token?: string }>('druckbruecke')
+  const druckModus = druckbruecke.modus === 'bruecke' ? 'bruecke' : 'pdf'
   const finanzen = get<Record<string, number>>('finanzen')
 
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
@@ -317,6 +326,52 @@ export default async function EinstellungenPage() {
             Gilt sofort für neue Anfragen. Faustregel: Opus für den Prozess-Entwurf, Sonnet für
             Auswertungen, Haiku für den Sprachmodus — so bleiben die Kosten im Rahmen, ohne
             Qualität dort zu verlieren, wo sie zählt.
+          </div>
+        </ActionForm>
+      </Card>
+
+      <Card title="Druckbrücke (Labels & Fertigungszettel)">
+        <ActionForm action={saveDruckbruecke}>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <input type="radio" name="modus" value="pdf" defaultChecked={druckModus === 'pdf'} />
+              <span>
+                <strong>PDF im Browser</strong> — Labels und Zettel öffnen als Tab, gedruckt wird
+                über den Browser-Dialog (zum Testen, ohne Einrichtung)
+              </span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="radio"
+                name="modus"
+                value="bruecke"
+                defaultChecked={druckModus === 'bruecke'}
+              />
+              <span>
+                <strong>Druckbrücke</strong> — stiller Direktdruck über Agenten an den
+                Arbeitsplatz-PCs (Labeldrucker am Packtisch, A4 in der Werkstatt)
+              </span>
+            </label>
+          </div>
+          <div className="row">
+            <label className="field" style={{ flex: 2 }}>
+              <span>Agent-Token (Ausweis der Druck-Agenten; leer = behalten bzw. beim Umstellen erzeugen)</span>
+              <input
+                type="text"
+                name="token"
+                className="mono"
+                defaultValue={druckbruecke.token ?? ''}
+                placeholder="wird beim Aktivieren der Brücke erzeugt"
+              />
+            </label>
+            <div className="shrink field">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+          <div className="notice info" style={{ marginBottom: 0 }}>
+            Gilt sofort, kein Redeploy nötig. Für die Brücke auf jedem Druck-PC einen Agenten mit
+            diesem Token starten (<span className="mono">scripts/druck-agent.ts</span>, Anleitung
+            in docs/module/versand.md); Zustand der Agenten auf der Integrationen-Seite.
           </div>
         </ActionForm>
       </Card>
