@@ -1,15 +1,35 @@
 import { requireArea } from '@/modules/auth'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
-import { code128 } from '@/modules/shared/barcode'
+import { barcodeSvg, code128 } from '@/modules/shared/barcode'
 import { PrintButton } from '@/components/print-button'
 import { date, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
+/** Beschrifteter Barcode — zwei nackte Code128 sind am Tisch nicht unterscheidbar. */
+function CodeBlock({ svg, label }: { svg: string; label: string }) {
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div
+        className="barcode"
+        aria-label={label}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', marginTop: 2 }}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
 /**
- * Druckbeleg für die Werkstatt: Kopfdaten mit scanbarer Auftragsnummer und
- * die eingefrorene, variantengefilterte Komponentenliste zum Abhaken.
+ * Druckbeleg für die Werkstatt UND den Packtisch: Kopfdaten mit zwei
+ * beschrifteten Barcodes — FERTIGUNG (schließt am Scanner die Produktion
+ * ab) und VERSAND (öffnet am Packtisch die Lieferung des Auftrags) —,
+ * dazu der Artikel-Code des Erzeugnisses und die eingefrorene,
+ * variantengefilterte Komponentenliste zum Abhaken. Der Zettel wandert
+ * mit der Ware bis zum Packtisch (docs/module/versand.md).
  */
 export default async function MoPrintPage({ params }: { params: Promise<{ id: string }> }) {
   await requireArea('fertigung')
@@ -20,19 +40,21 @@ export default async function MoPrintPage({ params }: { params: Promise<{ id: st
       number: string
       product: string
       sku: string | null
+      barcode: string | null
       qty_to_produce: number
       uom: string
       scheduled_date: string
       state: string
+      sales_order_id: string | null
       sales_order_number: string | null
       shopify_order_name: string | null
       customer: string | null
       note: string | null
     }[]
   >`
-    select mo.number, variant_display_name(mo.variant_id) as product, pv.sku,
+    select mo.number, variant_display_name(mo.variant_id) as product, pv.sku, pv.barcode,
            mo.qty_to_produce, u.name as uom, mo.scheduled_date, mo.state,
-           so.number as sales_order_number, so.shopify_order_name,
+           mo.sales_order_id, so.number as sales_order_number, so.shopify_order_name,
            p.name as customer, mo.note
     from manufacturing_orders mo
     join product_variants pv on pv.id = mo.variant_id
@@ -42,6 +64,18 @@ export default async function MoPrintPage({ params }: { params: Promise<{ id: st
     where mo.id = ${id}`
 
   if (!mo) notFound()
+
+  // Die Lieferung des Auftrags — deren Nummer wird am Packtisch gescannt.
+  // Jüngstes nicht storniertes Delivery-Picking; Lagerfertigung ohne
+  // Auftrag hat keins, dann entfällt der zweite Barcode.
+  const [lieferung] = mo.sales_order_id
+    ? await sql<{ number: string }[]>`
+        select p.number from stock_pickings p
+        join operation_types ot on ot.id = p.operation_type_id
+        where p.origin_model = 'sales_order' and p.origin_id = ${mo.sales_order_id}
+          and ot.kind = 'delivery' and p.state <> 'cancel'
+        order by p.created_at desc limit 1`
+    : []
 
   const components = await sql<
     { id: string; product: string; sku: string | null; qty: number; uom: string }[]
@@ -57,7 +91,9 @@ export default async function MoPrintPage({ params }: { params: Promise<{ id: st
   const [company] = await sql<{ name: string }[]>`
     select value ->> 'name' as name from settings where key = 'company'`
 
-  const barcode = code128(mo.number)
+  const fertigungCode = code128(mo.number)
+  const versandCode = lieferung ? code128(lieferung.number) : null
+  const artikelCode = mo.barcode || mo.sku ? barcodeSvg(mo.barcode ?? mo.sku ?? '', { height: 9, scale: 2 }) : null
 
   return (
     <>
@@ -67,11 +103,10 @@ export default async function MoPrintPage({ params }: { params: Promise<{ id: st
             <h1>Fertigungsauftrag {mo.number}</h1>
             <div style={{ fontSize: 13 }}>{company?.name}</div>
           </div>
-          <div
-            className="barcode"
-            aria-label={`Barcode ${mo.number}`}
-            dangerouslySetInnerHTML={{ __html: barcode }}
-          />
+          <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+            <CodeBlock svg={fertigungCode} label="FERTIGUNG" />
+            {versandCode && <CodeBlock svg={versandCode} label="VERSAND" />}
+          </div>
         </div>
 
         <table style={{ marginTop: 16, marginBottom: 20 }}>
@@ -83,6 +118,20 @@ export default async function MoPrintPage({ params }: { params: Promise<{ id: st
                 {mo.sku && <span style={{ color: '#555' }}> · {mo.sku}</span>}
               </td>
             </tr>
+            {artikelCode && (
+              <tr>
+                <th>Artikel-Code</th>
+                <td>
+                  {/* Wird am Packtisch je gepacktem Stück gescannt — derselbe
+                      Code klebt auch auf dem fertigen Artikel. */}
+                  <span
+                    className="barcode"
+                    aria-label={`Artikel ${mo.barcode ?? mo.sku}`}
+                    dangerouslySetInnerHTML={{ __html: artikelCode }}
+                  />
+                </td>
+              </tr>
+            )}
             <tr>
               <th>Menge</th>
               <td style={{ fontSize: 16, fontWeight: 700 }}>

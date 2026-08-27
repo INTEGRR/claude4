@@ -67,14 +67,26 @@ Der Wert steht als `unit_cost` auf der Fertigmeldungs-Bewegung und geht damit in
 
 Formular: Variante, BoM (auto), Menge, optionaler Ursprungs-MO, Quell-/Ziellagerort. Aktion **Demontieren**: Fertigprodukt −Menge, Komponenten +Mengen laut (gefilterter) BoM, proportional. Warnung bei resultierendem Negativbestand mit explizitem Bestätigen (Odoo-Verhalten). Defekte Teile anschließend über Ausschuss-Buchung (Lager-Modul) ausbuchen.
 
-## Drucken (Kernanforderung)
+## Drucken
 
-- **Fertigungsauftrag-PDF** (`@react-pdf/renderer`), angelehnt an Odoos `Production Order`-Report:
-  - Kopf: MO-Nummer **als Code-128-Barcode**, Produkt + Variante (Attributwerte), Menge, geplantes Datum, Quell-Verkaufsauftrag (inkl. Shopify-Ordername).
-  - Tabelle: Komponenten mit Soll-Menge + Maßeinheit (die gefilterte, eingefrorene Liste), Checkbox-Spalte zum Abhaken am Arbeitsplatz.
-  - Fußzeile: Notizen.
-- **Produkt-Etikett** je gefertigter Einheit: Produktname + Variante, SKU, Barcode (EAN falls vorhanden, sonst Code 128 der SKU). Druck aus dem MO heraus („n Etiketten drucken").
-- Alle PDFs serverseitig erzeugt, in Supabase Storage abgelegt und im Browser geöffnet (Print-Dialog).
+Umgesetzt als HTML-Druckansicht (`/fertigung/<id>/druck`, `window.print()`)
+mit serverseitigen SVG-Barcodes (bwip-js) — bewusst kein PDF-Renderer und
+keine Datei-Ablage, der Beleg entsteht bei jedem Aufruf frisch:
+
+- Kopf: **zwei beschriftete Code-128-Barcodes** — `FERTIGUNG` (MO-Nummer,
+  schließt am Scanner die Produktion ab) und `VERSAND` (Nummer der
+  Lieferung des Auftrags, öffnet am Packtisch die Sendung; entfällt bei
+  Lagerfertigung ohne Auftrag). Dazu Produkt + Variante, Menge, Termin,
+  Quell-Verkaufsauftrag (inkl. Shopify-Ordername, Kunde).
+- **Artikel-Code** des Erzeugnisses (EAN falls gepflegt, sonst Code 128
+  der SKU) — wird am Packtisch je gepacktem Stück gegengescannt; derselbe
+  Code klebt auf dem fertigen Artikel.
+- Tabelle: Komponenten mit Soll-Menge + Maßeinheit (die gefilterte,
+  eingefrorene Liste), Checkbox-Spalte zum Abhaken am Arbeitsplatz;
+  Fußzeile: Notizen, Unterschriften. Der Zettel wandert mit der Ware bis
+  zum Packtisch (Ablauf: docs/module/versand.md).
+- Für Lieferungen ohne Fertigung gibt es das Gegenstück **Packzettel**
+  (`/lager/<id>/druck`, docs/module/versand.md).
 
 ## Abnahmekriterien
 

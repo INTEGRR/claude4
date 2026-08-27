@@ -150,7 +150,16 @@ export default async function VersandPage({
                   return (
                   <tr key={r.picking_id}>
                     <td className="mono">
-                      <Link href={`/lager/${r.picking_id}`}>{r.picking_number}</Link>
+                      <Link href={`/lager/${r.picking_id}`}>{r.picking_number}</Link>{' '}
+                      <a
+                        className="small"
+                        href={`/lager/${r.picking_id}/druck`}
+                        target="_blank"
+                        rel="noopener"
+                        title="Packzettel drucken (Versand-Barcode + Positionen)"
+                      >
+                        🖨
+                      </a>
                     </td>
                     <td className="mono small">
                       {r.sales_order_id ? (

@@ -142,6 +142,9 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         actions={
           <>
             <Badge state={picking.state} kind="picking" />
+            <a className="btn" href={`/lager/${id}/druck`} target="_blank" rel="noopener">
+              Packzettel
+            </a>
             {picking.state === 'draft' && (
               <ActionButton action={confirmPicking.bind(null, id)}>
                 Bestätigen

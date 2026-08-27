@@ -83,6 +83,18 @@ Inhalts und die Kleinpaket-Tauglichkeit.
 - Ohne gepflegte Kartonagen bleibt alles wie zuvor: reines Warengewicht, keine
   Verbrauchsbuchung.
 
+## Packzettel (Kommissionier- und Scanbeleg)
+
+Jede Lieferung hat eine Druckansicht `/lager/<id>/druck` (Knopf
+„Packzettel" an der Lieferung, 🖨 in der Versandbereit-Liste): oben der
+beschriftete **VERSAND-Barcode** (Lieferungsnummer — öffnet die Sendung
+am Packtisch), dazu Auftrag/Shopify-Nummer/Kunde, die Lieferadresse und
+die Positionsliste mit **Artikel-Code je Zeile** (EAN bzw. Code 128 der
+SKU) zum Gegenscannen. Für Bestellungen mit Fertigung übernimmt der
+Fertigungszettel diese Rolle (zwei Barcodes, docs/module/fertigung.md);
+der Packzettel ist das Gegenstück für reine Lager-Bestellungen — und
+zugleich der Kommissionierbeleg.
+
 ## Massendruck (Fließband am Packtisch)
 
 Die Versandbereit-Liste ist filterbar (nur Einzelpositions-Aufträge, SKU,
