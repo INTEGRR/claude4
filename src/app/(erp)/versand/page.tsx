@@ -177,7 +177,17 @@ export default async function VersandPage({
                     </td>
                     <td>
                       {Number(r.shipment_count) > 0 ? (
-                        <span className="badge success">Label vorhanden</span>
+                        // Direkt zum PDF — die Route löst die jüngste Sendung
+                        // dieser Lieferung mit Label auf.
+                        <a
+                          className="badge success"
+                          href={`/api/label/lieferung/${r.picking_id}`}
+                          target="_blank"
+                          rel="noopener"
+                          title="Label-PDF öffnen"
+                        >
+                          Label öffnen
+                        </a>
                       ) : (
                         <ActionForm action={createLabel.bind(null, r.picking_id)}>
                           <div className="row" style={{ gap: 6 }}>
