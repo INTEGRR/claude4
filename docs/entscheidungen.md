@@ -9,6 +9,35 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-27 — Packtisch: ein Prozessschritt, Harness-Ausnahme, Druckbrücke im Pull-Modell
+
+ANVILs Versandablauf am Packtisch (Zettel scannen → Artikel gegenscannen →
+Label → Warenausgang → Shopify mit Tracking) ist als Prozess umgesetzt —
+mit drei Entscheidungen:
+
+- **Ein Prozessschritt statt drei.** `packtisch` (Migration 0075, Aktion
+  `versand.packtisch_abschliessen`) erledigt Abgleich, Label, Buchung,
+  Kartonage und Shop-Rückmeldung in einem Zug; Scannen/Label/Buchen als
+  getrennte Schritte hätten nur Klickwege erzeugt, die am Tisch niemand
+  geht. Der Schritt trägt KEINEN eigenen `zustand` — `done` bleibt beim
+  Schritt „buchen" (je Version ein Schritt je Zustand, der Belegstatus
+  bleibt die einzige Wahrheit); der Handweg bleibt als Alternative.
+- **Harness-Ausnahme für Aktions-Übergänge.** Der Standort-Wächter der
+  Prozesstests verbot Schritten ohne `zustand` jede Bewegung — das hätte
+  jeden Mehrschritt-in-einem-Zug-Schritt verboten. Neu: die Bewegung ist
+  erlaubt, wenn die Aktion einen `uebergang` deklariert und der neue
+  Standort auf einem `nach`-Zustand liegt (tests/prozesse/laufen.ts).
+- **Druckbrücke im Pull-Modell.** Die App (Vercel) erreicht den
+  LAN-Drucker nie — statt Browser-Druckdialog eine Warteschlange
+  (`druckauftraege`, 0077) und ein abhängigkeitsfreier Agent auf dem
+  Packtisch-PC (scripts/druck-agent.ts), der per Bearer-Token abholt,
+  still druckt und quittiert. Ohne Token gilt der Tab-Fallback; Diagnose
+  als Karte auf der Integrationen-Seite.
+
+Doku: [module/versand.md](module/versand.md) (Arbeitsplatz + Druckbrücke),
+[module/fertigung.md](module/fertigung.md) (Zettel mit zwei Barcodes),
+[prozesse.md](prozesse.md) (Abschnitt „Packtisch").
+
 ## 2026-08-27 — Nummernkreis-Reparatur: Backing-Sequenz gehört zur Angleichung
 
 Der Odoo-Import zog die Nummernkreise nur über `sequences.next_number`
