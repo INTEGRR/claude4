@@ -192,6 +192,17 @@ export interface CreatedShipment {
   warnings: string[]
 }
 
+/**
+ * Leere Felder WEGLASSEN statt mitschicken: DHL validiert vorhandene
+ * Felder auch dann, wenn sie leer sind („email must be between 3 and 80
+ * characters") — ein fehlendes optionales Feld ist dagegen erlaubt.
+ */
+function ohneLeere<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, wert]) => wert !== '' && wert !== null && wert !== undefined),
+  ) as Partial<T>
+}
+
 export async function createShipment(input: CreateShipmentInput): Promise<CreatedShipment> {
   if (process.env.DHL_FAKE === '1') {
     return (await import('./dhl-fake')).fakeCreateShipment(input)
@@ -199,14 +210,34 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
   const c = dhlConfig()
   const printFormat = input.printFormat ?? '910-300-700'
 
+  // Pflichtfelder des Absenders VOR dem Aufruf prüfen — die kommen aus den
+  // Firmendaten, und ein klarer Hinweis erspart die DHL-Fehlerrunde.
+  const fehltBeimAbsender = (
+    [
+      ['Name', input.shipper.name],
+      ['Straße', input.shipper.street],
+      ['PLZ', input.shipper.zip],
+      ['Ort', input.shipper.city],
+    ] as const
+  )
+    .filter(([, wert]) => !wert)
+    .map(([feld]) => feld)
+  if (fehltBeimAbsender.length > 0) {
+    throw new DhlError(
+      `Absenderdaten unvollständig (${fehltBeimAbsender.join(', ')}) — bitte unter ` +
+        'Einstellungen → Firmendaten pflegen.',
+    )
+  }
+
   const body = {
     profile: 'STANDARD_GRUPPENPROFIL',
     shipments: [
       {
         product: input.product,
         billingNumber: input.billingNumber ?? c.billingNumber,
-        refNo: input.reference,
-        shipper: {
+        // DHL verlangt 8–35 Zeichen — kurze Belegnummern (S01873) auffüllen.
+        refNo: input.reference.padEnd(8, '-'),
+        shipper: ohneLeere({
           name1: input.shipper.name,
           addressStreet: input.shipper.street,
           addressHouse: input.shipper.houseNumber,
@@ -215,8 +246,8 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
           country: input.shipper.country,
           email: input.shipper.email,
           phone: input.shipper.phone,
-        },
-        consignee: {
+        }),
+        consignee: ohneLeere({
           name1: input.consignee.name,
           addressStreet: input.consignee.street,
           addressHouse: input.consignee.houseNumber,
@@ -226,7 +257,7 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
           country: input.consignee.country,
           email: input.consignee.email,
           phone: input.consignee.phone,
-        },
+        }),
         details: { weight: { uom: 'g', value: input.weightG } },
         ...(input.insuredValue
           ? { services: { additionalInsurance: { currency: 'EUR', value: input.insuredValue } } }
@@ -271,7 +302,21 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
     })
 
   if (!res.ok || !json) {
-    const message = `DHL lehnte die Sendung ab (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'}`
+    // Die brauchbaren Gründe stehen in den validationMessages der einzelnen
+    // Sendung — die Kopfzeile („0 of 1 shipment successfully printed") sagt
+    // nichts. Alles einsammeln, Feldname voran, sonst auf die Kopfzeile
+    // zurückfallen.
+    const gruende = (json?.items ?? [])
+      .flatMap((i) => [
+        ...(i.validationMessages?.map((m) =>
+          m.property ? `${m.property}: ${m.validationMessage ?? ''}` : (m.validationMessage ?? ''),
+        ) ?? []),
+        i.sstatus?.detail ?? '',
+      ])
+      .filter(Boolean)
+    const kopf =
+      json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'
+    const message = `DHL lehnte die Sendung ab (${res.status}): ${gruende.join(' · ') || kopf}`
     await logCreate(false, message)
     throw new DhlError(message, res.status, json)
   }
@@ -407,7 +452,7 @@ export async function createReturnLabel(
     body: JSON.stringify({
       receiverId: c.returnReceiverId,
       customerReference: reference,
-      shipper: {
+      shipper: ohneLeere({
         name1: customer.name,
         addressStreet: customer.street,
         addressHouse: customer.houseNumber,
@@ -415,7 +460,7 @@ export async function createReturnLabel(
         city: customer.city,
         country: customer.country,
         email: customer.email,
-      },
+      }),
     }),
   })
 
