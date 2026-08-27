@@ -54,13 +54,18 @@ export async function packtischAbschliessen(
   const pickingId = ctx.recordId!
 
   // Soll-Positionen der Lieferung — gescannt wird gegen SKU ODER Barcode.
+  // Je VARIANTE aggregiert: zwei Auftragszeilen derselben Variante teilen
+  // sich einen Scan-Schlüssel; unaggregiert würde jede Zeile einzeln gegen
+  // dieselbe gescannte Menge geprüft und eine Unterdeckung durchrutschen.
   const soll = await sql<
     { qty: number; sku: string | null; barcode: string | null; product: string }[]
   >`
-    select m.qty, pv.sku, pv.barcode, variant_display_name(m.variant_id) as product
+    select sum(m.qty)::float as qty, pv.sku, pv.barcode,
+           variant_display_name(m.variant_id) as product
     from stock_moves m
     join product_variants pv on pv.id = m.variant_id
-    where m.picking_id = ${pickingId} and m.state <> 'cancel'`
+    where m.picking_id = ${pickingId} and m.state <> 'cancel'
+    group by m.variant_id, pv.sku, pv.barcode`
   if (soll.length === 0) throw new Error('Die Lieferung hat keine offenen Positionen.')
 
   const abgleich = packtischAbgleich(soll, p.gepackt)

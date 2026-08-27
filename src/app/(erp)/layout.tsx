@@ -146,7 +146,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             ]
           : []),
         ...(sees('versand') && prozessAktiv('versand')
-          ? [{ href: '/versand', label: 'Versand', count: counts.versandbereit }]
+          ? [
+              { href: '/versand', label: 'Versand', count: counts.versandbereit },
+              { href: '/packtisch', label: 'Packtisch' },
+            ]
           : []),
       ],
     },

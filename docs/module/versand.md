@@ -95,6 +95,38 @@ Fertigungszettel diese Rolle (zwei Barcodes, docs/module/fertigung.md);
 der Packzettel ist das Gegenstück für reine Lager-Bestellungen — und
 zugleich der Kommissionierbeleg.
 
+## Packtisch-Arbeitsplatz (/packtisch)
+
+Der Arbeitsplatz für den echten Ablauf am Tisch (Menüpunkt „Packtisch",
+Schreibrechte im Versand nötig) — dieselbe Scan-Maschine wie der
+Scanner-Arbeitsplatz (Dauerfokus-Feld, Beeps, Leuchten), aber ohne
+Teilmengen: ein Paket ist erst dann ein Paket, wenn alles drin ist.
+
+1. **VERSAND-Code scannen** (vom Fertigungs- oder Packzettel; tippbar sind
+   auch Liefer-, Auftrags- oder Shopify-Nummer). `/api/packtisch/lookup`
+   liefert die Sendung mit Auftrag, Kunde, Lieferadresse, den Positionen
+   (je Variante aggregiert, mit SKU/Barcode) und dem Regelvorschlag für
+   Gewicht und DHL-Produkt. Wächter mit Klartext statt stummem Fehler:
+   „wartet auf die Fertigung: WH/MO/…" (der Zettel hängt noch dort),
+   „nicht reserviert", „bereits versendet", „Position ohne SKU/Barcode".
+   Ein vorhandenes Label ist kein Blocker — es wird wiederverwendet.
+2. **Artikel scannen** (SKU- oder Artikel-Barcode vom Zettel bzw. vom
+   Produkt) oder per +/− abhaken; fremde Artikel lehnt der Tisch mit
+   Fehlerton ab.
+3. **VERSAND-Code erneut scannen**, wenn alles im Paket ist → Bestätigung
+   mit Gewichts-/Produktfeld (vorbelegt aus der Versandregel) → dritter
+   Scan oder Knopf führt `versand.packtisch_abschliessen` aus: Label,
+   Warenausgang, Kartonage, Shopify-Fulfillment mit Tracking (Shopify
+   benachrichtigt den Kunden). Die Gegenprobe „gescannt ⊇ Soll" läuft
+   serverseitig noch einmal — der Arbeitsplatz ist nur die Hülle um die
+   Registry-Aktion (docs/prozesse.md, Abschnitt „Packtisch").
+
+Das fertige Label öffnet sich als Tab zum Drucken (und über den Knopf
+„Label öffnen") — bis die Druckbrücke es still zum Labeldrucker schickt.
+Im Kopf der Seite zeigt ein Typenschild, ob DHL konfiguriert ist (sonst
+mit den Namen der fehlenden Variablen). Der Scan des nächsten Zettels im
+„Versandfertig"-Zustand startet direkt das nächste Paket.
+
 ## Massendruck (Fließband am Packtisch)
 
 Die Versandbereit-Liste ist filterbar (nur Einzelpositions-Aufträge, SKU,
