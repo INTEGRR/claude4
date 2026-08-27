@@ -55,14 +55,23 @@ export async function varianteSuchen(
   if (!begriff || worte.length === 0) return []
 
   const rows = await client<
-    { id: string; name: string; sku: string | null; bestand: number; hauptlager: number }[]
+    {
+      id: string
+      name: string
+      sku: string | null
+      bestand: number
+      hauptlager: number
+      exakt: boolean
+    }[]
   >`
     select pv.id,
            variant_display_name(pv.id) as name,
            pv.sku,
            coalesce(on_hand_qty(pv.id), 0) as bestand,
            coalesce(on_hand_qty(pv.id,
-             (select l.id from stock_locations l where l.full_path = 'WH/Stock')), 0) as hauptlager
+             (select l.id from stock_locations l where l.full_path = 'WH/Stock')), 0) as hauptlager,
+           (lower(coalesce(pv.sku, '')) = lower(${begriff})
+             or pv.barcode = ${begriff}) as exakt
     from product_variants pv
     join product_templates pt on pt.id = pv.template_id
     where pv.active and (
@@ -79,7 +88,11 @@ export async function varianteSuchen(
              length(coalesce(pv.display_name, pt.name)) asc
     limit ${limit}`
 
-  return rows.map((r) => ({
+  // „Exakt gewinnt sofort" wörtlich nehmen: sobald SKU oder Barcode genau
+  // treffen, verwässern Worttreffer das Ergebnis nur (auf Echtdaten trifft
+  // „SW-GAT-BL" sonst auch jeden „Switch Gateron Black").
+  const exakte = rows.filter((r) => r.exakt)
+  return (exakte.length > 0 ? exakte : rows).map((r) => ({
     id: r.id,
     name: r.name,
     sku: r.sku,
