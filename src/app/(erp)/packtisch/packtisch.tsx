@@ -71,6 +71,15 @@ function zeilenSchluessel(l: PacktischDoc['lines'][number]): string {
   return l.sku ?? l.barcode ?? ''
 }
 
+/**
+ * Darf ein Element den Fokus behalten? Das unsichtbare Scanfeld holt sich
+ * den Fokus nur zurück, wenn er ins Leere ging — sichtbare Eingabefelder
+ * (Nummer eintippen, Gewicht, DHL-Produkt) und Knöpfe bleiben bedienbar.
+ */
+function fokusBleibtFrei(el: EventTarget | null): boolean {
+  return el instanceof Element && Boolean(el.closest('input, button, select, textarea, a, label'))
+}
+
 export function Packtisch() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -259,9 +268,15 @@ export function Packtisch() {
   }
 
   return (
-    // Klick irgendwo holt den Fokus zurück ins Scanfeld.
+    // Klick auf freie Fläche holt den Fokus zurück ins Scanfeld —
+    // Eingabefelder und Knöpfe behalten ihn (fokusBleibtFrei).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-    <div className={`scanner${flash ? ` flash-${flash}` : ''}`} onClick={refocus}>
+    <div
+      className={`scanner${flash ? ` flash-${flash}` : ''}`}
+      onClick={(e) => {
+        if (!fokusBleibtFrei(e.target)) refocus()
+      }}
+    >
       <input
         ref={inputRef}
         className="scanner-input"
@@ -274,7 +289,9 @@ export function Packtisch() {
           }
           if (e.key === 'Escape' && phase !== 'booking') reset()
         }}
-        onBlur={refocus}
+        onBlur={(e) => {
+          if (!fokusBleibtFrei(e.relatedTarget)) refocus()
+        }}
       />
 
       {feedback && (
@@ -303,9 +320,34 @@ export function Packtisch() {
           <h2>Versand-Code scannen</h2>
           <p className="muted">
             Den <span className="mono">VERSAND</span>-Barcode vom Fertigungs- oder Packzettel
-            scannen (<span className="mono">WH/OUT/…</span>). Ohne Scanner: Liefer- oder
-            Auftragsnummer eintippen und Enter drücken.
+            scannen (<span className="mono">WH/OUT/…</span>).
           </p>
+          {/* Tipp-Weg ohne Scanner: sichtbares Feld — nach dem Öffnen geht
+              der Fokus zurück ans Scanfeld für die Artikel-Scans. */}
+          <form
+            className="actions"
+            style={{ justifyContent: 'center', marginTop: 8 }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              const feld = e.currentTarget.elements.namedItem('code') as HTMLInputElement
+              const wert = feld.value.trim()
+              if (!wert) return
+              feld.value = ''
+              onScan(wert)
+              refocus()
+            }}
+          >
+            <input
+              name="code"
+              type="text"
+              className="mono"
+              placeholder="Liefer- oder Auftragsnummer"
+              aria-label="Liefer- oder Auftragsnummer eintippen"
+              autoComplete="off"
+              style={{ maxWidth: 260 }}
+            />
+            <button className="small" type="submit">Öffnen</button>
+          </form>
         </div>
       )}
 

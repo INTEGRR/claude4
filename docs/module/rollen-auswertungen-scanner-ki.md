@@ -55,7 +55,12 @@ SQL-Aggregationen über das Bewegungs-Ledger, keine Chart-Bibliothek:
 
 Für Barcodescanner im Tastatur-Modus (Keyboard-Wedge): ein unsichtbares,
 dauerfokussiertes Eingabefeld nimmt Scans entgegen; Rückmeldung über
-Signaltöne (WebAudio) und Farbblitze.
+Signaltöne (WebAudio) und Farbblitze. Ohne Scanner gibt es im
+Ruhezustand ein sichtbares Feld zum Eintippen der Belegnummer — nach dem
+Öffnen springt der Fokus zurück ans Scanfeld. Das Scanfeld holt sich den
+Fokus nur zurück, wenn er ins Leere ging: sichtbare Eingabefelder
+(Nummer, Fertigmenge) und Knöpfe bleiben normal bedienbar (gleiches
+Muster am Packtisch, docs/module/versand.md).
 
 Ablauf:
 
