@@ -7,6 +7,7 @@ import {
   queueFulfillmentForPicking,
   syncTracking,
 } from '@/modules/versand/service'
+import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
@@ -36,6 +37,89 @@ export async function labelErstellen(
     await sql`select log_event('stock_picking', ${pickingId}, 'error',
       ${`DHL-Label fehlgeschlagen: ${message.slice(0, 300)}`}, 'system')`.catch(() => undefined)
     throw err
+  }
+}
+
+/**
+ * Der Packtisch-Abschluss: gescannte Positionen prüfen, Label erstellen
+ * (oder ein vorhandenes wiederverwenden — macht die Aktion nach einem
+ * Teilfehler gefahrlos wiederholbar), Warenausgang buchen, Kartonage
+ * verbrauchen, Shop-Rückmeldung einreihen. Die Bausteine sind dieselben
+ * wie in transferBuchen/massendruck — hier als EIN Prozessschritt.
+ */
+export async function packtischAbschliessen(
+  p: { gepackt: Record<string, number>; weight_g?: number; dhl_product?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const pickingId = ctx.recordId!
+
+  // Soll-Positionen der Lieferung — gescannt wird gegen SKU ODER Barcode.
+  const soll = await sql<
+    { qty: number; sku: string | null; barcode: string | null; product: string }[]
+  >`
+    select m.qty, pv.sku, pv.barcode, variant_display_name(m.variant_id) as product
+    from stock_moves m
+    join product_variants pv on pv.id = m.variant_id
+    where m.picking_id = ${pickingId} and m.state <> 'cancel'`
+  if (soll.length === 0) throw new Error('Die Lieferung hat keine offenen Positionen.')
+
+  const abgleich = packtischAbgleich(soll, p.gepackt)
+  if (abgleich.fehlend.length > 0) {
+    throw new Error(`Noch nicht vollständig gescannt: ${abgleich.fehlend.join(', ')}.`)
+  }
+  if (abgleich.fremd.length > 0) {
+    throw new Error(
+      `Gescannte Artikel gehören nicht zu dieser Lieferung: ${abgleich.fremd.join(', ')}.`,
+    )
+  }
+
+  // Label: ein vorhandenes wird wiederverwendet (Wiederholung nach
+  // Teilfehler), sonst frisch erstellt.
+  const [vorhanden] = await sql<{ id: string; shipment_number: string }[]>`
+    select id, shipment_number from shipments
+    where picking_id = ${pickingId} and state <> 'cancelled'
+      and (label_pdf is not null or label_path is not null)
+    order by created_at desc limit 1`
+  let shipmentId: string
+  let sendung: string
+  if (vorhanden) {
+    shipmentId = vorhanden.id
+    sendung = vorhanden.shipment_number
+  } else {
+    const result = await createLabelForPicking(pickingId, {
+      weightG: p.weight_g,
+      product: p.dhl_product,
+    })
+    shipmentId = result.shipmentId
+    sendung = result.shipmentNumber
+    if (result.warnings.length > 0) {
+      await sql`select log_event('stock_picking', ${pickingId}, 'note',
+        ${`DHL-Hinweise zur Adresse: ${result.warnings.join(' | ')}`}, 'system')`
+    }
+  }
+
+  // Warenausgang — bereits gebuchte Lieferung (Wiederholungsfall) überspringen.
+  const [zustand] = await sql<{ state: string }[]>`
+    select state from stock_pickings where id = ${pickingId}`
+  if (zustand?.state !== 'done') {
+    await sql`select picking_validate(${pickingId}, ${sql.json({})}, false)`
+    await consumePackagingForPicking(pickingId).catch(() => undefined)
+  }
+
+  // Shop-Rückmeldung (Fulfillment + Tracking, Shopify mailt den Kunden) —
+  // darf den Abschluss nie blockieren, muss aber eine Spur hinterlassen.
+  try {
+    await queueFulfillmentForPicking(pickingId)
+  } catch (err) {
+    await sql`select log_event('stock_picking', ${pickingId}, 'error',
+      ${`Shopify-Rückmeldung konnte nicht eingereiht werden: ${err instanceof Error ? err.message : String(err)}`})`
+      .catch(() => undefined)
+  }
+
+  return {
+    text: `Sendung ${sendung} abgeschlossen — Ware gebucht, Shop-Rückmeldung eingereiht.`,
+    recordId: pickingId,
+    link: `/api/label/${shipmentId}`,
   }
 }
 

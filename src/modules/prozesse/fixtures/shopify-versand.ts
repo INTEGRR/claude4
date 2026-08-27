@@ -210,6 +210,8 @@ async function mtoBestellungEinspeisen(ctx: FixtureKontext, sql: Sql): Promise<s
   const [variante] = await sql<{ id: string }[]>`
     select id from product_variants where template_id = ${tpl.id} and active limit 1`
   await sql`update product_variants set sku = ${`PT-MTO-${nummer}`} where id = ${variante.id}`
+  // Für den Packtisch-Lauf: die SKU ist der Scan-Schlüssel.
+  ctx.p4MtoSku = `PT-MTO-${nummer}`
   const [bom] = await sql<{ id: string }[]>`
     insert into boms (template_id, qty, uom_id) values (${tpl.id}, 1, ${stueck.id}) returning id`
   await sql`
@@ -438,6 +440,41 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
         const [sendung] = await sql<{ shopify_fulfillment_id: string | null }[]>`
           select shopify_fulfillment_id from shipments where picking_id = ${pickingId}`
         assert.ok(sendung?.shopify_fulfillment_id, 'das Fulfillment muss gemeldet sein')
+      },
+    },
+    {
+      // Der Packtisch-Weg (0075): EIN Schritt prüft die gescannten SKUs,
+      // erstellt das Label, bucht den Warenausgang und reiht die
+      // Shop-Rückmeldung ein — der reale Ablauf am Packtisch mit Zettel
+      // und Scanner (docs/module/versand.md).
+      name: 'Packtisch: MTO-Bestellung, Scan-Abschluss in einem Zug',
+      pfad: ['bestellung', 'fertigen', 'packtisch', 'fulfillment'],
+      ereignisse: {
+        bestellung: mtoBestellungEinspeisen,
+        fertigen: fertigungBereitstellen,
+      },
+      eingaben: {
+        packtisch: (ctx) => ({ gepackt: { [ctx.p4MtoSku]: 1 } }),
+      },
+      pruefen: async (sql, ctx, pickingId) => {
+        // Ein Schritt, drei Wirkungen: Ware raus, Sendung mit Label,
+        // Fulfillment gemeldet.
+        const [picking] = await sql<{ state: string }[]>`
+          select state from stock_pickings where id = ${pickingId}`
+        assert.equal(picking.state, 'done')
+
+        const [sendung] = await sql<
+          { shipment_number: string; label_pdf: unknown; shopify_fulfillment_id: string | null }[]
+        >`
+          select shipment_number, label_pdf, shopify_fulfillment_id
+          from shipments where picking_id = ${pickingId}`
+        assert.ok(sendung, 'die Sendung muss existieren')
+        assert.ok(sendung.label_pdf, 'das Label muss gespeichert sein')
+        assert.ok(sendung.shopify_fulfillment_id, 'das Fulfillment muss gemeldet sein')
+
+        const [auftrag] = await sql<{ delivery_status: string | null }[]>`
+          select delivery_status from sales_orders where id = ${ctx.p4MtoAuftragId}`
+        assert.equal(auftrag.delivery_status, 'full')
       },
     },
   ],

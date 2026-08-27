@@ -1192,6 +1192,37 @@ für Pilotverträge werden sie monatlich von Hand gezogen. Pilotstruktur
 Laufzeit / Ausstieg, Metriken = die drei Berichtsgrößen,
 Wochen-Feedback über bug_ticket. Wächter: tests/nutzung.test.ts.
 
+## Packtisch: ein Scan-Schritt statt Label+Buchen (Migration 0075, umgesetzt)
+
+ANVILs realer Versandablauf am Packtisch (Zettel scannen → Positionen
+gegenscannen → Label → Warenausgang → Shop-Rückmeldung) ist EIN
+Prozessschritt in `shopify_bestellung_versand` geworden: `packtisch`
+(Aktion `versand.packtisch_abschliessen`), erreichbar aus „Verfügbarkeit"
+neben dem bestehenden Handweg label → buchen. Drei Modellentscheidungen:
+
+- **Der Schritt trägt keinen eigenen `zustand`** — `done` gehört weiter
+  dem Schritt „buchen" (je Version genau ein Schritt je Zustand, der
+  Belegstatus bleibt die einzige Wahrheit). Die Kante `packtisch → buchen`
+  („bucht automatisch mit") macht im Diagramm sichtbar, dass der Beleg
+  nach dem Packtisch dort steht.
+- **Die Aktion deklariert `uebergang {von: assigned, nach: done}`** und
+  erledigt Positionsabgleich (`packtischAbgleich` in
+  src/modules/versand/packtisch-logik.ts — gescannt ⊇ Soll, SKU ODER
+  Barcode, sonst Klartext-Fehler), Label (vorhandene Sendung wird
+  wiederverwendet), `picking_validate`, Kartonage-Verbrauch und
+  Fulfillment-Job in einem Zug — dieselben Bausteine wie die Einzelwege.
+- **Der Standort-Wächter des Harness kennt jetzt Aktions-Übergänge**: ein
+  Schritt ohne `zustand` darf den Standort genau dann bewegen, wenn seine
+  Aktion einen `uebergang` deklariert und der neue Standort-Schritt auf
+  einem `nach`-Zustand liegt (tests/prozesse/laufen.ts). Vorher galt
+  strikt „ohne zustand keine Bewegung" — das hätte jeden
+  Mehrschritt-in-einem-Zug-Schritt verboten.
+
+Fixture-Lauf 4 („Packtisch: MTO-Bestellung, Scan-Abschluss in einem Zug")
+beweist die Kette Bestellung → Fertigung → Packtisch-Scan → picking done +
+Label + shopify_fulfillment_id + voll geliefert. Arbeitsplatz-Seite und
+Druckbrücke: docs/module/versand.md (folgt mit den nächsten Paketen).
+
 ## Noch offen (Kurzfassung)
 
 - **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:

@@ -26,6 +26,42 @@ export const VERSAND = {
     revalidate: ['/versand', '/lager/:id'],
   },
 
+  'versand.packtisch_abschliessen': {
+    label: 'Packtisch: Sendung abschließen',
+    bereich: 'versand',
+    beschreibung:
+      'Schließt eine gepackte Lieferung in einem Zug ab: prüft die gescannten Positionen ' +
+      'gegen die Sollmengen (Schlüssel = SKU oder Artikel-Barcode), erstellt das DHL-Label ' +
+      '(bzw. verwendet ein vorhandenes wieder), bucht den Warenausgang, verbraucht die ' +
+      'Kartonage und reiht die Shop-Rückmeldung mit Tracking ein — Shopify benachrichtigt ' +
+      'den Kunden.',
+    bindung: 'beleg',
+    modell: 'stock_picking',
+    uebergang: { von: ['assigned'], nach: ['done'] },
+    schema: z.object({
+      gepackt: z
+        .record(z.string(), z.number().nonnegative())
+        .default({})
+        .describe('Gescannte Mengen je SKU/Barcode'),
+      weight_g: z.number().positive().optional().describe('Gewicht überschreiben (Gramm)'),
+      dhl_product: z.string().max(20).optional().describe('DHL-Produkt überschreiben'),
+    }),
+    formdata: (fd) => {
+      const gepackt: Record<string, number> = {}
+      for (const [key, wert] of fd.entries()) {
+        if (!key.startsWith('gepackt_')) continue
+        const menge = Number(wert)
+        if (Number.isFinite(menge)) gepackt[key.slice('gepackt_'.length)] = menge
+      }
+      return {
+        gepackt,
+        weight_g: fd.get('weight_g') ? Number(fd.get('weight_g')) : undefined,
+        dhl_product: String(fd.get('dhl_product') ?? '') || undefined,
+      }
+    },
+    revalidate: ['/versand', '/packtisch', '/lager/:id'],
+  },
+
   'versand.label_stornieren': {
     label: 'Label stornieren',
     bereich: 'versand',

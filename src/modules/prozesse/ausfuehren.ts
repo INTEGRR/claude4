@@ -183,6 +183,7 @@ export const AUSFUEHRUNG = {
   'vorgang.status_setzen': vorgang.statusSetzen,
 
   'versand.label_erstellen': versand.labelErstellen,
+  'versand.packtisch_abschliessen': versand.packtischAbschliessen,
   'versand.label_stornieren': versand.labelStornieren,
   'versand.tracking_aktualisieren': versand.trackingAktualisieren,
   'versand.massendruck': versand.massendruck,

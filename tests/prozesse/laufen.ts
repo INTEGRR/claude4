@@ -290,11 +290,30 @@ export async function prozessDurchspielen(
         `${prozess}: nach „${code}" müsste der Beleg dort stehen`,
       )
     } else if (vorher !== null) {
-      assert.equal(
-        await standort(sql, prozess, recordId),
-        vorher,
-        `${prozess}/${code}: ein Schritt ohne zustand darf den Standort nicht ändern`,
-      )
+      const nachher = await standort(sql, prozess, recordId)
+      // Ein Schritt ohne eigenen zustand darf den Standort nur bewegen,
+      // wenn seine AKTION den Belegübergang in der Registry erklärt
+      // (z. B. der Packtisch-Abschluss bucht den Warenausgang gleich mit) —
+      // und dann nur auf den Schritt, dem der Zielzustand gehört.
+      const uebergang = schritt.aktion ? registrierteAktion(schritt.aktion)?.uebergang : undefined
+      if (nachher !== vorher && uebergang) {
+        const [ziel] = await sql<{ zustand: string | null }[]>`
+          select s.zustand
+          from prozess_schritte s
+          join prozess_versionen v on v.id = s.version_id and v.status = 'aktiv'
+          join prozesse p on p.id = v.prozess_id
+          where p.code = ${prozess} and s.code = ${nachher}`
+        assert.ok(
+          ziel?.zustand && uebergang.nach.includes(ziel.zustand),
+          `${prozess}/${code}: der Standort sprang auf „${nachher}" — die Aktion erklärt aber nur ${uebergang.nach.join('/')}`,
+        )
+      } else {
+        assert.equal(
+          nachher,
+          vorher,
+          `${prozess}/${code}: ein Schritt ohne zustand darf den Standort nicht ändern`,
+        )
+      }
     }
 
     await assertLedgerConsistent(sql)
