@@ -7,6 +7,7 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
+import { druckbrueckeKonfiguriert } from '@/modules/versand/druckbruecke'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
@@ -240,6 +241,16 @@ export default async function IntegrationenPage() {
   const [syncState] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`
 
+  // Druckbrücke: lebt der Agent (letzter Abruf), und hängt etwas fest?
+  const [druck] = await sql<
+    { letzter_abruf: string | null; offen: number; fehler: number }[]
+  >`
+    select
+      (select value ->> 'letzter_abruf' from settings where key = 'druckbruecke') as letzter_abruf,
+      (select count(*) from druckauftraege where status = 'offen')::int as offen,
+      (select count(*) from druckauftraege where status = 'fehler'
+        and created_at > now() - interval '7 days')::int as fehler`
+
   const events = await sql<
     { id: string; topic: string; status: string; error: string | null; received_at: string; order_id: string | null }[]
   >`
@@ -346,6 +357,22 @@ export default async function IntegrationenPage() {
             dhlConfigured()
               ? 'Parcel DE Shipping API v2'
               : `es fehlt: ${dhlFehlendeVariablen().join(', ') || 'Redeploy nach dem Setzen der Variablen'}`
+          }
+        />
+        <Stat
+          label="Druckbrücke"
+          value={<Verbindung ok={druckbrueckeKonfiguriert()} />}
+          hint={
+            !druckbrueckeKonfiguriert() ? (
+              'DRUCK_AGENT_TOKEN setzen — bis dahin öffnet das Label als Tab'
+            ) : (
+              <>
+                Letzter Abruf:{' '}
+                <span className="mono">{druck.letzter_abruf ? dateTime(druck.letzter_abruf) : 'nie'}</span>
+                {druck.offen > 0 && <> · {druck.offen} offen</>}
+                {druck.fehler > 0 && <> · {druck.fehler} Fehler (7 Tage)</>}
+              </>
+            )
           }
         />
         <Stat

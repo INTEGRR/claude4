@@ -121,11 +121,51 @@ Teilmengen: ein Paket ist erst dann ein Paket, wenn alles drin ist.
    serverseitig noch einmal — der Arbeitsplatz ist nur die Hülle um die
    Registry-Aktion (docs/prozesse.md, Abschnitt „Packtisch").
 
-Das fertige Label öffnet sich als Tab zum Drucken (und über den Knopf
-„Label öffnen") — bis die Druckbrücke es still zum Labeldrucker schickt.
-Im Kopf der Seite zeigt ein Typenschild, ob DHL konfiguriert ist (sonst
-mit den Namen der fehlenden Variablen). Der Scan des nächsten Zettels im
-„Versandfertig"-Zustand startet direkt das nächste Paket.
+Ist die Druckbrücke konfiguriert, kommt das Label still aus dem
+Labeldrucker; sonst (und zusätzlich, als Zweitausdruck) öffnet es sich
+als Tab und über den Knopf „Label öffnen". Im Kopf der Seite zeigt ein
+Typenschild, ob DHL konfiguriert ist (sonst mit den Namen der fehlenden
+Variablen). Der Scan des nächsten Zettels im „Versandfertig"-Zustand
+startet direkt das nächste Paket.
+
+## Druckbrücke (stiller Labeldruck am Packtisch)
+
+Die App (Vercel) erreicht den LAN-Drucker nie — deshalb ein
+**Pull-Modell**: `versand.packtisch_abschliessen` reiht das Label als
+Druckauftrag ein (Tabelle `druckauftraege`, idempotent solange einer
+offen ist), und ein kleiner Agent auf dem Packtisch-PC holt ab, druckt
+und quittiert. Kein Benutzer-Login auf dem Gerät; authentifiziert wird
+über das gemeinsame Token.
+
+**Einrichtung:**
+
+1. In Vercel die Env-Variable `DRUCK_AGENT_TOKEN` setzen (langer
+   Zufallswert, z. B. `openssl rand -hex 32`) und redeployen. Ohne die
+   Variable gilt weiter der Tab-Fallback.
+2. Auf dem Packtisch-PC: Node ≥ 22 installieren, die Datei
+   `scripts/druck-agent.ts` aus dem Repo kopieren (sie ist bewusst
+   abhängigkeitsfrei — kein `npm install` nötig) und starten:
+
+   ```powershell
+   $env:KRNL_URL = "https://<instanz>.vercel.app"
+   $env:DRUCK_AGENT_TOKEN = "<dasselbe Token>"
+   $env:DRUCKER = "Zebra GK420d"     # optional, sonst Standarddrucker
+   node druck-agent.ts
+   ```
+
+3. Windows druckt standardmäßig über **SumatraPDF**
+   (`SumatraPDF -print-to … -silent`, muss im PATH liegen),
+   Linux/macOS über `lp`. Ein eigenes Kommando geht über
+   `DRUCK_KOMMANDO` mit den Platzhaltern `{datei}` und `{drucker}`.
+
+Der Agent fragt alle 3 Sekunden (`DRUCK_INTERVALL_MS`) nach den ältesten
+offenen Aufträgen (`GET /api/druck/abholen`, Bearer-Token; liefert die
+PDFs base64), druckt und meldet je Auftrag ok/fehler
+(`POST /api/druck/quittieren`). Solange Aufträge kommen, zieht er ohne
+Pause weiter (Fließband). Diagnose auf der Integrationen-Seite: Karte
+„Druckbrücke" mit letztem Abruf des Agenten, offenen Aufträgen und
+Fehlern der letzten 7 Tage. Ein Auftrag ohne gespeichertes Label-PDF
+wird serverseitig sofort als Fehler quittiert.
 
 ## Massendruck (Fließband am Packtisch)
 

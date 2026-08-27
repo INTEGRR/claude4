@@ -7,6 +7,7 @@ import {
   queueFulfillmentForPicking,
   syncTracking,
 } from '@/modules/versand/service'
+import { druckbrueckeKonfiguriert, labelDruckEinreihen } from '@/modules/versand/druckbruecke'
 import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
@@ -121,8 +122,16 @@ export async function packtischAbschliessen(
       .catch(() => undefined)
   }
 
+  // Druckbrücke: mit gesetztem Agent-Token wird das Label still am Tisch
+  // gedruckt; der Link bleibt trotzdem — als Zweitausdruck und Fallback.
+  let druckHinweis = ''
+  if (druckbrueckeKonfiguriert()) {
+    await labelDruckEinreihen(shipmentId)
+    druckHinweis = ' Label liegt an der Druckbrücke.'
+  }
+
   return {
-    text: `Sendung ${sendung} abgeschlossen — Ware gebucht, Shop-Rückmeldung eingereiht.`,
+    text: `Sendung ${sendung} abgeschlossen — Ware gebucht, Shop-Rückmeldung eingereiht.${druckHinweis}`,
     recordId: pickingId,
     link: `/api/label/${shipmentId}`,
   }

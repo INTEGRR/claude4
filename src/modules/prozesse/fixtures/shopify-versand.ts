@@ -454,7 +454,12 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
         fertigen: fertigungBereitstellen,
       },
       eingaben: {
-        packtisch: (ctx) => ({ gepackt: { [ctx.p4MtoSku]: 1 } }),
+        packtisch: (ctx) => {
+          // Druckbrücke „konfiguriert" stellen, damit der Abschluss auch
+          // das Einreihen des Druckauftrags beweist (0077, Pull-Modell).
+          process.env.DRUCK_AGENT_TOKEN ??= 'prozesstest-token'
+          return { gepackt: { [ctx.p4MtoSku]: 1 } }
+        },
       },
       pruefen: async (sql, ctx, pickingId) => {
         // Ein Schritt, drei Wirkungen: Ware raus, Sendung mit Label,
@@ -475,6 +480,15 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
         const [auftrag] = await sql<{ delivery_status: string | null }[]>`
           select delivery_status from sales_orders where id = ${ctx.p4MtoAuftragId}`
         assert.equal(auftrag.delivery_status, 'full')
+
+        // Vierte Wirkung mit gesetztem DRUCK_AGENT_TOKEN: das Label wartet
+        // als offener Druckauftrag auf den Agenten der Druckbrücke.
+        const [druck] = await sql<{ status: string }[]>`
+          select d.status from druckauftraege d
+          join shipments s on s.id = d.shipment_id
+          where s.picking_id = ${pickingId}`
+        assert.ok(druck, 'der Druckauftrag muss eingereiht sein')
+        assert.equal(druck.status, 'offen')
       },
     },
   ],
