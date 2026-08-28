@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { bulkStart, bulkZettel } from './actions'
 import { isActionError } from '@/modules/shared/action'
 import { Badge } from '@/components/ui'
@@ -32,15 +32,53 @@ export interface BulkZeile {
 
 type Stufe = 'auswahl' | 'gedruckt' | 'startet'
 
+/** Sitzungsablage-Schlüssel für Auswahl + Druckstufe (überlebt den Sammeldruck-Umweg). */
+const ABLAGE = 'fertigung-bulk'
+
 export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
   const router = useRouter()
   const [gewaehlt, setGewaehlt] = useState<Set<string>>(new Set())
   const [stufe, setStufe] = useState<Stufe>('auswahl')
   const [meldung, setMeldung] = useState<{ text: string; fehler: boolean } | null>(null)
+  const geladen = useRef(false)
 
   const startbar = (r: BulkZeile) => r.state === 'confirmed' && r.missing === 0
   const startbare = rows.filter(startbar)
   const auswahl = [...gewaehlt].filter((id) => rows.some((r) => r.id === id && startbar(r)))
+
+  // Auswahl + Druckstufe überleben die Navigation zum Sammeldruck und
+  // zurück (Sitzungsablage je Tab, Muster des KI-Chats) — sonst wäre nach
+  // „Zurück zur Fertigung" die bestätigte Druckstufe verloren und
+  // „Produktion starten" bliebe grundlos gesperrt.
+  useEffect(() => {
+    try {
+      const roh = sessionStorage.getItem(ABLAGE)
+      if (roh) {
+        const daten = JSON.parse(roh) as { auswahl?: string[]; stufe?: string }
+        if (Array.isArray(daten.auswahl) && daten.auswahl.length > 0) {
+          setGewaehlt(new Set(daten.auswahl.filter((id) => typeof id === 'string')))
+          if (daten.stufe === 'gedruckt') setStufe('gedruckt')
+        }
+      }
+    } catch {
+      // Ohne Ablage (Privatmodus o. Ä.) startet die Auswahl einfach leer.
+    }
+    geladen.current = true
+  }, [])
+  useEffect(() => {
+    if (!geladen.current) return
+    try {
+      if (gewaehlt.size === 0) sessionStorage.removeItem(ABLAGE)
+      else {
+        sessionStorage.setItem(
+          ABLAGE,
+          JSON.stringify({ auswahl: [...gewaehlt], stufe: stufe === 'gedruckt' ? 'gedruckt' : 'auswahl' }),
+        )
+      }
+    } catch {
+      // Speichern ist Komfort — ohne Ablage funktioniert der Ablauf im Tab.
+    }
+  }, [gewaehlt, stufe])
 
   const umschalten = (id: string) => {
     // Jede Änderung der Auswahl entwertet eine schon bestätigte Druckstufe.
@@ -73,12 +111,22 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
       setMeldung({ text: result.error, fehler: true })
       return
     }
-    if (result && 'info' in result) {
-      // Ohne Druckbrücke kommt der Sammeldruck als Link zurück — Tab öffnen.
-      if (result.link) window.open(result.link, '_blank', 'noopener')
-      setMeldung({ text: result.info, fehler: false })
-    }
     setStufe('gedruckt')
+    if (result && 'info' in result) {
+      setMeldung({ text: result.info, fehler: false })
+      if (result.link) {
+        // PDF-Modus: Sammeldruck im SELBEN Tab — ein Popup würde geblockt,
+        // und der Rückweg „Zurück zur Fertigung" findet die Auswahl über
+        // die Sitzungsablage wieder. Direkt schreiben, damit der Stand vor
+        // der Navigation sicher liegt.
+        try {
+          sessionStorage.setItem(ABLAGE, JSON.stringify({ auswahl, stufe: 'gedruckt' }))
+        } catch {
+          // Ohne Ablage geht nur der Umweg über erneutes Auswählen.
+        }
+        router.push(result.link)
+      }
+    }
   }
 
   async function starten() {
@@ -96,6 +144,11 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
     })
     setGewaehlt(new Set())
     setStufe('auswahl')
+    try {
+      sessionStorage.removeItem(ABLAGE)
+    } catch {
+      // nichts zu tun
+    }
     router.refresh()
   }
 
