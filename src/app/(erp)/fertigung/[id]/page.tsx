@@ -47,6 +47,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       material_cost: number
       labor_cost: number
       unit_cost: number | null
+      aus_odoo: boolean
     }[]
   >`
     select mo.id, mo.number, variant_display_name(mo.variant_id) as product, mo.variant_id,
@@ -55,7 +56,9 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
            mo.material_cost, mo.labor_cost, mo.unit_cost,
            product_tracking(mo.variant_id) as tracking,
            mo.sales_order_id, so.number as sales_order_number,
-           bo.number as backorder_of_number, u.name as uom, b.consumption
+           bo.number as backorder_of_number, u.name as uom, b.consumption,
+           exists(select 1 from odoo_verweise v
+                  where v.krnl_tabelle = 'manufacturing_orders' and v.krnl_id = mo.id) as aus_odoo
     from manufacturing_orders mo
     left join sales_orders so on so.id = mo.sales_order_id
     left join manufacturing_orders bo on bo.id = mo.backorder_of_id
@@ -252,6 +255,17 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         }
         tight
       >
+        {components.length === 0 ? (
+          // Ein leerer Tabellenkopf sieht nach Buchungsfehler aus — dabei ist
+          // das bei übernommener Odoo-Historie der Normalfall: erledigte
+          // Alt-Aufträge kamen bewusst OHNE Lagerbewegungen (der Bestand kam
+          // als Summen-Inventur, docs/migration-odoo.md).
+          <Empty>
+            {mo.aus_odoo && (mo.state === 'done' || mo.state === 'cancel')
+              ? 'Aus Odoo im Endzustand übernommen — die Komponentenverbräuche liegen nur im Odoo-Archiv, hier gibt es keine Lagerbewegungen.'
+              : 'Keine Komponenten an diesem Auftrag.'}
+          </Empty>
+        ) : (
         <TableWrap>
           <table>
             <thead>
@@ -293,6 +307,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
             </tbody>
           </table>
         </TableWrap>
+        )}
       </Card>
 
       <Card
