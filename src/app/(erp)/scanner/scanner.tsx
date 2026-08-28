@@ -233,6 +233,15 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
     const isDocCode = code.toLowerCase() === doc.number.toLowerCase()
     if (phase === 'work') {
       if (isDocCode) {
+        if (!anyScanned) {
+          // Ohne einen einzigen Scan heißt der Doppelscan „alles wie
+          // geplant": die Checkliste füllt sich sichtbar auf Soll, gebucht
+          // werden die Sollmengen — niemand klickt 85 Positionen hoch.
+          setCounts(Object.fromEntries(doc.lines.map((l) => [l.moveId, Number(l.qty)])))
+          setPhase('confirm')
+          say('Alle Positionen mit Sollmengen übernommen — zum Buchen Beleg erneut scannen', 'ok')
+          return
+        }
         setPhase('confirm')
         say(
           complete
