@@ -43,9 +43,9 @@ export function aktionsFelder(aktion: RegistrierteAktion): FeldInfo[] {
 
 /**
  * Registry-Aktionen, die der KI-Agent vorschlagen darf (`ki: true`) — in der
- * Form, die `aktionenTool()` in den Werkzeugkatalog mischt. Lebt hier (nicht
- * in ki/aktionen.ts), weil die Registry die KI-Produktanlage importiert —
- * andersherum entstünde ein Importkreis.
+ * Form, die `aktionenTool()` in den Werkzeugkatalog mischt. Lebt hier als
+ * Teil der Registry-Selbstauskunft; der einstige Importkreis (Registry ↔
+ * KI-Produktanlage) ist mit der Auflösung des KI-Anlage-Katalogs Geschichte.
  */
 export function kiKatalog(): {
   name: string

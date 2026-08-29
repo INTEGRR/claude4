@@ -9,6 +9,37 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-27 — KI-Anlage-Katalog wird aufgelöst: der Torwächter ist der einzige Schreibweg
+
+Aus der MCP-Erkundung: Die 9 KI-Anlage-Aktionen (src/modules/ki/aktionen.ts,
+ein Relikt aus Phase 5, vor der Breitenmigration) schreiben per
+Direkt-INSERT am Torwächter vorbei — ohne nurAdmin-/Schrittrechte-Prüfung,
+ohne Nutzungszählung, teils mit schwächerer Fachlogik (Einkaufszeilen ohne
+Staffelpreis/MOQ, Einkaufseinheit und Steuer; Verkaufszeilen ohne
+Lieferadress-Vorbelegung und Statusneuberechnung). Das sind zwei Wahrheiten
+darüber, was „die KI darf" — gegen den Grundsatz aus AGENTS.md.
+
+Entschieden: Der Katalog wird Aktion für Aktion in die Registry überführt;
+danach ist `aktionAusfuehrenGeprueft` der einzige Schreibweg für ALLE
+Transporte (Chat, Sprachmodus, UI, künftig MCP). Eckpunkte:
+
+- 6 der 9 Aktionen haben funktionsgleiche Registry-Gegenstücke — sie
+  bekommen `ki: true` und die kleinen Deltas (E-Mail-Validierung,
+  Duplikatsprüfung Meldebestand, Code-Großschreibung Arbeitsplatz).
+- Verkaufsauftrag/Bestellung „mit Positionen" werden NEUE prozessfreie
+  Registry-Aktionen, die die bestehenden Einzel-Executoren komponieren —
+  ein Aufruf, volle Fachlogik.
+- Die Notiz wird EINE Registry-Aktion für KI UND UI-Kommentarfeld — damit
+  fallen zwei Torwächter-Umgehungen auf einmal.
+- Verweisfelder der Anlage-Aktionen sind „Kennungsfelder": Executoren
+  lösen SKU/Barcode/Name über ein gemeinsames Resolver-Modul auf, UUIDs
+  aus den Masken bleiben der schnelle Weg.
+- Neuer Wächter verbietet Schreib-SQL in src/modules/ki/** außerhalb
+  begründeter Ausnahmen — dieselbe Fehlerklasse kann nicht wiederkommen.
+
+Umsetzung in sechs Schritten (je Commit grün); Startpunkt ist das Drehen
+des Importkreises Registry ↔ KI-Produktanlage.
+
 ## 2026-08-27 — Druckweg ist eine Einstellung, keine Env-Variable
 
 Der Betreiber wollte zum Testen erst PDFs im Browser und lehnte die

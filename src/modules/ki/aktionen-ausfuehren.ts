@@ -1,7 +1,6 @@
 import type { Sql } from 'postgres'
 import { sql } from '@/db/client'
 import { type AktionErgebnis, type AktionName, UUID_MUSTER } from './aktionen'
-import { type ProduktEingabe, produktAnlegen } from './produkt-anlegen'
 
 /**
  * Die Ausführung der Katalogaktionen — getrennt vom Katalog, weil nur dieser
@@ -127,17 +126,6 @@ const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<Aktio
     return {
       text: `Fertigungsauftrag ${mo.number} für ${v.name} angelegt.`,
       link: `/fertigung/${row.id}`,
-    }
-  },
-
-  produkt_anlegen: async (p: Werte, actor) => {
-    const ergebnis = await produktAnlegen(sql, p as unknown as ProduktEingabe, actor)
-    return {
-      text:
-        `Produkt „${p.name as string}" mit ${ergebnis.varianten} Variante(n) angelegt` +
-        (p.sku ? `, davon ${ergebnis.benannt} mit Artikelnummer` : '') +
-        '. Stückliste und Bestände bitte in der Oberfläche ergänzen.',
-      link: `/produkte/${ergebnis.templateId}`,
     }
   },
 

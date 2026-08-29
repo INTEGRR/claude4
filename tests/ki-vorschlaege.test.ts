@@ -51,8 +51,8 @@ describe('KI: Vorschlagsgruppen für die Sammel-Bestätigung', () => {
 
   test('verschachtelte Feldsätze bleiben allein — sie brauchen den vollen Editor', () => {
     const gruppen = gruppiereVorschlaege([
-      v('a', 'produkt_anlegen', { name: 'A', attribute: [{ name: 'Farbe', werte: [] }] }),
-      v('b', 'produkt_anlegen', { name: 'B', attribute: [{ name: 'Farbe', werte: [] }] }),
+      v('a', 'produkte.produkt_anlegen', { name: 'A', attribute: [{ name: 'Farbe', werte: [] }] }),
+      v('b', 'produkte.produkt_anlegen', { name: 'B', attribute: [{ name: 'Farbe', werte: [] }] }),
     ])
     assert.equal(gruppen.length, 2)
   })

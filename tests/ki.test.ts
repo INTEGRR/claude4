@@ -210,78 +210,89 @@ describe('Schreibende Aktionen', () => {
     assert.match(aktion.zusammenfassung(werte), /Muster GmbH/)
   })
 
+  // Die Produktanlage lebt seit der Katalog-Auflösung in der Registry —
+  // geprüft wird sie deshalb über den Torwächter (derselbe Weg wie im
+  // Betrieb), nicht mehr über den KI-Katalog.
   test('Produkt mit Attributen: Variantenzahl steht in der Zusammenfassung', async () => {
-    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
-    const { aktion, werte } = aktionPruefen('produkt_anlegen', {
-      name: 'Anvil Native 1800',
-      verkaufspreis: 349,
-      sku: 'AN1800',
-      attribute: [
-        {
-          name: 'Farbe',
-          werte: [
-            { name: 'Schwarz', kuerzel: 'BK' },
-            { name: 'Blau', kuerzel: 'BL' },
-            { name: 'Grün', kuerzel: 'GN' },
-          ],
-        },
-        {
-          name: 'Switch',
-          werte: [
-            { name: 'Gateron HE 1', kuerzel: 'HE1' },
-            { name: 'Gateron HE 2', kuerzel: 'HE2' },
-            { name: 'Gateron HE 3', kuerzel: 'HE3' },
-            { name: 'Gateron HE 4', kuerzel: 'HE4' },
-          ],
-        },
-      ],
+    const { aktionPruefen } = await import('../src/modules/prozesse/torwaechter.ts')
+    const { aktion, werte } = aktionPruefen('produkte.produkt_anlegen', {
+      parameter: {
+        name: 'Anvil Native 1800',
+        verkaufspreis: 349,
+        sku: 'AN1800',
+        attribute: [
+          {
+            name: 'Farbe',
+            werte: [
+              { name: 'Schwarz', kuerzel: 'BK' },
+              { name: 'Blau', kuerzel: 'BL' },
+              { name: 'Grün', kuerzel: 'GN' },
+            ],
+          },
+          {
+            name: 'Switch',
+            werte: [
+              { name: 'Gateron HE 1', kuerzel: 'HE1' },
+              { name: 'Gateron HE 2', kuerzel: 'HE2' },
+              { name: 'Gateron HE 3', kuerzel: 'HE3' },
+              { name: 'Gateron HE 4', kuerzel: 'HE4' },
+            ],
+          },
+        ],
+      },
     })
     assert.equal(aktion.bereich, 'produkte')
     assert.equal(werte.verkaufbar, true, 'Vorgabe: verkaufbar')
     // 3 × 4 — die Zahl muss im Bestätigungstext stehen, sonst bestätigt
     // niemand bewusst zwölf neue Varianten.
-    assert.match(aktion.zusammenfassung(werte), /12 Varianten/)
-    assert.match(aktion.zusammenfassung(werte), /Anvil Native 1800/)
+    assert.match(aktion.zusammenfassung!(werte), /12 Varianten/)
+    assert.match(aktion.zusammenfassung!(werte), /Anvil Native 1800/)
   })
 
   test('die Variantenmatrix ist gedeckelt', async () => {
-    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
+    const { aktionPruefen } = await import('../src/modules/prozesse/torwaechter.ts')
     const viele = (n: number, praefix: string) =>
       Array.from({ length: n }, (_, i) => ({ name: `${praefix}${i}` }))
     assert.throws(
       () =>
-        aktionPruefen('produkt_anlegen', {
-          name: 'Zu viel',
-          attribute: [
-            { name: 'A', werte: viele(20, 'a') },
-            { name: 'B', werte: viele(20, 'b') },
-          ],
+        aktionPruefen('produkte.produkt_anlegen', {
+          parameter: {
+            name: 'Zu viel',
+            attribute: [
+              { name: 'A', werte: viele(20, 'a') },
+              { name: 'B', werte: viele(20, 'b') },
+            ],
+          },
         }),
       /200 Varianten/,
     )
     // Vier Attribute sind unabhängig davon zu viel.
     assert.throws(
       () =>
-        aktionPruefen('produkt_anlegen', {
-          name: 'Zu tief',
-          attribute: [1, 2, 3, 4].map((i) => ({ name: `A${i}`, werte: [{ name: 'x' }] })),
+        aktionPruefen('produkte.produkt_anlegen', {
+          parameter: {
+            name: 'Zu tief',
+            attribute: [1, 2, 3, 4].map((i) => ({ name: `A${i}`, werte: [{ name: 'x' }] })),
+          },
         }),
       /attribute/,
     )
   })
 
   test('Produkt ohne Attribute ist erlaubt (Einkaufsteil)', async () => {
-    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
-    const { aktion, werte } = aktionPruefen('produkt_anlegen', {
-      name: 'Gateron HE 1',
-      verkaufbar: false,
-      einkaufbar: true,
-      route: 'kaufen',
-      einstandspreis: 0.55,
+    const { aktionPruefen } = await import('../src/modules/prozesse/torwaechter.ts')
+    const { aktion, werte } = aktionPruefen('produkte.produkt_anlegen', {
+      parameter: {
+        name: 'Gateron HE 1',
+        verkaufbar: false,
+        einkaufbar: true,
+        route: 'kaufen',
+        einstandspreis: 0.55,
+      },
     })
     assert.equal(werte.verkaufbar, false)
     assert.deepEqual(werte.attribute, [])
-    assert.match(aktion.zusammenfassung(werte), /ohne Varianten/)
+    assert.match(aktion.zusammenfassung!(werte), /ohne Varianten/)
   })
 
   test('Produktanlage erzeugt die volle Matrix mit Artikelnummern', async () => {

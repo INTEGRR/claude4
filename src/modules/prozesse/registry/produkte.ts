@@ -1,21 +1,82 @@
 import { z } from 'zod'
-import { AKTIONEN } from '../../ki/aktionen.ts'
 import type { RegistrierteAktion } from './typen.ts'
 
 /**
- * Aktionen des Produktbereichs. Die Produktanlage teilt sich Schema und
- * Fachlogik mit der KI-Aktion `produkt_anlegen` — eine Definition, drei
- * Transporte (KI-Chat, generierte Maske, Prozesstest). Die Richtung stimmt
- * schon mit Phase 6 überein, wo der KI-Katalog ganz aus der Registry kommt.
+ * Aktionen des Produktbereichs. Die Produktanlage hat EINE Definition und
+ * drei Transporte (KI-Chat, generierte Maske, Prozesstest) — seit der
+ * Auflösung des KI-Anlage-Katalogs lebt sie hier, die Fachlogik weiter in
+ * ki/produkt-anlegen.ts (Entscheidungslog 2026-08-27).
  */
+
+const geld = (v: number) => v.toFixed(2).replace('.', ',') + ' €'
+
+interface Attribut {
+  name: string
+  werte: { name: string; aufpreis?: number; kuerzel?: string; farbe?: string }[]
+}
+
 export const PRODUKTE = {
   'produkte.produkt_anlegen': {
-    label: AKTIONEN.produkt_anlegen.label,
+    label: 'Produkt anlegen',
     bereich: 'produkte',
-    beschreibung: AKTIONEN.produkt_anlegen.beschreibung,
+    ki: true,
+    beschreibung:
+      'Legt ein Produkt an — mit Attributen entsteht daraus sofort die komplette ' +
+      'Variantenmatrix (z. B. 3 Farben × 4 Schaltertypen = 12 Varianten). Fehlende Attribute ' +
+      'und Attributwerte werden dabei mit angelegt, vorhandene wiederverwendet (Abgleich über ' +
+      'den Namen). Taugt auch für Einkaufsteile: verkaufbar=false, einkaufbar=true.',
     bindung: 'frei',
-    schema: AKTIONEN.produkt_anlegen.schema,
-    zusammenfassung: AKTIONEN.produkt_anlegen.zusammenfassung,
+    schema: z.object({
+      name: z.string().min(1).max(200),
+      verkaufspreis: z.number().nonnegative().optional().describe('Listenpreis netto'),
+      einstandspreis: z.number().nonnegative().optional().describe('Plankosten je Stück'),
+      gewicht_g: z.number().nonnegative().max(1_000_000).optional(),
+      verkaufbar: z.boolean().default(true),
+      einkaufbar: z.boolean().default(false),
+      route: z.enum(['kaufen', 'fertigen']).optional(),
+      sku: z
+        .string()
+        .max(40)
+        .optional()
+        .describe('Artikelnummer; mit Attributen als Präfix, ergänzt um die Kürzel je Wert'),
+      beschreibung: z.string().max(500).optional().describe('Belegtext Verkauf'),
+      attribute: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(60).describe('z. B. Farbe oder Switch'),
+            werte: z
+              .array(
+                z.object({
+                  name: z.string().min(1).max(60),
+                  aufpreis: z.number().optional().describe('Aufschlag auf den Listenpreis'),
+                  kuerzel: z.string().max(8).optional().describe('für die SKU, z. B. BK'),
+                  farbe: z
+                    .string()
+                    .regex(/^#[0-9a-fA-F]{6}$/, 'Farbe als Hex-Wert, z. B. #1a1a1a')
+                    .optional(),
+                }),
+              )
+              .min(1)
+              .max(40),
+          }),
+        )
+        .max(3)
+        .default([])
+        .describe('Höchstens drei Attribute — die Matrix wächst multiplikativ'),
+    }).refine(
+      (p) => p.attribute.reduce((n, a) => n * a.werte.length, 1) <= 200,
+      { message: 'Mehr als 200 Varianten — bitte die Attributwerte eingrenzen', path: ['attribute'] },
+    ),
+    zusammenfassung: (p) => {
+      const varianten = p.attribute.reduce((n: number, a: Attribut) => n * a.werte.length, 1)
+      const teile = p.attribute
+        .map((a: Attribut) => `${a.name} (${a.werte.map((w) => w.name).join(', ')})`)
+        .join(' × ')
+      return (
+        `${p.name}${p.verkaufspreis ? `, ${geld(p.verkaufspreis)}` : ''}` +
+        (p.attribute.length > 0 ? ` — ${teile} ⇒ ${varianten} Varianten` : ' — ohne Varianten')
+      )
+    },
     revalidate: ['/produkte'],
   },
 
