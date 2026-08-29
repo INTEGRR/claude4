@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
-import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
+import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
 
 /** Ausführung der Verkaufs-Aktionen — Fachlogik unverändert aus verkauf/actions.ts. */
 
@@ -54,6 +55,42 @@ export async function auftragFuerNeuenKunden(
   )
   const auftrag = await auftragAnlegen({ partner_id: kunde.recordId! })
   return { ...auftrag, text: `${kunde.text} ${auftrag.text}` }
+}
+
+/**
+ * Kombi-Aktion für KI und API: Kopf + Zeilen in einem Aufruf. Sie KOMPONIERT
+ * die bestehenden Aktionen (auftragAnlegen, positionHinzufuegen) — dadurch
+ * kommen Lieferadresse, Einheit, Listenpreis und Statusneuberechnung gratis
+ * und es gibt keinen zweiten Zeilen-Dialekt.
+ */
+export async function auftragMitPositionen(
+  p: { kunde: string; positionen: PositionsZeile[]; hinweis?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Alle Kennungen VOR dem Kopf-Insert auflösen — scheitert eine, entsteht
+  // gar kein Beleg statt ein halber.
+  const kunde = await partnerAufloesen(sql, p.kunde, 'kunde')
+  const varianten = []
+  for (const pos of p.positionen) varianten.push(await varianteAufloesen(sql, pos.produkt))
+
+  const kopf = await auftragAnlegen({ partner_id: kunde.id })
+  const orderId = kopf.recordId!
+  if (p.hinweis) await sql`update sales_orders set note = ${p.hinweis} where id = ${orderId}`
+
+  for (const [i, pos] of p.positionen.entries()) {
+    await positionHinzufuegen(
+      { variant_id: varianten[i].id, qty: pos.menge, price_unit: pos.preis },
+      { ...ctx, recordId: orderId },
+    )
+  }
+
+  const [order] = await sql<{ number: string }[]>`
+    select number from sales_orders where id = ${orderId}`
+  return {
+    text: `Angebot ${order.number} für ${kunde.name} mit ${p.positionen.length} Position(en) angelegt.`,
+    link: `/verkauf/${orderId}`,
+    recordId: orderId,
+  }
 }
 
 export async function bestaetigen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {

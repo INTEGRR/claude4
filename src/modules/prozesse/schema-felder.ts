@@ -118,6 +118,11 @@ function beschriftung(name: string): string {
     menge: 'Menge',
     note: 'Vermerk',
     vermerk: 'Vermerk',
+    hinweis: 'Hinweis',
+    // Kombi-Aktionen (Auftrag/Bestellung mit Positionen)
+    kunde: 'Kunde',
+    lieferant: 'Lieferant',
+    positionen: 'Positionen',
     titel: 'Titel',
     beschreibung: 'Beschreibung',
     status: 'Status',

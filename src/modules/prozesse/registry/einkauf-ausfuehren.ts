@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { money, qty } from '@/modules/shared/format'
-import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
+import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
 
 /** Ausführung der Einkaufs-Aktionen — Fachlogik unverändert aus einkauf/actions.ts. */
 
@@ -52,6 +53,41 @@ export async function positionHinzufuegen(
     where pv.id = ${p.variant_id}`
 
   return { recordId: orderId }
+}
+
+/**
+ * Kombi-Aktion für KI und API: Kopf + Zeilen in einem Aufruf. Komponiert
+ * bestellungAnlegen + positionHinzufuegen — Lieferantenpreisliste (Staffel,
+ * Rabatt), Einkaufseinheit und Steuersatz kommen dadurch gratis mit.
+ */
+export async function bestellungMitPositionen(
+  p: { lieferant: string; positionen: PositionsZeile[]; hinweis?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Alle Kennungen VOR dem Kopf-Insert auflösen — scheitert eine, entsteht
+  // gar kein Beleg statt ein halber.
+  const lieferant = await partnerAufloesen(sql, p.lieferant, 'lieferant')
+  const varianten = []
+  for (const pos of p.positionen) varianten.push(await varianteAufloesen(sql, pos.produkt))
+
+  const kopf = await bestellungAnlegen({ vendor_id: lieferant.id })
+  const orderId = kopf.recordId!
+  if (p.hinweis) await sql`update purchase_orders set note = ${p.hinweis} where id = ${orderId}`
+
+  for (const [i, pos] of p.positionen.entries()) {
+    await positionHinzufuegen(
+      { variant_id: varianten[i].id, qty: pos.menge, price_unit: pos.preis },
+      { ...ctx, recordId: orderId },
+    )
+  }
+
+  const [order] = await sql<{ number: string }[]>`
+    select number from purchase_orders where id = ${orderId}`
+  return {
+    text: `Bestellung ${order.number} bei ${lieferant.name} mit ${p.positionen.length} Position(en) angelegt.`,
+    link: `/einkauf/${orderId}`,
+    recordId: orderId,
+  }
 }
 
 export async function positionEntfernen(

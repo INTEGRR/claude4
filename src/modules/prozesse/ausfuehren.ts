@@ -27,6 +27,7 @@ export const AUSFUEHRUNG = {
   'auswertungen.kennzahlen_aktualisieren': auswertungen.kennzahlenAktualisieren,
 
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
+  'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,
   'einkauf.position_entfernen': einkauf.positionEntfernen,
   'einkauf.kopf_aendern': einkauf.kopfAendern,
@@ -172,6 +173,7 @@ export const AUSFUEHRUNG = {
 
   'verkauf.auftrag_anlegen': verkauf.auftragAnlegen,
   'verkauf.auftrag_fuer_neuen_kunden': verkauf.auftragFuerNeuenKunden,
+  'verkauf.auftrag_mit_positionen': verkauf.auftragMitPositionen,
   'verkauf.bestaetigen': verkauf.bestaetigen,
   'verkauf.stornieren': verkauf.stornieren,
   'verkauf.zurueck_auf_angebot': verkauf.zurueckAufAngebot,

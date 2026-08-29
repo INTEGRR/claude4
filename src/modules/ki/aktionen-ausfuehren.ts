@@ -1,6 +1,5 @@
-import type { Sql } from 'postgres'
 import { sql } from '@/db/client'
-import { type AktionErgebnis, type AktionName, UUID_MUSTER } from './aktionen'
+import type { AktionErgebnis, AktionName } from './aktionen'
 
 /**
  * Die Ausführung der Katalogaktionen — getrennt vom Katalog, weil nur dieser
@@ -12,98 +11,11 @@ import { type AktionErgebnis, type AktionName, UUID_MUSTER } from './aktionen'
  * Sonderweg für die KI — sonst gälten für ihre Datensätze andere Regeln.
  */
 
-// --- Auflösung von Bezeichnern ---------------------------------------------
-
-/** Findet eine Variante über UUID, SKU, Barcode oder Anzeigename. */
-async function variante(db: Sql, kennung: string): Promise<{ id: string; name: string }> {
-  const alsUuid = UUID_MUSTER.test(kennung) ? kennung : null
-  const [row] = await db<{ id: string; name: string }[]>`
-    select pv.id, variant_display_name(pv.id) as name
-    from product_variants pv
-    join product_templates pt on pt.id = pv.template_id
-    where pv.active and (
-      pv.id = ${alsUuid}::uuid
-      or lower(pv.sku) = lower(${kennung})
-      or pv.barcode = ${kennung}
-      or lower(coalesce(pv.display_name, pt.name)) = lower(${kennung})
-    )
-    limit 1`
-  if (!row) throw new Error(`Produkt „${kennung}" nicht gefunden`)
-  return row
-}
-
-/** Findet einen Kontakt über UUID, Referenz oder Namen. */
-async function partner(db: Sql, kennung: string, art: 'kunde' | 'lieferant') {
-  const alsUuid = UUID_MUSTER.test(kennung) ? kennung : null
-  const [row] = await db<{ id: string; name: string }[]>`
-    select id, name from partners
-    where active
-      and (id = ${alsUuid}::uuid or lower(ref) = lower(${kennung}) or lower(name) = lower(${kennung}))
-      and (${art === 'kunde'}::boolean and is_customer or ${art === 'lieferant'}::boolean and is_vendor)
-    limit 1`
-  if (!row) {
-    throw new Error(`${art === 'kunde' ? 'Kunde' : 'Lieferant'} „${kennung}" nicht gefunden`)
-  }
-  return row
-}
-
-async function stueck(db: Sql): Promise<string> {
-  const [row] = await db<{ id: string }[]>`select id from uoms where name = 'Stück' limit 1`
-  return row.id
-}
-
 // --- Ausführung -------------------------------------------------------------
 
 type Werte = Record<string, unknown>
-type Position = { produkt: string; menge: number; preis?: number }
 
 const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<AktionErgebnis>> = {
-  verkaufsauftrag_anlegen: async (p: Werte, actor) => {
-    const kunde = await partner(sql, p.kunde as string, 'kunde')
-    const uom = await stueck(sql)
-    const [order] = await sql<{ id: string; number: string }[]>`
-      insert into sales_orders (number, partner_id, note)
-      values (next_sequence('sale'), ${kunde.id}, ${(p.hinweis as string) ?? null})
-      returning id, number`
-
-    for (const [i, pos] of (p.positionen as Position[]).entries()) {
-      const v = await variante(sql, pos.produkt)
-      await sql`
-        insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit)
-        select ${order.id}, ${(i + 1) * 10}, ${v.id}, ${v.name}, ${pos.menge}, ${uom},
-               coalesce(${pos.preis ?? null}::numeric, pt.list_price + coalesce(pv.price_extra, 0))
-        from product_variants pv join product_templates pt on pt.id = pv.template_id
-        where pv.id = ${v.id}`
-    }
-
-    await sql`select log_event('sales_order', ${order.id}, 'note',
-      ${'Über die KI-Analyse angelegt'}, ${actor})`
-    return { text: `Angebot ${order.number} angelegt.`, link: `/verkauf/${order.id}` }
-  },
-
-  bestellung_anlegen: async (p: Werte, actor) => {
-    const lieferant = await partner(sql, p.lieferant as string, 'lieferant')
-    const uom = await stueck(sql)
-    const [order] = await sql<{ id: string; number: string }[]>`
-      insert into purchase_orders (number, vendor_id, note)
-      values (next_sequence('purchase'), ${lieferant.id}, ${(p.hinweis as string) ?? null})
-      returning id, number`
-
-    for (const [i, pos] of (p.positionen as Position[]).entries()) {
-      const v = await variante(sql, pos.produkt)
-      await sql`
-        insert into purchase_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit)
-        select ${order.id}, ${(i + 1) * 10}, ${v.id}, ${v.name}, ${pos.menge}, ${uom},
-               coalesce(${pos.preis ?? null}::numeric, pt.standard_cost)
-        from product_variants pv join product_templates pt on pt.id = pv.template_id
-        where pv.id = ${v.id}`
-    }
-
-    await sql`select log_event('purchase_order', ${order.id}, 'note',
-      ${'Über die KI-Analyse angelegt'}, ${actor})`
-    return { text: `Bestellung ${order.number} angelegt.`, link: `/einkauf/${order.id}` }
-  },
-
   notiz_anlegen: async (p: Werte, actor) => {
     await sql`select log_event(${p.model as string}, ${p.record_id as string}::uuid, 'note',
       ${p.text as string}, ${actor})`

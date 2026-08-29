@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 import type { Area, Role } from '../../auth/permissions.ts'
 
 /**
@@ -93,3 +93,14 @@ export const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
 /** Deutsche Geldschreibweise für Zusammenfassungen — bewusst ohne Intl (DB-frei, deterministisch). */
 export const geld = (v: number) => v.toFixed(2).replace('.', ',') + ' €'
+
+/**
+ * Eine Belegzeile der Kombi-Aktionen (Auftrag/Bestellung mit Positionen) —
+ * gemeinsam, damit Verkauf und Einkauf dieselbe Zeilensprache sprechen.
+ */
+export const positionenSchema = z.object({
+  produkt: z.string().min(1).describe('SKU, Barcode, Name oder ID der Variante'),
+  menge: z.number().positive(),
+  preis: z.number().nonnegative().optional().describe('Netto je Einheit; leer = Preisfindung'),
+})
+export type PositionsZeile = z.infer<typeof positionenSchema>

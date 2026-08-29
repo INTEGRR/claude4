@@ -188,7 +188,7 @@ describe('Schreibende Aktionen', () => {
   test('fehlende Felder nennen die Ursache im Klartext', async () => {
     const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
     const torwaechter = await import('../src/modules/prozesse/torwaechter.ts')
-    assert.throws(() => aktionPruefen('verkaufsauftrag_anlegen', { positionen: [] }), /kunde|positionen/)
+    assert.throws(() => aktionPruefen('notiz_anlegen', { text: '' }), /model|record_id|text/)
     assert.throws(
       () =>
         torwaechter.aktionPruefen('kontakte.partner_anlegen', {

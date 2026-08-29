@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { RegistrierteAktion } from './typen.ts'
+import { positionenSchema, type PositionsZeile, type RegistrierteAktion } from './typen.ts'
 
 /**
  * Aktionen des Verkaufs. Der Shop-Weg läuft über P4
@@ -72,6 +72,32 @@ export const VERKAUF = {
       country_code: String(fd.get('country_code') ?? 'DE'),
     }),
     revalidate: ['/verkauf', '/kontakte'],
+  },
+
+  'verkauf.auftrag_mit_positionen': {
+    label: 'Auftrag mit Positionen anlegen',
+    bereich: 'verkauf',
+    ki: true,
+    beschreibung:
+      'Legt ein Angebot (Entwurf) für einen BESTEHENDEN Kunden samt Positionen in einem ' +
+      'Zug an. kunde nimmt Name, Referenz oder ID; jede Position: produkt (SKU, Barcode, ' +
+      'Name oder ID), menge, optional preis (netto je Einheit, leer = Listenpreis). Der ' +
+      'Auftrag wird NICHT bestätigt — das bleibt ein bewusster Schritt in der Oberfläche.',
+    bindung: 'frei',
+    modell: 'sales_order',
+    uebergang: { von: [], nach: ['draft'] },
+    // Wie auftrag_fuer_neuen_kunden: alternativer Einstieg in denselben
+    // Zustand (draft), deshalb kein eigener Prozessschritt.
+    prozessfrei: true,
+    schema: z.object({
+      kunde: z.string().min(1).describe('Name, Referenz oder ID eines vorhandenen Kunden'),
+      positionen: z.array(positionenSchema).min(1).max(50),
+      hinweis: z.string().max(500).optional(),
+    }),
+    zusammenfassung: (p) =>
+      `Angebot für ${p.kunde} mit ${p.positionen.length} Position(en): ` +
+      p.positionen.map((pos: PositionsZeile) => `${pos.menge} × ${pos.produkt}`).join(', '),
+    revalidate: ['/verkauf'],
   },
 
   'verkauf.bestaetigen': {

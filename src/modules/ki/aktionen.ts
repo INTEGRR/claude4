@@ -35,47 +35,9 @@ export interface Aktion<S extends z.ZodTypeAny = z.ZodTypeAny> {
 
 export const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export const positionSchema = z.object({
-  produkt: z.string().min(1).describe('SKU, Barcode, Name oder ID der Variante'),
-  menge: z.number().positive(),
-  preis: z.number().nonnegative().optional().describe('Netto je Einheit; leer = Listenpreis'),
-})
-type Position = z.infer<typeof positionSchema>
-
 // --- Katalog ---------------------------------------------------------------
 
 export const AKTIONEN = {
-  verkaufsauftrag_anlegen: {
-    label: 'Verkaufsauftrag anlegen',
-    bereich: 'verkauf',
-    beschreibung:
-      'Legt ein Angebot (Status Entwurf) für einen bestehenden Kunden an. Der Auftrag wird ' +
-      'NICHT bestätigt — das bleibt ein bewusster Schritt in der Oberfläche.',
-    schema: z.object({
-      kunde: z.string().min(1).describe('Name oder ID eines vorhandenen Kunden'),
-      positionen: z.array(positionSchema).min(1).max(50),
-      hinweis: z.string().max(500).optional(),
-    }),
-    zusammenfassung: (p) =>
-      `Angebot für ${p.kunde} mit ${p.positionen.length} Position(en): ` +
-      p.positionen.map((z: Position) => `${z.menge} × ${z.produkt}`).join(', '),
-  },
-
-  bestellung_anlegen: {
-    label: 'Bestellung anlegen',
-    bereich: 'einkauf',
-    beschreibung:
-      'Legt eine Bestellung im Entwurf bei einem vorhandenen Lieferanten an. Wird nicht bestätigt.',
-    schema: z.object({
-      lieferant: z.string().min(1),
-      positionen: z.array(positionSchema).min(1).max(50),
-      hinweis: z.string().max(500).optional(),
-    }),
-    zusammenfassung: (p) =>
-      `Bestellung bei ${p.lieferant} mit ${p.positionen.length} Position(en): ` +
-      p.positionen.map((z: Position) => `${z.menge} × ${z.produkt}`).join(', '),
-  },
-
   notiz_anlegen: {
     label: 'Notiz an einem Datensatz',
     bereich: 'ki',

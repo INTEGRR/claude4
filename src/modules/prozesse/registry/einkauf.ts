@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { RegistrierteAktion } from './typen.ts'
+import { positionenSchema, type PositionsZeile, type RegistrierteAktion } from './typen.ts'
 
 /**
  * Aktionen des Einkaufs: Bestellung, Lieferantenrechnung,
@@ -19,6 +19,32 @@ export const EINKAUF = {
       vendor_id: z.string().min(1, 'Bitte einen Lieferanten auswählen'),
     }),
     formdata: (fd) => ({ vendor_id: String(fd.get('vendor_id') ?? '') }),
+    revalidate: ['/einkauf'],
+  },
+
+  'einkauf.bestellung_mit_positionen': {
+    label: 'Bestellung mit Positionen anlegen',
+    bereich: 'einkauf',
+    ki: true,
+    beschreibung:
+      'Legt eine Bestellung (Entwurf) bei einem BESTEHENDEN Lieferanten samt Positionen ' +
+      'in einem Zug an. lieferant nimmt Name, Referenz oder ID; jede Position: produkt ' +
+      '(SKU, Barcode, Name oder ID), menge, optional preis (netto je Einheit, leer = ' +
+      'Lieferantenpreisliste bzw. Standardkosten). Wird nicht bestätigt.',
+    bindung: 'frei',
+    modell: 'purchase_order',
+    uebergang: { von: [], nach: ['draft'] },
+    // Alternativer Einstieg in denselben Zustand (draft) wie
+    // bestellung_anlegen — deshalb kein eigener Prozessschritt.
+    prozessfrei: true,
+    schema: z.object({
+      lieferant: z.string().min(1).describe('Name, Referenz oder ID eines vorhandenen Lieferanten'),
+      positionen: z.array(positionenSchema).min(1).max(50),
+      hinweis: z.string().max(500).optional(),
+    }),
+    zusammenfassung: (p) =>
+      `Bestellung bei ${p.lieferant} mit ${p.positionen.length} Position(en): ` +
+      p.positionen.map((pos: PositionsZeile) => `${pos.menge} × ${pos.produkt}`).join(', '),
     revalidate: ['/einkauf'],
   },
 
