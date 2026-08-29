@@ -100,41 +100,6 @@ export const AKTIONEN = {
       p.positionen.map((z: Position) => `${z.menge} × ${z.produkt}`).join(', '),
   },
 
-  fertigungsauftrag_anlegen: {
-    label: 'Fertigungsauftrag anlegen',
-    bereich: 'fertigung',
-    beschreibung:
-      'Legt einen Fertigungsauftrag im Entwurf an. Die Stückliste wird dabei aufgelöst und ' +
-      'der Komponentenbedarf eingefroren.',
-    schema: z.object({
-      produkt: z.string().min(1),
-      menge: z.number().positive(),
-    }),
-    zusammenfassung: (p) => `${p.menge} × ${p.produkt} fertigen`,
-  },
-
-  meldebestand_anlegen: {
-    label: 'Meldebestand anlegen',
-    bereich: 'lager',
-    beschreibung:
-      'Legt eine Nachbestellregel an: fällt der Bestand unter den Mindestbestand, schlägt die ' +
-      'Beschaffung eine Bestellung oder Fertigung bis zum Maximalbestand vor.',
-    schema: z
-      .object({
-        produkt: z.string().min(1),
-        minimum: z.number().nonnegative(),
-        maximum: z.number().nonnegative(),
-        route: z.enum(['buy', 'manufacture']).optional(),
-      })
-      .refine((p) => p.maximum >= p.minimum, {
-        message: 'Der Maximalbestand darf den Mindestbestand nicht unterschreiten',
-        path: ['maximum'],
-      }),
-    zusammenfassung: (p) =>
-      `${p.produkt}: unter ${p.minimum} auf ${p.maximum} auffüllen` +
-      (p.route ? ` (${p.route === 'buy' ? 'bestellen' : 'fertigen'})` : ''),
-  },
-
   arbeitsplatz_anlegen: {
     label: 'Arbeitsplatz anlegen',
     bereich: 'fertigung',

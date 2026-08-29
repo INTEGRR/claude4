@@ -117,34 +117,6 @@ const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<Aktio
     return { text: `Bestellung ${order.number} angelegt.`, link: `/einkauf/${order.id}` }
   },
 
-  fertigungsauftrag_anlegen: async (p: Werte, actor) => {
-    const v = await variante(sql, p.produkt as string)
-    const [row] = await sql<{ id: string }[]>`
-      select create_manufacturing_order(${v.id}, ${p.menge as number}, null, null, ${actor}) as id`
-    const [mo] = await sql<{ number: string }[]>`
-      select number from manufacturing_orders where id = ${row.id}`
-    return {
-      text: `Fertigungsauftrag ${mo.number} für ${v.name} angelegt.`,
-      link: `/fertigung/${row.id}`,
-    }
-  },
-
-  meldebestand_anlegen: async (p: Werte) => {
-    const v = await variante(sql, p.produkt as string)
-    const [loc] = await sql<{ id: string }[]>`
-      select id from stock_locations where full_path = 'WH/Stock'`
-    const [vorhanden] = await sql<{ id: string }[]>`
-      select id from stock_orderpoints where variant_id = ${v.id} and location_id = ${loc.id}`
-    if (vorhanden) {
-      throw new Error(`Für ${v.name} gibt es bereits einen Meldebestand — bitte dort ändern`)
-    }
-    await sql`
-      insert into stock_orderpoints (variant_id, location_id, min_qty, max_qty, route)
-      values (${v.id}, ${loc.id}, ${p.minimum as number}, ${p.maximum as number},
-              ${(p.route as string) ?? null})`
-    return { text: `Meldebestand für ${v.name} angelegt.`, link: '/lager/beschaffung' }
-  },
-
   arbeitsplatz_anlegen: async (p: Werte) => {
     await sql`
       insert into work_centers (code, name, cost_per_hour, time_efficiency)

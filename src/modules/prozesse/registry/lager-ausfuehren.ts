@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { parseLotSpec } from '@/modules/shared/form'
 import { consumePackagingForPicking, queueFulfillmentForPicking } from '@/modules/versand/service'
+import { varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /**
@@ -130,13 +131,24 @@ export async function meldebestandAnlegen(p: {
   qty_multiple: number
   route?: string
 }): Promise<AktionsErgebnis> {
+  const produkt = await varianteAufloesen(sql, p.variant_id)
   const loc = await HAUPTLAGER()
+  // Zwei Regeln je Produkt hieße zwei widersprüchliche Beschaffungs-
+  // Vorschläge — ändern statt doppelt anlegen.
+  const [vorhanden] = await sql<{ id: string }[]>`
+    select id from stock_orderpoints
+    where variant_id = ${produkt.id} and location_id = ${loc}`
+  if (vorhanden) {
+    throw new Error(
+      `Für ${produkt.name} gibt es bereits einen Meldebestand — bitte dort ändern statt neu anlegen.`,
+    )
+  }
   const [row] = await sql<{ id: string }[]>`
     insert into stock_orderpoints (variant_id, location_id, min_qty, max_qty, qty_multiple, route)
-    values (${p.variant_id}, ${loc}, ${p.min_qty}, ${p.max_qty}, ${p.qty_multiple},
+    values (${produkt.id}, ${loc}, ${p.min_qty}, ${p.max_qty}, ${p.qty_multiple},
             ${p.route ?? null})
     returning id`
-  return { recordId: row.id }
+  return { text: `Meldebestand für ${produkt.name} angelegt.`, recordId: row.id }
 }
 
 export async function meldebestandLoeschen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {

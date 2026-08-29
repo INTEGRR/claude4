@@ -187,8 +187,15 @@ describe('Schreibende Aktionen', () => {
 
   test('fehlende Felder nennen die Ursache im Klartext', async () => {
     const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
+    const torwaechter = await import('../src/modules/prozesse/torwaechter.ts')
     assert.throws(() => aktionPruefen('kontakt_anlegen', { email: 'keine-adresse' }), /name|email/)
-    assert.throws(() => aktionPruefen('fertigungsauftrag_anlegen', { produkt: 'X', menge: -1 }), /menge/)
+    assert.throws(
+      () =>
+        torwaechter.aktionPruefen('fertigung.auftrag_anlegen', {
+          parameter: { variant_id: 'X', qty: -1 },
+        }),
+      /qty/,
+    )
   })
 
   test('jede Aktion nennt einen Bereich, der der Rechtematrix bekannt ist', async () => {
@@ -374,9 +381,11 @@ describe('Schreibende Aktionen', () => {
 
   test('der Fertigungsmitarbeiter darf über die KI keinen Kunden anlegen', async () => {
     const { AKTIONEN } = await import('../src/modules/ki/aktionen.ts')
+    const { registrierteAktion } = await import('../src/modules/prozesse/registry/index.ts')
     const { canWrite } = await import('../src/modules/auth/permissions.ts')
     assert.equal(canWrite('fertigung', AKTIONEN.kontakt_anlegen.bereich), false)
-    assert.equal(canWrite('fertigung', AKTIONEN.fertigungsauftrag_anlegen.bereich), true)
+    // Der Registry-Zwilling: die Rechte gelten transportunabhängig weiter.
+    assert.equal(canWrite('fertigung', registrierteAktion('fertigung.auftrag_anlegen')!.bereich), true)
   })
 })
 

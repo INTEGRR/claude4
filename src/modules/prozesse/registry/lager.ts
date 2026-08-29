@@ -182,7 +182,10 @@ export const LAGER = {
     bindung: 'frei',
     schema: z
       .object({
-        variant_id: z.string().min(1, 'Bitte ein Produkt auswählen'),
+        variant_id: z
+          .string()
+          .min(1, 'Bitte ein Produkt auswählen')
+          .describe('Produkt: ID, SKU, Barcode oder Name'),
         min_qty: z.number().nonnegative(),
         max_qty: z.number().nonnegative(),
         qty_multiple: z.number().positive().default(1),
@@ -192,6 +195,9 @@ export const LAGER = {
         message: 'Der Maximalbestand darf den Mindestbestand nicht unterschreiten',
         path: ['max_qty'],
       }),
+    zusammenfassung: (p) =>
+      `${p.variant_id}: unter ${p.min_qty} auf ${p.max_qty} auffüllen` +
+      (p.route ? ` (${p.route === 'buy' ? 'bestellen' : 'fertigen'})` : ''),
     formdata: (fd) => ({
       variant_id: String(fd.get('variant_id') ?? ''),
       min_qty: Number(fd.get('min_qty') ?? 0),

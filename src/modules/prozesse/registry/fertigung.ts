@@ -12,15 +12,20 @@ export const FERTIGUNG = {
   'fertigung.auftrag_anlegen': {
     label: 'Fertigungsauftrag anlegen',
     bereich: 'fertigung',
+    ki: true,
     beschreibung:
       'Legt einen Fertigungsauftrag im Entwurf an — die Stückliste wird aufgelöst, der Komponentenbedarf eingefroren.',
     bindung: 'frei',
     modell: 'manufacturing_order',
     uebergang: { von: [], nach: ['draft'] },
     schema: z.object({
-      variant_id: z.string().min(1, 'Bitte ein Produkt auswählen'),
+      variant_id: z
+        .string()
+        .min(1, 'Bitte ein Produkt auswählen')
+        .describe('Produkt: ID, SKU, Barcode oder Name'),
       qty: z.number().positive('Die Menge muss größer als 0 sein'),
     }),
+    zusammenfassung: (p) => `${p.qty} × ${p.variant_id} fertigen`,
     formdata: (fd) => ({
       variant_id: String(fd.get('variant_id') ?? ''),
       qty: Number(fd.get('qty') ?? 0),

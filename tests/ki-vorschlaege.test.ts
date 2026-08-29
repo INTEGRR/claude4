@@ -28,9 +28,9 @@ describe('KI: Vorschlagsgruppen für die Sammel-Bestätigung', () => {
 
   test('aufeinanderfolgende gleiche Aktionen mit flachen Feldern werden eine Gruppe', () => {
     const gruppen = gruppiereVorschlaege([
-      v('a', 'meldebestand_anlegen', { produkt: 'A', minimum: 1, maximum: 2 }),
-      v('b', 'meldebestand_anlegen', { produkt: 'B', minimum: 3, maximum: 4 }),
-      v('c', 'meldebestand_anlegen', { produkt: 'C', minimum: 5, maximum: 6 }),
+      v('a', 'lager.meldebestand_anlegen', { produkt: 'A', minimum: 1, maximum: 2 }),
+      v('b', 'lager.meldebestand_anlegen', { produkt: 'B', minimum: 3, maximum: 4 }),
+      v('c', 'lager.meldebestand_anlegen', { produkt: 'C', minimum: 5, maximum: 6 }),
     ])
     assert.equal(gruppen.length, 1)
     assert.deepEqual(gruppen[0].map((e) => e.id), ['a', 'b', 'c'])
@@ -38,10 +38,10 @@ describe('KI: Vorschlagsgruppen für die Sammel-Bestätigung', () => {
 
   test('Aktionswechsel trennt Gruppen, die Reihenfolge bleibt', () => {
     const gruppen = gruppiereVorschlaege([
-      v('a', 'meldebestand_anlegen', { produkt: 'A' }),
-      v('b', 'meldebestand_anlegen', { produkt: 'B' }),
+      v('a', 'lager.meldebestand_anlegen', { produkt: 'A' }),
+      v('b', 'lager.meldebestand_anlegen', { produkt: 'B' }),
       v('c', 'kontakt_anlegen', { name: 'Neu' }),
-      v('d', 'meldebestand_anlegen', { produkt: 'D' }),
+      v('d', 'lager.meldebestand_anlegen', { produkt: 'D' }),
     ])
     assert.deepEqual(
       gruppen.map((g) => g.map((e) => e.id)),

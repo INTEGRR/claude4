@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import { druckbrueckeAktiv, zettelDruckEinreihen } from '@/modules/versand/druckbruecke'
+import { varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Fertigungs-Aktionen — Fachlogik unverändert aus fertigung/actions.ts. */
@@ -8,10 +9,15 @@ export async function auftragAnlegen(
   p: { variant_id: string; qty: number },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // variant_id ist ein Kennungsfeld: die Maske liefert die UUID, die KI
+  // darf SKU/Barcode/Name sagen — aufgelöst wird hier (aufloesen.ts).
+  const produkt = await varianteAufloesen(sql, p.variant_id)
   const [row] = await sql<{ create_manufacturing_order: string }[]>`
-    select create_manufacturing_order(${p.variant_id}, ${p.qty}, null, null, ${ctx.actor})`
+    select create_manufacturing_order(${produkt.id}, ${p.qty}, null, null, ${ctx.actor})`
+  const [mo] = await sql<{ number: string }[]>`
+    select number from manufacturing_orders where id = ${row.create_manufacturing_order}`
   return {
-    text: 'Fertigungsauftrag angelegt.',
+    text: `Fertigungsauftrag ${mo.number} für ${produkt.name} angelegt.`,
     link: `/fertigung/${row.create_manufacturing_order}`,
     recordId: row.create_manufacturing_order,
   }
