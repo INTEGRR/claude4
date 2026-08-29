@@ -342,3 +342,43 @@ describe('Registry-Abdeckung (statisch)', () => {
     assert.deepEqual(unbekannt, [])
   })
 })
+
+/**
+ * Schreib-SQL-Wächter über das KI-Modul: Seit der Auflösung des
+ * KI-Anlage-Katalogs (Entscheidungslog 2026-08-27) schreibt src/modules/ki
+ * NICHT mehr selbst in Fachtabellen — der Torwächter ist der einzige
+ * Schreibweg. Die Allowlist ist geschlossen: produkt-anlegen.ts ist die
+ * Fachlogik der Registry-Aktion produkte.produkt_anlegen (wird NUR vom
+ * Registry-Executor gerufen), sprechen-werkzeuge.ts protokolliert die
+ * Sprachsession in ihren eigenen Tabellen (die Fachaktionen darin laufen
+ * über aktionAusfuehrenGeprueft).
+ */
+describe('KI-Modul: kein Schreib-SQL am Torwächter vorbei', () => {
+  const KI_WURZEL = new URL('../src/modules/ki', import.meta.url).pathname
+  const ERLAUBT: Record<string, RegExp[]> = {
+    'produkt-anlegen.ts': [/^product_/],
+    'sprechen-werkzeuge.ts': [/^sprachprotokoll/, /^sprach_vorgaenge$/],
+  }
+
+  test('insert/update/delete nur auf der geschlossenen Allowlist', () => {
+    const verstoesse: string[] = []
+    for (const datei of dateienUnter(KI_WURZEL)) {
+      const inhalt = readFileSync(datei, 'utf8')
+      const basis = datei.slice(KI_WURZEL.length + 1)
+      for (const [idx, zeile] of inhalt.split('\n').entries()) {
+        const schreiber =
+          zeile.match(/\b(?:insert\s+into|delete\s+from)\s+([a-z_]+)/) ??
+          zeile.match(/\bupdate\s+([a-z_]+)\s+set\b/)
+        if (!schreiber) continue
+        const tabelle = schreiber[1]
+        if (ERLAUBT[basis]?.some((muster) => muster.test(tabelle))) continue
+        verstoesse.push(`${basis}:${idx + 1} schreibt in ${tabelle}`)
+      }
+    }
+    assert.deepEqual(
+      verstoesse,
+      [],
+      `Schreib-SQL im KI-Modul — bitte als Registry-Aktion über den Torwächter:\n${verstoesse.join('\n')}`,
+    )
+  })
+})

@@ -1,6 +1,5 @@
 import { sql } from '@/db/client'
 import type { User } from '@/modules/auth'
-import { canWrite } from '@/modules/auth/permissions'
 import {
   AktionsFehler,
   aktionErlaubt,
@@ -8,7 +7,6 @@ import {
 } from '@/modules/prozesse/torwaechter'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { kiKatalog } from '@/modules/prozesse/introspektion'
-import { AKTIONEN, aktionPruefen as katalogPruefen, type Aktion } from './aktionen'
 import { ARGUMENTE, type WerkzeugName } from './sprechen-katalog'
 import { varianteSuchen } from './produkt-suche'
 
@@ -123,20 +121,11 @@ async function ausfuehren(
 
       // Sofort prüfen (Schema + Rechte), damit die Stimme Lücken direkt
       // meldet — gespeichert wird nur die Absicht, gebucht wird nichts.
-      if (aktion.includes('.')) {
-        const { aktion: registriert } = registryPruefen(aktion, { parameter, recordId })
-        if (!aktionErlaubt(registriert, nutzer.role, nutzer.befugnisse)) {
-          throw new AktionsFehler(
-            `Dafür fehlt die Berechtigung („${registriert.label}") — der Vorgang wird nicht notiert.`,
-          )
-        }
-      } else {
-        const geprueft = katalogPruefen(aktion, parameter)
-        if (!canWrite(nutzer.role, geprueft.aktion.bereich)) {
-          throw new AktionsFehler(
-            `Dafür fehlt die Berechtigung („${geprueft.aktion.label}") — der Vorgang wird nicht notiert.`,
-          )
-        }
+      const { aktion: registriert } = registryPruefen(aktion, { parameter, recordId })
+      if (!aktionErlaubt(registriert, nutzer.role, nutzer.befugnisse)) {
+        throw new AktionsFehler(
+          `Dafür fehlt die Berechtigung („${registriert.label}") — der Vorgang wird nicht notiert.`,
+        )
       }
 
       if (!protokollId) {
@@ -159,20 +148,14 @@ async function ausfuehren(
       const begriff = String(argumente.begriff).toLowerCase()
       const passt = (text: string) => text.toLowerCase().includes(begriff)
 
-      const registry = kiKatalog()
+      const treffer = kiKatalog()
         .filter((a) => passt(a.name) || passt(a.label) || passt(a.beschreibung))
         .filter((a) => {
           const def = registrierteAktion(a.name)
           return def ? aktionErlaubt(def, nutzer.role, nutzer.befugnisse) : false
         })
         .map((a) => ({ name: a.name, label: a.label, beschreibung: a.beschreibung, felder: a.felder }))
-
-      const katalog = Object.entries(AKTIONEN as Record<string, Aktion>)
-        .filter(([n, a]) => passt(n) || passt(a.label) || passt(a.beschreibung))
-        .filter(([, a]) => canWrite(nutzer.role, a.bereich))
-        .map(([n, a]) => ({ name: n, label: a.label, beschreibung: a.beschreibung }))
-
-      const treffer = [...registry, ...katalog].slice(0, 5)
+        .slice(0, 5)
       if (treffer.length === 0) {
         return { output: `Keine passende Aktion zu „${argumente.begriff}" gefunden.` }
       }

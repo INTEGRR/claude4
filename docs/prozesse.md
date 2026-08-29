@@ -343,18 +343,43 @@ kommt, zwingt der Test die Einträge von der Liste.
 
 ## Phase 6g — KI-Katalog aus der Registry (umgesetzt)
 
-Registry-Aktionen mit **`ki: true`** (18 Stück: Statusübergänge in
-Verkauf, Einkauf, Rechnung, Fertigung, Reparatur; Meldebestand, Tracking,
-Kennzahlen) erscheinen im Werkzeugkatalog des KI-Agenten — zusätzlich zum
-namensbasierten Anlage-Katalog (`produkt_anlegen`, `bestellung_anlegen`,
-…). Beleg-IDs schlägt der Agent per sql_abfrage nach und übergibt sie als
-`record_id`; ausgeführt wird **erst nach Bestätigung im Chat**, und zwar
-über den Torwächter (Schema, Rechte inkl. nurAdmin, Audit) — derselbe Weg
-wie Knöpfe, generierte Masken und Prozesstest. Auch das KI-Umschreiben
-von Vorschlägen („die Menge auf 5") funktioniert für Registry-Aktionen
-(record_id bleibt dabei unangetastet). Der Katalog-Helfer lebt in
-`prozesse/introspektion.kiKatalog()` — nicht im KI-Modul, weil die
-Registry ihrerseits die KI-Produktanlage importiert (kein Importkreis).
+Registry-Aktionen mit **`ki: true`** erscheinen im Werkzeugkatalog des
+KI-Agenten (mit Feldliste je Aktion). Beleg-IDs schlägt der Agent per
+sql_abfrage nach und übergibt sie als `record_id`; ausgeführt wird
+**erst nach Bestätigung im Chat**, und zwar über den Torwächter (Schema,
+Rechte inkl. nurAdmin, Audit) — derselbe Weg wie Knöpfe, generierte
+Masken und Prozesstest. Auch das KI-Umschreiben von Vorschlägen („die
+Menge auf 5") funktioniert (record_id bleibt dabei unangetastet). Der
+Katalog-Helfer lebt in `prozesse/introspektion.kiKatalog()`.
+
+## Phase 6h — KI-Anlage-Katalog aufgelöst (umgesetzt)
+
+Der namensbasierte Anlage-Katalog (`ki/aktionen.ts`: `produkt_anlegen`,
+`bestellung_anlegen`, …) schrieb mit Direkt-INSERTs am Torwächter vorbei
+— eigenes Rechtemodell, kein `nurAdmin`, kein Nutzungszähler,
+unterschieden an sechs Stellen über den Punkt im Namen. Er ist komplett
+in die Registry überführt (Entscheidungslog 2026-08-27); die
+Dispatch-Weichen sind gelöscht, `aktionAusfuehrenGeprueft` ist der
+einzige Schreibweg für jeden Transport (Maske, KI-Chat, Sprachmodus,
+Prozesstest, künftig MCP). Eckpunkte:
+
+- **Kennungsfelder** (`registry/aufloesen.ts`): Verweisfelder der
+  Anlage-Aktionen nehmen UUID, SKU, Barcode, Referenz oder Namen —
+  exakte Treffer gewinnen, mehrdeutige Namen werden abgewiesen.
+- **Kombi-Aktionen** `verkauf.auftrag_mit_positionen` und
+  `einkauf.bestellung_mit_positionen` legen Kopf + Zeilen in einem Zug
+  an und **komponieren** die bestehenden Aktionen (auftragAnlegen/
+  bestellungAnlegen + positionHinzufuegen) — Lieferadresse, Einheit,
+  Listen-/Staffelpreis und Steuersatz kommen dadurch mit. Alle
+  Kennungen werden VOR dem Kopf-Insert aufgelöst (kein halber Beleg).
+- **`notiz.anlegen`** vereint KI-Notiz und UI-Kommentarfeld
+  (`registry/notizen.ts`, KOMMENTAR_MODELLE-Allowlist; Bereich
+  'fehler' + canAccess je Modell im Executor = die alte
+  Kommentar-Semantik). `comments-action.ts` ist nur noch ein Wrapper
+  um `serverAktion('notiz.anlegen', …)`.
+- **Zwei neue Wächter**: Schreib-SQL-Scan über `src/modules/ki/**`
+  (geschlossene Allowlist, prozess-registry.test.ts) und
+  zusammenfassung-Pflicht für freie ki-Aktionen (schema-felder.test.ts).
 
 ## Phase 7 — Chamäleon-Fundament (umgesetzt)
 
@@ -783,8 +808,8 @@ fünf Minuten Stille trennt der Client selbst.
 
 Kernprinzip **Sammeln statt Sofort-Buchen**: Lesewerkzeuge antworten live
 (`produkt_bestand` — unscharfer Resolver mit Wortstamm-Suche und Bestand;
-`aktionen_suchen` — beide KI-Kataloge, rechtegefiltert, Felder mit deutschen
-Labels; `datenfrage` — kleines Anthropic-Modell mit Schema-Doku +
+`aktionen_suchen` — der Registry-Katalog (ki-Aktionen), rechtegefiltert,
+Felder mit deutschen Labels; `datenfrage` — kleines Anthropic-Modell mit Schema-Doku +
 Read-only-SQL, nur bei gesetztem ANTHROPIC_API_KEY). Schreibwünsche landen
 über `vorgang_sammeln` NUR in der Sammel-Transaktion der Sitzung
 (`sprach_vorgaenge`, Status offen) — Schema und Rechte werden beim Sammeln

@@ -177,11 +177,11 @@ describe('Diagramm-Vorgaben des Agenten', () => {
 
 describe('Schreibende Aktionen', () => {
   test('unbekannte Aktionen werden abgewiesen', async () => {
-    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
+    const { aktionPruefen } = await import('../src/modules/prozesse/torwaechter.ts')
     assert.throws(
-      () => aktionPruefen('tabelle_loeschen', {}),
+      () => aktionPruefen('tabelle_loeschen', { parameter: {} }),
       /Unbekannte Aktion/,
-      'der Katalog ist abschließend',
+      'die Registry ist abschließend',
     )
   })
 
@@ -216,14 +216,6 @@ describe('Schreibende Aktionen', () => {
     )
   })
 
-  test('der Alt-Katalog bleibt leer — neue Aktionen gehören in die Registry', async () => {
-    const { AKTIONEN } = await import('../src/modules/ki/aktionen.ts')
-    assert.deepEqual(
-      Object.keys(AKTIONEN),
-      [],
-      'Anlage-Aktionen laufen seit der Katalog-Auflösung durch den Torwächter (Entscheidungslog 2026-08-27)',
-    )
-  })
 
   test('gültige Felder kommen typisiert mit Vorgabewerten zurück', async () => {
     const { aktionPruefen } = await import('../src/modules/prozesse/torwaechter.ts')

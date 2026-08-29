@@ -126,8 +126,9 @@ Entscheidungslog 2026-08-25.
   Kategorien, bekommt das Modell die Meldung zurück und kann korrigieren.
 
 **3. `aktion_vorschlagen` — anlegen, aber nur mit Bestätigung.** Der Agent
-  schreibt **kein** SQL. Er wählt eine Aktion aus einem festen Katalog
-  (`src/modules/ki/aktionen.ts`) und füllt deren Felder; der Vorschlag
+  schreibt **kein** SQL. Er wählt eine Registry-Aktion mit `ki: true`
+  (Werkzeugkatalog aus `kiKatalog()`, gebaut in `agent.ts` — inklusive
+  Feldliste je Aktion) und füllt deren Felder; der Vorschlag
   erscheint im Chat als Karte mit Zusammenfassung, Begründung — und den
   Feldern direkt als **editierbares Formular** (kein rohes JSON; Objektlisten
   wie Attributwerte als Tabelle mit editierbaren Zellen). Zusätzlich lässt
@@ -146,28 +147,27 @@ Entscheidungslog 2026-08-25.
   eigenes Ergebnis bekommt — ein Fehler in Zeile 3 hält Zeile 4 nicht auf.
   Beleg-IDs (`record_id`) zeigt die Tabelle nur an, editierbar sind sie
   nicht — die hat der Agent nachgeschlagen. Erst der Klick auf „Anlegen"
-  (bzw. „Alle anlegen") schickt den Vorschlag an `/api/ki/aktion`, wo
-  **erneut** geprüft wird:
+  (bzw. „Alle anlegen") schickt den Vorschlag an `/api/ki/aktion`, die den
+  **kompletten Torwächter-Weg** läuft (`bestaetigteAktionAusfuehren` →
+  `aktionAusfuehrenGeprueft`): Schema, Rechte inkl. `nurAdmin`,
+  Beleg-Existenz, Ausführung, `log_event` und Nutzungszähler — exakt
+  dieselbe Prüfung wie bei Maske und Prozesstest. Seit der Auflösung des
+  KI-Anlage-Katalogs (Entscheidungslog 2026-08-27) gibt es **keinen
+  zweiten Schreibweg** mehr; ein Wächter-Test verbietet Schreib-SQL in
+  `src/modules/ki/**` (Allowlist: `produkt-anlegen.ts` als Fachlogik der
+  Registry-Aktion, `sprechen-werkzeuge.ts` für die Sprachprotokolle).
 
-  - Ist die Aktion im Katalog? (sonst 400 mit der Liste der erlaubten)
-  - Sind die Felder gültig? (Zod-Schema, Meldung im Klartext)
-  - Darf die Rolle im Zielbereich schreiben? (sonst 403)
-
-  Ausgeführt wird über dieselben Wege wie in der Oberfläche — Nummernkreise
-  über `next_sequence`, Fertigungsaufträge über `create_manufacturing_order`.
-  Kein Sonderweg für die KI, sonst gälten für ihre Datensätze andere Regeln.
-
-  Der Katalog ist bewusst abschließend und legt nur an, nie ändern oder
-  löschen: Kontakt, Verkaufsauftrag (Entwurf), Bestellung (Entwurf),
-  Fertigungsauftrag, **Produkt** (samt Attributen und kompletter
-  Variantenmatrix inkl. SKU-Vergabe aus Präfix + Wertekürzeln; vorhandene
-  Attribute werden über den Namen wiederverwendet, die Matrix ist auf
-  200 Varianten gedeckelt), Meldebestand, Arbeitsplatz, Mitarbeiter, Notiz.
-  Belege entstehen im Entwurf — das Bestätigen bleibt ein bewusster Schritt
-  in der Oberfläche.
-
-  Katalog und Ausführung liegen in getrennten Dateien: der Agent lädt nur den
-  Katalog, die Datenbankseite hängt allein an der bestätigten Route.
+  Verweisfelder der Anlage-Aktionen sind **Kennungsfelder**: sie nehmen
+  neben der UUID auch SKU, Barcode, Referenz oder Namen
+  (`registry/aufloesen.ts`) — exakte Treffer gewinnen, mehrdeutige Namen
+  werden abgewiesen statt zufällig aufgelöst. Die Kombi-Aktionen
+  `verkauf.auftrag_mit_positionen` und `einkauf.bestellung_mit_positionen`
+  legen Kopf + Zeilen in einem Zug an und komponieren dabei die
+  bestehenden Aktionen (Lieferadresse, Listen-/Staffelpreis, Steuersatz
+  inklusive). Belege entstehen im Entwurf — das Bestätigen bleibt ein
+  bewusster Schritt in der Oberfläche. Jede freie `ki`-Aktion braucht
+  eine `zusammenfassung` (Wächter in `schema-felder.test.ts`), sonst
+  degradiert der Bestätigungstext zum Label.
 
 - Sperrliste hält Geheimnisse fern: `users`, `sessions`, `settings`,
   `integration_jobs`, `password_hash` sind tabu.

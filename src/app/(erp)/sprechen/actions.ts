@@ -6,7 +6,6 @@ import { canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { type ActionResult, actionError, actionFail, actionInfo } from '@/modules/shared/action'
 import { AktionsFehler, aktionAusfuehrenGeprueft } from '@/modules/prozesse/torwaechter'
-import { bestaetigteAktionAusfuehren } from '@/modules/ki/aktion-bestaetigt'
 
 /**
  * Prüftabelle der Sprachsammlung: Hier passiert die Sichtprüfung — und erst
@@ -88,16 +87,15 @@ export async function sammlungBuchen(protokollId: string): Promise<ActionResult>
           user,
         )
         text = 'Zählung gebucht'
-      } else if (v.aktion.includes('.')) {
+      } else {
+        // Ein vor der Katalog-Auflösung notierter Alt-Vorgang scheitert hier
+        // sichtbar als „Unbekannte Aktion" — bewusst kein Alias-Weg.
         const ergebnis = await aktionAusfuehrenGeprueft(
           v.aktion,
           { parameter: v.parameter, recordId: v.record_id ?? undefined },
           user,
         )
         text = ergebnis.text ?? 'Ausgeführt'
-      } else {
-        const ergebnis = await bestaetigteAktionAusfuehren(v.aktion, v.parameter, user)
-        text = ergebnis.text
       }
       await sql`update sprach_vorgaenge
                 set status = 'gebucht', ergebnis_text = ${text.slice(0, 500)}, gebucht_am = now()

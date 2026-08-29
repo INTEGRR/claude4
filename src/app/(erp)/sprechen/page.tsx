@@ -4,7 +4,6 @@ import { sql } from '@/db/client'
 import { Card, Empty, PageHeader } from '@/components/ui'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { formularFelder } from '@/modules/prozesse/schema-felder'
-import { AKTIONEN, type Aktion } from '@/modules/ki/aktionen'
 import { sprechenKonfiguriert, sprechenModell } from '@/modules/ki/sprechen'
 import { Gespraech } from './gespraech'
 import { Pruefung, type PruefVorgang } from './pruefung'
@@ -36,10 +35,7 @@ export default async function SprechenSeite() {
     )
   }
 
-  const label = (aktion: string) =>
-    registrierteAktion(aktion)?.label ??
-    (AKTIONEN as Record<string, Aktion>)[aktion]?.label ??
-    aktion
+  const label = (aktion: string) => registrierteAktion(aktion)?.label ?? aktion
 
   // Parameter mit deutschen Feldlabels für die Prüftabelle — dieselben
   // Beschriftungen wie in den generierten Masken (formularFelder).

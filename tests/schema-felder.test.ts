@@ -84,3 +84,25 @@ describe('Maskengenerierung: schema-felder', () => {
     assert.ok(katalog.some((e) => e.name === 'verkauf.bestaetigen'))
   })
 })
+
+/**
+ * zusammenfassung-Wächter: Der Bestätigungsdialog des KI-Chats zeigt für
+ * jede vorgeschlagene Anlage-Aktion die zusammenfassung — fehlt sie,
+ * degradiert der Text zum bloßen Label und niemand bestätigt bewusst
+ * (aktion-bestaetigt/agent fallen dann auf `?? label` zurück). Freie
+ * ki-Aktionen legen Datensätze an, deshalb ist die Zusammenfassung dort
+ * Pflicht; beleggebundene Übergänge (bestätigen, stornieren) sagt schon
+ * das Label vollständig.
+ */
+describe('KI-Aktionen: Bestätigungstext', () => {
+  test('jede freie ki-Aktion hat eine zusammenfassung', () => {
+    for (const [name, a] of alleAktionen()) {
+      if (!a.ki || a.bindung !== 'frei') continue
+      assert.equal(
+        typeof a.zusammenfassung,
+        'function',
+        `${name}: ki-Anlage-Aktion ohne zusammenfassung — der Bestätigungsdialog zeigt sonst nur das Label`,
+      )
+    }
+  })
+})

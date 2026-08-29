@@ -2,10 +2,10 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
-import { canWrite } from '@/modules/auth/permissions'
-import { type Aktion, AKTIONEN, aktionPruefen } from '@/modules/ki/aktionen'
 import { kiConfigured } from '@/modules/ki/agent'
 import { kiModell } from '@/modules/ki/modelle'
+import { registrierteAktion } from '@/modules/prozesse/registry'
+import { aktionErlaubt, aktionPruefen } from '@/modules/prozesse/torwaechter'
 
 /**
  * Einen Vorschlag per Zuruf überarbeiten („die Kürzel für Grün auf GN").
@@ -43,61 +43,31 @@ export async function POST(request: Request) {
   }
   if (!anweisung) return NextResponse.json({ error: 'Keine Änderung angegeben' }, { status: 400 })
 
-  // Registry-Aktionen (namespaced) und der eigene KI-Katalog teilen sich den
-  // Ablauf — nur Nachschlag, Rechteprüfung und Validierung unterscheiden sich.
-  // Die record_id einer Registry-Aktion wird vor dem Umschreiben abgetrennt
-  // und danach unverändert wieder angehängt.
-  const registry = name.includes('.')
-  let label: string
-  let beschreibung: string
-  let recordId: string | undefined
-  let pruefen: (werte: unknown) => { werte: Record<string, unknown>; zusammenfassung: string }
-
-  if (registry) {
-    const { registrierteAktion } = await import('@/modules/prozesse/registry')
-    const { aktionErlaubt, aktionPruefen: torPruefen } = await import(
-      '@/modules/prozesse/torwaechter'
+  // Die record_id einer beleggebundenen Aktion wird vor dem Umschreiben
+  // abgetrennt und danach unverändert wieder angehängt.
+  const eintrag = registrierteAktion(name)
+  if (!eintrag) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
+  // Wer die Aktion nicht ausführen darf, soll sie auch nicht umschreiben.
+  if (!aktionErlaubt(eintrag, user.role, user.befugnisse)) {
+    return NextResponse.json(
+      { error: `Ihrer Rolle fehlt die Berechtigung für „${eintrag.label}"` },
+      { status: 403 },
     )
-    const eintrag = registrierteAktion(name)
-    if (!eintrag) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
-    if (!aktionErlaubt(eintrag, user.role, user.befugnisse)) {
-      return NextResponse.json(
-        { error: `Ihrer Rolle fehlt die Berechtigung für „${eintrag.label}"` },
-        { status: 403 },
-      )
-    }
-    label = eintrag.label
-    beschreibung = eintrag.beschreibung
-    const p = (parameter && typeof parameter === 'object' ? parameter : {}) as Record<
-      string,
-      unknown
-    >
-    recordId = typeof p.record_id === 'string' ? p.record_id : undefined
-    const { record_id: _weg, ...felder } = p
-    parameter = felder
-    pruefen = (werte) => {
-      const geprueft = torPruefen(name, { parameter: werte, recordId })
-      return {
-        werte: geprueft.werte,
-        zusammenfassung:
-          eintrag.zusammenfassung?.(geprueft.werte as never) ?? eintrag.label,
-      }
-    }
-  } else {
-    const aktion = (AKTIONEN as Record<string, Aktion>)[name]
-    if (!aktion) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
-    // Wer die Aktion nicht ausführen darf, soll sie auch nicht umschreiben.
-    if (!canWrite(user.role, aktion.bereich, user.befugnisse)) {
-      return NextResponse.json(
-        { error: `Ihrer Rolle fehlt die Berechtigung für „${aktion.label}"` },
-        { status: 403 },
-      )
-    }
-    label = aktion.label
-    beschreibung = aktion.beschreibung
-    pruefen = (werte) => {
-      const { werte: geprueft } = aktionPruefen(name, werte)
-      return { werte: geprueft, zusammenfassung: aktion.zusammenfassung(geprueft) }
+  }
+  const label = eintrag.label
+  const beschreibung = eintrag.beschreibung
+  const p = (parameter && typeof parameter === 'object' ? parameter : {}) as Record<
+    string,
+    unknown
+  >
+  const recordId = typeof p.record_id === 'string' ? p.record_id : undefined
+  const { record_id: _weg, ...felder } = p
+  parameter = felder
+  const pruefen = (werte: unknown) => {
+    const geprueft = aktionPruefen(name, { parameter: werte, recordId })
+    return {
+      werte: geprueft.werte,
+      zusammenfassung: eintrag.zusammenfassung?.(geprueft.werte as never) ?? eintrag.label,
     }
   }
 

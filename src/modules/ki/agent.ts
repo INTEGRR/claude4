@@ -5,7 +5,6 @@ import { sql } from '@/db/client'
 import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
 import { FINANZ_SPERRE, MAX_ROWS, ergebnisFuerModell, runReadOnlyQuery } from './sql-tool'
 import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
-import { aktionPruefen, aktionenTool } from './aktionen'
 import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { kiKatalog } from '@/modules/prozesse/introspektion'
@@ -60,10 +59,60 @@ Regeln:
 - Wenn eine Frage nicht aus den Daten beantwortbar ist, sage das ehrlich.
 ${SCHEMA_DOKU}${finanzen ? SCHEMA_DOKU_FINANZEN : ''}${kontext === 'werkstatt' ? werkstattSystemZusatz() : ''}`
 
+/**
+ * Werkzeugbeschreibung für das Modell — der Vorschlagskatalog kommt komplett
+ * aus der Registry (kiKatalog, Aktionen mit ki-Flag), inklusive Feldliste je
+ * Aktion. Seit der Auflösung des KI-Anlage-Katalogs gibt es keinen zweiten
+ * Katalog mehr (Entscheidungslog 2026-08-27).
+ */
+function aktionenTool(katalog: ReturnType<typeof kiKatalog>): Anthropic.Messages.Tool {
+  const zeilen = katalog
+    .map(
+      (a) =>
+        `- ${a.name} (${a.label}): ${a.beschreibung}` +
+        (a.beleg ? ' [beleggebunden — record_id angeben]' : '') +
+        (a.felder ? ` — Felder: ${a.felder}` : ''),
+    )
+    .join('\n')
+
+  return {
+    name: 'aktion_vorschlagen',
+    description:
+      'Schlägt eine schreibende Aktion vor. Der Vorschlag wird dem Benutzer zur Bestätigung ' +
+      'angezeigt und erst nach seinem Klick ausgeführt — du führst nichts selbst aus und ' +
+      'behauptest auch nicht, etwas sei bereits angelegt. Schlage nur vor, was ausdrücklich ' +
+      'gewünscht ist. Mehrere Datensätze derselben Art (etwa ein Meldebestand je Produkt) ' +
+      'schlägst du in EINER Antwort vor: das Werkzeug mehrfach aufrufen, ein Aufruf je ' +
+      'Datensatz — der Benutzer sieht sie als Sammelliste und bestätigt gemeinsam oder ' +
+      'einzeln. Verlässliche Bezeichner (SKU, Kundenname, IDs) vorher per sql_abfrage ' +
+      'nachschlagen.\n\nVerfügbare Aktionen:\n' +
+      zeilen,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        aktion: { type: 'string', enum: katalog.map((a) => a.name) },
+        parameter: {
+          type: 'object',
+          description: 'Die Felder der Aktion. Bei Fehlern nennt die Antwort die genaue Ursache.',
+        },
+        record_id: {
+          type: 'string',
+          description:
+            'Beleg-ID (UUID) für beleggebundene Aktionen — vorher per sql_abfrage ermitteln.',
+        },
+        begruendung: {
+          type: 'string',
+          description: 'Ein Satz, warum das jetzt sinnvoll ist — steht mit im Bestätigungsdialog.',
+        },
+      },
+      required: ['aktion', 'parameter'],
+    },
+  }
+}
+
 const werkzeuge = (admin: boolean): Anthropic.Messages.Tool[] => [
   DIAGRAMM_TOOL,
-  // Eigener KI-Katalog (namensbasierte Anlage-Aktionen) plus alle
-  // Registry-Aktionen mit ki-Flag — eine Definition, alle Transporte.
+  // Alle Registry-Aktionen mit ki-Flag — eine Definition, alle Transporte.
   // nurAdmin-Aktionen bekommen Nicht-Admins gar nicht erst angeboten:
   // der Torwächter würde sie ohnehin ablehnen, aber erst NACH dem Klick —
   // ein Vorschlag, der sicher scheitert, ist schlechte Führung.
@@ -226,31 +275,19 @@ export async function runAgent(
         }
         try {
           const name = String(eingabe.aktion ?? '')
-          let label: string
-          let bereich: string
-          let zusammenfassung: string
-          let werte: Record<string, unknown>
-          if (name.includes('.')) {
-            // Registry-Aktion: derselbe DB-freie Prüfweg wie der Torwächter;
-            // die record_id wandert IM Parameter mit, damit die Bestätigung
-            // im Chat sie unverändert an /api/ki/aktion zurückgeben kann.
-            const recordId =
-              typeof eingabe.record_id === 'string' && eingabe.record_id
-                ? eingabe.record_id
-                : undefined
-            const geprueft = registryPruefen(name, { parameter: eingabe.parameter, recordId })
-            label = geprueft.aktion.label
-            bereich = geprueft.aktion.bereich
-            zusammenfassung =
-              geprueft.aktion.zusammenfassung?.(geprueft.werte as never) ?? geprueft.aktion.label
-            werte = { ...geprueft.werte, ...(recordId ? { record_id: recordId } : {}) }
-          } else {
-            const geprueft = aktionPruefen(name, eingabe.parameter)
-            label = geprueft.aktion.label
-            bereich = geprueft.aktion.bereich
-            zusammenfassung = geprueft.aktion.zusammenfassung(geprueft.werte)
-            werte = geprueft.werte as Record<string, unknown>
-          }
+          // Derselbe DB-freie Prüfweg wie der Torwächter; die record_id
+          // wandert IM Parameter mit, damit die Bestätigung im Chat sie
+          // unverändert an /api/ki/aktion zurückgeben kann.
+          const recordId =
+            typeof eingabe.record_id === 'string' && eingabe.record_id
+              ? eingabe.record_id
+              : undefined
+          const geprueft = registryPruefen(name, { parameter: eingabe.parameter, recordId })
+          const label = geprueft.aktion.label
+          const bereich = geprueft.aktion.bereich
+          const zusammenfassung =
+            geprueft.aktion.zusammenfassung?.(geprueft.werte as never) ?? geprueft.aktion.label
+          const werte = { ...geprueft.werte, ...(recordId ? { record_id: recordId } : {}) }
           const id = randomUUID()
           await onEvent({
             type: 'aktion',

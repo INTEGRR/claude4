@@ -12,6 +12,7 @@ export const AUSWERTUNGEN = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({}),
+    zusammenfassung: () => 'Alle Kennzahlen sofort neu berechnen',
     revalidate: ['/auswertungen/kennzahlen', '/auswertungen'],
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -47,7 +47,8 @@ src/
                             # Torwächter, Introspektion, Maskengenerierung,
                             # Prozess-Fixtures
     ki/                     # Chat-Agent (Anthropic), Sprachmodus (OpenAI
-                            # Realtime/Whisper), KI-Anlagekatalog
+                            # Realtime/Whisper) — schreibt NIE selbst,
+                            # alle Aktionen laufen über den Torwächter
     integrationen/          # Shopify-Client, Import-Pipeline, Outbox-Runner, E-Mail
     versand/                # DHL-Client, Label-/Tracking-Service, Versandregeln
     demo/                   # Beispieldaten + Betriebshistorie

@@ -82,6 +82,7 @@ export const VERSAND = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({}),
+    zusammenfassung: () => 'Sendungsstatus aller offenen Sendungen bei DHL abfragen',
     revalidate: ['/versand'],
   },
 

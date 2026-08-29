@@ -213,7 +213,7 @@ Vier Punkte sind zu groß für eine Sofortmaßnahme. Aufwand und Nutzen:
 | Punkt | Aufwand | Nutzen |
 |---|---|---|
 | **`ki/chat.tsx` zerlegen** — 1.121 Zeilen mit sechs Verantwortungen (Markdown-Renderer, SVG/CSV-Export, Diagrammkarte, zwei Vorschlagskarten, NDJSON-Stream-Parser, plus ein kompletter zweiter Bildschirm für den Buddy-Modus) | ~1 Tag, rein mechanisch | Die einzige Datei, vor der ein Neuzugang kapituliert, wird zu sieben Modulen. Zwei davon (Markdown-Renderer, Stream-Parser) sind reine Logik und werden dabei erstmals testbar. |
-| **KI-Zweitregistry auflösen** — `ki/aktionen.ts` ist ein zweiter Aktionskatalog mit eigenem Rechtemodell neben der Registry; unterschieden wird an **einem Punkt im String** (`name.includes('.')`), an sechs Stellen von Hand | ~1–2 Tage | Der KI-Zweig umgeht heute `nurAdmin`, die Schritt-Rechte und den Nutzungszähler. 8 der 9 Aktionen haben bereits ein Registry-Gegenstück. |
+| ~~**KI-Zweitregistry auflösen**~~ — ERLEDIGT (2026-08-29, Entscheidungslog 2026-08-27): `ki/aktionen.ts` ist gelöscht, alle 9 Aktionen laufen als Registry-Aktionen durch den Torwächter, die sechs `name.includes('.')`-Weichen sind entfernt; ein Schreib-SQL-Wächter hält `src/modules/ki/**` sauber | ~~erledigt~~ | ~~erledigt~~ |
 | **Die 24 Umgehungen migrieren** — jetzt, da sie sichtbar sind | ~1–2 Tage | Das Architekturversprechen wird wieder wahr. `integrationen/page.tsx` schrumpft von 746 auf ~580 Zeilen. |
 | **Sammelbecken zerlegen** — `einstellungen-ausfuehren.ts` (542 Z., vier Domänen inkl. Benutzerverwaltung, die zu `auth/` gehört) und `importShopifyOrder` (230 Zeilen, 6 Rückgabepunkte) | ~1 Tag | Bessere Kohäsion an den zwei Stellen, wo sie wirklich fehlt. |
 

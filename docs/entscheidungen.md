@@ -9,6 +9,24 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-08-29 — KI-Anlage-Katalog vollständig aufgelöst
+
+Der Plan vom 2026-08-27 ist umgesetzt: `ki/aktionen.ts` und
+`ki/aktionen-ausfuehren.ts` sind gelöscht, alle 9 Aktionen laufen als
+Registry-Aktionen durch `aktionAusfuehrenGeprueft`, die sechs
+`name.includes('.')`-Weichen sind entfernt, `aktionenTool` baut den
+Werkzeugkatalog des Agenten rein aus `kiKatalog()` (mit Feldliste je
+Aktion — die Prompt-Asymmetrie zwischen beiden Katalogen ist weg).
+Zwei neue Wächter sichern den Zustand: der Schreib-SQL-Scan über
+`src/modules/ki/**` (prozess-registry.test.ts, Allowlist nur
+produkt-anlegen.ts und die Sprachprotokoll-Tabellen) und die
+zusammenfassung-Pflicht für freie ki-Aktionen (schema-felder.test.ts —
+brachte drei fehlende Bestätigungstexte ans Licht). Offene
+Alt-Vorschläge aus der Zeit vor dem Deploy scheitern sichtbar als
+„Unbekannte Aktion" — bewusst keine Alias-Map. Doku: prozesse.md
+(Phase 6h), rollen-auswertungen-scanner-ki.md, architektur.md,
+code-review.md.
+
 ## 2026-08-27 — KI-Anlage-Katalog wird aufgelöst: der Torwächter ist der einzige Schreibweg
 
 Aus der MCP-Erkundung: Die 9 KI-Anlage-Aktionen (src/modules/ki/aktionen.ts,

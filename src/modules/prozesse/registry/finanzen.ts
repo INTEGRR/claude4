@@ -404,6 +404,7 @@ export const FINANZEN = {
     schema: z.object({
       monat: DATUM,
     }),
+    zusammenfassung: (p) => `USt-Zahllast für ${p.monat} als Steuertermin übernehmen`,
     revalidate: ['/finanzen/steuern', '/finanzen'],
   },
 

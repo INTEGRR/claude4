@@ -123,6 +123,7 @@ export const LAGER = {
       variant_id: z.string().min(1, 'Bitte ein Produkt auswählen'),
       counted_qty: z.number().nonnegative('Bitte eine gültige Menge erfassen'),
     }),
+    zusammenfassung: (p) => `Zählung: ${p.counted_qty} Stück für ${p.variant_id}`,
     formdata: (fd) => ({
       variant_id: String(fd.get('variant_id') ?? ''),
       counted_qty: Number(fd.get('counted_qty') ?? NaN),
