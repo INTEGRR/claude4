@@ -40,7 +40,7 @@ describe('KI: Vorschlagsgruppen für die Sammel-Bestätigung', () => {
     const gruppen = gruppiereVorschlaege([
       v('a', 'lager.meldebestand_anlegen', { produkt: 'A' }),
       v('b', 'lager.meldebestand_anlegen', { produkt: 'B' }),
-      v('c', 'kontakt_anlegen', { name: 'Neu' }),
+      v('c', 'kontakte.partner_anlegen', { name: 'Neu' }),
       v('d', 'lager.meldebestand_anlegen', { produkt: 'D' }),
     ])
     assert.deepEqual(

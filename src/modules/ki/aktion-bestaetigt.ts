@@ -10,8 +10,9 @@ import { aktionAusfuehren as katalogAusfuehren } from './aktionen-ausfuehren'
  * des Sprachmodus (POST /api/sprechen/buchen, Sichtprüfung + „Alle buchen").
  *
  * Zwei Zweige wie gehabt: Registry-Aktionen (Name mit Punkt) laufen komplett
- * über den Torwächter (Schema, Rechte inkl. nurAdmin, Audit); der
- * KI-Anlage-Katalog (kontakt_anlegen …) über aktionPruefen + canWrite.
+ * über den Torwächter (Schema, Rechte inkl. nurAdmin, Audit); der Rest des
+ * KI-Anlage-Katalogs (verkaufsauftrag_anlegen …) über aktionPruefen +
+ * canWrite — bis auch er in die Registry überführt ist.
  * Fehler kommen als AktionsFehler/RechteFehler bzw. Error zum Aufrufer —
  * der entscheidet, ob daraus HTTP-Status oder Tabellenzeilen-Status wird.
  */

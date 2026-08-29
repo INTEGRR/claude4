@@ -90,3 +90,6 @@ export type AktionsFn<S extends z.ZodTypeAny = z.ZodTypeAny> = (
 ) => Promise<AktionsErgebnis | void>
 
 export const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Deutsche Geldschreibweise für Zusammenfassungen — bewusst ohne Intl (DB-frei, deterministisch). */
+export const geld = (v: number) => v.toFixed(2).replace('.', ',') + ' €'

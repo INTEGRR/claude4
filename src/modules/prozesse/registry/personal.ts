@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { RegistrierteAktion } from './typen.ts'
+import { geld, type RegistrierteAktion } from './typen.ts'
 
 /**
  * Aktionen des Personalbereichs: Mitarbeiterstamm, Stempeluhr, Nachträge,
@@ -11,6 +11,7 @@ export const PERSONAL = {
   'personal.mitarbeiter_anlegen': {
     label: 'Mitarbeiter anlegen',
     bereich: 'personal',
+    ki: true,
     beschreibung: 'Legt einen Mitarbeiter mit Stammdaten, Kostensatz und Wochenstunden an.',
     bindung: 'frei',
     prozessfrei: true,
@@ -27,6 +28,9 @@ export const PERSONAL = {
       email: z.string().max(200).optional(),
       phone: z.string().max(60).optional(),
     }),
+    zusammenfassung: (p) =>
+      `${p.name}${p.job_title ? ` — ${p.job_title}` : ''}` +
+      (p.hourly_cost ? `, ${geld(p.hourly_cost)} je Stunde` : ''),
     formdata: (fd) => ({
       name: String(fd.get('name') ?? '').trim(),
       barcode: String(fd.get('barcode') ?? '').trim() || undefined,

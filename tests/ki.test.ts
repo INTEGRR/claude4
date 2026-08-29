@@ -188,7 +188,14 @@ describe('Schreibende Aktionen', () => {
   test('fehlende Felder nennen die Ursache im Klartext', async () => {
     const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
     const torwaechter = await import('../src/modules/prozesse/torwaechter.ts')
-    assert.throws(() => aktionPruefen('kontakt_anlegen', { email: 'keine-adresse' }), /name|email/)
+    assert.throws(() => aktionPruefen('verkaufsauftrag_anlegen', { positionen: [] }), /kunde|positionen/)
+    assert.throws(
+      () =>
+        torwaechter.aktionPruefen('kontakte.partner_anlegen', {
+          parameter: { name: 'X', is_company: true, email: 'keine-adresse' },
+        }),
+      /email/,
+    )
     assert.throws(
       () =>
         torwaechter.aktionPruefen('fertigung.auftrag_anlegen', {
@@ -209,12 +216,14 @@ describe('Schreibende Aktionen', () => {
   })
 
   test('gültige Felder kommen typisiert mit Vorgabewerten zurück', async () => {
-    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
-    const { aktion, werte } = aktionPruefen('kontakt_anlegen', { name: 'Muster GmbH' })
+    const { aktionPruefen } = await import('../src/modules/prozesse/torwaechter.ts')
+    const { aktion, werte } = aktionPruefen('kontakte.partner_anlegen', {
+      parameter: { name: 'Muster GmbH', is_company: true },
+    })
     assert.equal(aktion.bereich, 'kontakte')
-    assert.equal(werte.kunde, true, 'Vorgabe: Kunde')
-    assert.equal(werte.lieferant, false)
-    assert.match(aktion.zusammenfassung(werte), /Muster GmbH/)
+    assert.equal(werte.is_customer, true, 'Vorgabe: Kunde')
+    assert.equal(werte.is_vendor, false)
+    assert.match(aktion.zusammenfassung!(werte), /Muster GmbH/)
   })
 
   // Die Produktanlage lebt seit der Katalog-Auflösung in der Registry —
@@ -380,11 +389,11 @@ describe('Schreibende Aktionen', () => {
   })
 
   test('der Fertigungsmitarbeiter darf über die KI keinen Kunden anlegen', async () => {
-    const { AKTIONEN } = await import('../src/modules/ki/aktionen.ts')
     const { registrierteAktion } = await import('../src/modules/prozesse/registry/index.ts')
     const { canWrite } = await import('../src/modules/auth/permissions.ts')
-    assert.equal(canWrite('fertigung', AKTIONEN.kontakt_anlegen.bereich), false)
-    // Der Registry-Zwilling: die Rechte gelten transportunabhängig weiter.
+    // Die Rechte hängen am Bereich der Registry-Aktion — transportunabhängig:
+    // KI-Chat, Maske und Prozesstest laufen alle durch dieselbe Prüfung.
+    assert.equal(canWrite('fertigung', registrierteAktion('kontakte.partner_anlegen')!.bereich), false)
     assert.equal(canWrite('fertigung', registrierteAktion('fertigung.auftrag_anlegen')!.bereich), true)
   })
 })

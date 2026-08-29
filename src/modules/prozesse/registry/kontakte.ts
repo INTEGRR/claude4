@@ -21,13 +21,13 @@ export const KONTAKTE = {
         is_company: z.boolean().default(false),
         is_customer: z.boolean().default(true),
         is_vendor: z.boolean().default(false),
-        email: z.string().max(200).optional(),
+        email: z.string().email('Bitte eine gültige E-Mail-Adresse angeben').max(200).optional(),
         phone: z.string().max(60).optional(),
         street: z.string().max(200).optional(),
         house_number: z.string().max(20).optional(),
         zip: z.string().max(20).optional(),
         city: z.string().max(100).optional(),
-        country_code: z.string().max(2).default('DE'),
+        country_code: z.string().max(2).default('DE').describe('ISO-Code, z. B. DE'),
         vat: z.string().max(30).optional(),
       })
       // BUG/00013: Eine Person ohne Nachname ist kein Kontakt, sondern ein

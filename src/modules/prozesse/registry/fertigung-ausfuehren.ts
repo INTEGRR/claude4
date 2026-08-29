@@ -312,11 +312,14 @@ export async function arbeitsplatzAnlegen(p: {
   time_efficiency: number
   note?: string
 }): Promise<AktionsErgebnis> {
+  // Uppercase auch hier, nicht nur im Formular-Adapter — die KI liefert
+  // Kürzel in beliebiger Schreibweise.
+  const code = p.code.toUpperCase()
   await sql`
     insert into work_centers (code, name, cost_per_hour, capacity, time_efficiency, note)
-    values (${p.code}, ${p.name}, ${p.cost_per_hour}, ${p.capacity}, ${p.time_efficiency},
+    values (${code}, ${p.name}, ${p.cost_per_hour}, ${p.capacity}, ${p.time_efficiency},
             ${p.note ?? null})`
-  return { text: `Arbeitsplatz ${p.code} angelegt.` }
+  return { text: `Arbeitsplatz ${code} angelegt.` }
 }
 
 export async function arbeitsplatzAendern(

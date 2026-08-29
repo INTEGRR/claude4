@@ -35,8 +35,6 @@ export interface Aktion<S extends z.ZodTypeAny = z.ZodTypeAny> {
 
 export const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const geld = (v: number) => v.toFixed(2).replace('.', ',') + ' €'
-
 export const positionSchema = z.object({
   produkt: z.string().min(1).describe('SKU, Barcode, Name oder ID der Variante'),
   menge: z.number().positive(),
@@ -47,28 +45,6 @@ type Position = z.infer<typeof positionSchema>
 // --- Katalog ---------------------------------------------------------------
 
 export const AKTIONEN = {
-  kontakt_anlegen: {
-    label: 'Kontakt anlegen',
-    bereich: 'kontakte',
-    beschreibung: 'Legt einen Kunden und/oder Lieferanten an.',
-    schema: z.object({
-      name: z.string().min(1).max(200),
-      kunde: z.boolean().default(true),
-      lieferant: z.boolean().default(false),
-      firma: z.boolean().default(true),
-      email: z.string().email().optional(),
-      telefon: z.string().max(60).optional(),
-      strasse: z.string().max(120).optional(),
-      hausnummer: z.string().max(20).optional(),
-      plz: z.string().max(12).optional(),
-      ort: z.string().max(80).optional(),
-      land: z.string().length(2).optional().describe('ISO-Code, z. B. DE'),
-    }),
-    zusammenfassung: (p) =>
-      `${p.name} — ${[p.kunde && 'Kunde', p.lieferant && 'Lieferant'].filter(Boolean).join(' und ') || 'Kontakt'}` +
-      (p.ort ? `, ${`${p.plz ?? ''} ${p.ort}`.trim()}` : ''),
-  },
-
   verkaufsauftrag_anlegen: {
     label: 'Verkaufsauftrag anlegen',
     bereich: 'verkauf',
@@ -98,36 +74,6 @@ export const AKTIONEN = {
     zusammenfassung: (p) =>
       `Bestellung bei ${p.lieferant} mit ${p.positionen.length} Position(en): ` +
       p.positionen.map((z: Position) => `${z.menge} × ${z.produkt}`).join(', '),
-  },
-
-  arbeitsplatz_anlegen: {
-    label: 'Arbeitsplatz anlegen',
-    bereich: 'fertigung',
-    beschreibung: 'Legt einen Arbeitsplatz mit Stundensatz an.',
-    schema: z.object({
-      kuerzel: z.string().min(1).max(20),
-      name: z.string().min(1).max(80),
-      stundensatz: z.number().nonnegative(),
-      leistung: z.number().positive().max(500).optional().describe('in Prozent, Standard 100'),
-    }),
-    zusammenfassung: (p) => `${p.kuerzel} — ${p.name}, ${geld(p.stundensatz)} je Stunde`,
-  },
-
-  mitarbeiter_anlegen: {
-    label: 'Mitarbeiter anlegen',
-    bereich: 'personal',
-    beschreibung: 'Legt einen Mitarbeiter mit Personalkostensatz an.',
-    schema: z.object({
-      name: z.string().min(1).max(120),
-      funktion: z.string().max(80).optional(),
-      abteilung: z.string().max(80).optional(),
-      kostensatz: z.number().nonnegative().optional(),
-      ausweis: z.string().max(40).optional(),
-      wochenstunden: z.number().nonnegative().max(80).optional(),
-    }),
-    zusammenfassung: (p) =>
-      `${p.name}${p.funktion ? ` — ${p.funktion}` : ''}` +
-      (p.kostensatz ? `, ${geld(p.kostensatz)} je Stunde` : ''),
   },
 
   notiz_anlegen: {

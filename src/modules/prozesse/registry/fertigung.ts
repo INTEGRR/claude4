@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { parseQtyMap } from '../../shared/form.ts'
-import type { RegistrierteAktion } from './typen.ts'
+import { geld, type RegistrierteAktion } from './typen.ts'
 
 /**
  * Aktionen der Fertigung: Fertigungsaufträge, Demontage, Stücklisten,
@@ -303,6 +303,7 @@ export const FERTIGUNG = {
   'fertigung.arbeitsplatz_anlegen': {
     label: 'Arbeitsplatz anlegen',
     bereich: 'fertigung',
+    ki: true,
     beschreibung: 'Legt einen Arbeitsplatz mit Kostensatz, Kapazität und Effizienz an.',
     bindung: 'frei',
     prozessfrei: true,
@@ -311,9 +312,11 @@ export const FERTIGUNG = {
       name: z.string().min(1, 'Bitte einen Namen vergeben').max(100),
       cost_per_hour: z.number().nonnegative().default(0),
       capacity: z.number().positive().default(1),
-      time_efficiency: z.number().positive().default(100),
+      time_efficiency: z.number().positive().default(100).describe('in Prozent, Standard 100'),
       note: z.string().max(500).optional(),
     }),
+    zusammenfassung: (p) =>
+      `${p.code.toUpperCase()} — ${p.name}, ${geld(p.cost_per_hour)} je Stunde`,
     formdata: (fd) => ({
       code: String(fd.get('code') ?? '').trim().toUpperCase(),
       name: String(fd.get('name') ?? '').trim(),

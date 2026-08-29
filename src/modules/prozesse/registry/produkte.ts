@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { RegistrierteAktion } from './typen.ts'
+import { geld, type RegistrierteAktion } from './typen.ts'
 
 /**
  * Aktionen des Produktbereichs. Die Produktanlage hat EINE Definition und
@@ -7,8 +7,6 @@ import type { RegistrierteAktion } from './typen.ts'
  * Auflösung des KI-Anlage-Katalogs lebt sie hier, die Fachlogik weiter in
  * ki/produkt-anlegen.ts (Entscheidungslog 2026-08-27).
  */
-
-const geld = (v: number) => v.toFixed(2).replace('.', ',') + ' €'
 
 interface Attribut {
   name: string

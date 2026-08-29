@@ -49,7 +49,7 @@ export async function partnerAnlegen(
       ${p.is_company}, ${p.is_customer}, ${p.is_vendor},
       ${p.email ?? null}, ${p.phone ?? null}, ${p.street ?? null},
       ${p.house_number ?? null}, ${p.zip ?? null}, ${p.city ?? null},
-      ${p.country_code}, ${p.vat ?? null})
+      ${p.country_code.toUpperCase()}, ${p.vat ?? null})
     returning id`
 
   await sql`select log_event('partner', ${zeile.id}, 'state',

@@ -58,19 +58,6 @@ type Werte = Record<string, unknown>
 type Position = { produkt: string; menge: number; preis?: number }
 
 const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<AktionErgebnis>> = {
-  kontakt_anlegen: async (p: Werte) => {
-    const [row] = await sql<{ id: string }[]>`
-      insert into partners (name, is_company, is_customer, is_vendor, email, phone,
-                            street, house_number, zip, city, country_code)
-      values (${p.name as string}, ${p.firma as boolean}, ${p.kunde as boolean},
-              ${p.lieferant as boolean}, ${(p.email as string) ?? null},
-              ${(p.telefon as string) ?? null}, ${(p.strasse as string) ?? null},
-              ${(p.hausnummer as string) ?? null}, ${(p.plz as string) ?? null},
-              ${(p.ort as string) ?? null}, ${((p.land as string) ?? 'DE').toUpperCase()})
-      returning id`
-    return { text: `Kontakt „${p.name as string}" angelegt.`, link: `/kontakte/${row.id}` }
-  },
-
   verkaufsauftrag_anlegen: async (p: Werte, actor) => {
     const kunde = await partner(sql, p.kunde as string, 'kunde')
     const uom = await stueck(sql)
@@ -115,27 +102,6 @@ const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<Aktio
     await sql`select log_event('purchase_order', ${order.id}, 'note',
       ${'Über die KI-Analyse angelegt'}, ${actor})`
     return { text: `Bestellung ${order.number} angelegt.`, link: `/einkauf/${order.id}` }
-  },
-
-  arbeitsplatz_anlegen: async (p: Werte) => {
-    await sql`
-      insert into work_centers (code, name, cost_per_hour, time_efficiency)
-      values (${(p.kuerzel as string).toUpperCase()}, ${p.name as string},
-              ${p.stundensatz as number}, ${(p.leistung as number) ?? 100})`
-    return {
-      text: `Arbeitsplatz ${(p.kuerzel as string).toUpperCase()} angelegt.`,
-      link: '/fertigung/arbeitsplaetze',
-    }
-  },
-
-  mitarbeiter_anlegen: async (p: Werte) => {
-    const [row] = await sql<{ id: string; number: string }[]>`
-      insert into employees (number, name, job_title, department, hourly_cost, barcode, weekly_hours)
-      values (next_sequence('employee'), ${p.name as string}, ${(p.funktion as string) ?? null},
-              ${(p.abteilung as string) ?? null}, ${(p.kostensatz as number) ?? 0},
-              ${(p.ausweis as string) ?? null}, ${(p.wochenstunden as number) ?? 40})
-      returning id, number`
-    return { text: `Mitarbeiter ${row.number} angelegt.`, link: `/personal/${row.id}` }
   },
 
   notiz_anlegen: async (p: Werte, actor) => {
