@@ -37,31 +37,11 @@ export const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
 // --- Katalog ---------------------------------------------------------------
 
-export const AKTIONEN = {
-  notiz_anlegen: {
-    label: 'Notiz an einem Datensatz',
-    bereich: 'ki',
-    beschreibung:
-      'Hängt eine Notiz an den Verlauf eines Datensatzes (model + record_id), z. B. an einen ' +
-      'Verkaufsauftrag oder ein Produkt. Ändert keine Daten.',
-    schema: z.object({
-      model: z.enum([
-        'sales_order',
-        'purchase_order',
-        'manufacturing_order',
-        'stock_picking',
-        'repair_order',
-        'product_template',
-        'partner',
-        'employee',
-      ]),
-      record_id: z.string().regex(UUID_MUSTER, 'Bitte die ID des Datensatzes angeben'),
-      text: z.string().min(1).max(1000),
-    }),
-    zusammenfassung: (p) => `Notiz an ${p.model}: „${p.text.slice(0, 120)}"`,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  },
-} satisfies Record<string, Aktion<any>>
+// Leer seit der Katalog-Auflösung (Entscheidungslog 2026-08-27): alle
+// Anlage-Aktionen leben in der Registry. Die Datei fällt im letzten
+// Schritt weg, sobald die Dispatch-Weichen entfernt sind.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const AKTIONEN = {} satisfies Record<string, Aktion<any>>
 
 export type AktionName = keyof typeof AKTIONEN
 
@@ -81,7 +61,9 @@ export interface ZusatzAktion {
 
 export function aktionenTool(zusatz: ZusatzAktion[] = []) {
   const katalog = [
-    ...Object.entries(AKTIONEN).map(([name, a]) => `- ${name} (${a.label}): ${a.beschreibung}`),
+    ...Object.entries(AKTIONEN as Record<string, Aktion>).map(
+      ([name, a]) => `- ${name} (${a.label}): ${a.beschreibung}`,
+    ),
     ...zusatz.map(
       (z) =>
         `- ${z.name} (${z.label}): ${z.beschreibung}` +

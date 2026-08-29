@@ -186,9 +186,20 @@ describe('Schreibende Aktionen', () => {
   })
 
   test('fehlende Felder nennen die Ursache im Klartext', async () => {
-    const { aktionPruefen } = await import('../src/modules/ki/aktionen.ts')
     const torwaechter = await import('../src/modules/prozesse/torwaechter.ts')
-    assert.throws(() => aktionPruefen('notiz_anlegen', { text: '' }), /model|record_id|text/)
+    // Beleggebunden: ohne record_id kommt die Bindung zu Wort, mit ihr das Schema.
+    assert.throws(
+      () => torwaechter.aktionPruefen('notiz.anlegen', { parameter: { text: 'x' } }),
+      /braucht die ID/,
+    )
+    assert.throws(
+      () =>
+        torwaechter.aktionPruefen('notiz.anlegen', {
+          recordId: '00000000-0000-4000-8000-000000000000',
+          parameter: { text: '' },
+        }),
+      /model|text/,
+    )
     assert.throws(
       () =>
         torwaechter.aktionPruefen('kontakte.partner_anlegen', {
@@ -205,14 +216,13 @@ describe('Schreibende Aktionen', () => {
     )
   })
 
-  test('jede Aktion nennt einen Bereich, der der Rechtematrix bekannt ist', async () => {
+  test('der Alt-Katalog bleibt leer — neue Aktionen gehören in die Registry', async () => {
     const { AKTIONEN } = await import('../src/modules/ki/aktionen.ts')
-    const { canWrite } = await import('../src/modules/auth/permissions.ts')
-    for (const [name, a] of Object.entries(AKTIONEN)) {
-      assert.equal(typeof a.bereich, 'string', `${name} ohne Bereich`)
-      // canWrite darf für keinen Bereich stolpern und der Admin darf überall
-      assert.equal(canWrite('admin', a.bereich), true, `${name}: Admin muss dürfen`)
-    }
+    assert.deepEqual(
+      Object.keys(AKTIONEN),
+      [],
+      'Anlage-Aktionen laufen seit der Katalog-Auflösung durch den Torwächter (Entscheidungslog 2026-08-27)',
+    )
   })
 
   test('gültige Felder kommen typisiert mit Vorgabewerten zurück', async () => {

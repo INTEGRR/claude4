@@ -8,6 +8,7 @@ import { FINANZEN } from './finanzen.ts'
 import { INTEGRATIONEN } from './integrationen.ts'
 import { KONTAKTE } from './kontakte.ts'
 import { LAGER } from './lager.ts'
+import { NOTIZEN } from './notizen.ts'
 import { PERSONAL } from './personal.ts'
 import { PRODUKTE } from './produkte.ts'
 import { REPARATUR } from './reparatur.ts'
@@ -33,6 +34,7 @@ export const REGISTRY = {
   ...INTEGRATIONEN,
   ...KONTAKTE,
   ...LAGER,
+  ...NOTIZEN,
   ...PERSONAL,
   ...PRODUKTE,
   ...REPARATUR,

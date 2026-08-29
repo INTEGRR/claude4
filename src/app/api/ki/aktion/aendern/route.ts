@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
-import { AKTIONEN, type AktionName, aktionPruefen } from '@/modules/ki/aktionen'
+import { type Aktion, AKTIONEN, aktionPruefen } from '@/modules/ki/aktionen'
 import { kiConfigured } from '@/modules/ki/agent'
 import { kiModell } from '@/modules/ki/modelle'
 
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       }
     }
   } else {
-    const aktion = (AKTIONEN as Record<string, (typeof AKTIONEN)[AktionName]>)[name]
+    const aktion = (AKTIONEN as Record<string, Aktion>)[name]
     if (!aktion) return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 })
     // Wer die Aktion nicht ausführen darf, soll sie auch nicht umschreiben.
     if (!canWrite(user.role, aktion.bereich, user.befugnisse)) {

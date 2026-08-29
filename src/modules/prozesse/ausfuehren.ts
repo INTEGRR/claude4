@@ -9,6 +9,7 @@ import * as finanzen from './registry/finanzen-ausfuehren.ts'
 import * as integrationen from './registry/integrationen-ausfuehren.ts'
 import * as kontakte from './registry/kontakte-ausfuehren.ts'
 import * as lager from './registry/lager-ausfuehren.ts'
+import * as notizen from './registry/notizen-ausfuehren.ts'
 import * as personal from './registry/personal-ausfuehren.ts'
 import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
@@ -137,6 +138,8 @@ export const AUSFUEHRUNG = {
   'kontakte.partner_anlegen': kontakte.partnerAnlegen,
   'kontakte.partner_aendern': kontakte.partnerAendern,
   'kontakte.unterkontakt_anlegen': kontakte.unterkontaktAnlegen,
+
+  'notiz.anlegen': notizen.notizAnlegen,
 
   'personal.mitarbeiter_anlegen': personal.mitarbeiterAnlegen,
   'personal.mitarbeiter_aendern': personal.mitarbeiterAendern,

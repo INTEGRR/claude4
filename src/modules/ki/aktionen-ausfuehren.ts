@@ -1,4 +1,3 @@
-import { sql } from '@/db/client'
 import type { AktionErgebnis, AktionName } from './aktionen'
 
 /**
@@ -13,20 +12,17 @@ import type { AktionErgebnis, AktionName } from './aktionen'
 
 // --- Ausführung -------------------------------------------------------------
 
-type Werte = Record<string, unknown>
-
-const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<AktionErgebnis>> = {
-  notiz_anlegen: async (p: Werte, actor) => {
-    await sql`select log_event(${p.model as string}, ${p.record_id as string}::uuid, 'note',
-      ${p.text as string}, ${actor})`
-    return { text: 'Notiz hinterlegt.' }
-  },
-}
+// Leer seit der Katalog-Auflösung — siehe aktionen.ts.
+const AUSFUEHRUNG: Record<AktionName, (p: never, actor: string) => Promise<AktionErgebnis>> = {}
 
 export async function aktionAusfuehren(
   name: AktionName,
   werte: Record<string, unknown>,
   actor: string,
 ): Promise<AktionErgebnis> {
-  return AUSFUEHRUNG[name](werte as never, actor)
+  const fn = (AUSFUEHRUNG as Record<string, (p: never, actor: string) => Promise<AktionErgebnis>>)[
+    name
+  ]
+  if (!fn) throw new Error(`Unbekannte Aktion „${name}"`)
+  return fn(werte as never, actor)
 }

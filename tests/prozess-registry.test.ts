@@ -18,7 +18,9 @@ describe('Aktions-Registry: Katalog', () => {
     // Modellbezogene Namensräume, die bewusst NICHT nach ihrem Bereich heißen:
     // Vorgänge sind bereichsübergreifend gedacht (der Bereich regelt nur die
     // Rechte, das Muster-Paket hängt sie an den Verkauf).
-    const NAMENSRAUM_AUSNAHMEN: Record<string, string> = { vorgang: 'verkauf' }
+    // notiz: Kommentieren darf jede Rolle (Bereich 'fehler'), das Modell
+    // entscheidet im Executor — deshalb passt kein Bereichs-Präfix.
+    const NAMENSRAUM_AUSNAHMEN: Record<string, string> = { vorgang: 'verkauf', notiz: 'fehler' }
 
     for (const [name, a] of alleAktionen()) {
       assert.match(name, /^[a-z]+\.[a-z_]+$/, `${name}: Namensschema <bereich>.<verb_objekt>`)
@@ -266,10 +268,10 @@ const UI_UMGEHUNGEN = new Set<string>([
   'integrationen:resetRunning',
   'integrationen/import:uebernehmen',
   'integrationen/import:alleUebernehmen',
-  // Querschnitt: Kommentare und Tags an beliebigen Belegen. Beide haben eine
-  // EIGENE Modell-Allowlist statt der Registry — bewusstes Muster, aber
-  // dadurch ohne Prozessbindung und ohne Nutzungszaehler.
-  'comments-action:addComment',
+  // Querschnitt: Tags an beliebigen Belegen — eigene Modell-Allowlist statt
+  // der Registry, bewusstes Muster, aber dadurch ohne Prozessbindung und
+  // ohne Nutzungszaehler. (Kommentare laufen seit der Katalog-Auflösung
+  // über notiz.anlegen durch den Torwächter.)
   'tags-action:setTags',
 ])
 
