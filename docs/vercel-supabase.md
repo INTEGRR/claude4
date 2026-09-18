@@ -66,16 +66,17 @@ SESSION_SECRET   <32 Byte Zufall, z. B. `openssl rand -hex 32`>
 Ohne `SESSION_SECRET` lässt sich niemand anmelden. Der Wert darf sich später
 ändern — dann sind alle offenen Sitzungen ungültig, mehr passiert nicht.
 
-**Empfohlen:**
+**Pflicht auf Vercel:**
 
 ```
 CRON_SECRET      <24 Byte Zufall>
 ```
 
 Schützt `/api/cron/*` vor fremden Aufrufen. Vercel sendet ihn bei den eigenen
-Cron-Aufrufen automatisch als `Authorization: Bearer …` mit. Ist er nicht
-gesetzt, ist der Endpunkt offen — er löst nur Hintergrundarbeit aus und gibt
-keine Daten heraus, aber ohne Not sollte das niemand so lassen.
+Cron-Aufrufen automatisch als `Authorization: Bearer …` mit. Ist er auf Vercel
+nicht gesetzt, antwortet der Endpunkt seit 2026-09-18 mit 401 — dann läuft
+kein einziger Cron (Outbox, Webhooks, Abgleich, Tracking, Aufräumen), bis der
+Wert steht.
 
 **Optional, je nach Anbindung** (leer lassen heißt: Modul ist aus):
 
@@ -154,14 +155,14 @@ von der Startseite überleben beide. Danach holt die Shopify-Erstübernahme
 
 ## 5. Zeitgesteuerte Aufgaben
 
-`vercel.json` bringt fünf Cron-Einträge mit — Outbox, Webhooks, Abgleich,
-Sendungsverfolgung, Aufräumen.
+`vercel.json` bringt sechs Cron-Einträge mit — Outbox, Webhooks, Abgleich,
+Sendungsverfolgung, Kennzahlen, Aufräumen.
 
 **Der Hobby-Tarif erlaubt nur zwei Cron-Jobs, und die laufen einmal täglich.**
 Das reicht für einen Testbetrieb, aber nicht für den Versandalltag: Fulfillment
 und Sendungsverfolgung hängen dann bis zum nächsten Tag fest. Zwei Wege:
 
-- **Pro-Tarif** — die fünf Einträge laufen wie hinterlegt.
+- **Pro-Tarif** — die sechs Einträge laufen wie hinterlegt.
 - **Hobby** — `vercel.json` auf zwei tägliche Einträge kürzen und die
   minütlichen Aufgaben von außen anstoßen, etwa per GitHub Action oder von
   einem beliebigen Rechner, der ohnehin läuft:

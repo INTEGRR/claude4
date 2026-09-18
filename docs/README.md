@@ -61,6 +61,9 @@ der [AGENTS.md](../AGENTS.md).
 - [migration-odoo.md](migration-odoo.md) — die Datenübernahme aus Odoo 18
   (ANVIL): Architektur des Importers, Phasen, Verzichtsliste,
   Cutover-Runbook.
+- [go-live.md](go-live.md) — **der Go-Live-Plan**: Checkliste aller
+  Zugänge, Einstellungen und Prüfungen vor dem Stichtag (DHL-Keys,
+  Supabase, Vercel, Konten, Versandtests); verweist aufs Cutover-Runbook.
 
 ## Module (Fachdoku der Gründungsphase, je Bereich)
 

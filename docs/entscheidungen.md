@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-18 — Go-Live-Plan als Checkliste im Repository
+
+Auslöser: Beim Sicherheitscheck und dem DHL-Umbau sammelten sich Aufgaben
+für den Betreiber an (DHL-Produktions-Keys in Vercel, CRON_SECRET,
+Supabase-Einstellungen, Verträge, Konten, erste echte Versandtests), die
+alle erst zum Go-Live anstehen — nicht jetzt. Im Chat gehen solche Listen
+verloren.
+
+Entscheidung: Es gibt [docs/go-live.md](go-live.md), eine Checkliste mit
+Zuständigkeit (Betreiber oder KRNL) und Kästchen, die im selben Commit
+wie die Umsetzung abgehakt werden. Sie wiederholt nicht das Cutover-
+Runbook (Datenübernahme bleibt in migration-odoo.md) und nicht die
+Variablen-Doku (vercel-supabase.md), sondern verweist dorthin — eine
+Wahrheit je Thema. Geheimnisse stehen dort nie als Wert, nur als Name
+und Herkunft. Nebenbei berichtigt: vercel-supabase.md nannte CRON_SECRET
+noch „empfohlen" und den Endpunkt ohne Secret „offen"; seit dem
+Sicherheitscheck ist er auf Vercel fail-closed, und es sind sechs Crons,
+nicht fünf.
+
 ## 2026-09-18 — Korrektur 0080: Erweiterungsfunktionen bleiben unangetastet
 
 Befund: Der Build mit dem Sicherheitscheck (Eintrag unten) blieb auf
