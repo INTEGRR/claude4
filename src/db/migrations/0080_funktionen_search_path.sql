@@ -1,5 +1,5 @@
 -- ===========================================================================
--- 0080  Fester search_path für alle Funktionen im Schema public
+-- 0080  Fester search_path für alle EIGENEN Funktionen im Schema public
 -- ===========================================================================
 -- Befund des Supabase-Sicherheits-Linters (function_search_path_mutable,
 -- 166 Funktionen): Eine Funktion ohne festen search_path löst Tabellen und
@@ -9,6 +9,13 @@
 -- ist das heute nicht, aber „nicht ausnutzbar" ist keine Härtung. Deshalb
 -- bekommt jede Routine in public den festen Pfad `public, pg_temp`
 -- (pg_catalog wird implizit immer zuerst durchsucht).
+--
+-- Ausgenommen sind Routinen, die zu einer Erweiterung gehören (btree_gist
+-- liegt in public und gehört auf Supabase supabase_admin, nicht postgres —
+-- der erste Fassung dieser Datei scheiterte daran mit „must be owner of
+-- function", der Build blieb stehen), und vorsichtshalber alles, was der
+-- ausführenden Rolle nicht gehört. Diese Fassung ersetzt die erste, die
+-- nirgends außer in Wegwerf-Datenbanken angewendet wurde.
 -- Sicherheitscheck vor dem Go-Live, Entscheidungslog 2026-09-18.
 
 do $$
@@ -21,6 +28,13 @@ begin
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and p.prokind in ('f', 'p')
+      and pg_has_role(current_user, p.proowner, 'USAGE')
+      and not exists (
+        select 1 from pg_depend d
+        where d.classid = 'pg_proc'::regclass
+          and d.objid = p.oid
+          and d.deptype = 'e'
+      )
   loop
     execute format('alter routine %s set search_path = public, pg_temp', r.signatur);
   end loop;

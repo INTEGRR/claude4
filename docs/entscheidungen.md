@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-18 — Korrektur 0080: Erweiterungsfunktionen bleiben unangetastet
+
+Befund: Der Build mit dem Sicherheitscheck (Eintrag unten) blieb auf
+Vercel stehen — 0079 wurde eingespielt, 0080 brach ab, die Anwendung lief
+danach weiter auf dem alten Stand (Washington, ohne Header). Grund: Die
+Migration setzte den search_path für ALLE Routinen in public, und dazu
+gehören auf Supabase die rund 190 Funktionen der Erweiterung btree_gist.
+Die gehören der Rolle supabase_admin, nicht postgres — „must be owner of
+function". Lokal fiel das nicht auf, weil die Testrolle Superuser ist.
+
+Entscheidung: 0080 wird in der Datei berichtigt statt durch eine 0081
+ergänzt. Das ist eine bewusste, einmalige Ausnahme von „Migrationen sind
+unveränderlich": Die Regel schützt Datenbanken, die eine Migration schon
+angewendet haben, und das war hier keine außer zwei lokalen Wegwerf-
+Datenbanken (kein Eintrag in schema_migrations der Produktion, der
+Prüfsummen-Wächter in migrate.ts hat also nichts zu vergleichen). Eine
+0081 hätte das Problem nicht gelöst, weil 0080 weiterhin zuerst laufen
+und scheitern würde. Die neue Fassung überspringt Erweiterungsmitglieder
+(pg_depend, deptype 'e') und alles, was der ausführenden Rolle nicht
+gehört — genau das, was auch der Supabase-Linter zählt (166 eigene
+Funktionen, nicht 354).
+
+Lehre, als Wächter-Idee notiert: Migrationen, die über Katalogtabellen
+iterieren, müssen mit Eigentum und Erweiterungen rechnen, weil die
+lokale Superuser-Rolle solche Fehler verdeckt. Bis ein Test mit
+Nicht-Superuser-Rolle existiert, gilt: catalog-getriebene DDL immer mit
+`pg_has_role(current_user, owner, 'USAGE')` absichern.
+
 ## 2026-09-18 — Sendungsverfolgung über Parcel DE Tracking statt Unified API
 
 Auslöser: In der DHL-Produktions-App sind „Parcel DE Shipping", „Parcel DE
