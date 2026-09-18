@@ -504,6 +504,12 @@ SHOPIFY_CLIENT_ID=…
 SHOPIFY_CLIENT_SECRET=…
 ```
 
+Die Anbindung startet im Modus **nur lesen**: Bestellungen, Kunden und
+Produkte kommen herein, aber KRNL schreibt nichts in den Shop (keine
+Fulfillments, Bestände, Produkte, Webhooks), bis ein Admin unter
+Einstellungen → Shopify-Anbindung auf „schreiben" stellt — so lässt sich
+auch ein Live-Shop gefahrlos anbinden (docs/module/integrationen.md).
+
 Ein Token muss nirgends kopiert werden: KRNL tauscht Client ID und Secret
 selbst gegen ein Access Token (Client-Credentials-Grant, 24 Stunden gültig)
 und erneuert es automatisch. Das funktioniert, weil App und Shop derselben

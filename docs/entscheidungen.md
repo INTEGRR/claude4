@@ -9,6 +9,51 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-18 — Shopify-Lesemodus: ein Schalter, eine Naht, kein Nachlauf
+
+Auslöser: Vor dem Stichtag soll KRNL am Live-Shop hängen und mitlesen
+(Bestellungen, Kunden, Produkte), während Odoo den Shop weiter bedient.
+Ein zweites System, das nebenbei Fulfillments, Bestände oder
+Produktänderungen in den Shop schreibt, wäre der teuerste denkbare
+Staging-Unfall. Gewünscht war ein „Schreibfilter", den der Betreiber am
+Stichtag einfach umlegt.
+
+Entscheidung:
+
+- **Ein Betreiber-Schalter als Daten**, nicht als Deployment:
+  `settings.shopify.modus` ∈ {lesen, schreiben}, gesetzt über die
+  Registry-Aktion `einstellungen.shopify_modus_setzen` (nur Admin,
+  auditiert), UI unter Einstellungen → Shopify-Anbindung. Gilt sofort.
+- **Standard ist „lesen"**, auch ohne Eintrag: Zugangsdaten setzen heißt
+  nicht, dass ein zweites System in den Shop schreiben darf.
+- **Eine Naht statt vieler Abfragen:** `shopifyGraphQL()` weist jede
+  GraphQL-Mutation mit `ShopifyNurLesen` ab — vor der Konfigurations-
+  prüfung, damit der Wächter ohne Zugangsdaten und ohne Netz testbar
+  ist, und hinter dem Fake, weil der Fake keinen Shop hat, den es zu
+  schützen gäbe (der datenbankfreie Fake-Weichen-Test bleibt so
+  datenbankfrei). Kein Aufrufer muss den Modus kennen; ein vergessener
+  Aufrufer kann ihn nicht umgehen. Der Token-Tausch ist keine Mutation
+  und läuft immer.
+- **Übersprungen, nicht gescheitert, kein Nachlauf:** Die Outbox hakt
+  einen so abgewiesenen Schreibjob als erledigt mit „Übersprungen: …"
+  ab, schreibt ein Info-Ereignis an den Beleg und gibt den Dedupe-
+  Schlüssel frei. Verworfen: Jobs „pending" lassen und nach dem
+  Umschalten nachlaufen lassen — eine Bestellung aus der Lesezeit ist
+  bis dahin in Odoo erledigt, ein verspätetes KRNL-Fulfillment würde den
+  Kunden ein zweites Mal benachrichtigen und Shopify verwirren. Ebenso
+  verworfen: Jobs als fehlgeschlagen führen — im Staging ist das kein
+  Fehler, und ein roter Monitor, der Wochen lang rot bleibt, stumpft ab.
+  Nach dem Scharfschalten meldet der Betreiber einmal den Bestand und
+  registriert die Webhooks (steht im Aktionstext und im Runbook).
+- Webhook-Registrierung zählt als Schreiben (sie verändert den Shop);
+  im Lesemodus liefert der 15-Minuten-Abgleich die Bestellungen.
+
+Umgesetzt: shopify-modus.ts (rein, getestet), shopify.ts, jobs.ts,
+Registry, Einstellungen- und Integrationen-Seite, Harness; Tests
+tests/shopify-modus.test.ts und tests/prozesse/shopify-modus.test.ts.
+Doku: module/integrationen.md, go-live.md, migration-odoo.md (Runbook
+Schritt 7), vercel-supabase.md, lokal-starten.md.
+
 ## 2026-09-18 — Go-Live-Plan als Checkliste im Repository
 
 Auslöser: Beim Sicherheitscheck und dem DHL-Umbau sammelten sich Aufgaben

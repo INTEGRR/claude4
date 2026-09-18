@@ -135,6 +135,29 @@ export const EINSTELLUNGEN = {
     revalidate: ['/einstellungen', '/integrationen'],
   },
 
+  'einstellungen.shopify_modus_setzen': {
+    label: 'Shopify-Anbindung: lesen oder schreiben',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Betreiber-Schalter für die Shopify-Anbindung (settings.shopify): „lesen" ist der ' +
+      'Staging-Modus — Bestellungen, Kunden und Produkte kommen herein, aber nichts geht ' +
+      'hinaus (keine Fulfillments, kein Tracking, keine Bestände, keine Produktänderungen, ' +
+      'keine Webhook-Registrierung); „schreiben" schaltet alle Rückmeldungen scharf. ' +
+      'Standard ohne Eintrag ist lesen. Schreibjobs aus der Lesezeit laufen nach dem ' +
+      'Umschalten nicht nach.',
+    bindung: 'frei',
+    schema: z.object({
+      modus: z
+        .enum(['lesen', 'schreiben'])
+        .describe('lesen = Staging (nur lesend), schreiben = Rückmeldungen scharf'),
+    }),
+    zusammenfassung: (p) => `Shopify ${p.modus === 'schreiben' ? 'schreibend (scharf)' : 'nur lesend'}`,
+    formdata: (fd) => ({ modus: String(fd.get('modus') ?? 'lesen') }),
+    revalidate: ['/einstellungen', '/integrationen'],
+  },
+
   'einstellungen.ki_modelle_setzen': {
     label: 'KI-Modelle je Ebene festlegen',
     bereich: 'einstellungen',

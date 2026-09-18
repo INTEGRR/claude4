@@ -256,7 +256,10 @@ Entscheidungslog 2026-08-25, Phase 7).
    admin@example.com/erp-admin an — ein bekanntes Standardpasswort darf
    keinen Tag auf Prod überleben).
 7. **Shopify-Kopplung**: ZUERST der Produkt-Import (SKU-Match setzt
-   `shopify_variant_id` an den Bestandsdaten), dann Webhooks aktivieren;
+   `shopify_variant_id` an den Bestandsdaten) — der läuft schon im
+   Lesemodus —, dann unter Einstellungen → Shopify-Anbindung auf
+   **schreiben** stellen (bis hierhin hat KRNL nichts in den Shop
+   geschrieben, siehe module/integrationen.md), dann Webhooks aktivieren;
    Order-Backfill nur für den Zeitraum ab Stichtag — ältere Bestellungen
    sind bereits über die Odoo-Übernahme da (GID-Dedupe greift).
    Danach `integration_jobs` prüfen: der Import löscht wartende

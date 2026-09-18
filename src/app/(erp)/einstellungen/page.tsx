@@ -43,6 +43,13 @@ async function saveDruckbruecke(formData: FormData) {
   return serverAktion('einstellungen.druckbruecke_setzen', { formData })
 }
 
+async function saveShopifyModus(formData: FormData) {
+  'use server'
+  // Lese-/Schreibmodus der Shopify-Anbindung — Registry-Aktion, damit der
+  // Wechsel auditiert ist (wer hat wann scharf geschaltet).
+  return serverAktion('einstellungen.shopify_modus_setzen', { formData })
+}
+
 async function saveDhl(formData: FormData) {
   'use server'
   await requireAdmin()
@@ -192,6 +199,7 @@ export default async function EinstellungenPage() {
   const kiModelle = get<Record<string, unknown>>('ki_modelle')
   const druckbruecke = get<{ modus?: string; token?: string }>('druckbruecke')
   const druckModus = druckbruecke.modus === 'bruecke' ? 'bruecke' : 'pdf'
+  const shopifyModus = get<{ modus?: string }>('shopify').modus === 'schreiben' ? 'schreiben' : 'lesen'
   const finanzen = get<Record<string, number>>('finanzen')
 
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
@@ -326,6 +334,43 @@ export default async function EinstellungenPage() {
             Gilt sofort für neue Anfragen. Faustregel: Opus für den Prozess-Entwurf, Sonnet für
             Auswertungen, Haiku für den Sprachmodus — so bleiben die Kosten im Rahmen, ohne
             Qualität dort zu verlieren, wo sie zählt.
+          </div>
+        </ActionForm>
+      </Card>
+
+      <Card title="Shopify-Anbindung (lesen oder schreiben)">
+        <ActionForm action={saveShopifyModus}>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <input type="radio" name="modus" value="lesen" defaultChecked={shopifyModus === 'lesen'} />
+              <span>
+                <strong>Nur lesen (Staging)</strong> — Bestellungen, Kunden und Produkte kommen
+                herein; Fulfillments, Tracking, Bestände, Produktänderungen und Webhook-Registrierung
+                gehen nicht hinaus. Der Shop bleibt beim Altsystem.
+              </span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="radio"
+                name="modus"
+                value="schreiben"
+                defaultChecked={shopifyModus === 'schreiben'}
+              />
+              <span>
+                <strong>Schreiben (scharf)</strong> — KRNL meldet Fulfillments mit Tracking, Bestände
+                und Produkte an den Shop zurück. Ab dem Stichtag.
+              </span>
+            </label>
+          </div>
+          <div className="row">
+            <div className="shrink field">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+          <div className="notice info" style={{ marginBottom: 0 }}>
+            Gilt sofort, kein Redeploy nötig. Schreibjobs aus der Lesezeit werden als
+            „übersprungen" abgehakt und laufen nach dem Umschalten nicht nach — nach dem Scharfschalten
+            einmal „Mit Shopify abgleichen" (Bestand) und Webhooks registrieren.
           </div>
         </ActionForm>
       </Card>

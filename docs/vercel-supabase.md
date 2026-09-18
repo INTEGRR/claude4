@@ -95,6 +95,9 @@ INSTANZ_REGION           Anzeige in der Ersteinrichtung, z. B. "EU-Central · Fr
 ```
 
 Die Startseite `/integrationen` zeigt später, welche Anbindungen scharf sind.
+Shopify startet mit Zugangsdaten im Modus **nur lesen** (Staging: Bestellungen
+kommen herein, nichts geht hinaus); scharf schaltet ein Admin unter
+Einstellungen → Shopify-Anbindung — siehe module/integrationen.md.
 
 ---
 

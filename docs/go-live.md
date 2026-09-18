@@ -14,7 +14,8 @@ sein müssen.
 
 Stand: 2026-09-18. Erledigt seit Aufstellung: Region Frankfurt,
 Sicherheits-Header, Login-Drossel, Cron fail-closed, Tracking über
-Parcel DE Tracking (Entscheidungslog 2026-09-18).
+Parcel DE Tracking, Shopify-Lesemodus als Staging-Schalter
+(Entscheidungslog 2026-09-18).
 
 ## 1. Geheimnisse und Zugänge (Betreiber, Vercel → Production)
 
@@ -44,11 +45,17 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
   - Voraussetzung: „Parcel DE Tracking" in der Produktions-App steht auf
     aktiv, nicht mehr auf pending. Bis dahin meldet der Tracking-Lauf
     einen Anmeldefehler im Ergebnis und sonst nichts.
-- [ ] **Shopify**: `SHOPIFY_SHOP_DOMAIN`, `SHOPIFY_CLIENT_ID`,
-      `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_WEBHOOK_SECRET` — siehe
+- [ ] **Shopify**: App im Live-Shop anlegen (Dev Dashboard, Scopes laut
+      [lokal-starten.md](lokal-starten.md)), dann `SHOPIFY_SHOP_DOMAIN`,
+      `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`,
+      `SHOPIFY_WEBHOOK_SECRET` — siehe
       [api-referenz/shopify.md](api-referenz/shopify.md); Scope
       `read_all_orders`, falls der Backfill weiter als 60 Tage zurück
-      soll.
+      soll. **Gefahrlos vor dem Stichtag:** die Anbindung startet im
+      Modus „nur lesen" (Staging) — Bestellungen und Produkte kommen
+      herein, nichts geht hinaus, bis ein Admin unter Einstellungen →
+      Shopify-Anbindung auf „schreiben" stellt
+      ([module/integrationen.md](module/integrationen.md)).
 - [ ] **Mail**: `RESEND_API_KEY`, `MAIL_FROM` mit verifizierter Domain,
       `REGISTRIERUNG_MAIL`.
 - [ ] **KI** (optional): `ANTHROPIC_API_KEY`; `OPENAI_API_KEY` nur, wenn
@@ -109,9 +116,12 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 
 ## 6. Shopify (im Runbook, Schritt 7)
 
-- [ ] Produkt-Import gegen Prod **vor** den Webhooks (SKU-Match setzt
-      `shopify_variant_id`).
-- [ ] Webhooks registrieren, Order-Backfill nur ab Stichtag.
+- [ ] Staging: Produkt-Import gegen Prod im Lesemodus (SKU-Match setzt
+      `shopify_variant_id`), Bestellungen per 15-Minuten-Abgleich
+      mitlesen und mit Odoo vergleichen.
+- [ ] Stichtag: Shopify-Modus auf **schreiben** stellen, dann Webhooks
+      registrieren, einmal „Mit Shopify abgleichen" (Bestand), Order-
+      Backfill nur ab Stichtag.
 
 ## 7. Probelauf und Stichtag
 

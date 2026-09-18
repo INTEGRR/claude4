@@ -2,6 +2,34 @@
 
 API-Referenz: [docs/api-referenz/shopify.md](../api-referenz/shopify.md) · Versand/DHL: [docs/module/versand.md](versand.md)
 
+## Shopify — Lese-/Schreibmodus (Staging-Schalter)
+
+Die Anbindung hat einen Betreiber-Schalter `settings.shopify.modus`
+(Einstellungen → „Shopify-Anbindung", Registry-Aktion
+`einstellungen.shopify_modus_setzen`, nur Admin, auditiert):
+
+- **lesen** (Standard, auch ohne Eintrag): KRNL hängt am Live-Shop und
+  holt Bestellungen, Kunden und Produkte — Webhook-Empfang, 15-Minuten-
+  Abgleich, Importe. Aber **nichts geht hinaus**: keine Fulfillments,
+  kein Tracking, keine Bestände, keine Produktänderungen, keine
+  Webhook-Registrierung. Das ist der Parallelbetrieb neben Odoo.
+- **schreiben**: alle Rückmeldungen scharf. Ab dem Stichtag.
+
+Durchgesetzt wird das an **einer** Naht: `shopifyGraphQL()` weist jede
+GraphQL-Mutation mit `ShopifyNurLesen` ab (Erkennung in
+`shopify-modus.ts`) — vor der Konfigurationsprüfung, hinter dem Fake
+(der Fake hat keinen Shop zu schützen). Die Outbox hakt einen so
+abgewiesenen Job als **erledigt mit „Übersprungen: …"** ab — nicht als
+fehlgeschlagen, und er läuft nach dem Umschalten **nicht nach**: Eine
+Bestellung aus der Lesezeit ist bis dahin im Altsystem erledigt, ein
+verspätetes Fulfillment würde den Kunden doppelt benachrichtigen. Am
+Beleg steht ein Info-Ereignis, im Job-Monitor das Ergebnis, im
+Transaktionsprotokoll ein Eintrag mit `ok = false`. Nach dem
+Scharfschalten: einmal „Mit Shopify abgleichen" (Bestand) und Webhooks
+registrieren. Der Wächter hängt am Dokumentanfang (`mutation …`); der
+Token-Tausch (Client-Credentials) ist keine Mutation und läuft immer.
+Entscheidungslog 2026-09-18.
+
 ## Shopify — Order-Import
 
 **Setup (einmalig, manuell):** Custom App im Shopify Dev Dashboard mit Scopes `read_orders`, `write_orders`, `write_merchant_managed_fulfillment_orders`; Admin-API-Token (`shpat_…`) + Webhook-Secret als Env-Vars. Webhook-Subscriptions per `webhookSubscriptionCreate` auf: `orders/create`, `orders/paid`, `orders/updated`, `orders/cancelled` → `https://<app>/api/webhooks/shopify`.

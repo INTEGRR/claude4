@@ -1,6 +1,9 @@
 import 'server-only'
+import { sql } from '@/db/client'
+import { istMutation, shopifyModus } from './shopify-modus'
 
 export { verifyWebhookHmac } from './shopify-hmac'
+export { type ShopifyModus, shopifyModus } from './shopify-modus'
 
 /**
  * Shopify Admin API (GraphQL). Die REST-API ist Legacy; alles läuft über
@@ -117,6 +120,25 @@ export class ShopifyError extends Error {
   }
 }
 
+/**
+ * Die Anbindung steht auf „nur lesen" und eine Mutation wurde verlangt.
+ * Nicht wiederholbar — der Job-Runner hakt solche Jobs als übersprungen ab,
+ * statt sie stündlich gegen die Wand laufen zu lassen (jobs.ts).
+ */
+export class ShopifyNurLesen extends ShopifyError {
+  readonly operation: string
+
+  constructor(operation: string) {
+    super(
+      `Shopify steht auf „nur lesen" — ${operation} wurde nicht ausgeführt. ` +
+        'Umstellen: Einstellungen → Shopify-Anbindung.',
+      false,
+    )
+    this.name = 'ShopifyNurLesen'
+    this.operation = operation
+  }
+}
+
 interface GraphQLResponse<T> {
   data?: T
   errors?: { message: string; extensions?: { code?: string } }[]
@@ -136,6 +158,20 @@ export async function shopifyGraphQL<T>(
   if (process.env.SHOPIFY_FAKE === '1') {
     const { fakeShopifyGraphQL } = await import('./shopify-fake')
     return fakeShopifyGraphQL<T>(query, variables)
+  }
+
+  // Lese-/Schreibmodus: EINE Naht für alle Mutationen — Fulfillment,
+  // Tracking, Bestand, Produkte, Webhooks. Vor der Konfigurationsprüfung,
+  // damit der Wächter ohne Zugangsdaten und ohne Netz testbar ist; hinter
+  // dem Fake, weil der Fake keinen Shop hat, den es zu schützen gäbe.
+  if (istMutation(query) && (await shopifyModus(sql)) !== 'schreiben') {
+    const operation = operationName(query)
+    const { logTransaction } = await import('./transaktionen')
+    await logTransaction({
+      system: 'shopify', kind: `graphql:${operation}`, request: { variables },
+      ok: false, error: 'Übersprungen: Shopify steht auf „nur lesen"',
+    })
+    throw new ShopifyNurLesen(operation)
   }
 
   const c = shopifyConfig()

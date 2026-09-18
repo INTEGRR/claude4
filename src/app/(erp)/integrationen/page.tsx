@@ -5,7 +5,7 @@ import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
-import { shopifyConfigured } from '@/modules/integrationen/shopify'
+import { shopifyConfigured, shopifyModus } from '@/modules/integrationen/shopify'
 import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
@@ -240,6 +240,7 @@ export default async function IntegrationenPage() {
 
   const [syncState] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`
+  const modus = await shopifyModus(sql)
 
   // Druckbrücke: welche Agenten leben (letzter Abruf je Agent), und hängt
   // etwas fest?
@@ -349,7 +350,12 @@ export default async function IntegrationenPage() {
           value={<Verbindung ok={shopifyConfigured()} />}
           hint={
             <>
-              Letzter Abgleich:{' '}
+              {modus === 'lesen' ? (
+                <strong>Nur lesend (Staging)</strong>
+              ) : (
+                <>Schreibend (scharf)</>
+              )}
+              {' · '}Letzter Abgleich:{' '}
               <span className="mono">{syncState ? dateTime(syncState.value) : '—'}</span>
             </>
           }
@@ -411,6 +417,15 @@ export default async function IntegrationenPage() {
               <Link href="/integrationen/transaktionen?nur=fehler">zum Protokoll</Link>.
             </>
           )}
+        </div>
+      )}
+
+      {shopifyConfigured() && modus === 'lesen' && (
+        <div className="notice warn">
+          Shopify ist verbunden, steht aber auf <strong>nur lesen</strong>: Bestellungen, Kunden
+          und Produkte kommen herein, Fulfillments, Tracking, Bestände, Produktänderungen und
+          Webhook-Registrierung gehen nicht hinaus (Schreibjobs werden als übersprungen abgehakt).
+          Scharfschalten unter <Link href="/einstellungen">Einstellungen → Shopify-Anbindung</Link>.
         </div>
       )}
 

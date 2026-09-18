@@ -2,6 +2,7 @@ import 'server-only'
 import { sql } from '@/db/client'
 import {
   ShopifyError,
+  ShopifyNurLesen,
   addOrderTags,
   cancelOrder,
   createFulfillment,
@@ -297,6 +298,8 @@ const handlers = {
 export interface RunResult {
   ran: number
   succeeded: number
+  /** Schreibjobs, die wegen „Shopify nur lesen“ bewusst nicht liefen. */
+  uebersprungen: number
   failed: number
 }
 
@@ -347,6 +350,7 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
 
   let succeeded = 0
   let failed = 0
+  let uebersprungen = 0
 
   for (const job of jobs) {
     const handler = handlerFuer(job.kind)
@@ -368,6 +372,24 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
                 where id = ${job.id}`
       succeeded++
     } catch (err) {
+      if (err instanceof ShopifyNurLesen) {
+        // Staging: der Shop soll nicht beschrieben werden. Der Job ist damit
+        // erledigt, nicht gescheitert — er darf nach dem Umschalten NICHT
+        // nachlaufen (die Bestellung ist bis dahin im Altsystem erledigt).
+        // Sichtbar bleibt es am Beleg und im Job-Monitor.
+        uebersprungen++
+        await sql`update integration_jobs
+                  set status = 'done', last_result = ${`Übersprungen: ${err.message}`},
+                      last_error = null, dedupe_key = null
+                  where id = ${job.id}`
+        const origin = await originForJob(job.kind, job.payload)
+        if (origin) {
+          await sql`select log_event(${origin.model}, ${origin.id}, 'info',
+            ${`${job.kind} übersprungen — Shopify steht auf „nur lesen"`})`
+        }
+        continue
+      }
+
       failed++
       const message = err instanceof Error ? err.message : String(err)
       const permanent =
@@ -391,7 +413,7 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
     }
   }
 
-  return { ran: jobs.length, succeeded, failed }
+  return { ran: jobs.length, succeeded, failed, uebersprungen }
 }
 
 /** Stellt einen fehlgeschlagenen Job zur erneuten Ausführung ein. */

@@ -68,6 +68,29 @@ export async function druckbrueckeSetzen(
   }
 }
 
+/**
+ * Lese-/Schreibmodus der Shopify-Anbindung. Gilt sofort an der Naht
+ * shopifyGraphQL() — kein Redeploy, kein Neustart (shopify-modus.ts).
+ */
+export async function shopifyModusSetzen(
+  p: { modus: 'lesen' | 'schreiben' },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value)
+    values ('shopify', ${sql.json({ modus: p.modus })})
+    on conflict (key) do update set value =
+      settings.value || ${sql.json({ modus: p.modus })}::jsonb`
+
+  return {
+    text:
+      p.modus === 'lesen'
+        ? 'Shopify nur lesend — Bestellungen und Produkte kommen herein, nichts geht hinaus.'
+        : 'Shopify schreibend — Fulfillments, Tracking, Bestände und Produkte werden ab jetzt ' +
+          'zurückgemeldet. Bestand einmal per „Mit Shopify abgleichen" melden und Webhooks registrieren.',
+  }
+}
+
 export async function demodatenEinspielenAktion(
   _p: Record<string, never>,
   _ctx: AktionsKontext,
