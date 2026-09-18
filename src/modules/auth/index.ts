@@ -1,10 +1,17 @@
 import 'server-only'
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { type Area, type Role, canAccess, canWrite } from './permissions'
+import {
+  fehlversuchMerken,
+  fehlversucheLoeschen,
+  kennungHash,
+  loginGesperrt,
+  loginVersucheAufraeumen,
+} from './drossel'
 
 const scrypt = promisify(scryptCb) as (
   password: string,
@@ -48,7 +55,27 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-export async function login(email: string, password: string): Promise<User | null> {
+/** Ergebnis der Anmeldung: Benutzer, falsche Daten (null) oder zeitweise gesperrt. */
+export type LoginErgebnis = User | null | 'gesperrt'
+
+/** Absender-Pseudonym aus dem Proxy-Header — außerhalb einer Anfrage (Skripte) null. */
+async function absenderHash(): Promise<string | null> {
+  try {
+    const h = await headers()
+    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip')
+    return ip ? kennungHash(ip) : null
+  } catch {
+    return null
+  }
+}
+
+export async function login(email: string, password: string): Promise<LoginErgebnis> {
+  // Drossel VOR der Prüfung: ein gesperrtes Konto bekommt keine Antwort
+  // darauf, ob das Passwort gestimmt hätte (Entscheidungslog 2026-09-18).
+  const konto = kennungHash(email)
+  const absender = await absenderHash()
+  if (await loginGesperrt(sql, konto, absender)) return 'gesperrt'
+
   const [row] = await sql<
     { id: string; email: string; name: string; role: Role; befugnisse: string[]; password_hash: string }[]
   >`select id, email, name, role, befugnisse, password_hash from users
@@ -56,9 +83,13 @@ export async function login(email: string, password: string): Promise<User | nul
   if (!row) {
     // Gleichbleibende Antwortzeit, damit unbekannte Konten nicht auffallen.
     await scrypt(password, randomBytes(16), 64)
+    await fehlversuchMerken(sql, konto, absender)
     return null
   }
-  if (!(await verifyPassword(password, row.password_hash))) return null
+  if (!(await verifyPassword(password, row.password_hash))) {
+    await fehlversuchMerken(sql, konto, absender)
+    return null
+  }
 
   const token = randomBytes(32).toString('hex')
   await sql`
@@ -74,6 +105,7 @@ export async function login(email: string, password: string): Promise<User | nul
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   })
 
+  await fehlversucheLoeschen(sql, konto)
   return { id: row.id, email: row.email, name: row.name, role: row.role, befugnisse: row.befugnisse }
 }
 
@@ -137,4 +169,8 @@ export async function requireWrite(area: Area): Promise<User> {
 export async function pruneSessions(): Promise<number> {
   const rows = await sql`delete from sessions where expires_at < now() returning token`
   return rows.length
+}
+
+export async function pruneLoginVersuche(): Promise<number> {
+  return loginVersucheAufraeumen(sql)
 }

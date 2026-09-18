@@ -115,8 +115,12 @@ describe('Finanzen: Zahlungsregister', () => {
       await t`select pay_vendor_bill(${billId}, 'test')`
       const [bill] = await t<{ state: string }[]>`select state from vendor_bills where id = ${billId}`
       assert.equal(bill.state, 'paid')
+      // Nur die Zahlungen DIESES Vorgangs zählen — Seed-Daten (Demo-Anzahlung)
+      // dürfen die Summe nicht verfälschen.
       const [summe] = await t<{ s: number }[]>`
-        select coalesce(sum(betrag_eur), 0) as s from zahlungen where storniert_am is null`
+        select coalesce(sum(betrag_eur), 0) as s from zahlungen
+        where storniert_am is null
+          and (vendor_bill_id = ${billId} or zahlplan_rate_id = ${rate30.id})`
       assert.equal(Number(summe.s), 1190, 'Insgesamt fließt genau das Bestellbrutto')
     })
   })

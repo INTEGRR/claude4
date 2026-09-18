@@ -183,7 +183,8 @@ Cron nicht mehr:
 
 - `/api/webhooks/shopify` — prüft die HMAC-Signatur selbst und weist alles ohne
   gültige Signatur mit 401 ab.
-- `/api/cron/*` — abgesichert über `CRON_SECRET`.
+- `/api/cron/*` — abgesichert über `CRON_SECRET` (Pflicht auf Vercel — ohne
+  gesetztes Secret antwortet der Endpunkt mit 401).
 
 Die öffentliche Startseite `/start` wird von der Deployment Protection
 ebenfalls ausgesperrt — sie ist dann nur nach Vercel-Anmeldung sichtbar.

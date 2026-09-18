@@ -9,6 +9,47 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-18 — Sicherheitscheck vor dem Go-Live: Frankfurt, Header, Login-Drossel
+
+Auslöser: Vor der Ablösung von Odoo und Sendcloud ein vollständiger Blick
+darauf, was von KRNL ohne Anmeldung im Netz erreichbar ist. Befund der
+Live-Probe gegen die Produktions-URL: alle 24 API-Routen und 75 von 76
+Seiten weisen ohne Sitzung ab (401 bzw. Umleitung zu /login); öffentlich
+sind allein /start, /login und die gedrosselte Registrierung — gewollt.
+Die Supabase Data API gibt mit dem anon-Schlüssel keinen Datensatz her
+(Schema-Rechte seit 0074 entzogen). Kein Geheimnis im Repository.
+
+Vier Dinge waren trotzdem nicht in Ordnung, alle behoben:
+
+- **Region.** `vercel.json` setzte keine Region, Vercel legt neue Projekte
+  auf Washington D.C. — die App lief in den USA und sprach mit der
+  Datenbank in Frankfurt (`x-vercel-id: iad1`). Jetzt `regions: ["fra1"]`:
+  Verarbeitung und Speicherung beide in Frankfurt, keine Atlantik-Latenz
+  je Datenbankabfrage.
+- **Header.** Kein X-Frame-Options, kein nosniff, kein Referrer-Policy;
+  jetzt gesetzt (next.config.ts), dazu `poweredByHeader: false`. Bewusst
+  keine Content-Security-Policy — die braucht bei react-pdf und React Flow
+  eine gepflegte Ausnahmeliste und ist ein eigenes Vorhaben.
+- **Login-Drossel (0079).** Die Anmeldung hatte keine Begrenzung von
+  Fehlversuchen; scrypt schützt die Hashes, nicht vor Durchprobieren.
+  Jetzt: 5 Fehlversuche je Konto oder 30 je Absender in 15 Minuten
+  sperren, pseudonym gespeichert (Hash mit SESSION_SECRET), Prüfung vor
+  der Passwortprüfung, Aufräumen im Housekeeping.
+- **Cron fail-closed.** `/api/cron` war ohne gesetztes CRON_SECRET offen
+  (auf Prod ist es gesetzt — aber „zufällig gesichert" reicht nicht). Auf
+  Vercel antwortet der Endpunkt ohne Secret jetzt mit 401; der Vergleich
+  ist zeitkonstant.
+
+Dazu 0080: fester `search_path` für alle Routinen in public — der
+Supabase-Linter meldete 166 Funktionen; ausnutzbar war das ohne anonymen
+Zugang nicht, gehärtet ist es jetzt trotzdem.
+
+Bewusst NICHT geändert: kein zweiter Faktor in der Anwendung — die
+Empfehlung bleibt ein Zugangsschutz vor der App (Cloudflare Access),
+dokumentiert in betrieb.md; und die Data API bei Supabase bleibt
+Betreiber-Aufgabe (Dashboard abschalten), der Code kann sie nicht
+abschalten. Details der Prüfung: docs/betrieb.md, Modul-Doku Rollen.
+
 ## 2026-08-29 — KI-Anlage-Katalog vollständig aufgelöst
 
 Der Plan vom 2026-08-27 ist umgesetzt: `ki/aktionen.ts` und

@@ -63,6 +63,8 @@ Wenn der Komfort einer verwalteten Plattform (Vercel) gewünscht ist:
     gültige Signatur gibt es 401. Kein Datenabfluss möglich, der Endpunkt
     speichert nur.
   - `/api/cron/*` — abgesichert über `CRON_SECRET` im Authorization-Header.
+    Auf Vercel ist das Secret **Pflicht**: fehlt es, antwortet der Endpunkt
+    mit 401 statt offen zu stehen (im Docker-Betrieb hinter VPN optional).
 - Datenbank bleibt privat (Supabase mit eingeschränkten Netzwerkregeln).
 
 **Konsequenz:** Bestellungen kommen in Sekunden an. Dafür existieren zwei

@@ -12,6 +12,7 @@ async function signIn(formData: FormData) {
   const password = String(formData.get('password') ?? '')
 
   const user = await login(email, password)
+  if (user === 'gesperrt') redirect('/login?fehler=gesperrt')
   if (!user) redirect('/login?fehler=1')
   redirect('/')
 }
@@ -45,9 +46,13 @@ export default async function LoginPage({
         <div className="card">
           <header>Anmelden</header>
           <div className="body">
-            {params.fehler && (
+            {params.fehler === 'gesperrt' ? (
+              <div className="notice danger">
+                Zu viele Fehlversuche — die Anmeldung ist für dieses Konto 15 Minuten gesperrt.
+              </div>
+            ) : params.fehler ? (
               <div className="notice danger">E-Mail-Adresse oder Passwort ist falsch.</div>
-            )}
+            ) : null}
             {count === 0 && (
               <div className="notice warn">
                 Es existiert noch kein Benutzer. Lege einen an mit:

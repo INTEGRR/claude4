@@ -25,6 +25,18 @@ Rolle ändern, deaktivieren (beendet laufende Sitzungen), Passwort
 zurücksetzen. Der letzte aktive Administrator lässt sich weder herabstufen
 noch deaktivieren.
 
+### Anmeldung und Login-Drossel
+
+Passwörter liegen als scrypt-Hash mit Salz in `users`, Sitzungen als
+SHA-256-Hash des Cookie-Werts in `sessions` (30 Tage, `httpOnly`, `secure`,
+`sameSite=lax`). Unbekannte Konten kosten dieselbe Antwortzeit wie falsche
+Passwörter. Weil die Anmeldung an einer öffentlichen URL hängt, gibt es seit
+0079 eine **Drossel**: nach 5 Fehlversuchen je Konto oder 30 je Absender in
+15 Minuten ist die Anmeldung gesperrt (Meldung im Formular, Prüfung VOR der
+Passwortprüfung). Gespeichert wird nur ein Hash aus Konto bzw. IP mit
+`SESSION_SECRET` — kein Klartext; der Housekeeping-Cron räumt nach einem
+Tag ab. Die Tabelle `login_versuche` steht auf der KI-Sperrliste.
+
 ## Kommentare an jedem Datensatz
 
 Jede Detailseite (Verkauf, Einkauf, Rechnung, Fertigung, Stückliste,

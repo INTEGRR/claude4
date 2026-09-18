@@ -1,10 +1,11 @@
+import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen/import'
 import { runDueJobs } from '@/modules/integrationen/jobs'
 import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
-import { pruneSessions } from '@/modules/auth'
+import { pruneLoginVersuche, pruneSessions } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
 
@@ -22,9 +23,16 @@ export const maxDuration = 60
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
+  // Auf Vercel ist der Endpunkt öffentlich erreichbar — ohne CRON_SECRET
+  // bleibt er ZU, statt still offen zu stehen. Im Docker-Betrieb (hinter
+  // VPN, Aufruf vom Host) ist das Secret optional, siehe betrieb.md.
+  if (!secret && process.env.VERCEL) {
+    return NextResponse.json({ error: 'CRON_SECRET fehlt' }, { status: 401 })
+  }
   if (secret) {
-    const auth = request.headers.get('authorization')
-    if (auth !== `Bearer ${secret}`) {
+    const geliefert = Buffer.from(request.headers.get('authorization') ?? '')
+    const erwartet = Buffer.from(`Bearer ${secret}`)
+    if (geliefert.length !== erwartet.length || !timingSafeEqual(geliefert, erwartet)) {
       return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 401 })
     }
   }
@@ -63,6 +71,7 @@ export async function GET(request: Request) {
         return NextResponse.json({
           task,
           sessions: await pruneSessions(),
+          logins: await pruneLoginVersuche(),
           tracking: await pruneTrackingData(),
           monitor: await pruneMonitorData(),
           tuev: 'eingereiht',

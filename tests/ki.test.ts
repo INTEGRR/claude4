@@ -411,6 +411,7 @@ describe('KI: Schema-Doku wächst mit dem Schema (Wächter)', () => {
     'schema_migrations',        // Runner-Buchhaltung, kein Fachinhalt
     'users',                    // Passworthashes — per Sperrliste blockiert
     'sessions',                 // Sitzungstokens — per Sperrliste blockiert
+    'login_versuche',           // Fehlversuchs-Hashes der Login-Drossel — per Sperrliste blockiert
     'settings',                 // API-Schlüssel möglich — per Sperrliste blockiert
     'integration_jobs',         // Outbox mit Payloads — per Sperrliste blockiert
     'sprachprotokolle',         // Gesprächsmitschnitte — per Sperrliste blockiert
