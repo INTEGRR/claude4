@@ -4,6 +4,7 @@ import path from 'node:path'
 import { sql } from '@/db/client'
 import {
   DhlError,
+  type TrackingResult,
   type ZollDaten,
   cancelShipment,
   createReturnLabel,
@@ -12,8 +13,9 @@ import {
   dhlConfigured,
   productForCountry,
   toAlpha3,
-  trackShipment,
+  trackShipments,
   trackingUrl,
+  unifiedTracking,
 } from './dhl'
 import { brauchtZoll } from './dhl-codes'
 import { billingNumberForProduct } from './regeln-logik'
@@ -369,50 +371,64 @@ export async function queueFulfillmentForPicking(pickingId: string): Promise<voi
 }
 
 /**
- * Tracking-Abgleich. Achtung DHL-Limit: initial 250 Abfragen/Tag und eine
- * Abfrage alle 5 Sekunden - deshalb kleine Stapel und Pause zwischen Abfragen.
+ * Tracking-Abgleich über die Sammelabfrage (Parcel DE Tracking: 20 Sendungen
+ * je Aufruf, 1.000 Aufrufe je Tag). Älteste Prüfung zuerst, jede Sendung
+ * höchstens alle zwei Stunden. Mit DHL_TRACKING_API=unified läuft die
+ * Einzelabfrage mit 5,5 s Pause — dann bleibt der Stapel klein, sonst
+ * überschreitet der Cron-Aufruf die Laufzeitgrenze der Plattform.
+ *
+ * Ein Fehler der Abfrage (Limit, Anmeldung) bricht den Lauf ab; alle
+ * Sendungen des Laufs gelten als geprüft, damit nicht jede Stunde derselbe
+ * Stapel dieselbe Fehlermeldung erzeugt, und der Grund steht im Ergebnis.
  */
-export async function syncTracking(limit = 20): Promise<{ checked: number; updated: number }> {
+export async function syncTracking(
+  limit?: number,
+): Promise<{ checked: number; updated: number; fehler?: string }> {
+  const stapel = limit ?? (unifiedTracking() ? 20 : 100)
   const shipments = await sql<{ id: string; shipment_number: string; state: string }[]>`
     select id, shipment_number, state from shipments
     where state in ('created', 'manifested', 'transit')
       and shipment_number is not null
       and (last_tracking_check is null or last_tracking_check < now() - interval '2 hours')
     order by last_tracking_check nulls first
-    limit ${limit}`
+    limit ${stapel}`
+  if (shipments.length === 0) return { checked: 0, updated: 0 }
+
+  let lagen: Map<string, TrackingResult | null>
+  try {
+    lagen = await trackShipments(shipments.map((s) => s.shipment_number))
+  } catch (err) {
+    await sql`update shipments set last_tracking_check = now()
+      where id in ${sql(shipments.map((s) => s.id))}`
+    const fehler = err instanceof DhlError ? err.message : 'Tracking-Abfrage fehlgeschlagen'
+    return { checked: shipments.length, updated: 0, fehler }
+  }
 
   let updated = 0
-  for (const [index, shipment] of shipments.entries()) {
-    if (index > 0) await new Promise((r) => setTimeout(r, 5500))
-
-    try {
-      const result = await trackShipment(shipment.shipment_number)
-      if (!result) {
-        await sql`update shipments set last_tracking_check = now() where id = ${shipment.id}`
-        continue
-      }
-
-      const state =
-        result.status === 'delivered'
-          ? 'delivered'
-          : result.status === 'transit'
-            ? 'transit'
-            : result.status === 'failure'
-              ? 'failure'
-              : shipment.state
-
-      await sql`
-        update shipments set
-          state = ${state}::shipment_state,
-          last_tracking_event = ${sql.json({ ...result })},
-          last_tracking_check = now(),
-          delivered_at = case when ${result.status} = 'delivered' then now() else delivered_at end
-        where id = ${shipment.id}`
-      if (state !== shipment.state) updated++
-    } catch (err) {
-      if (err instanceof DhlError && err.status === 429) break // Limit erreicht
+  for (const shipment of shipments) {
+    const result = lagen.get(shipment.shipment_number) ?? null
+    if (!result) {
       await sql`update shipments set last_tracking_check = now() where id = ${shipment.id}`
+      continue
     }
+
+    const state =
+      result.status === 'delivered'
+        ? 'delivered'
+        : result.status === 'transit'
+          ? 'transit'
+          : result.status === 'failure'
+            ? 'failure'
+            : shipment.state
+
+    await sql`
+      update shipments set
+        state = ${state}::shipment_state,
+        last_tracking_event = ${sql.json({ ...result })},
+        last_tracking_check = now(),
+        delivered_at = case when ${result.status} = 'delivered' then now() else delivered_at end
+      where id = ${shipment.id}`
+    if (state !== shipment.state) updated++
   }
 
   return { checked: shipments.length, updated }

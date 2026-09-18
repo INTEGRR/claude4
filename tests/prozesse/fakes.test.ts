@@ -86,6 +86,9 @@ describe('Fake-Weichen', () => {
 
     const lage = await dhl.trackShipment(sendung.shipmentNumber)
     assert.equal(lage?.status, 'transit')
+    const lagen = await dhl.trackShipments([sendung.shipmentNumber, '00340434161094042557'])
+    assert.equal(lagen.size, 2, 'die Sammelabfrage antwortet je Nummer')
+    assert.equal(lagen.get('00340434161094042557')?.status, 'transit')
 
     const retoure = await dhl.createReturnLabel(
       { name: 'Kunde', street: 'Gasse', houseNumber: '3', zip: '50667', city: 'Köln', country: 'DEU' },

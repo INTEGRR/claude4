@@ -39,16 +39,20 @@ REST-Nachfolger des alten SOAP-„Geschäftskundenversands" (die Alt-Schnittstel
 
 ## 3. Tracking
 
-**a) Shipment Tracking – Unified API** (einfach, konzernweit):
+**a) Shipment Tracking – Unified API** (einfach, konzernweit; in KRNL nur noch per Umschalter):
 - `GET https://api-eu.dhl.com/track/shipments?trackingNumber=…&service=parcel-de&requesterCountryCode=DE&language=de`
 - Auth: nur Header `DHL-API-Key` (separate Freischaltung der API im Portal nötig)
 - Response: `shipments[]` mit `status` und `events[]`; normalisierter `status.statusCode` ∈ **`pre-transit` | `transit` | `delivered` | `failure` | `unknown`** (plus Parcel-DE-Rohcodes, z. B. „ZU" = zugestellt)
 - **Rate Limit initial: 250 Calls/Tag, max. 1 Call/5 s** — für Produktion Upgrade beantragen. Trackingdaten müssen 30 Tage nach Zustellung gelöscht werden (Vertragsauflage).
 - **Push statt Polling:** „Shipment Tracking – Unified **Push** API" (Webhooks je Sendungsnummer; Zugang per Antrag; Endpoint braucht SSL + HTTP 200 < 5 s; Retry nach 1 h/6 h, dann Deaktivierung).
 
-**b) Parcel DE Shipment Tracking API** (Geschäftskunden-Variante, volle Daten):
-- `GET https://api-eu.dhl.com/parcel/de/tracking/v0/shipments`; Auth: `DHL-API-Key` + GKP-User; bis 20 Sendungsnummern je Call, inkl. POD-Unterschrift
-- Limits: 1.000 Abfragen und 10.000 Sendungen/Tag, 3 Requests/s
+**b) Parcel DE Shipment Tracking API** (Geschäftskunden-Variante, volle Daten) — **das nutzt KRNL** (seit 2026-09-18, vorher a):
+- `GET https://api-eu.dhl.com/parcel/de/tracking/v0/shipments?xml=<URL-kodiertes XML>`; Auth: Header `DHL-API-Key` **plus** GKP-Benutzer und Passwort **im XML** (`<data appname="…" password="…" request="d-get-piece-detail" language-code="de" piece-code="a;b;c"/>`) — die URL enthält also das Passwort und darf nie protokolliert werden
+- bis 20 Sendungsnummern je Call (Semikolon-Liste), inkl. POD-Unterschrift; Limits: 1.000 Abfragen und 10.000 Sendungen/Tag, 3 Requests/s
+- Antwort ist XML: `<data name="piece-shipment-list" code="0">` → je Sendung `<data name="pieceshipment" error-status piece-code status status-timestamp delivery-event-flag ice ric standard-event-code>` → je Ereignis `<data name="pieceevent" event-timestamp="dd.MM.yyyy HH:mm" event-status event-location ice ric standard-event-code/>`. Rückgabecodes: 0 ok, 5 Anmeldung fehlgeschlagen, 100/200 keine Daten; `error-status` ≠ 0 je Sendung = (noch) keine Sendungsdaten
+- Statusableitung in KRNL (`dhl-tracking-xml.ts`): `delivery-event-flag=1`, ice `DLVRD` oder Standardcode `ZU` → `delivered`; ice `NTDLV/RTNSH/RTNDL/DLNTF/NTDLB` → `failure`; keine Ereignisse oder ice `ULFMV` (nur Auftragsdaten übermittelt) → `pre-transit`; sonst `transit`
+- Sandbox: `https://api-sandbox.dhl.com` mit den Test-Zugangsdaten `zt12345` / `geheim` (Variablen `DHL_TRACKING_USER`/`DHL_TRACKING_PASSWORD`); Produktion: derselbe GKP-Systembenutzer wie beim Labeldruck
+- Umschalter zurück auf a): `DHL_TRACKING_API=unified` (Einzelabfragen mit 5,5 s Pause, kleiner Stapel)
 
 ## 4. Retouren: **Parcel DE Returns API**
 

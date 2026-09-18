@@ -59,6 +59,19 @@ export async function fakeTrackShipment(shipmentNumber: string): Promise<Trackin
   }
 }
 
+/** Sammelabfrage: jede Nummer gilt als unterwegs — ein Protokolleintrag je Aufruf. */
+export async function fakeTrackShipments(
+  shipmentNumbers: string[],
+): Promise<Map<string, TrackingResult | null>> {
+  await protokoll('tracking', `${shipmentNumbers.length} Sendungen`, { status: 'transit' })
+  return new Map(
+    shipmentNumbers.map((nummer) => [
+      nummer,
+      { status: 'transit' as const, description: 'Fake: Sendung im Zustellfahrzeug', timestamp: null },
+    ]),
+  )
+}
+
 export async function fakeCreateReturnLabel(
   customer: DhlAddress,
   reference: string,

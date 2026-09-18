@@ -123,7 +123,11 @@ Weitere Punkte:
   umstellen — DHL hält Labels nur rund drei Tage vor.
 - **Datenbank-Backups** einschalten (Supabase: PITR).
 - **DHL-Systembenutzer:** Passwort läuft nach 365 Tagen ab — Erinnerung setzen.
-- **DHL-Tracking-Limit:** Standard sind 250 Abfragen pro Tag. Für den
-  Produktivbetrieb frühzeitig eine Erhöhung beantragen.
+- **DHL-Tracking:** läuft über die Parcel DE Tracking API (im Developer-
+  Portal für die Produktions-App freischalten lassen — Status „pending"
+  heißt: DHL prüft noch). Limit 1.000 Aufrufe à 20 Sendungen pro Tag;
+  bei stündlichem Sync reicht das für rund 2.000 offene Sendungen.
+  Nur der Rückfall `DHL_TRACKING_API=unified` hat die enge Grenze von
+  250 Abfragen pro Tag.
 - **Shopify-Zugriff:** Orders älter als 60 Tage brauchen den zusätzlichen Scope
   `read_all_orders`.

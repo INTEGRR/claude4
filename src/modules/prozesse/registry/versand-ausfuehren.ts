@@ -146,8 +146,9 @@ export async function labelStornieren(
 }
 
 export async function trackingAktualisieren(): Promise<AktionsErgebnis> {
-  const r = await syncTracking(10)
-  return { text: `${r.checked} Sendung(en) geprüft, ${r.updated} aktualisiert.` }
+  const r = await syncTracking(20)
+  const text = `${r.checked} Sendung(en) geprüft, ${r.updated} aktualisiert.`
+  return { text: r.fehler ? `${text} Abbruch: ${r.fehler}` : text }
 }
 
 /** Höchstzahl je Massendruck-Lauf — DHL-Aufrufe laufen nacheinander. */

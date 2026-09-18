@@ -1,5 +1,11 @@
 import 'server-only'
 import { productForCountry, toAlpha3, trackingUrl } from './dhl-codes'
+import {
+  MAX_SENDUNGEN_JE_AUFRUF,
+  parseZtAntwort,
+  trackingStatusAus,
+  ztAnfrageXml,
+} from './dhl-tracking-xml'
 
 export { productForCountry, toAlpha3, trackingUrl }
 
@@ -378,8 +384,11 @@ export interface TrackingResult {
 }
 
 /**
- * Shipment Tracking - Unified API. Achtung Rate Limit: initial 250 Abfragen
- * pro Tag und max. 1 Abfrage alle 5 Sekunden.
+ * Einzelabfrage über die konzernweite „Shipment Tracking – Unified API".
+ * Nur noch der Umschalter `DHL_TRACKING_API=unified` (oder ein direkter
+ * Aufruf) landet hier — der Sync nutzt trackShipments() und damit die
+ * Geschäftskunden-API. Rate Limit der Unified API: initial 250 Abfragen pro
+ * Tag und max. 1 Abfrage alle 5 Sekunden.
  */
 export async function trackShipment(shipmentNumber: string): Promise<TrackingResult | null> {
   if (process.env.DHL_FAKE === '1') {
@@ -404,7 +413,7 @@ export async function trackShipment(shipmentNumber: string): Promise<TrackingRes
   }
   if (res.status === 429) {
     await logTrack(false, 'Tracking-Limit erreicht')
-    throw new DhlError('DHL-Tracking-Limit erreicht (250 Abfragen/Tag, 1 alle 5 s)', 429)
+    throw new DhlError('DHL-Tracking-Limit erreicht (Unified API: 250 Abfragen/Tag, 1 alle 5 s)', 429)
   }
   if (!res.ok) {
     await logTrack(false, `Tracking fehlgeschlagen (${res.status})`)
@@ -426,6 +435,115 @@ export async function trackShipment(shipmentNumber: string): Promise<TrackingRes
     description: status.description ?? status.status ?? '',
     timestamp: status.timestamp ?? null,
   }
+}
+
+/** Unified statt Parcel DE Tracking — nur auf ausdrücklichen Wunsch. */
+export function unifiedTracking(): boolean {
+  return process.env.DHL_TRACKING_API === 'unified'
+}
+
+/**
+ * Sammelabfrage — der Weg für den Tracking-Sync. Standard ist die
+ * Geschäftskunden-API „Parcel DE Tracking" (bis 20 Sendungen je Aufruf,
+ * 1.000 Aufrufe und 10.000 Sendungen je Tag, 3 Aufrufe je Sekunde); mit
+ * DHL_TRACKING_API=unified läuft stattdessen die Einzelabfrage in Schleife
+ * (5,5 s Pause), mit DHL_FAKE=1 der deterministische Fake.
+ *
+ * Ergebnis: je angefragter Nummer ein Eintrag — TrackingResult oder null
+ * („noch keine Sendungsdaten"). Fehler, die die ganze Abfrage betreffen
+ * (Limit, Anmeldung, HTTP-Fehler), werfen DhlError; was bis dahin
+ * beantwortet war, verfällt — der Aufrufer fragt beim nächsten Lauf neu.
+ */
+export async function trackShipments(
+  shipmentNumbers: string[],
+): Promise<Map<string, TrackingResult | null>> {
+  const ergebnis = new Map<string, TrackingResult | null>()
+  if (shipmentNumbers.length === 0) return ergebnis
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeTrackShipments(shipmentNumbers)
+  }
+  if (unifiedTracking()) {
+    for (const [index, nummer] of shipmentNumbers.entries()) {
+      if (index > 0) await new Promise((r) => setTimeout(r, 5500))
+      ergebnis.set(nummer, await trackShipment(nummer))
+    }
+    return ergebnis
+  }
+
+  const c = dhlConfig()
+  // Die Sandbox der Tracking-API hat eigene Zugangsdaten (zt12345/geheim);
+  // in Produktion ist es derselbe GKP-Systembenutzer wie beim Labeldruck.
+  const benutzer = process.env.DHL_TRACKING_USER || c.user
+  const passwort = process.env.DHL_TRACKING_PASSWORD || c.password
+  for (let i = 0; i < shipmentNumbers.length; i += MAX_SENDUNGEN_JE_AUFRUF) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 400)) // 3 Aufrufe/s
+    const stapel = shipmentNumbers.slice(i, i + MAX_SENDUNGEN_JE_AUFRUF)
+    for (const [nummer, lage] of await parcelDeTracking(c, benutzer, passwort, stapel)) {
+      ergebnis.set(nummer, lage)
+    }
+  }
+  return ergebnis
+}
+
+/** Ein Aufruf der Parcel DE Tracking API für höchstens 20 Sendungen. */
+async function parcelDeTracking(
+  c: DhlConfig,
+  benutzer: string,
+  passwort: string,
+  stapel: string[],
+): Promise<Map<string, TrackingResult | null>> {
+  const start = Date.now()
+  // Anmeldung UND Sendungsnummern stecken im XML im Query-Parameter — die
+  // URL enthält also das GKP-Passwort und darf nie ins Protokoll.
+  const xml = ztAnfrageXml({ benutzer, passwort, sendungsnummern: stapel })
+  const res = await fetch(
+    `${c.base}/parcel/de/tracking/v0/shipments?xml=${encodeURIComponent(xml)}`,
+    { headers: { 'DHL-API-Key': c.apiKey } },
+  )
+  const text = await res.text()
+  const log = (ok: boolean, error?: string) =>
+    protokoll({
+      kind: 'tracking',
+      reference: stapel.length === 1 ? stapel[0] : `${stapel.length} Sendungen`,
+      request: { sendungen: stapel },
+      ok, statusCode: res.status, error, durationMs: Date.now() - start,
+    })
+
+  if (res.status === 429) {
+    await log(false, 'Tracking-Limit erreicht')
+    throw new DhlError('DHL-Tracking-Limit erreicht (1.000 Aufrufe/Tag, 3 je Sekunde)', 429)
+  }
+  if (!res.ok) {
+    await log(false, `Tracking fehlgeschlagen (${res.status})`)
+    throw new DhlError(`Tracking fehlgeschlagen (${res.status})`, res.status, text.slice(0, 500))
+  }
+
+  const antwort = parseZtAntwort(text)
+  if (antwort.code === 5) {
+    await log(false, 'Anmeldung abgelehnt (DHL-Code 5)')
+    throw new DhlError(
+      'Tracking-Anmeldung abgelehnt — GKP-Benutzer und Passwort prüfen (DHL_GKP_USER bzw. DHL_TRACKING_USER)',
+      401,
+    )
+  }
+
+  const ergebnis = new Map<string, TrackingResult | null>()
+  for (const nummer of stapel) ergebnis.set(nummer, null)
+  if (antwort.code === 100 || antwort.code === 200) {
+    // Keine Daten zu keiner der Nummern — typisch direkt nach dem Labeldruck.
+    await log(true, 'Noch keine Sendungsdaten')
+    return ergebnis
+  }
+  if (antwort.code !== 0) {
+    await log(false, `DHL-Rückgabecode ${antwort.code}`)
+    throw new DhlError(`Tracking fehlgeschlagen (DHL-Code ${antwort.code})`, res.status, antwort.code)
+  }
+  for (const sendung of antwort.sendungen) {
+    const nummer = stapel.find((n) => n.trim() === sendung.pieceCode) ?? sendung.pieceCode
+    ergebnis.set(nummer, trackingStatusAus(sendung))
+  }
+  await log(true)
+  return ergebnis
 }
 
 // --- Retouren --------------------------------------------------------------

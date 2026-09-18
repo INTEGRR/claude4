@@ -241,8 +241,8 @@ created ──(Storno, nur vor Manifest)──▶ cancelled                └�
 
 ## Tracking-Sync
 
-- **Cron (stündlich):** alle Sendungen mit Status `created/manifested/transit` über die **Unified Tracking API** abfragen (`service=parcel-de`), Status + letztes Event speichern; `delivered` beendet den Sync.
-- **Rate-Limit-Budget:** Initial 250 Calls/Tag, 1 Call/5 s — Sync dros­selt sich selbst (Batching nach ältestem Sync zuerst); **Upgrade früh bei DHL beantragen**. Erweiterung: Unified **Push API** (Webhooks je Sendung) statt Polling, oder die Parcel-DE-Tracking-API (20 Sendungen/Call, 10.000/Tag).
+- **Cron (stündlich):** alle Sendungen mit Status `created/manifested/transit` (älteste Prüfung zuerst, je Sendung höchstens alle zwei Stunden) über die **Parcel DE Tracking API** als Sammelabfrage holen — 20 Sendungen je Aufruf, bis 100 je Lauf —, Status + letztes Ereignis speichern; `delivered` beendet den Sync. XML-Bau, Antwort-Parser und Statusableitung liegen rein und getestet in `dhl-tracking-xml.ts`, der HTTP-Aufruf in `trackShipments()` (dhl.ts).
+- **Rate-Limit-Budget:** 1.000 Aufrufe und 10.000 Sendungen je Tag, 3 Aufrufe je Sekunde (Sync pausiert 400 ms zwischen Stapeln) — bei stündlichem Lauf reicht das für rund 2.000 offene Sendungen ohne Erhöhung. Bricht DHL eine Abfrage ab (Limit, Anmeldung), gilt der ganze Stapel als geprüft und der Grund steht im Ergebnis des Laufs (`fehler`) bzw. im Aktionstext „Tracking aktualisieren". Rückfall auf die Unified Tracking API per `DHL_TRACKING_API=unified` (250 Aufrufe/Tag, 1 alle 5 s, Stapel 20). Erweiterung: Unified **Push API** (Webhooks je Sendung) statt Polling.
 - **Datenschutz-Auflage:** Trackingdaten 30 Tage nach Zustellung löschen (Cron bereinigt `last_tracking_event`).
 
 ## Shopify-Rückmeldung

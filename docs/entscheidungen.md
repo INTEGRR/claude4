@@ -9,6 +9,35 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-18 — Sendungsverfolgung über Parcel DE Tracking statt Unified API
+
+Auslöser: In der DHL-Produktions-App sind „Parcel DE Shipping", „Parcel DE
+Returns" und „Parcel DE Tracking" beantragt — die konzernweite „Shipment
+Tracking – Unified API", die der Sync bislang nutzte, ist dort gar nicht
+dabei. Der Tracking-Sync wäre in Produktion also mit 401 gestartet.
+
+Entscheidung: Der Sync fragt über die Geschäftskunden-API **Parcel DE
+Tracking** ab. Sie ist die für den Labeldruck-Vertrag vorgesehene
+Verfolgung, spricht mit demselben GKP-Systembenutzer und ist deutlich
+großzügiger: 20 Sendungen je Aufruf, 1.000 Aufrufe und 10.000 Sendungen
+je Tag statt 250 Einzelabfragen mit fünf Sekunden Pause. Für ANVIL heißt
+das: ein stündlicher Lauf mit bis zu 100 Sendungen kommt ohne Limit-
+Erhöhung aus, und der Cron braucht Sekunden statt Minuten.
+
+Umsetzung: Die API spricht XML in beide Richtungen (Anfrage als Query-
+Parameter, Anmeldung im XML). Bauen, Lesen und Statusableitung liegen als
+reines, netzfreies Modul `dhl-tracking-xml.ts` unter Test
+(`tests/dhl-tracking.test.ts`); der HTTP-Aufruf `trackShipments()` in
+dhl.ts stapelt zu 20, pausiert 400 ms (3 Aufrufe je Sekunde) und
+protokolliert nie die URL, weil sie das Passwort enthält. `syncTracking`
+macht eine Sammelabfrage statt der Einzelschleife und meldet einen
+DHL-Abbruch (Limit, Anmeldung) im Ergebnis, statt ihn zu schlucken.
+Unbekannte Ereigniscodes gelten als „unterwegs" — lieber einmal zu lange
+transit als ein falsches failure, das die Shop-Rückmeldung stoppt. Die
+Unified API bleibt als Rückfall (`DHL_TRACKING_API=unified`), falls DHL
+die Freischaltung verweigert. Doku: api-referenz/dhl.md §3, module/
+versand.md „Tracking-Sync", betrieb.md, .env.example.
+
 ## 2026-09-18 — Sicherheitscheck vor dem Go-Live: Frankfurt, Header, Login-Drossel
 
 Auslöser: Vor der Ablösung von Odoo und Sendcloud ein vollständiger Blick
