@@ -91,6 +91,7 @@ DHL_API_KEY              …und die übrigen DHL_-Variablen aus .env.example
 RESEND_API_KEY           Mailversand an Lieferanten
 MAIL_FROM                "Einkauf <einkauf@example.com>"
 REGISTRIERUNG_MAIL       Empfänger der Hinweis-Mail bei neuen Registrierungen
+REPARATUR_MAIL           Empfänger der Hinweis-Mail bei Reparaturanfragen (/service/reparatur); leer = Firmen-E-Mail
 INSTANZ_REGION           Anzeige in der Ersteinrichtung, z. B. "EU-Central · Frankfurt"
 ```
 

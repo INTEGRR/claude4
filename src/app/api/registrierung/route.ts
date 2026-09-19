@@ -1,14 +1,16 @@
-import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
-import { mailConfigured, sendMail } from '@/modules/integrationen/mail'
+import { absenderHashAusRequest } from '@/modules/auth/drossel'
+import { htmlSicher, mailConfigured, sendMail } from '@/modules/integrationen/mail'
 import { normalisiereRegistrierung, pruefeRegistrierung } from '@/modules/shared/registrierung'
 
 /**
- * Registrierung von der öffentlichen Startseite — der EINZIGE Schreibweg
- * ohne Sitzung. Er läuft bewusst NICHT über den Torwächter: der setzt einen
- * angemeldeten Nutzer mit Rolle voraus, und den gibt es hier per Definition
- * nicht. Stattdessen ist der Weg so eng wie möglich gehalten:
+ * Registrierung von der öffentlichen Startseite — ein Schreibweg ohne
+ * Sitzung (der zweite ist die Reparaturanfrage, api/reparaturanfrage, nach
+ * demselben Muster; Entscheidungslog 2026-09-19). Er läuft bewusst NICHT
+ * über den Torwächter: der setzt einen angemeldeten Nutzer mit Rolle voraus,
+ * und den gibt es hier per Definition nicht. Stattdessen ist der Weg so eng
+ * wie möglich gehalten:
  *
  *   - genau eine Tabelle (registrierungen), keine Verknüpfung zu Belegen,
  *   - serverseitige Prüfung mit denselben Regeln wie im Formular
@@ -24,16 +26,6 @@ import { normalisiereRegistrierung, pruefeRegistrierung } from '@/modules/shared
 
 const DROSSEL_MINUTEN = 10
 const DROSSEL_ANZAHL = 5
-
-/** Pseudonym des Absenders — nur zur Drosselung, nicht rückrechenbar. */
-function absenderHash(request: Request): string | null {
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip')
-  if (!ip) return null
-  const salz = process.env.SESSION_SECRET ?? 'krnl'
-  return createHash('sha256').update(`${salz}:${ip}`).digest('hex').slice(0, 32)
-}
 
 export async function POST(request: Request) {
   let roh: Record<string, unknown>
@@ -54,7 +46,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, fehler }, { status: 422 })
   }
 
-  const hash = absenderHash(request)
+  const hash = absenderHashAusRequest(request)
   if (hash) {
     const [{ anzahl }] = await sql<{ anzahl: number }[]>`
       select count(*)::int as anzahl from registrierungen
@@ -88,11 +80,11 @@ export async function POST(request: Request) {
         to: an,
         subject: `KRNL · neue Registrierung: ${daten.firma}`,
         html:
-          `<p><strong>${daten.firma}</strong><br>` +
-          `${daten.ansprechpartner} · ${daten.email}` +
-          `${daten.telefon ? ` · ${daten.telefon}` : ''}</p>` +
-          `<p>Nutzer: ${daten.nutzer || '—'} · Heute: ${daten.heutiges_system || '—'}</p>` +
-          `<p>${daten.ablauf.replace(/\n/g, '<br>')}</p>`,
+          `<p><strong>${htmlSicher(daten.firma)}</strong><br>` +
+          `${htmlSicher(daten.ansprechpartner)} · ${htmlSicher(daten.email)}` +
+          `${daten.telefon ? ` · ${htmlSicher(daten.telefon)}` : ''}</p>` +
+          `<p>Nutzer: ${htmlSicher(daten.nutzer || '—')} · Heute: ${htmlSicher(daten.heutiges_system || '—')}</p>` +
+          `<p>${htmlSicher(daten.ablauf).replace(/\n/g, '<br>')}</p>`,
       })
     } catch (err) {
       console.warn('[registrierung] Hinweis-Mail fehlgeschlagen', err)

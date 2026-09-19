@@ -1,4 +1,4 @@
-# Öffentliche Startseite und Registrierung
+# Öffentliche Startseite, Registrierung und Reparaturanfrage
 
 Die Seite **vor** dem Login: was KRNL ist, für wen, wie ein Einstieg abläuft —
 und das Formular, über das sich Interessenten melden. Sie liegt unter
@@ -56,10 +56,11 @@ Mobilmenü ist offen (siehe unten).
 ## Registrierung
 
 Das Formular schreibt über `POST /api/registrierung` in die Tabelle
-`registrierungen` (Migration 0066). Das ist der **einzige Schreibweg ohne
-Sitzung** im ganzen System und läuft deshalb bewusst nicht über den
-Torwächter — der setzt einen angemeldeten Nutzer mit Rolle voraus, und den
-gibt es hier per Definition nicht.
+`registrierungen` (Migration 0066). Das ist einer von zwei Schreibwegen ohne
+Sitzung im ganzen System (der zweite ist die Reparaturanfrage, unten) und
+läuft deshalb bewusst nicht über den Torwächter — der setzt einen
+angemeldeten Nutzer mit Rolle voraus, und den gibt es hier per Definition
+nicht.
 
 Stattdessen ist der Weg so eng wie möglich:
 
@@ -93,6 +94,41 @@ gespeichert — sie darf nicht an der Benachrichtigung scheitern.
 
 ---
 
+## Reparaturanfrage (/service/reparatur)
+
+Die Seite `/service/reparatur` (außerhalb der `(erp)`-Gruppe, Optik der
+Startseite, kein ERP-Rahmen) nimmt Reparaturanfragen von Kunden entgegen:
+Kontakt, Adresse, Fehlerbeschreibung, Bestellnummer optional. Der Shop
+verlinkt sie — ein iframe geht nicht, die Sicherheits-Header verbieten das
+Einbetten (`X-Frame-Options: DENY`).
+
+`POST /api/reparaturanfrage` ist der **zweite Schreibweg ohne Sitzung**,
+nach dem Muster der Registrierung (Entscheidungslog 2026-09-19):
+
+- genau eine Tabelle (`vorgaenge`), ein Insert — die Anfrage ist ein Vorgang
+  des Prozesses `reparatur_anfrage` (Quelle `kundenformular`); der
+  Reparaturauftrag entsteht erst, wenn ein Mitarbeiter die Anfrage im ERP
+  über `reparatur.anfrage_annehmen` annimmt;
+- Prüfregeln aus **einer** Quelle
+  ([`modules/shared/reparaturanfrage.ts`](../src/modules/shared/reparaturanfrage.ts))
+  für Formular, Route und Annahme; Längen werden beschnitten, nicht abgewiesen;
+- Honigtopf, Drosselung je Absender-Hash (5 in 10 Minuten, gezählt in
+  `vorgaenge.absender_hash` — kein Klartext-IP);
+- der Prozess-Schalter ist der Formular-Schalter: ist `reparatur_anfrage`
+  abgeschaltet, antwortet die Route mit 503 und die Seite zeigt „derzeit
+  nicht verfügbar";
+- Nebenwirkungen nur über die Outbox: Eingangsbestätigung mit Vorgangsnummer
+  an den Kunden (`send_repair_request_email`); die Hinweis-Mail an den
+  Service (`REPARATUR_MAIL`, sonst Firmen-E-Mail) ist best effort;
+- Audit-Eintrag mit Akteur `kundenformular`.
+
+Wächter: `tests/reparatur-anfrage.test.ts` (Eingangsregeln, Felder =
+Prozessfelder, Drosselabfrage, Registry-Statik) und der Prozesstest der
+Fixture `reparatur-anfrage.ts` (Annehmen, Ablehnen, Kunde wiederverwenden).
+Fachlich: [module/reparatur.md](module/reparatur.md).
+
+---
+
 ## Weiche vor dem Login
 
 `src/proxy.ts` leitet Aufrufe der **Wurzel ohne Sitzungs-Cookie** auf
@@ -114,6 +150,7 @@ ein eigenes Deployment um, fällt sie ersatzlos weg.
 |---|---|---|
 | **Annahmen des Kostenrechners** | `ANNAHMEN` in [`kosten-rechner.tsx`](../src/app/start/kosten-rechner.tsx) | Lizenz je Nutzer, Beratungstage je Prozess, Schulungsanteil, Betrieb je Nutzer stammen aus dem Design-Handoff und sind branchenübliche Hausnummern, **keine geprüften Zahlen von ANVIL**. Solange sie stehen, ist die Disclaimer-Zeile („Modellrechnung für Jahr 1. Kein Angebot …") nicht verhandelbar. |
 | **Empfänger der Hinweis-Mail** | `REGISTRIERUNG_MAIL` | bewusst nicht im Code hinterlegt |
+| **Empfänger der Reparaturanfrage-Mail** | `REPARATUR_MAIL` | leer = Firmen-E-Mail aus den Einstellungen; für den Service-Posteingang setzen |
 | **Mobilmenü** | Kopfnavigation unter 980 px | im Handoff als Folgeaufgabe markiert; die Sprungmarken sind über den Seitenfluss weiter erreichbar |
 | **Eigenes Vercel-Projekt** | siehe [vercel-supabase.md](vercel-supabase.md) | solange die Seite im ERP-Deployment mitläuft, sperrt die Deployment Protection sie mit aus |
 

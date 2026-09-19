@@ -110,6 +110,12 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       beobachten (Aktion „Tracking aktualisieren").
 - [ ] Ein Retourenlabel erzeugen und die Mail beim Kunden-Testkonto
       prüfen.
+- [ ] Reparaturanfrage: Link im Shop und auf der Website auf
+      `https://<erp>/service/reparatur` setzen (Link, kein iframe —
+      X-Frame-Options DENY); `REPARATUR_MAIL` auf den Service-Posteingang;
+      Testanfrage abschicken, im ERP annehmen, Retourenlabel mit RMA-Nummer
+      im Geschäftskundenportal sichtbar; Rückversand-Label aus einer
+      Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
 - [ ] Druckbrücke am Packtisch-Rechner einrichten
       ([module/versand.md „Druckbrücke"](module/versand.md)); KRNL liefert
       die Schritt-für-Schritt-Anleitung.

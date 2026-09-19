@@ -26,6 +26,19 @@ export function kennungHash(wert: string, salz = process.env.SESSION_SECRET ?? '
   return createHash('sha256').update(`${salz}:${wert.trim().toLowerCase()}`).digest('hex').slice(0, 32)
 }
 
+/**
+ * Absender-Pseudonym eines HTTP-Aufrufs (x-forwarded-for / x-real-ip) — für
+ * Eingänge ohne Sitzung (Registrierung, Reparaturanfrage). Null, wenn keine
+ * Adresse bekannt ist; dann wird nicht gedrosselt, aber auch nichts
+ * Falsches gezählt.
+ */
+export function absenderHashAusRequest(request: Request): string | null {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip')
+  return ip ? kennungHash(ip) : null
+}
+
 export async function loginGesperrt(
   db: Db,
   kontoHash: string,
