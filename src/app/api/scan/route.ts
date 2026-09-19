@@ -24,7 +24,21 @@ export async function GET(request: Request) {
       union all
       select '/fertigung/' || id, 4 from manufacturing_orders where number = ${code}
       union all
-      select '/reparatur/' || id, 5 from repair_orders where number = ${code}
+      -- RMA-Nummer: wartet der Auftrag auf das Gerät, öffnet die Seite gleich
+      -- das Formular „Gerät eingegangen" (Wareneingang per Scan).
+      select '/reparatur/' || id
+             || case when state in ('new', 'awaiting_device') then '?schritt=eingang' else '' end,
+             5
+      from repair_orders where number = ${code}
+      union all
+      -- Retouren-Sendungsnummer vom DHL-Label des Kundenpakets → derselbe Weg.
+      select '/reparatur/' || rl.repair_order_id || '?schritt=eingang', 5
+      from return_labels rl
+      where rl.shipment_number = ${code} and rl.repair_order_id is not null
+      union all
+      -- Vorgangsnummer (z. B. aus der Bestätigungsmail einer Reparaturanfrage,
+      -- die der Kunde auf den Karton schreibt) → der Vorgang selbst.
+      select '/vorgaenge/' || id, 5 from vorgaenge where number = ${code}
       union all
       select '/produkte/variante/' || id, 6 from product_variants
         where (barcode = ${code} or sku = ${code}) and active

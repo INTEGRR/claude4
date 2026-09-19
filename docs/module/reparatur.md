@@ -46,7 +46,10 @@ Kundengerät selbst wird **nie** als Bestand gebucht — es gehört dem Kunden.
 4. **Gerät eingegangen** (`received`): Scan der Retouren-Sendungsnummer
    oder der RMA-Nummer im Kopf-Scanfeld führt zur Reparaturseite mit
    geöffnetem Formular „Gerät eingegangen"; `received_at` wird gesetzt,
-   keine Bestandsbuchung. Erwartete Rücksendungen stehen im Zulauf.
+   keine Bestandsbuchung. Erwartete Rücksendungen stehen im Zulauf
+   (Karte „Erwartete Reparatur-Rücksendungen": RMA, Kunde, Sendungsnummer,
+   Mailstatus). Steht nur die Vorgangsnummer aus der Bestätigungsmail auf
+   dem Karton, führt ihr Scan zum Vorgang — von dort zum Auftrag.
 5. **Bestätigen** (`confirmed`, aus `new` oder `received`): Teilebewegungen
    entstehen, Einbauteile werden reserviert.
 6. **Teile** je Zeile mit Typ — erfassbar ab `new` (Bewegung entsteht erst

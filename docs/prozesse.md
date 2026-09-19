@@ -1285,7 +1285,11 @@ werden nach `repaired` bei kostenpflichtigen Reparaturen beide angeboten.
 
 **Scan-Kette am Wareneingang:** Retouren-Sendungsnummer oder RMA-Nummer im
 Kopf-Scanfeld → Reparaturseite mit geöffnetem Formular „Gerät eingegangen"
-→ Enter. Keine Bestandsbuchung; erwartete Rücksendungen im Zulauf.
+→ Enter (`/api/scan` liefert `?schritt=eingang`, das Prozess-Panel reicht
+es als `sofortOffen` an die generierten Formulare durch — nur wenn der
+Schritt gerade angeboten wird). Auch Vorgangsnummern (`VG/…`) sind
+scannbar und führen zum Vorgang. Keine Bestandsbuchung; erwartete
+Rücksendungen im Zulauf.
 
 **Sendungen ohne Lieferung:** `shipments.picking_id` ist optional,
 `repair_order_id` kommt dazu (genau eins per Check). Der DHL-Aufruf lebt im

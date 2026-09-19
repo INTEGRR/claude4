@@ -23,6 +23,7 @@ export async function ProzessPanel({
   rolle,
   befugnisse = [],
   nurDiagramm = false,
+  sofortOffen,
 }: {
   prozessCode: string
   recordId: string
@@ -35,6 +36,11 @@ export async function ProzessPanel({
    * als einklappbaren Kontext ans Ende stellen (Vorgangs-Detailseite).
    */
   nurDiagramm?: boolean
+  /**
+   * Dieses Formular steht sofort offen (Schritt-Code) — z. B. nach einem
+   * Scan am Wareneingang: die Seite öffnet direkt „Gerät eingegangen".
+   */
+  sofortOffen?: string
 }) {
   const [prozess] = await sql<{ id: string; name: string; beschreibung: string | null }[]>`
     select id, name, beschreibung from prozesse where code = ${prozessCode} and aktiv`
@@ -95,7 +101,13 @@ export async function ProzessPanel({
             <span className="muted small">Nichts — der Prozess ist am Ende oder wartet.</span>
           ) : (
             <>
-              {angebote.length > 0 && <ProzessAktionen schritte={angebote} recordId={recordId} />}
+              {angebote.length > 0 && (
+                <ProzessAktionen
+                  schritte={angebote}
+                  recordId={recordId}
+                  sofortOffen={sofortOffen && angebote.some((a) => a.code === sofortOffen) ? sofortOffen : undefined}
+                />
+              )}
               {passiv.length > 0 && (
                 <div className="actions" style={{ marginTop: 6, flexWrap: 'wrap', gap: 6 }}>
                   {passiv.map((s) => (

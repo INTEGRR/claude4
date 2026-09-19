@@ -3,13 +3,22 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date } from '@/modules/shared/format'
+import { LABELS, date } from '@/modules/shared/format'
 import { createRepair } from './actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ReparaturPage() {
+const ZUSTAENDE = Object.keys(LABELS.repair) as (keyof typeof LABELS.repair)[]
+
+export default async function ReparaturPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ zustand?: string }>
+}) {
   await requireArea('reparatur')
+  const { zustand } = await searchParams
+  const filter = ZUSTAENDE.find((z) => z === zustand) ?? null
+
   const rows = await sql<
     {
       id: string
@@ -19,16 +28,21 @@ export default async function ReparaturPage() {
       state: string
       under_warranty: boolean
       scheduled_date: string
+      received_at: string | null
+      origin_label: string | null
       parts: number
     }[]
   >`
     select r.id, r.number, p.name as customer, variant_display_name(r.variant_id) as product,
-           r.state, r.under_warranty, r.scheduled_date,
+           r.state, r.under_warranty, r.scheduled_date, r.received_at, r.origin_label,
            (select count(*) from repair_parts rp where rp.repair_id = r.id)::int as parts
     from repair_orders r
     join partners p on p.id = r.partner_id
+    where ${filter ? sql`r.state = ${filter}::repair_state` : sql`true`}
     order by
-      case r.state when 'under_repair' then 0 when 'confirmed' then 1 when 'new' then 2 else 3 end,
+      case r.state
+        when 'received' then 0 when 'under_repair' then 1 when 'confirmed' then 2
+        when 'awaiting_device' then 3 when 'new' then 4 when 'repaired' then 5 else 6 end,
       r.scheduled_date desc
     limit 200`
 
@@ -45,7 +59,12 @@ export default async function ReparaturPage() {
       <PageHeader
         title="Reparaturen"
         subtitle="Reparaturaufträge mit Teileverbrauch — Ersatzteile verlassen das Lager, ausgebaute Teile werden entsorgt oder wiederverwendet"
-        actions={<Link className="btn" href="/versand/retouren">Retourenlabel</Link>}
+        actions={
+          <>
+            <Link className="btn" href="/vorgaenge/prozess/reparatur_anfrage">Reparaturanfragen</Link>
+            <Link className="btn" href="/lager/zulauf">Zulauf</Link>
+          </>
+        }
       />
 
       <Card title="Neuer Reparaturauftrag">
@@ -88,8 +107,21 @@ export default async function ReparaturPage() {
       </Card>
 
       <Card tight>
+        {/* Filter als Links: die Adresszeile ist der Filterzustand. */}
+        <div className="actions" style={{ padding: '10px 12px 0', flexWrap: 'wrap', gap: 6 }}>
+          <Link className={`btn small${filter ? '' : ' primary'}`} href="/reparatur">alle</Link>
+          {ZUSTAENDE.map((z) => (
+            <Link
+              key={z}
+              className={`btn small${filter === z ? ' primary' : ''}`}
+              href={`/reparatur?zustand=${z}`}
+            >
+              {LABELS.repair[z]}
+            </Link>
+          ))}
+        </div>
         {rows.length === 0 ? (
-          <Empty>Keine Reparaturaufträge.</Empty>
+          <Empty>Keine Reparaturaufträge{filter ? ` im Zustand „${LABELS.repair[filter]}"` : ''}.</Empty>
         ) : (
           <TableWrap>
             <table>
@@ -101,13 +133,17 @@ export default async function ReparaturPage() {
                   <th className="num">Teile</th>
                   <th>Status</th>
                   <th>Abrechnung</th>
+                  <th>Eingang</th>
                   <th>Termin</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="mono"><Link href={`/reparatur/${r.id}`}>{r.number}</Link></td>
+                    <td className="mono">
+                      <Link href={`/reparatur/${r.id}`}>{r.number}</Link>
+                      {r.origin_label && <span className="muted small"> · {r.origin_label}</span>}
+                    </td>
                     <td>{r.customer}</td>
                     <td>{r.product}</td>
                     <td className="num">{r.parts}</td>
@@ -119,6 +155,7 @@ export default async function ReparaturPage() {
                         <span className="badge neutral">kostenpflichtig</span>
                       )}
                     </td>
+                    <td className="mono nowrap">{r.received_at ? date(r.received_at) : '—'}</td>
                     <td className="mono nowrap">{date(r.scheduled_date)}</td>
                   </tr>
                 ))}

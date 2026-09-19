@@ -303,7 +303,7 @@ export async function baueHistorie(sql: Client): Promise<string[]> {
         try {
           await sql`select repair_confirm(${rep.id}, 'demo')`
           await sql`select repair_start(${rep.id}, 'demo')`
-          if (r.trifft(0.85)) await sql`select repair_end(${rep.id}, 'demo')`
+          if (r.trifft(0.85)) await sql`select repair_end(${rep.id}, '{}'::jsonb, 'demo')`
         } catch {
           // Ohne Bestand für Ersatzteile bleibt die Reparatur offen
         }

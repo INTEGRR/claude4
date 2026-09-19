@@ -42,8 +42,10 @@ export default async function VersandPage({
       hat_label: boolean
       dhl_product: string
       created_at: string
-      picking_number: string
-      picking_id: string
+      picking_number: string | null
+      picking_id: string | null
+      repair_id: string | null
+      repair_number: string | null
       customer: string | null
       shopify_fulfillment_id: string | null
       last_event: { description?: string } | null
@@ -52,11 +54,15 @@ export default async function VersandPage({
     select s.id, s.shipment_number, s.state, s.tracking_url, s.dhl_product,
            (s.label_pdf is not null or s.label_path is not null) as hat_label,
            s.created_at, p.number as picking_number, p.id as picking_id,
-           part.name as customer, s.shopify_fulfillment_id,
+           r.id as repair_id, r.number as repair_number,
+           coalesce(part.name, rpart.name) as customer, s.shopify_fulfillment_id,
            s.last_tracking_event as last_event
     from shipments s
-    join stock_pickings p on p.id = s.picking_id
+    -- Eine Sendung gehört zu einer Lieferung ODER zu einer Reparatur (0081).
+    left join stock_pickings p on p.id = s.picking_id
     left join partners part on part.id = p.partner_id
+    left join repair_orders r on r.id = s.repair_order_id
+    left join partners rpart on rpart.id = r.partner_id
     order by s.created_at desc
     limit 60`
 
@@ -313,7 +319,15 @@ export default async function VersandPage({
                       )}
                     </td>
                     <td className="mono small">
-                      <Link href={`/lager/${s.picking_id}`}>{s.picking_number}</Link>
+                      {s.picking_id ? (
+                        <Link href={`/lager/${s.picking_id}`}>{s.picking_number}</Link>
+                      ) : s.repair_id ? (
+                        <Link href={`/reparatur/${s.repair_id}`} title="Rückversand einer Reparatur">
+                          {s.repair_number}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td>{s.customer ?? '—'}</td>
                     <td><Badge state={s.state} kind="shipment" /></td>

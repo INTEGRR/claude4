@@ -46,12 +46,13 @@ export default async function VorgangDetail({
       origin_model: string | null
       origin_id: string | null
       origin_label: string | null
+      quelle: string
       created_at: string
     }[]
   >`
     select v.id, v.number, v.prozess_code, p.name as prozess_name, p.bereich,
            v.titel, v.state, pa.name as partner, v.partner_id, v.zusatz,
-           v.origin_model, v.origin_id, v.origin_label, v.created_at
+           v.origin_model, v.origin_id, v.origin_label, v.quelle, v.created_at
     from vorgaenge v
     join prozesse p on p.code = v.prozess_code
     left join partners pa on pa.id = v.partner_id
@@ -101,6 +102,11 @@ export default async function VorgangDetail({
   const [auftrag] = await sql<{ id: string; number: string }[]>`
     select id, number from sales_orders
     where origin_model = 'vorgang' and origin_id = ${v.id}`
+  // Dasselbe für die Reparatur (0081): der Reparaturauftrag aus einer
+  // angenommenen Reparaturanfrage hängt über origin am Vorgang.
+  const [reparatur] = await sql<{ id: string; number: string; state: string }[]>`
+    select id, number, state from repair_orders
+    where origin_model = 'vorgang' and origin_id = ${v.id}`
 
   // Herkunft dieses Vorgangs (falls er selbst Kind eines Belegs ist).
   const HERKUNFT_ROUTE: Record<string, string> = {
@@ -145,9 +151,19 @@ export default async function VorgangDetail({
         actions={
           <>
             <span className="badge info">{zustandsSchritt?.name ?? v.state}</span>
+            {v.quelle === 'kundenformular' && (
+              <span className="badge neutral" title="Über die öffentliche Seite /service/reparatur eingegangen">
+                Kundenformular
+              </span>
+            )}
             {auftrag && (
               <Link className="btn" href={`/verkauf/${auftrag.id}`}>
                 Auftrag {auftrag.number}
+              </Link>
+            )}
+            {reparatur && (
+              <Link className="btn" href={`/reparatur/${reparatur.id}`}>
+                Reparatur {reparatur.number}
               </Link>
             )}
             <Link className="btn" href={`/vorgaenge/prozess/${v.prozess_code}`}>

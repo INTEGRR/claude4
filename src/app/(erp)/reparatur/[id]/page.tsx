@@ -8,7 +8,7 @@ import { ResponsibleForm } from '@/components/responsible-form'
 import { TagEditor } from '@/components/tag-editor'
 import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
-import { date, qty } from '@/modules/shared/format'
+import { date, dateTime, qty } from '@/modules/shared/format'
 import {
   addPart,
   cancelRepair,
@@ -28,9 +28,18 @@ const PART_TYPES = {
   recycle: { label: 'Wiederverwenden', hint: 'geht zurück ins Lager' },
 } as const
 
-export default async function RepairPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RepairPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ schritt?: string }>
+}) {
   const user = await requireArea('reparatur')
   const { id } = await params
+  // Vom Scan-Resolver gesetzt (Wareneingang): das Formular dieses Schritts
+  // steht sofort offen — Sendungsnummer scannen, Enter, fertig.
+  const { schritt: sofortOffen } = await searchParams
 
   const [repair] = await sql<
     {
@@ -48,18 +57,49 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
       sales_order_number: string | null
       user_id: string | null
       priority: string
+      origin_model: string | null
+      origin_id: string | null
+      origin_label: string | null
+      received_at: string | null
+      customer_email: string | null
     }[]
   >`
     select r.id, r.number, p.name as customer, r.partner_id,
            variant_display_name(r.variant_id) as product, r.qty, r.under_warranty, r.state,
            r.scheduled_date, r.note, r.sales_order_id, so.number as sales_order_number,
-           r.user_id, r.priority
+           r.user_id, r.priority,
+           r.origin_model, r.origin_id, r.origin_label, r.received_at, p.email as customer_email
     from repair_orders r
     join partners p on p.id = r.partner_id
     left join sales_orders so on so.id = r.sales_order_id
     where r.id = ${id}`
 
   if (!repair) notFound()
+
+  // Versand rund um die Reparatur: das Retourenlabel (Kunde → Werkstatt) und
+  // die Rücksendung (Werkstatt → Kunde, eine Sendung ohne Lieferung, 0081).
+  const [retoure] = await sql<
+    { shipment_number: string | null; qr_link: string | null; emailed_at: string | null; created_at: string }[]
+  >`
+    select shipment_number, qr_link, emailed_at, created_at from return_labels
+    where repair_order_id = ${id} order by created_at desc limit 1`
+  const [sendung] = await sql<
+    {
+      id: string
+      shipment_number: string | null
+      state: string
+      tracking_url: string | null
+      dhl_product: string
+      hat_label: boolean
+      last_event: { description?: string } | null
+      created_at: string
+    }[]
+  >`
+    select id, shipment_number, state, tracking_url, dhl_product,
+           (label_pdf is not null or label_path is not null) as hat_label,
+           last_tracking_event as last_event, created_at
+    from shipments where repair_order_id = ${id} and state <> 'cancelled'
+    order by created_at desc limit 1`
 
   const parts = await sql<
     {
@@ -87,11 +127,13 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.active and pt.active order by label limit 500`
 
-  const editable = repair.state === 'new'
+  const editable = ['new', 'awaiting_device', 'received'].includes(repair.state)
   // Teile lassen sich auch während der Reparatur nachtragen — erst am
   // offenen Gerät zeigt sich der Bedarf (repair_add_part bucht sofort nach).
-  const teileErfassbar = ['new', 'confirmed', 'under_repair'].includes(repair.state)
-  const open = repair.state !== 'repaired' && repair.state !== 'cancel'
+  const teileErfassbar = ['new', 'awaiting_device', 'received', 'confirmed', 'under_repair'].includes(
+    repair.state,
+  )
+  const open = !['repaired', 'shipped', 'cancel'].includes(repair.state)
 
   return (
     <>
@@ -101,6 +143,17 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
           <>
             {repair.customer} · {repair.product} ({qty(repair.qty)}) ·{' '}
             <span className="mono">{date(repair.scheduled_date)}</span>
+            {repair.origin_model === 'vorgang' && repair.origin_id && (
+              <>
+                {' '}· aus Anfrage{' '}
+                <Link className="mono" href={`/vorgaenge/${repair.origin_id}`}>{repair.origin_label}</Link>
+              </>
+            )}
+            {repair.received_at && (
+              <>
+                {' '}· Gerät eingegangen <span className="mono">{dateTime(repair.received_at)}</span>
+              </>
+            )}
             {repair.sales_order_id && (
               <>
                 {' '}· Angebot{' '}
@@ -117,7 +170,7 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
               <span className={`led ${repair.under_warranty ? 'ok' : 'off'}`} />{' '}
               {repair.under_warranty ? 'Garantie' : 'kostenpflichtig'}
             </span>
-            {repair.state === 'new' && (
+            {(repair.state === 'new' || repair.state === 'received') && (
               <ActionButton className="primary" action={confirmRepair.bind(null, id)}>
                 Bestätigen
               </ActionButton>
@@ -146,7 +199,80 @@ export default async function RepairPage({ params }: { params: Promise<{ id: str
         <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
       </div>
 
-      <ProzessPanel prozessCode="reparatur" recordId={id} rolle={user.role} befugnisse={user.befugnisse} />
+      <ProzessPanel
+        prozessCode="reparatur"
+        recordId={id}
+        rolle={user.role}
+        befugnisse={user.befugnisse}
+        sofortOffen={sofortOffen}
+      />
+
+      {(retoure || sendung || repair.state === 'awaiting_device') && (
+        <Card title="Versand">
+          <div className="grid-2">
+            <div>
+              <span className="mono-label">Retourenlabel (Kunde → Werkstatt)</span>
+              <div style={{ marginTop: 4 }}>
+                {retoure ? (
+                  <>
+                    <span className="mono">{retoure.shipment_number}</span>
+                    <div className="small muted">
+                      {retoure.emailed_at
+                        ? `gemailt ${dateTime(retoure.emailed_at)}`
+                        : 'Mail in der Warteschlange'}
+                      {repair.customer_email ? ` an ${repair.customer_email}` : ' — der Kunde hat keine E-Mail'}
+                      {retoure.qr_link && (
+                        <>
+                          {' '}·{' '}
+                          <a href={retoure.qr_link} target="_blank" rel="noreferrer">QR-Code</a>
+                        </>
+                      )}
+                    </div>
+                    <div className="small muted">
+                      Referenz für den Wareneingang: <span className="mono">{repair.number}</span> —
+                      Sendungsnummer oder RMA scannen.
+                    </div>
+                  </>
+                ) : (
+                  <span className="muted small">Noch kein Retourenlabel.</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="mono-label">Rücksendung (Werkstatt → Kunde)</span>
+              <div style={{ marginTop: 4 }}>
+                {sendung ? (
+                  <>
+                    <span className="mono">{sendung.shipment_number}</span>{' '}
+                    <Badge state={sendung.state} kind="shipment" />
+                    <div className="small muted">
+                      {sendung.dhl_product} · erstellt {dateTime(sendung.created_at)}
+                      {sendung.last_event?.description ? ` · ${sendung.last_event.description}` : ''}
+                    </div>
+                    <div className="small" style={{ marginTop: 4 }}>
+                      {sendung.tracking_url && (
+                        <a href={sendung.tracking_url} target="_blank" rel="noreferrer">Sendungsverfolgung</a>
+                      )}
+                      {sendung.hat_label && (
+                        <>
+                          {sendung.tracking_url ? ' · ' : ''}
+                          <a href={`/api/label/${sendung.id}`} target="_blank" rel="noreferrer">Label herunterladen</a>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <span className="muted small">
+                    {repair.state === 'shipped'
+                      ? 'Ohne DHL-Label zurückgegeben (Abholung/Eigenversand).'
+                      : 'Noch nicht versendet — nach dem Abschluss über „Rückgabe an den Kunden".'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Der Rohtext des Kunden — am Arbeitsplatz gelesen, darum als Geräteanzeige. */}
       {repair.note && (

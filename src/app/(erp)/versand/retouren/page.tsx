@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -19,10 +20,11 @@ export default async function RetourenPage() {
       emailed_at: string | null
       created_at: string
       repair_number: string | null
+      repair_id: string | null
     }[]
   >`
     select rl.id, rl.shipment_number, p.name as partner, rl.qr_link, rl.emailed_at,
-           rl.created_at, r.number as repair_number
+           rl.created_at, r.number as repair_number, r.id as repair_id
     from return_labels rl
     join partners p on p.id = rl.partner_id
     left join repair_orders r on r.id = rl.repair_order_id
@@ -119,7 +121,9 @@ export default async function RetourenPage() {
                   <tr key={l.id}>
                     <td className="mono">{l.shipment_number}</td>
                     <td>{l.partner}</td>
-                    <td className="mono small">{l.repair_number ?? '—'}</td>
+                    <td className="mono small">
+                      {l.repair_id ? <Link href={`/reparatur/${l.repair_id}`}>{l.repair_number}</Link> : '—'}
+                    </td>
                     <td>
                       {/* Zustand als Leuchte plus Wort; der Zeitstempel bleibt lesbares Mono. */}
                       {l.emailed_at ? (
