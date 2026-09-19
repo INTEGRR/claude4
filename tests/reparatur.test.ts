@@ -178,3 +178,105 @@ describe('Reparatur', () => {
     })
   })
 })
+
+/**
+ * Reparatur v2 (0081/0082): das Gerät kommt per Post und geht per Post
+ * zurück. Statusfunktionen werfen in Klartext statt still zurückzukehren.
+ */
+describe('Reparatur: Rücksendung und Rückversand', () => {
+  test('Retourenlabel raus: new → awaiting_device, erneut ein No-op, danach nicht mehr', async () => {
+    await withRollback(async (t) => {
+      const s = await repairScenario(t)
+      await t`select repair_await_device(${s.repairId}, 'tester')`
+      let [r] = await t<{ state: string }[]>`select state from repair_orders where id = ${s.repairId}`
+      assert.equal(r.state, 'awaiting_device')
+
+      await t`select repair_await_device(${s.repairId}, 'tester')`
+      ;[r] = await t<{ state: string }[]>`select state from repair_orders where id = ${s.repairId}`
+      assert.equal(r.state, 'awaiting_device', 'Label erneut gesendet ändert nichts')
+
+      await t`select repair_receive(${s.repairId}, 'tester')`
+      await expectError(t, (sp) => sp`select repair_await_device(${s.repairId})`, /wartet nicht mehr/)
+    })
+  })
+
+  test('Geräteeingang: aus awaiting_device und aus new (Walk-in), mit Zeitstempel, ohne Bestandsbuchung', async () => {
+    await withRollback(async (t) => {
+      const s = await repairScenario(t)
+      const [vorher] = await t<{ n: number }[]>`select count(*)::int as n from stock_moves`
+
+      await t`select repair_await_device(${s.repairId})`
+      await t`select repair_receive(${s.repairId}, 'tester', 'Karton unbeschädigt')`
+      const [r] = await t<{ state: string; received_at: string | null }[]>`
+        select state, received_at from repair_orders where id = ${s.repairId}`
+      assert.equal(r.state, 'received')
+      assert.ok(r.received_at, 'received_at ist gesetzt')
+
+      const [nachher] = await t<{ n: number }[]>`select count(*)::int as n from stock_moves`
+      assert.equal(nachher.n, vorher.n, 'das Kundengerät wird nicht gebucht')
+
+      const s2 = await repairScenario(t)
+      await t`select repair_receive(${s2.repairId})`
+      const [r2] = await t<{ state: string }[]>`select state from repair_orders where id = ${s2.repairId}`
+      assert.equal(r2.state, 'received', 'Walk-in: direkt aus new')
+
+      await expectError(t, (sp) => sp`select repair_receive(${s.repairId})`, /Geräteeingang im Status/)
+    })
+  })
+
+  test('Bestätigen aus received reserviert Teile; im falschen Status wirft es statt zu schweigen', async () => {
+    await withRollback(async (t) => {
+      const s = await repairScenario(t)
+      await t`select repair_await_device(${s.repairId})`
+      await t`select repair_receive(${s.repairId})`
+      // Teile lassen sich schon erfassen, solange das Gerät unterwegs ist — ohne Bewegung.
+      const [teil] = await t<{ repair_add_part: string }[]>`
+        select repair_add_part(${s.repairId}, ${s.switchPart}, 2, 'add'::repair_part_type, 'tester')`
+      const [zeile] = await t<{ move_id: string | null }[]>`
+        select move_id from repair_parts where id = ${teil.repair_add_part}`
+      assert.equal(zeile.move_id, null, 'vor dem Bestätigen keine Bewegung')
+
+      await t`select repair_confirm(${s.repairId}, 'tester')`
+      assert.equal(await freeToUse(t, s.switchPart), 48, 'Bestätigen reserviert')
+      await expectError(t, (sp) => sp`select repair_confirm(${s.repairId})`, /kann nicht bestätigt werden/)
+      await assertLedgerConsistent(t)
+    })
+  })
+
+  test('Storno geht aus den Wartezuständen, nicht mehr nach dem Versand', async () => {
+    await withRollback(async (t) => {
+      const s = await repairScenario(t)
+      await t`select repair_await_device(${s.repairId})`
+      await t`select repair_cancel(${s.repairId})`
+      const [r] = await t<{ state: string }[]>`select state from repair_orders where id = ${s.repairId}`
+      assert.equal(r.state, 'cancel')
+
+      const s2 = await repairScenario(t, { warranty: true })
+      await t`select repair_confirm(${s2.repairId})`
+      await t`select repair_end(${s2.repairId})`
+      await expectError(t, (sp) => sp`select repair_ship(${s.repairId})`, /nicht repariert/)
+      await t`select repair_ship(${s2.repairId}, 'tester', 'Abholung')`
+      const [r2] = await t<{ state: string }[]>`select state from repair_orders where id = ${s2.repairId}`
+      assert.equal(r2.state, 'shipped')
+      await expectError(t, (sp) => sp`select repair_cancel(${s2.repairId})`, /Abgeschlossene/)
+    })
+  })
+
+  test('eine Sendung gehört zu genau einem Beleg: Lieferung oder Reparatur', async () => {
+    await withRollback(async (t) => {
+      const s = await repairScenario(t)
+      await expectError(
+        t,
+        (sp) => sp`insert into shipments (billing_number, weight_g, shipment_number)
+                   values ('33333333330101', 500, '00000000000000000001')`,
+        /shipments_genau_ein_beleg/,
+      )
+      const [sendung] = await t<{ id: string; picking_id: string | null }[]>`
+        insert into shipments (repair_order_id, billing_number, weight_g, shipment_number)
+        values (${s.repairId}, '33333333330101', 500, '00000000000000000002')
+        returning id, picking_id`
+      assert.ok(sendung.id)
+      assert.equal(sendung.picking_id, null)
+    })
+  })
+})

@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { sql } from '@/db/client'
 import {
+  type CreatedShipment,
   DhlError,
   type TrackingResult,
   type ZollDaten,
@@ -128,6 +129,77 @@ async function zolldatenFuerPicking(
   }
 }
 
+/** Empfänger eines Labels — Adresse ohne Beleg-Bezug (Lieferung ODER Reparatur). */
+export interface LabelEmpfaenger {
+  name: string
+  street: string
+  houseNumber: string
+  addition?: string
+  zip: string
+  city: string
+  /** ISO alpha-2 (wie in partners/sales_orders geführt). */
+  countryAlpha2: string
+  email?: string
+  phone?: string
+}
+
+/**
+ * Der eine DHL-Kern: Absender aus den Firmendaten, Druckformat aus den
+ * DHL-Einstellungen, Aufruf, PDF-Ablage. Kein Datenbank-Insert — den macht
+ * der Aufrufer, weil Lieferung und Reparatur an verschiedenen Belegen hängen.
+ */
+async function dhlLabelErzeugen(input: {
+  empfaenger: LabelEmpfaenger
+  reference: string
+  weightG: number
+  product: string
+  billingNumber: string
+  insuredValue: number | null
+  customs: ZollDaten | null
+}): Promise<{ result: CreatedShipment; labelPath: string | null; printFormat: string }> {
+  const company = await companySettings()
+  const [settings] = await sql<{ print_format: string | null }[]>`
+    select value ->> 'print_format' as print_format from settings where key = 'dhl'`
+  const printFormat = settings?.print_format ?? '910-300-700'
+  const e = input.empfaenger
+
+  const result = await createShipment({
+    product: input.product,
+    billingNumber: input.billingNumber,
+    insuredValue: input.insuredValue,
+    customs: input.customs,
+    reference: input.reference,
+    weightG: input.weightG,
+    printFormat,
+    shipper: {
+      name: company.name,
+      street: company.street,
+      houseNumber: company.house,
+      zip: company.zip,
+      city: company.city,
+      country: toAlpha3(company.country),
+      email: company.email,
+      phone: company.phone,
+    },
+    consignee: {
+      name: e.name,
+      street: e.street,
+      houseNumber: e.houseNumber,
+      addition: e.addition,
+      zip: e.zip,
+      city: e.city,
+      country: toAlpha3(e.countryAlpha2),
+      email: e.email,
+      phone: e.phone,
+    },
+  })
+
+  const labelPath = result.labelBase64
+    ? await storeLabel(`${result.shipmentNumber}.pdf`, result.labelBase64)
+    : null
+  return { result, labelPath, printFormat }
+}
+
 /**
  * Erstellt ein DHL-Label für eine Lieferung. Läuft bewusst synchron (nicht
  * über die Outbox): am Packtisch wird das Label sofort gebraucht.
@@ -212,12 +284,6 @@ export async function createLabelForPicking(
     throw new Error('Die Lieferadresse ist unvollständig (Name, Straße, PLZ und Ort werden benötigt).')
   }
 
-  const company = await companySettings()
-  const [settings] = await sql<{ print_format: string; default_product: string }[]>`
-    select value ->> 'print_format' as print_format,
-           value ->> 'default_product' as default_product
-    from settings where key = 'dhl'`
-
   const vorschlag = (await vorschlaegeFuerPickings([pickingId])).get(pickingId)
   // Gewogen wird das Paket, nicht der Inhalt: ohne Handeingabe zählt das
   // Warengewicht plus Leergewicht der gewählten Kartonage.
@@ -239,40 +305,25 @@ export async function createLabelForPicking(
     ? await zolldatenFuerPicking(pickingId, picking.sales_order_id, reference)
     : null
 
-  const result = await createShipment({
-    product,
-    billingNumber,
-    insuredValue,
-    customs: zoll?.customs ?? null,
-    reference,
-    weightG,
-    printFormat: settings?.print_format ?? '910-300-700',
-    shipper: {
-      name: company.name,
-      street: company.street,
-      houseNumber: company.house,
-      zip: company.zip,
-      city: company.city,
-      country: toAlpha3(company.country),
-      email: company.email,
-      phone: company.phone,
-    },
-    consignee: {
+  const { result, labelPath, printFormat } = await dhlLabelErzeugen({
+    empfaenger: {
       name,
       street,
       houseNumber,
       addition: picking.ship_street2 ?? undefined,
       zip,
       city,
-      country: toAlpha3(countryAlpha2),
+      countryAlpha2,
       email: picking.ship_email ?? picking.partner_email ?? undefined,
       phone: picking.ship_phone ?? undefined,
     },
+    reference,
+    weightG,
+    product,
+    billingNumber,
+    insuredValue,
+    customs: zoll?.customs ?? null,
   })
-
-  const labelPath = result.labelBase64
-    ? await storeLabel(`${result.shipmentNumber}.pdf`, result.labelBase64)
-    : null
 
   const warnings = [...result.warnings, ...(zoll?.hinweise ?? [])]
   const [shipment] = await sql<{ id: string }[]>`
@@ -285,7 +336,7 @@ export async function createLabelForPicking(
       ${weightG}, ${insuredValue}, ${ruleName}, ${vorschlag?.kartonage?.id ?? null},
       ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
       ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},
-      ${settings?.print_format ?? '910-300-700'},
+      ${printFormat},
       ${warnings.length ? sql.json(warnings) : null})
     returning id`
 
@@ -305,17 +356,161 @@ export async function createLabelForPicking(
   }
 }
 
+/**
+ * Rückversand eines reparierten Geräts an den Kunden: eine Sendung ohne
+ * Lieferung (shipments.repair_order_id). Adresse vom Kunden, Referenz die
+ * RMA-Nummer, Gewicht das Produktgewicht (oder Handeingabe), Produkt nach
+ * Land. Keine Kartonage, keine Versicherung, kein Bestand — das Gerät gehört
+ * dem Kunden. Tracking läuft über syncTracking wie bei jeder Sendung.
+ */
+export async function createLabelForRepair(
+  repairId: string,
+  opts: { weightG?: number; product?: string } = {},
+): Promise<CreateLabelResult> {
+  if (!dhlConfigured()) {
+    throw new DhlError(
+      'DHL ist nicht konfiguriert. Bitte API-Key, GKP-Zugang und Abrechnungsnummer in den Einstellungen hinterlegen.',
+    )
+  }
+
+  const [r] = await sql<
+    {
+      number: string
+      state: string
+      qty: number
+      name: string | null
+      street: string | null
+      house_number: string | null
+      street2: string | null
+      zip: string | null
+      city: string | null
+      country_code: string | null
+      email: string | null
+      phone: string | null
+      produkt: string
+      weight_g: number | null
+      hs_code: string | null
+      country_of_origin: string | null
+      list_price: number | null
+    }[]
+  >`
+    select r.number, r.state, r.qty,
+           p.name, p.street, p.house_number, p.street2, p.zip, p.city, p.country_code,
+           p.email, p.phone,
+           pt.name as produkt, pt.weight_g, pt.hs_code, pt.country_of_origin, pt.list_price
+    from repair_orders r
+    join partners p on p.id = r.partner_id
+    join product_variants pv on pv.id = r.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where r.id = ${repairId}`
+  if (!r) throw new Error('Reparaturauftrag nicht gefunden')
+  if (r.state !== 'repaired') {
+    throw new Error(`Rückversand nur nach abgeschlossener Reparatur (Status ${r.state})`)
+  }
+
+  const [open] = await sql<{ count: number }[]>`
+    select count(*)::int as count from shipments
+    where repair_order_id = ${repairId} and state not in ('cancelled', 'failure')`
+  if (Number(open.count) > 0) {
+    throw new Error('Für diese Reparatur existiert bereits ein Label. Bitte zuerst stornieren.')
+  }
+
+  const name = r.name ?? ''
+  const street = r.street ?? ''
+  const houseNumber = r.house_number ?? ''
+  const zip = r.zip ?? ''
+  const city = r.city ?? ''
+  const countryAlpha2 = r.country_code ?? 'DE'
+  if (!name || !street || !zip || !city) {
+    throw new Error('Die Kundenadresse ist unvollständig (Name, Straße, PLZ und Ort werden benötigt).')
+  }
+
+  const qty = Math.max(Math.round(Number(r.qty)) || 1, 1)
+  const weightG = Math.max(opts.weightG ?? Math.round(Number(r.weight_g ?? 0) * qty), 1)
+  const product = opts.product ?? productForCountry(countryAlpha2)
+  const billingNumber = billingNumberForProduct(product, dhlConfig().billingNumber)
+
+  const customs: ZollDaten | null = brauchtZoll(countryAlpha2)
+    ? {
+        invoiceNo: r.number.slice(0, 35),
+        exportType: 'RETURN_OF_GOODS',
+        postalCharges: { currency: 'EUR', value: 0 },
+        items: [
+          {
+            itemDescription: r.produkt.slice(0, 50),
+            countryOfOrigin: r.country_of_origin ? toAlpha3(r.country_of_origin) : undefined,
+            hsCode: r.hs_code ?? undefined,
+            packagedQuantity: qty,
+            itemValue: { currency: 'EUR', value: Math.round(Number(r.list_price ?? 1) * 100) / 100 },
+            itemWeight: { uom: 'g', value: Math.max(Number(r.weight_g ?? 0), 1) },
+          },
+        ],
+      }
+    : null
+
+  const { result, labelPath, printFormat } = await dhlLabelErzeugen({
+    empfaenger: {
+      name,
+      street,
+      houseNumber,
+      addition: r.street2 ?? undefined,
+      zip,
+      city,
+      countryAlpha2,
+      email: r.email ?? undefined,
+      phone: r.phone ?? undefined,
+    },
+    reference: r.number,
+    weightG,
+    product,
+    billingNumber,
+    insuredValue: null,
+    customs,
+  })
+
+  const warnings = [...result.warnings, ...(customs && !r.hs_code ? [`Zoll: HS-Code fehlt bei ${r.produkt} — am Produkt pflegen.`] : [])]
+  const [shipment] = await sql<{ id: string }[]>`
+    insert into shipments (
+      repair_order_id, dhl_product, billing_number, weight_g,
+      shipment_number, tracking_url, label_path, label_pdf, label_format, dhl_warnings)
+    values (
+      ${repairId}, ${product}, ${billingNumber}, ${weightG},
+      ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
+      ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},
+      ${printFormat},
+      ${warnings.length ? sql.json(warnings) : null})
+    returning id`
+
+  await sql`select log_event('repair_order', ${repairId}, 'note',
+    ${`DHL-Label für den Rückversand erstellt: ${result.shipmentNumber} (${product}, ${weightG} g)`}, 'system')`
+
+  return {
+    shipmentId: shipment.id,
+    shipmentNumber: result.shipmentNumber,
+    labelPath,
+    warnings,
+    product,
+    ruleName: null,
+  }
+}
+
 /** Storniert eine Sendung bei DHL (nur vor dem Tagesabschluss möglich). */
 export async function cancelShipmentById(shipmentId: string): Promise<void> {
-  const [shipment] = await sql<{ shipment_number: string; state: string; picking_id: string }[]>`
-    select shipment_number, state, picking_id from shipments where id = ${shipmentId}`
+  const [shipment] = await sql<
+    { shipment_number: string; state: string; picking_id: string | null; repair_order_id: string | null }[]
+  >`
+    select shipment_number, state, picking_id, repair_order_id from shipments where id = ${shipmentId}`
   if (!shipment) throw new Error('Sendung nicht gefunden')
   if (shipment.state === 'cancelled') return
   if (shipment.state === 'delivered') throw new Error('Zugestellte Sendungen können nicht storniert werden')
 
   await cancelShipment(shipment.shipment_number)
   await sql`update shipments set state = 'cancelled' where id = ${shipmentId}`
-  await sql`select log_event('stock_picking', ${shipment.picking_id}, 'note',
+  // Der Beleg, an dem die Sendung hängt: Lieferung oder Reparatur (genau eins, 0081).
+  const beleg = shipment.picking_id
+    ? { model: 'stock_picking', id: shipment.picking_id }
+    : { model: 'repair_order', id: shipment.repair_order_id! }
+  await sql`select log_event(${beleg.model}, ${beleg.id}, 'note',
     ${`DHL-Sendung ${shipment.shipment_number} storniert`}, 'system')`
 }
 

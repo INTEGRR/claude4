@@ -256,6 +256,8 @@ created ──(Storno, nur vor Manifest)──▶ cancelled                └�
 
 Aus dem Reparatur-/Retourenprozess heraus: Button „DHL-Retourenlabel erstellen" → `POST returns/v1/orders?labelType=BOTH` (`receiverId` des GKP-Retourenempfängers, Kundenadresse als Absender) → Label-PDF + QR-Code per E-Mail an den Kunden (Resend). Voraussetzung: Retouren-Vertrag + Retourenempfänger im GKP.
 
+**Reparaturen (seit 0082):** Das Retourenlabel entsteht aus dem Reparaturauftrag (`reparatur.retourenlabel_senden`, auch als Teil von „Annehmen" der Reparaturanfrage) mit der **RMA-Nummer als `customerReference`**; die Mail nennt die RMA-Nummer und bittet um einen Zettel im Paket. Die generische Retouren-Seite bleibt für Retouren ohne Reparatur. Der **Rückversand** des reparierten Geräts ist eine Sendung **ohne Lieferung** (`shipments.repair_order_id`, `picking_id` null — genau eins per Check): Adresse vom Kunden, Referenz die RMA-Nummer, Gewicht aus dem Produkt oder Handeingabe, Produkt nach Land, keine Kartonage, keine Versicherung, Zoll bei Drittland als `RETURN_OF_GOODS`. Tracking läuft über denselben Sync wie bei Lieferungen; die Versandliste zeigt solche Sendungen mit `RMA/…` statt Lieferung. Retourenlabels selbst werden nicht verfolgt (Folgeaufgabe).
+
 ## UI
 
 - **Versandbereit-Liste**: alle reservierten, unversandten Lieferungen (Auftrag, Kunde, Shopify-Name, Fertigungsstatus) — die Packstation-Arbeitsliste.

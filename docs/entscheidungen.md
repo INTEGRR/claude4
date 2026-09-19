@@ -9,6 +9,76 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-19 — Reparatur end-to-end: Anfrage als Vorgang, zweiter Schreibweg ohne Sitzung, Reparatur v2 mit Rückversand
+
+Auslöser: Der Reparaturprozess hatte nur die Werkstatt-Mitte (anlegen →
+bestätigen → Teile → abschließen → Angebot). Es fehlten der Eingang von
+außen (Kunde), das Retourenlabel mit RMA-Nummer (der Code dafür existierte,
+wurde aber nie mit Auftragsbezug aufgerufen), der Geräteeingang und der
+Rückversand. Vom Betreiber entschieden: Prüfung durch Mitarbeiter (kein
+Vollautomat), Wareneingang als Statuswechsel per Scan ohne Lagerbuchung,
+Formular mit Kontakt, Adresse, Fehlerbeschreibung und optionaler
+Bestellnummer, Rückversand gehört dazu.
+
+Entscheidungen (Migrationen 0081/0082):
+
+- **Die Anfrage ist ein Laufzeit-Prozess auf Vorgängen** (`reparatur_anfrage`,
+  Bereich Reparatur, Felder als `feld_definitionen` am Prozess), keine
+  Fachtabelle: Sidebar, Liste, Detailmaske, Prozess-Panel und generierte
+  Masken gibt es geschenkt; der Reparaturauftrag hängt als Teilprozess
+  daran (`repair_orders.origin_*`, Muster 0072). Genau das, wofür der
+  Chamäleon-Baukasten gebaut wurde.
+- **Zweiter Schreibweg ohne Sitzung** — revidiert den Eintrag 2026-08-21
+  („eine solche Stelle, keine zweite"). Die Registrierung bleibt das
+  Muster, das den zweiten Weg qualifiziert: genau eine Tabelle
+  (`vorgaenge`), ein Insert, pure Prüfregeln geteilt mit dem Formular,
+  Honigtopf, Drossel über gesalzenen Absender-Hash, Audit-Eintrag,
+  Nebenwirkungen nur über die Outbox, und der Prozess-Schalter ist der
+  Formular-Schalter (inaktiver Prozess → 503). Ein Route-Handler, kein
+  Server Action, damit die Ausnahme hier benannt steht statt in einer
+  Umgehungsliste zu verschwinden. Dafür bekommt `vorgaenge` `quelle` und
+  `absender_hash` — der Hash gehört nicht ins `zusatz`, wo er als Feld
+  erschiene.
+- **Annehmen ist eine Kombi-Aktion**: Kunde per E-Mail wiederverwenden
+  (Kundenkonten zuerst, ältestes gewinnt, leere Adressfelder ergänzen,
+  nie überschreiben) oder anlegen, Auftrag mit Herkunft, Retourenlabel
+  sofort — das Label nach dem Commit, damit ein externer Aufruf nie in
+  der Transaktion hängt. Scheitert es, bleibt der Auftrag `new` mit dem
+  Grund am Beleg und „Retourenlabel senden" wird erneut angeboten.
+- **Reparatur v2** mit `awaiting_device`, `received`, `shipped`; jeder
+  Zustand genau ein Schritt. `repair_confirm` wirft jetzt im falschen
+  Status (vorher still zurück) — konsistent mit `repair_end`. Der
+  Dashboard-Zähler zählt bis `shipped`: ein repariertes, nicht
+  zurückgegebenes Gerät ist offene Arbeit.
+- **XOR bietet Angebot UND Rückgabe an** (kostenpflichtig): das Modell folgt
+  allen Kanten, deren Bedingung hält — der Mitarbeiter entscheidet, ob vor
+  der Rückgabe ein Angebot nötig ist. Wer das erzwingen will, macht die
+  Kante `kosten→rueckversand` bedingt (Daten, kein Code).
+- **`ohne_label` statt eines zweiten Schritts „Abholung"**: je Version nur
+  ein Schritt je Zustand, und die XOR-Regel erlaubt nur eine Default-Kante.
+- **Sendungen gehören zu genau einem Beleg**: `shipments.picking_id` wird
+  optional, `repair_order_id` kommt dazu, ein Check erzwingt genau eins
+  (Expand-Contract). Der DHL-Aufruf lebt in einem gemeinsamen Kern
+  (`dhlLabelErzeugen`), Lieferung und Reparatur bleiben dünne Aufrufer;
+  Tracking-Sync läuft für beide unverändert.
+- **Kein Bestand für das Kundengerät**: der Geräteeingang setzt
+  `received_at` und ein Ereignis; `return_picking_id` bleibt tot.
+- **Werkszustand behält Felder ausgelieferter Prozesse** (0069 löschte alle
+  `feld_definitionen`; die Anfrage-Felder wären nach einem Reset weg).
+- **`mv_rma_analysis`** zählt `shipped` als repariert.
+- Verworfen: Mail als `dienst`-Schritt (Dienstschritte sind Endstationen
+  der Schrittsuche und blockierten Nachfolger); `versand.retourenlabel_erstellen`
+  um `repair_order_id` erweitern (zwei Wege für dasselbe Label, einer ohne
+  Statuswechsel); Vollautomat aus dem Formular (jede Müll-Eingabe würde zum
+  Beleg mit DHL-Label).
+
+Umsetzung: Registry `reparatur.anfrage_annehmen`, `reparatur.retourenlabel_senden`,
+`reparatur.geraet_eingegangen`, `reparatur.rueckversand_label`;
+`createLabelForRepair`; Outbox-Job `send_repair_request_email`; Fixtures
+`reparatur-anfrage.ts` (vier Läufe) und `reparatur.ts` (fünf Läufe).
+Doku: module/reparatur.md (neu geschrieben), prozesse.md, module/versand.md.
+Formular, Route, Scan-Kette und Oberfläche folgen in eigenen Commits.
+
 ## 2026-09-18 — Shopify-Lesemodus: ein Schalter, eine Naht, kein Nachlauf
 
 Auslöser: Vor dem Stichtag soll KRNL am Live-Shop hängen und mitlesen

@@ -118,6 +118,8 @@ function beschriftung(name: string): string {
     menge: 'Menge',
     note: 'Vermerk',
     vermerk: 'Vermerk',
+    label_senden: 'Retourenlabel sofort mailen',
+    ohne_label: 'Ohne DHL-Label (Abholung/Eigenversand)',
     hinweis: 'Hinweis',
     // Kombi-Aktionen (Auftrag/Bestellung mit Positionen)
     kunde: 'Kunde',

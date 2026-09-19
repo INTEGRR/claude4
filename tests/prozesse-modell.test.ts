@@ -100,10 +100,12 @@ describe('Prozessmodell: Standort und nächste Schritte', () => {
           select code from prozess_naechste_schritte('reparatur', ${r.id})`
       }
 
-      // Kostenpflichtig → das Angebot ist der nächste Schritt.
-      assert.deepEqual((await repair(false)).map((n) => n.code), ['angebot'])
-      // Garantie → direkt zum Ende, kein Angebot.
-      assert.deepEqual((await repair(true)).map((n) => n.code), [])
+      // Kostenpflichtig → Angebot UND Rückversand werden angeboten (das XOR
+      // folgt allen Kanten, deren Bedingung hält; der Mitarbeiter entscheidet,
+      // ob vor der Rückgabe ein Angebot nötig ist).
+      assert.deepEqual((await repair(false)).map((n) => n.code), ['angebot', 'rueckversand'])
+      // Garantie → nur die Rückgabe an den Kunden, kein Angebot.
+      assert.deepEqual((await repair(true)).map((n) => n.code), ['rueckversand'])
     })
   })
 

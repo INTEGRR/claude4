@@ -18,6 +18,16 @@ export interface MailInput {
   attachments?: MailAttachment[]
 }
 
+/** Nutzertext für HTML-Mails maskieren — Namen und Freitexte kommen von außen. */
+export function htmlSicher(wert: unknown): string {
+  return String(wert ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export function mailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY)
 }

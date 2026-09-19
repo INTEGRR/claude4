@@ -146,9 +146,12 @@ export const LABELS = {
   },
   repair: {
     new: 'Neu',
+    awaiting_device: 'Wartet auf Gerät',
+    received: 'Gerät eingegangen',
     confirmed: 'Bestätigt',
     under_repair: 'In Reparatur',
     repaired: 'Repariert',
+    shipped: 'Versendet',
     cancel: 'Abgebrochen',
   },
   absence: {
@@ -176,6 +179,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'full':
     case 'invoiced':
     case 'repaired':
+    case 'shipped':
     case 'fully_billed':
     case 'paid':
     case 'approved':
@@ -186,6 +190,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'transit':
     case 'purchase':
     case 'under_repair':
+    case 'received':
     case 'posted':
       return 'info'
     case 'cancel':
@@ -201,6 +206,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'to_close':
     case 'created':
     case 'requested':
+    case 'awaiting_device':
       return 'warn'
     default:
       return 'neutral'

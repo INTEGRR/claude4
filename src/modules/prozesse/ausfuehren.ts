@@ -174,6 +174,10 @@ export const AUSFUEHRUNG = {
   'reparatur.stornieren': reparatur.stornieren,
   'reparatur.angebot_erstellen': reparatur.angebotErstellen,
   'reparatur.details': reparatur.details,
+  'reparatur.anfrage_annehmen': reparatur.anfrageAnnehmen,
+  'reparatur.retourenlabel_senden': reparatur.retourenlabelSenden,
+  'reparatur.geraet_eingegangen': reparatur.geraetEingegangen,
+  'reparatur.rueckversand_label': reparatur.rueckversandLabel,
 
   'verkauf.auftrag_anlegen': verkauf.auftragAnlegen,
   'verkauf.auftrag_fuer_neuen_kunden': verkauf.auftragFuerNeuenKunden,

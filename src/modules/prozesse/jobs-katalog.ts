@@ -76,6 +76,13 @@ export const JOB_KATALOG = {
     beschreibung: 'Schickt das DHL-Retourenlabel samt QR-Code an den Kunden.',
     faehigkeit: 'mail:retourenlabel',
   },
+  send_repair_request_email: {
+    label: 'Reparaturanfrage bestätigen (Kunde)',
+    beschreibung:
+      'Eingangsbestätigung mit Vorgangsnummer an den Kunden, der über das öffentliche Formular ' +
+      'eine Reparatur angefragt hat.',
+    faehigkeit: 'mail:anfrage_bestaetigung',
+  },
 } satisfies Record<string, JobEintrag>
 
 export type JobKind = keyof typeof JOB_KATALOG

@@ -9,7 +9,7 @@ import {
   fetchFulfillmentOrders,
   updateTrackingInfo,
 } from './shopify'
-import { sendMail } from './mail'
+import { htmlSicher, sendMail } from './mail'
 import type { JobKind } from '@/modules/prozesse/jobs-katalog'
 
 /** Nachschlag über den (aus der DB stammenden) Job-Typ als String. */
@@ -264,26 +264,48 @@ const handlers = {
     return `${r.imported} Bestellung(en) übernommen — Übernahme abgeschlossen`
   },
 
-  /** Retourenlabel an den Kunden. */
+  /**
+   * Retourenlabel an den Kunden. Hängt das Label an einer Reparatur, nennt
+   * die Mail die RMA-Nummer — der Zettel im Paket ist am Wareneingang die
+   * zweite Kennung neben dem Barcode.
+   */
   async send_return_label_email(payload) {
     const labelId = String(payload.return_label_id)
     const [label] = await sql<
-      { shipment_number: string; qr_link: string | null; email: string | null; name: string }[]
+      {
+        shipment_number: string
+        qr_link: string | null
+        email: string | null
+        name: string
+        rma: string | null
+      }[]
     >`
-      select rl.shipment_number, rl.qr_link, p.email, p.name
-      from return_labels rl join partners p on p.id = rl.partner_id
+      select rl.shipment_number, rl.qr_link, p.email, p.name, r.number as rma
+      from return_labels rl
+      join partners p on p.id = rl.partner_id
+      left join repair_orders r on r.id = rl.repair_order_id
       where rl.id = ${labelId}`
     if (!label) return 'Retourenlabel nicht gefunden'
     if (!label.email) throw new Error(`${label.name} hat keine E-Mail-Adresse`)
 
+    const betreff = label.rma
+      ? `Ihr Retourenlabel für die Reparatur ${label.rma}`
+      : `Ihr Retourenlabel (${label.shipment_number})`
+    const einleitung = label.rma
+      ? `<p>anbei das Retourenlabel für Ihre Reparatur <strong>${htmlSicher(label.rma)}</strong>. ` +
+        `Bitte kleben Sie das Label auf das Paket und legen Sie einen Zettel mit der Nummer ` +
+        `<strong>${htmlSicher(label.rma)}</strong> und einer kurzen Fehlerbeschreibung bei.</p>`
+      : '<p>anbei Ihr Retourenlabel.</p>'
+
     await sendMail({
       to: label.email,
-      subject: `Ihr Retourenlabel (${label.shipment_number})`,
+      subject: betreff,
       html:
-        `<p>Hallo ${label.name},</p>` +
-        `<p>anbei Ihr Retourenlabel. Sendungsnummer: <strong>${label.shipment_number}</strong>.</p>` +
+        `<p>Hallo ${htmlSicher(label.name)},</p>` +
+        einleitung +
+        `<p>Sendungsnummer: <strong>${htmlSicher(label.shipment_number)}</strong>.</p>` +
         (label.qr_link
-          ? `<p>Alternativ ohne Ausdruck per QR-Code: <a href="${label.qr_link}">QR-Code öffnen</a></p>`
+          ? `<p>Alternativ ohne Ausdruck per QR-Code: <a href="${htmlSicher(label.qr_link)}">QR-Code öffnen</a></p>`
           : ''),
       attachments: payload.pdf_base64
         ? [{ filename: `Retourenlabel-${label.shipment_number}.pdf`, content: String(payload.pdf_base64) }]
@@ -291,7 +313,35 @@ const handlers = {
     })
 
     await sql`update return_labels set emailed_at = now() where id = ${labelId}`
-    return `Retourenlabel an ${label.email} gesendet`
+    return `Retourenlabel an ${label.email} gesendet${label.rma ? ` (${label.rma})` : ''}`
+  },
+
+  /**
+   * Eingangsbestätigung einer Reparaturanfrage aus dem Kundenformular. Über
+   * die Outbox, damit ein Mail-Ausfall die Anfrage nie verliert. Ohne
+   * E-Mail (telefonisch erfasst) gibt es nichts zu senden — kein Fehler.
+   */
+  async send_repair_request_email(payload) {
+    const vorgangId = String(payload.vorgang_id)
+    const [v] = await sql<
+      { number: string; zusatz: { email?: string; kontakt_name?: string } }[]
+    >`select number, zusatz from vorgaenge where id = ${vorgangId}`
+    if (!v) return 'Anfrage nicht mehr vorhanden'
+    const email = String(v.zusatz?.email ?? '').trim()
+    if (!email) return 'Keine E-Mail-Adresse — nichts zu senden'
+    const name = String(v.zusatz?.kontakt_name ?? '').trim() || 'Kundin/Kunde'
+
+    await sendMail({
+      to: email,
+      subject: `Ihre Reparaturanfrage ${v.number} ist eingegangen`,
+      html:
+        `<p>Hallo ${htmlSicher(name)},</p>` +
+        `<p>vielen Dank — Ihre Reparaturanfrage ist bei uns eingegangen und hat die Nummer ` +
+        `<strong>${htmlSicher(v.number)}</strong>.</p>` +
+        `<p>Wir prüfen die Anfrage und melden uns mit einem Retourenlabel für den Versand ` +
+        `des Geräts oder mit einer Rückfrage. Bitte schicken Sie das Gerät erst nach Erhalt des Labels.</p>`,
+    })
+    return `Eingangsbestätigung an ${email} gesendet`
   },
 } satisfies Record<JobKind, Handler>
 
@@ -321,9 +371,17 @@ async function originForJob(
     return { model: 'purchase_order', id: String(payload.purchase_order_id) }
   }
   if (kind === 'shopify_fulfillment_create' && payload.shipment_id) {
-    const [row] = await sql<{ picking_id: string }[]>`
+    const [row] = await sql<{ picking_id: string | null }[]>`
       select picking_id from shipments where id = ${String(payload.shipment_id)}`
-    if (row) return { model: 'stock_picking', id: row.picking_id }
+    if (row?.picking_id) return { model: 'stock_picking', id: row.picking_id }
+  }
+  if (kind === 'send_return_label_email' && payload.return_label_id) {
+    const [row] = await sql<{ repair_order_id: string | null }[]>`
+      select repair_order_id from return_labels where id = ${String(payload.return_label_id)}`
+    if (row?.repair_order_id) return { model: 'repair_order', id: row.repair_order_id }
+  }
+  if (kind === 'send_repair_request_email' && payload.vorgang_id) {
+    return { model: 'vorgang', id: String(payload.vorgang_id) }
   }
   return null
 }

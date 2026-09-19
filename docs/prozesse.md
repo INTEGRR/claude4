@@ -1248,6 +1248,57 @@ beweist die Kette Bestellung → Fertigung → Packtisch-Scan → picking done +
 Label + shopify_fulfillment_id + voll geliefert. Arbeitsplatz-Seite und
 Druckbrücke: docs/module/versand.md (folgt mit den nächsten Paketen).
 
+## Reparatur end-to-end: Kundenformular → Anfrage → Reparatur → Rückversand (Migrationen 0081/0082, umgesetzt)
+
+Der Reparaturprozess bekommt beide Enden per Post, und die Anfrage des
+Kunden wird ein eigener Laufzeit-Prozess. Entscheidungslog 2026-09-19,
+Fachdoku [module/reparatur.md](module/reparatur.md).
+
+**Prozess `reparatur_anfrage`** (modell `vorgang`, Bereich Reparatur; Felder
+`kontakt_name`, `email`, `telefon`, `strasse`, `hausnummer`, `plz`, `ort`,
+`land`, `fehlerbeschreibung`, `bestellnummer` als `feld_definitionen` am
+Prozess, sichtbar nur im Anlage-Schritt):
+
+| Schritt | Art | Aktion / Verknüpfung | Zustand |
+|---|---|---|---|
+| Anfrage eingegangen | start | | |
+| Anfrage erfassen | aktion | `vorgang.anlegen` | `neu` |
+| Rückfrage beim Kunden (optional) | aktion | `vorgang.status_setzen` | `rueckfrage` |
+| Annehmen → Reparaturauftrag | aktion | `reparatur.anfrage_annehmen` | `angenommen` |
+| Ablehnen | aktion | `vorgang.status_setzen` | `abgelehnt` |
+| Reparatur & Rückversand | prozess | Teilprozess `reparatur` (über `repair_orders.origin_*`) | |
+| Erledigt | ende | | |
+
+Das öffentliche Formular `/service/reparatur` legt den Vorgang ohne Sitzung
+an (Quelle `kundenformular`, Absender-Hash zur Drosselung) — der zweite
+sanktionierte Schreibweg neben der Registrierung.
+
+**Prozess `reparatur` v2** (per `prozess_version_kopieren`, v1 archiviert):
+neue Schritte `retourenlabel` (`reparatur.retourenlabel_senden` →
+`awaiting_device`, optional), `eingang` (`reparatur.geraet_eingegangen` →
+`received`) und `rueckversand` (`reparatur.rueckversand_label` → `shipped`);
+Kanten anlegen→retourenlabel („Gerät kommt per Post"), anlegen→bestaetigen
+(„Gerät liegt vor"), retourenlabel→eingang→bestaetigen, kosten→rueckversand
+(Default „Garantie / ohne Angebot"), angebot→rueckversand, rueckversand→ende;
+Storno zusätzlich aus `awaiting_device`/`received`. Angebot und Rückgabe
+werden nach `repaired` bei kostenpflichtigen Reparaturen beide angeboten.
+
+**Scan-Kette am Wareneingang:** Retouren-Sendungsnummer oder RMA-Nummer im
+Kopf-Scanfeld → Reparaturseite mit geöffnetem Formular „Gerät eingegangen"
+→ Enter. Keine Bestandsbuchung; erwartete Rücksendungen im Zulauf.
+
+**Sendungen ohne Lieferung:** `shipments.picking_id` ist optional,
+`repair_order_id` kommt dazu (genau eins per Check). Der DHL-Aufruf lebt im
+gemeinsamen Kern `dhlLabelErzeugen`; `createLabelForRepair` ist der zweite
+Aufrufer neben `createLabelForPicking`. Tracking-Sync unverändert.
+
+**Fixtures:** `reparatur-anfrage.ts` (annehmen mit Label, bekannter Kunde,
+annehmen ohne Label, ablehnen) und `reparatur.ts` (kostenpflichtig mit
+Angebot, Garantie mit DHL-Rückversand, per Post mit Retourenlabel/Eingang/
+Angebot/Rückversand, Abholung ohne Label, Storno). `tests/reparatur.test.ts`
+prüft die SQL-Statusfunktionen, `tests/reparatur-anfrage.test.ts` die
+Eingangsregeln, Felder und Registry-Statik.
+
 ## Noch offen (Kurzfassung)
 
 - **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:

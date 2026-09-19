@@ -65,9 +65,9 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **absences**: Abwesenheiten (kind 'vacation'|'sick'|'training'|'unpaid'|'other', starts_on, ends_on, half_day, state 'requested'|'approved'|'rejected'|'cancel', reason, decided_by, decided_at). Arbeitstage: absence_days(id).
 
 ### Reparatur & Versand
-- **repair_orders**: number ('RMA/…'), partner_id, variant_id, state ('new','confirmed','under_repair','repaired','cancel').
+- **repair_orders**: number ('RMA/…'), partner_id, variant_id, state ('new','awaiting_device' = Retourenlabel raus, wartet auf das Gerät,'received' = Gerät eingegangen,'confirmed','under_repair','repaired','shipped' = an den Kunden zurück,'cancel'), received_at, origin_model/origin_id/origin_label (Herkunft, z. B. 'vorgang' = Reparaturanfrage), note, under_warranty, sales_order_id (Angebot).
 - **repair_parts**: Teile (kind 'add'|'remove'|'recycle', variant_id, qty).
-- **shipments**: DHL-Sendungen (shipment_number, picking_id, sales_order_id, state 'created'|'manifested'|'transit'|'delivered'|'failure'|'cancelled', tracking_url).
+- **shipments**: DHL-Sendungen (shipment_number, picking_id ODER repair_order_id — genau eins: Lieferung oder Rückversand einer Reparatur —, sales_order_id, state 'created'|'manifested'|'transit'|'delivered'|'failure'|'cancelled', tracking_url).
 - **shipping_ready** (View): versandbereite Lieferungen (Lieferung 'assigned', keine offenen MOs).
 
 ### Kennzahlen (materialisierte Sichten, per Cron neu berechnet)
@@ -83,12 +83,12 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **prozesse**: Prozesskopf (code z. B. 'einkauf_wareneingang_rechnung', name, bereich, aktiv). **prozess_versionen** (prozess_id, nr, aktiv) mit **prozess_schritte** (schluessel, art 'start'|'aktion'|'ende'|'teilprozess', aktion = Registry-Name, zustand, optional, befugnis) und **prozess_uebergaenge** (von/nach, bedingung).
 - **prozess_instanzen**: laufende Assistenten (prozess_id, schritt, status 'laeuft'|'fertig'|'abgebrochen', daten jsonb mit beleg_id, gestartet_von).
 - **prozess_modelle** (code → Tabelle, Statusspalte, Detailroute), **prozess_routen** (Einstiegsrouten), **prozess_pakete** (Prozess-Pakete fürs Geschäftsmodell, prozess_codes[]), **prozess_overrides** (Laufzeit-Anpassungen). Ist ein Schritt Teil des aktiven Ablaufs: prozessschritt_aktiv(code, schluessel).
-- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb, origin_model/origin_id/origin_label — ein Vorgang kann selbst aus einem anderen Beleg entstehen). **feld_definitionen**: eigene Zusatzfelder ohne Migration (modell, name, label, typ, pflicht, auswahl, sichtbar_in). Sie gehören zu einem PROZESS (prozess_code) und optional nur zu bestimmten Schritten (schritte text[]); prozess_code null = für alle Belege des Modells. Werte landen im zusatz-jsonb und sind in Bedingungen als zusatz.name ansprechbar.
+- **vorgaenge**: generische Vorgänge des Chamäleon-Baukastens (nummer 'VG/…', art, titel, status, partner_id, zusatz jsonb, origin_model/origin_id/origin_label — ein Vorgang kann selbst aus einem anderen Beleg entstehen; quelle 'erp'|'kundenformular', absender_hash nur zur Drosselung öffentlicher Eingänge). **feld_definitionen**: eigene Zusatzfelder ohne Migration (modell, name, label, typ, pflicht, auswahl, sichtbar_in). Sie gehören zu einem PROZESS (prozess_code) und optional nur zu bestimmten Schritten (schritte text[]); prozess_code null = für alle Belege des Modells. Werte landen im zusatz-jsonb und sind in Bedingungen als zusatz.name ansprechbar.
 - **bug_reports**: Tickets (number 'BUG/…', titel, beschreibung, status 'offen'|'in_arbeit'|'behoben'|'geschlossen', schwere, seite, commit_sha).
 
 ### Versand-Extras & Shopify-Abgleich
 - **operation_types**: Transferarten (name, kind 'receipt'|'delivery'|'internal'|'repair', sequence_code). **warehouses**: Lagerhäuser (code, name).
-- **packagings**: Kartonagen (name, Innenmaße, max_weight_g, kosten). **shipping_rules**: Versandregeln zur Kartonagen-/Produktwahl (priority, bedingungen, packaging_id). **return_labels**: Retourenlabels (shipment_number, sales_order_id, state).
+- **packagings**: Kartonagen (name, Innenmaße, max_weight_g, kosten). **shipping_rules**: Versandregeln zur Kartonagen-/Produktwahl (priority, bedingungen, packaging_id). **return_labels**: Retourenlabels (shipment_number, partner_id, sales_order_id, repair_order_id — Retoure zu einer Reparatur mit RMA-Nummer als Referenz —, emailed_at).
 - **shopify_unmatched_lines**: Klärliste nicht zuordenbarer Shopify-Positionen (order_name, sku, title, resolved_at). **shopify_inventory_state** / **shopify_sync_state**: Abgleich-Zustand (variant_id bzw. Schlüssel, zuletzt gemeldete Menge/Cursor).
 - **uom_categories**: Einheitenkategorien. **product_template_attribute_lines**: welche Attribute ein Template nutzt. **bom_byproducts**: Kuppelprodukte einer Stückliste (variant_id, qty).
 
