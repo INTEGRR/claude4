@@ -26,3 +26,10 @@ export async function resetPassword(userId: string, formData: FormData): Promise
 export async function setBefugnisse(userId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('einstellungen.benutzer_befugnisse', { recordId: userId, formData })
 }
+
+export async function resetZweiFaktor(userId: string): Promise<ActionResult> {
+  return serverAktion('einstellungen.benutzer_zweifaktor_zuruecksetzen', {
+    recordId: userId,
+    parameter: {},
+  })
+}

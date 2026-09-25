@@ -27,6 +27,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       steht** (Outbox, Webhooks, Shopify-Abgleich, Tracking, Aufräumen).
       Vercel schickt ihn bei eigenen Aufrufen automatisch als Bearer mit.
 - [ ] `SESSION_SECRET` ist gesetzt und nicht der Wert aus einem Beispiel.
+- [ ] `ZWEIFAKTOR_SCHLUESSEL` setzen (eigener Zufallswert, `openssl rand -hex 32`):
+      verschlüsselt die TOTP-Geheimnisse des zweiten Faktors. Fehlt er, nimmt
+      KRNL `SESSION_SECRET` — dann darf DER sich nie mehr ändern, sonst
+      müssen alle Benutzer die Authenticator-App neu einrichten.
 - [ ] **DHL** (alle aus der Produktions-App im DHL Developer Portal bzw.
       dem Geschäftskundenportal, Sandbox-Werte raus):
   - `DHL_API_BASE=https://api-eu.dhl.com`
@@ -94,6 +98,12 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 - [ ] Benutzerkonten je Rolle anlegen (Odoo-Konten werden nicht
       migriert); Rollenmodell in
       [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md).
+- [ ] **Zweiter Faktor ist Pflicht für alle** (Standard): jeder Benutzer
+      braucht beim ersten Login nach dem Deploy eine Authenticator-App auf
+      dem Telefon und richtet sie direkt ein — vorher ankündigen, Backup-
+      Codes sichern lassen. Der Admin, der den Deploy macht, richtet als
+      Erster ein (Seed-Konto eingeschlossen). Lockern geht unter
+      Einstellungen → Sicherheit (`admins` / `freiwillig`).
 
 ## 5. Versand fachlich (KRNL + Betreiber)
 

@@ -292,6 +292,16 @@ const RAHMEN_AKTIONEN = new Set([
   // Anmeldung/Abmeldung: Rahmen der Sitzung, keine Fachaktion an einem Beleg.
   'login:signIn',
   'layout:signOut',
+  // Zweiter Faktor (0083): Code prüfen, Einrichtung abschließen, Abbruch =
+  // Abmelden — dieselbe Kategorie wie signIn/signOut.
+  'login/code:codePruefen',
+  'login/code:abbrechen',
+  'login/einrichten:einrichtungBestaetigen',
+  'login/einrichten:abbrechen',
+  // Eigenes Konto (Backup-Codes, vertraute Geräte): Identität der Sitzung,
+  // kein Beleg, kein Bereich — mit eigenem Audit-Eintrag am Benutzer.
+  'konto:backupCodesErneuern',
+  'konto:geraetWiderrufen',
 ])
 
 describe('Registry-Abdeckung (statisch)', () => {

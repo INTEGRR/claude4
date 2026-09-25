@@ -37,6 +37,50 @@ Passwortprüfung). Gespeichert wird nur ein Hash aus Konto bzw. IP mit
 `SESSION_SECRET` — kein Klartext; der Housekeeping-Cron räumt nach einem
 Tag ab. Die Tabelle `login_versuche` steht auf der KI-Sperrliste.
 
+### Zweiter Faktor (Authenticator-App, seit 0083)
+
+Nach dem Passwort verlangt KRNL einen sechsstelligen Code aus einer
+Authenticator-App (TOTP: Google Authenticator, Authy, 1Password, Bitwarden …).
+Technisch ist der zweite Faktor ein **Zustand der Sitzung**: das Passwort
+erzeugt eine *wartende* Sitzung (zehn Minuten, `zweiter_faktor_ok = false`),
+der Code bestätigt sie auf 30 Tage. `currentUser()` liefert nur bestätigte
+Sitzungen — Seiten und API-Routen brauchen dafür nichts zu wissen.
+
+- **Pflicht** steuert der Betreiber unter Einstellungen → Sicherheit
+  (`settings.sicherheit.zwei_faktor`): `alle` (Standard), `admins` oder
+  `freiwillig`. Wer unter die Pflicht fällt und noch keinen Faktor hat,
+  landet beim nächsten Seitenaufruf auf `/login/einrichten` — auch mit einer
+  Altsitzung.
+- **Einrichtung** (`/login/einrichten`): QR-Code scannen oder Geheimnis
+  abtippen, ersten Code eingeben. Danach zeigt Konto & Sicherheit **einmalig
+  zehn Backup-Codes** (`xxxx-xxxx`, jeder gilt einmal, nur Hashes in der
+  Datenbank) — für den Notfall ohne Telefon. Neue Codes gibt es dort gegen
+  den aktuellen App-Code; die alten verfallen sofort.
+- **Vertraute Geräte**: beim Code-Eingeben „Dieses Gerät 30 Tage merken"
+  (Cookie `erp_geraet`, Hash in `vertraute_geraete`). Der Benutzer sieht seine
+  Geräte unter Konto & Sicherheit (`/konto`, jede Rolle) und entfernt sie
+  dort; ein Admin-Reset räumt sie mit.
+- **Drossel**: falsche Codes zählen wie falsche Passwörter (fünf je Konto in
+  15 Minuten). Ein Code gilt nur einmal (`users.totp_letzter_schritt`), auch
+  nicht aus zwei Browsern gleichzeitig; das Prüf-Fenster ist ±30 Sekunden
+  (Uhrenabweichung des Telefons).
+- **Telefon verloren**: Backup-Code, sonst Einstellungen → Benutzer → „2FA
+  zurücksetzen" (entfernt Geheimnis, Codes, Geräte und Sitzungen; der nächste
+  Login richtet neu ein). Ist der **einzige Administrator** ausgesperrt,
+  bleibt der Notfallweg über die Datenbank:
+  `update users set totp_secret = null, totp_aktiviert_at = null,
+  totp_letzter_schritt = null where email = '…';` (dann bei Pflicht
+  Neu-Einrichtung beim nächsten Login).
+- **Geheimnisse** liegen AES-256-GCM-verschlüsselt in `users.totp_secret`;
+  Schlüssel ist `ZWEIFAKTOR_SCHLUESSEL`, ersatzweise `SESSION_SECRET`. Wer
+  den Schlüssel rotiert, macht alle Einrichtungen unlesbar — dann richten
+  alle neu ein (Admin-Reset je Konto). `backup_codes` und
+  `vertraute_geraete` stehen auf der KI-Sperrliste und überleben
+  „Betriebsdaten löschen".
+- **Verlauf**: Anmeldungen (Methode, vertrautes Gerät), Backup-Code-Nutzung,
+  Einrichtung und Resets stehen als `audit_log`-Einträge am Benutzer —
+  sichtbar unter Konto & Sicherheit.
+
 ## Kommentare an jedem Datensatz
 
 Jede Detailseite (Verkauf, Einkauf, Rechnung, Fertigung, Stückliste,

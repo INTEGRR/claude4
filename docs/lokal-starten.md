@@ -153,6 +153,13 @@ Browser öffnen: **<http://localhost:3000>** (bzw. der Port, den du über
 | E-Mail | `admin@example.com` |
 | Passwort | `erp-admin` |
 
+**Zweiter Faktor:** Beim ersten Login verlangt KRNL die Einrichtung einer
+Authenticator-App (Pflicht für alle, Standard) — QR-Code mit dem Telefon
+scannen, Code eingeben, Backup-Codes sichern. Wer nur lokal ausprobiert und
+das nicht will, schaltet die Pflicht nach der Einrichtung unter Einstellungen
+→ Sicherheit auf „freiwillig" (oder vorab per SQL:
+`insert into settings (key, value) values ('sicherheit', '{"zwei_faktor":"freiwillig"}')`).
+
 Für die Rollen liegen zwei weitere Demo-Konten bei (Passwort jeweils
 `erp-admin`): **`lager@example.com`** sieht nur Lager, Versand, Reparatur
 und den Scanner; **`fertigung@example.com`** nur Fertigung, Reparatur und

@@ -50,6 +50,13 @@ async function saveShopifyModus(formData: FormData) {
   return serverAktion('einstellungen.shopify_modus_setzen', { formData })
 }
 
+async function saveSicherheit(formData: FormData) {
+  'use server'
+  // Pflicht für den zweiten Faktor — Registry-Aktion, damit der Wechsel
+  // auditiert ist (wer hat die Pflicht gelockert).
+  return serverAktion('einstellungen.sicherheit_setzen', { formData })
+}
+
 async function saveDhl(formData: FormData) {
   'use server'
   await requireAdmin()
@@ -201,6 +208,14 @@ export default async function EinstellungenPage() {
   const druckModus = druckbruecke.modus === 'bruecke' ? 'bruecke' : 'pdf'
   const shopifyModus = get<{ modus?: string }>('shopify').modus === 'schreiben' ? 'schreiben' : 'lesen'
   const finanzen = get<Record<string, number>>('finanzen')
+  const sicherheit = get<{ zwei_faktor?: string }>('sicherheit')
+  const zweiFaktor = ['admins', 'freiwillig'].includes(sicherheit.zwei_faktor ?? '')
+    ? (sicherheit.zwei_faktor as 'admins' | 'freiwillig')
+    : 'alle'
+  const [zweiFaktorStand] = await sql<{ gesamt: number; eingerichtet: number }[]>`
+    select count(*)::int as gesamt,
+           count(*) filter (where totp_aktiviert_at is not null)::int as eingerichtet
+    from users where active`
 
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen, nicht
   // mehr in der Tabellenspalte.
@@ -334,6 +349,42 @@ export default async function EinstellungenPage() {
             Gilt sofort für neue Anfragen. Faustregel: Opus für den Prozess-Entwurf, Sonnet für
             Auswertungen, Haiku für den Sprachmodus — so bleiben die Kosten im Rahmen, ohne
             Qualität dort zu verlieren, wo sie zählt.
+          </div>
+        </ActionForm>
+      </Card>
+
+      <Card title="Sicherheit (zweiter Faktor)">
+        <ActionForm action={saveSicherheit}>
+          <div className="mono-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <span className={zweiFaktorStand.eingerichtet === zweiFaktorStand.gesamt ? 'led ok' : 'led warn'} />
+            {zweiFaktorStand.eingerichtet} von {zweiFaktorStand.gesamt} aktiven Konten haben die
+            Authenticator-App eingerichtet
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            {(
+              [
+                ['alle', 'Pflicht für alle', 'Jeder Benutzer richtet den zweiten Faktor beim nächsten Seitenaufruf ein — auch Lager- und Werkstattkonten.'],
+                ['admins', 'Pflicht für Administratoren', 'Administratoren müssen, alle anderen können freiwillig (Konto & Sicherheit).'],
+                ['freiwillig', 'Freiwillig', 'Niemand wird zur Einrichtung geschickt; wer will, richtet ihn im eigenen Konto ein.'],
+              ] as const
+            ).map(([wert, titel, text]) => (
+              <label key={wert} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                <input type="radio" name="zwei_faktor" value={wert} defaultChecked={zweiFaktor === wert} />
+                <span>
+                  <strong>{titel}</strong> — {text}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="row">
+            <div className="shrink field">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+          <div className="notice info" style={{ marginBottom: 0 }}>
+            Gilt sofort. Telefon verloren: „2FA zurücksetzen" unter Benutzer verwalten — der
+            nächste Login richtet neu ein. Vertraute Geräte (30 Tage) verwaltet jeder Benutzer
+            selbst unter Konto &amp; Sicherheit.
           </div>
         </ActionForm>
       </Card>

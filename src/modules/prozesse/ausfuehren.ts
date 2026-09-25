@@ -70,6 +70,8 @@ export const AUSFUEHRUNG = {
   'einstellungen.benutzer_aktiv': einstellungen.benutzerAktiv,
   'einstellungen.benutzer_befugnisse': einstellungen.benutzerBefugnisse,
   'einstellungen.benutzer_passwort': einstellungen.benutzerPasswort,
+  'einstellungen.benutzer_zweifaktor_zuruecksetzen': einstellungen.benutzerZweifaktorZuruecksetzen,
+  'einstellungen.sicherheit_setzen': einstellungen.sicherheitSetzen,
 
   'fehler.ticket_melden': fehler.ticketMelden,
   'fehler.ticket_status': fehler.ticketStatus,

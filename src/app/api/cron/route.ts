@@ -5,7 +5,7 @@ import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen
 import { runDueJobs } from '@/modules/integrationen/jobs'
 import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
-import { pruneLoginVersuche, pruneSessions } from '@/modules/auth'
+import { pruneLoginVersuche, pruneSessions, pruneGeraete } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
 
@@ -72,6 +72,7 @@ export async function GET(request: Request) {
           task,
           sessions: await pruneSessions(),
           logins: await pruneLoginVersuche(),
+          geraete: await pruneGeraete(),
           tracking: await pruneTrackingData(),
           monitor: await pruneMonitorData(),
           tuev: 'eingereiht',

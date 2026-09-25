@@ -3,8 +3,8 @@ import { requireArea, requireAdmin } from '@/modules/auth'
 import { ALLE_BEFUGNISSE, ALL_ROLES, BEFUGNISSE, ROLE_LABELS, type Role } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, PageHeader, TableWrap } from '@/components/ui'
-import { dateTime } from '@/modules/shared/format'
-import { createUser, resetPassword, setActive, setBefugnisse, setRole } from './actions'
+import { date as datum, dateTime } from '@/modules/shared/format'
+import { createUser, resetPassword, resetZweiFaktor, setActive, setBefugnisse, setRole } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,8 +21,10 @@ export default async function BenutzerPage() {
       befugnisse: string[]
       active: boolean
       created_at: string
+      totp_aktiviert_at: string | null
     }[]
-  >`select id, email, name, role, befugnisse, active, created_at from users order by created_at`
+  >`select id, email, name, role, befugnisse, active, created_at, totp_aktiviert_at
+    from users order by created_at`
 
   const activeAdmins = users.filter((u) => u.role === 'admin' && u.active).length
 
@@ -30,7 +32,7 @@ export default async function BenutzerPage() {
     <>
       <PageHeader
         title="Benutzer"
-        subtitle="Konten und Rollen. Lager- und Fertigungsrollen sehen nur ihre Bereiche."
+        subtitle="Konten und Rollen. Lager- und Fertigungsrollen sehen nur ihre Bereiche. Pflicht für den zweiten Faktor: Einstellungen → Sicherheit."
       />
 
       <Card title={`Konten (${users.length})`} tight>
@@ -43,6 +45,7 @@ export default async function BenutzerPage() {
                 <th>Rolle</th>
                 <th>Befugnisse</th>
                 <th>Status</th>
+                <th>2FA</th>
                 <th>Angelegt</th>
                 <th />
               </tr>
@@ -121,6 +124,16 @@ export default async function BenutzerPage() {
                         {u.active ? 'aktiv' : 'deaktiviert'}
                       </span>
                     </td>
+                    <td>
+                      <span
+                        className="mono-label"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        title={u.totp_aktiviert_at ? 'Authenticator-App eingerichtet' : 'Zweiter Faktor fehlt'}
+                      >
+                        <span className={u.totp_aktiviert_at ? 'led ok' : 'led warn'} />
+                        {u.totp_aktiviert_at ? `seit ${datum(u.totp_aktiviert_at)}` : 'fehlt'}
+                      </span>
+                    </td>
                     <td className="nowrap small muted mono">{dateTime(u.created_at)}</td>
                     <td className="num">
                       <div className="actions">
@@ -138,6 +151,14 @@ export default async function BenutzerPage() {
                             Aktivieren
                           </ActionButton>
                         )}
+                        <ActionButton
+                          className="small"
+                          action={resetZweiFaktor.bind(null, u.id)}
+                          title="Telefon verloren oder gewechselt: Geheimnis, Backup-Codes, Geräte und Sitzungen entfernen"
+                          confirm={`Zweiten Faktor von ${u.name} zurücksetzen? Alle Sitzungen enden, der nächste Login richtet neu ein.`}
+                        >
+                          2FA zurücksetzen
+                        </ActionButton>
                         <details style={{ display: 'inline-block' }}>
                           <summary className="btn small">Passwort…</summary>
                           <ActionForm action={resetPassword.bind(null, u.id)} style={{ marginTop: 6 }}>

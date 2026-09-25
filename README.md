@@ -102,7 +102,10 @@ npm run dev                   # http://localhost:3000
 ```
 
 Anmeldung mit den beim Seed ausgegebenen Zugangsdaten
-(Standard: `admin@example.com` / `erp-admin` — bitte danach ändern).
+(Standard: `admin@example.com` / `erp-admin` — bitte danach ändern). Der
+erste Login richtet den zweiten Faktor ein (Authenticator-App, Pflicht für
+alle — umschaltbar unter Einstellungen → Sicherheit); dafür muss
+`SESSION_SECRET` oder `ZWEIFAKTOR_SCHLUESSEL` in der `.env` stehen.
 
 Die Beispieldaten enthalten eine Tastatur mit drei Farbvarianten und eine
 Stückliste mit 20 Positionen, in der Gehäuse und Keycaps je Farbe gefiltert

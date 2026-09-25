@@ -5,6 +5,7 @@ import { JOB_KATALOG } from '../jobs-katalog.ts'
 import { EREIGNISSE } from '../ereignisse.ts'
 import { entwurfPruefen } from '../entwurf-pruefen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { zweifaktorZuruecksetzen } from '../../auth/zweifaktor.ts'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
 
@@ -806,6 +807,43 @@ export async function benutzerPasswort(
   await sql`delete from sessions where user_id = ${userId}`
   await sql`select log_event('user', ${userId}, 'state', 'Passwort zurückgesetzt', ${ctx.actor})`
   return { recordId: userId }
+}
+
+export async function benutzerZweifaktorZuruecksetzen(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const userId = ctx.recordId!
+  const [row] = await sql<{ name: string; aktiv: boolean }[]>`
+    select name, totp_aktiviert_at is not null as aktiv from users where id = ${userId}`
+  if (!row) throw new Error('Benutzer nicht gefunden')
+  await zweifaktorZuruecksetzen(sql, userId)
+  await sql`select log_event('user', ${userId}, 'state',
+    ${row.aktiv
+      ? 'Zweiter Faktor zurückgesetzt — Geheimnis, Backup-Codes, vertraute Geräte und Sitzungen entfernt'
+      : 'Zweiter Faktor zurückgesetzt (war nicht eingerichtet) — Sitzungen und Geräte entfernt'},
+    ${ctx.actor})`
+  return {
+    text: `Zweiter Faktor von ${row.name} zurückgesetzt — der nächste Login richtet neu ein.`,
+    recordId: userId,
+  }
+}
+
+export async function sicherheitSetzen(
+  p: { zwei_faktor: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value) values ('sicherheit', ${sql.json({ zwei_faktor: p.zwei_faktor })})
+    on conflict (key) do update
+      set value = settings.value || ${sql.json({ zwei_faktor: p.zwei_faktor })}::jsonb`
+  const text =
+    p.zwei_faktor === 'alle'
+      ? 'Zweiter Faktor ist Pflicht für alle — wer ihn nicht hat, richtet ihn beim nächsten Seitenaufruf ein.'
+      : p.zwei_faktor === 'admins'
+        ? 'Zweiter Faktor ist Pflicht für Administratoren, freiwillig für alle anderen.'
+        : 'Zweiter Faktor ist freiwillig — niemand wird zur Einrichtung geschickt.'
+  return { text }
 }
 
 // --- Registrierungen von der öffentlichen Startseite ------------------------

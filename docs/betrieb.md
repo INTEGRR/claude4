@@ -87,6 +87,12 @@ kein eigener Server betrieben werden soll.
 Beide Varianten laufen mit derselben Codebasis — die Entscheidung lässt sich
 später ohne Umbau ändern.
 
+Seit 0083 hat KRNL einen eigenen **zweiten Faktor** (Authenticator-App,
+Pflicht für alle per Standard, Details in
+[module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)).
+Ein Zugangsschutz vor der App (Cloudflare Access, VPN) bleibt sinnvoll gegen
+Angriffsfläche, ist aber für den Schutz der Konten nicht mehr Voraussetzung.
+
 ---
 
 ## Lokal ausprobieren

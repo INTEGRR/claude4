@@ -63,8 +63,16 @@ DIRECT_URL       postgres://postgres.<ref>:<passwort>@aws-1-eu-central-1.pooler.
 SESSION_SECRET   <32 Byte Zufall, z. B. `openssl rand -hex 32`>
 ```
 
-Ohne `SESSION_SECRET` lässt sich niemand anmelden. Der Wert darf sich später
-ändern — dann sind alle offenen Sitzungen ungültig, mehr passiert nicht.
+`SESSION_SECRET` salzt die Login-Drossel und die Backup-Codes des zweiten
+Faktors — und dient als Rückfall-Schlüssel für die verschlüsselten TOTP-
+Geheimnisse, wenn `ZWEIFAKTOR_SCHLUESSEL` fehlt. **Deshalb nicht leichtfertig
+rotieren:** ohne eigenen `ZWEIFAKTOR_SCHLUESSEL` macht eine Änderung alle
+Einrichtungen der Authenticator-App unlesbar, und jeder Benutzer muss (nach
+Admin-Reset) neu einrichten. Empfohlen:
+
+```
+ZWEIFAKTOR_SCHLUESSEL   <32 Byte Zufall, eigener Wert>
+```
 
 **Pflicht auf Vercel:**
 

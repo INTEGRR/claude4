@@ -653,6 +653,40 @@ export const EINSTELLUNGEN = {
     formdata: (fd) => ({ password: String(fd.get('password') ?? '') }),
     revalidate: ['/einstellungen/benutzer'],
   },
+
+  'einstellungen.benutzer_zweifaktor_zuruecksetzen': {
+    label: 'Zweiten Faktor zurücksetzen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Entfernt TOTP-Geheimnis, Backup-Codes und vertraute Geräte eines Kontos und beendet ' +
+      'seine Sitzungen — für Telefon verloren oder Wechsel. Der nächste Login richtet neu ein ' +
+      '(bei Pflicht) bzw. läuft ohne zweiten Faktor (freiwillig).',
+    bindung: 'beleg',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/benutzer'],
+  },
+
+  'einstellungen.sicherheit_setzen': {
+    label: 'Sicherheit: Pflicht für den zweiten Faktor',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Betreiber-Schalter (settings.sicherheit): „alle" = jeder Benutzer richtet den zweiten ' +
+      'Faktor beim nächsten Login ein, „admins" = nur Administratoren müssen, „freiwillig" = ' +
+      'niemand muss. Standard ohne Eintrag ist alle.',
+    bindung: 'frei',
+    schema: z.object({
+      zwei_faktor: z
+        .enum(['alle', 'admins', 'freiwillig'])
+        .describe('alle | admins | freiwillig'),
+    }),
+    zusammenfassung: (p) => `Zweiter Faktor: ${p.zwei_faktor}`,
+    formdata: (fd) => ({ zwei_faktor: String(fd.get('zwei_faktor') ?? 'alle') }),
+    revalidate: ['/einstellungen', '/einstellungen/benutzer'],
+  },
   // --- Registrierungen von der öffentlichen Startseite ----------------------
 
   'einstellungen.registrierung_status': {

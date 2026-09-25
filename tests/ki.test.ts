@@ -38,6 +38,9 @@ describe('KI: SQL-Werkzeug (Schutzmechanismen)', () => {
       'select value from settings',
       'select password_hash from partners',
       'select * from integration_jobs',
+      'select code_hash from backup_codes',
+      'select token_hash from vertraute_geraete',
+      'select totp_secret from partners',
     ]) {
       const result = await runReadOnlyQuery(db(), query)
       assert.ok(result.error, `sollte blockiert werden: ${query}`)
@@ -412,6 +415,8 @@ describe('KI: Schema-Doku wächst mit dem Schema (Wächter)', () => {
     'users',                    // Passworthashes — per Sperrliste blockiert
     'sessions',                 // Sitzungstokens — per Sperrliste blockiert
     'login_versuche',           // Fehlversuchs-Hashes der Login-Drossel — per Sperrliste blockiert
+    'backup_codes',             // Hashes der 2FA-Notfallcodes — per Sperrliste blockiert
+    'vertraute_geraete',        // Geräte-Token-Hashes (2FA) — per Sperrliste blockiert
     'settings',                 // API-Schlüssel möglich — per Sperrliste blockiert
     'integration_jobs',         // Outbox mit Payloads — per Sperrliste blockiert
     'sprachprotokolle',         // Gesprächsmitschnitte — per Sperrliste blockiert

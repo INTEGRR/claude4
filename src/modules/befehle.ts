@@ -70,6 +70,8 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/einstellungen/nutzung', label: 'Nutzungsbericht', area: 'einstellungen' },
   { href: '/einstellungen/registrierungen', label: 'Registrierungen (Startseite)', area: 'einstellungen' },
   { href: '/tickets', label: 'Tickets', area: 'fehler' },
+  // Jede Rolle: 'fehler' ist der eine Bereich, den alle erreichen (Seite prüft nur requireUser).
+  { href: '/konto', label: 'Konto & Sicherheit (zweiter Faktor)', area: 'fehler' },
 ]
 
 export function befehlsKatalog(

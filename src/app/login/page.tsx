@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
-import { currentUser, login } from '@/modules/auth'
+import { currentUser, login, wartenderNutzer } from '@/modules/auth'
 import { sql } from '@/db/client'
-import { ThemeToggle } from '@/components/theme-toggle'
-import { HexcoreMark, Wortmarke } from '@/components/marke'
+import { LoginRahmen } from './rahmen'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,9 +10,11 @@ async function signIn(formData: FormData) {
   const email = String(formData.get('email') ?? '')
   const password = String(formData.get('password') ?? '')
 
-  const user = await login(email, password)
-  if (user === 'gesperrt') redirect('/login?fehler=gesperrt')
-  if (!user) redirect('/login?fehler=1')
+  const ergebnis = await login(email, password)
+  if (ergebnis === 'gesperrt') redirect('/login?fehler=gesperrt')
+  if (!ergebnis) redirect('/login?fehler=1')
+  // Zweiter Schritt: die wartende Sitzung liegt bereits im Cookie.
+  if ('schritt' in ergebnis) redirect(ergebnis.schritt === 'code' ? '/login/code' : '/login/einrichten')
   redirect('/')
 }
 
@@ -23,62 +24,47 @@ export default async function LoginPage({
   searchParams: Promise<{ fehler?: string }>
 }) {
   if (await currentUser()) redirect('/')
+  // Passwort schon geprüft, Code fehlt noch: nicht das Formular zeigen,
+  // sondern dort weitermachen, wo die Anmeldung steht.
+  const wartend = await wartenderNutzer()
+  if (wartend) redirect(wartend.totpAktiv ? '/login/code' : '/login/einrichten')
 
   const params = await searchParams
   const [{ count }] = await sql<{ count: number }[]>`select count(*)::int as count from users`
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        {/* Typenschild wie in der Anwendung — auch der Anmeldeschirm gehört zur Maschine. */}
-        <div style={{ padding: '0 2px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <HexcoreMark groesse={26} />
-            <Wortmarke groesse={20} />
-          </div>
-          <div
-            className="mono-label"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}
-          >
-            <span className="led ok" /> System bereit
-          </div>
+    <LoginRahmen titel="Anmelden">
+      {params.fehler === 'gesperrt' ? (
+        <div className="notice danger">
+          Zu viele Fehlversuche — die Anmeldung ist für dieses Konto 15 Minuten gesperrt.
         </div>
-        <div className="card">
-          <header>Anmelden</header>
-          <div className="body">
-            {params.fehler === 'gesperrt' ? (
-              <div className="notice danger">
-                Zu viele Fehlversuche — die Anmeldung ist für dieses Konto 15 Minuten gesperrt.
-              </div>
-            ) : params.fehler ? (
-              <div className="notice danger">E-Mail-Adresse oder Passwort ist falsch.</div>
-            ) : null}
-            {count === 0 && (
-              <div className="notice warn">
-                Es existiert noch kein Benutzer. Lege einen an mit:
-                <br />
-                <code className="mono">npm run db:seed</code>
-              </div>
-            )}
-            <form action={signIn}>
-              <label className="field">
-                <span>E-Mail</span>
-                <input type="email" name="email" required autoFocus autoComplete="username" />
-              </label>
-              <label className="field">
-                <span>Passwort</span>
-                <input type="password" name="password" required autoComplete="current-password" />
-              </label>
-              <button className="primary" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
-                Anmelden
-              </button>
-            </form>
-          </div>
+      ) : params.fehler === 'abgelaufen' ? (
+        <div className="notice warn">
+          Die Anmeldung ist abgelaufen — bitte erneut anmelden.
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ThemeToggle />
+      ) : params.fehler ? (
+        <div className="notice danger">E-Mail-Adresse oder Passwort ist falsch.</div>
+      ) : null}
+      {count === 0 && (
+        <div className="notice warn">
+          Es existiert noch kein Benutzer. Lege einen an mit:
+          <br />
+          <code className="mono">npm run db:seed</code>
         </div>
-      </div>
-    </div>
+      )}
+      <form action={signIn}>
+        <label className="field">
+          <span>E-Mail</span>
+          <input type="email" name="email" required autoFocus autoComplete="username" />
+        </label>
+        <label className="field">
+          <span>Passwort</span>
+          <input type="password" name="password" required autoComplete="current-password" />
+        </label>
+        <button className="primary" type="submit" style={{ width: '100%', justifyContent: 'center' }}>
+          Anmelden
+        </button>
+      </form>
+    </LoginRahmen>
   )
 }

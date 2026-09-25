@@ -9,6 +9,64 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-25 — Zweiter Faktor in der App: TOTP als Sitzungszustand, Pflicht per Einstellung, vertraute Geräte
+
+Revidiert den Punkt „kein zweiter Faktor in der Anwendung" aus dem
+Sicherheitscheck vom 2026-09-18. Damals hieß die Empfehlung Cloudflare Access
+vor der App; der Betreiber will den zweiten Faktor jetzt in KRNL selbst — auch
+weil ein Zugangsschutz vor der App das öffentliche Formular-/API-Modell
+(Startseite, Reparaturanfrage, Cron) nicht abdecken kann und der Login an
+einer öffentlichen URL hängt.
+
+**Entschieden (Migration 0083, `src/modules/auth/{totp,geheimnis,zweifaktor}.ts`):**
+
+- **Verfahren: TOTP** (RFC 6238, SHA1, sechs Stellen, 30 s) für jede
+  Authenticator-App, selbst gerechnet mit `node:crypto` und gegen die
+  RFC-Vektoren getestet — keine Bibliothek, kein externer Dienst. Verworfen:
+  Passkeys (Domain-Bindung, geteilte Lagerrechner, deutlich mehr Aufwand) und
+  E-Mail-Codes (hängen an Resend, schwächstes Verfahren).
+- **Der zweite Faktor ist ein Zustand der Sitzung**, kein zweites Token-
+  Modell: `sessions.zweiter_faktor_ok`. Nach dem Passwort entsteht eine
+  *wartende* Sitzung (zehn Minuten), `currentUser()` liefert nur bestätigte —
+  alle 33 Konsumenten (Seiten, API-Routen, Torwächter) sind damit ohne eigene
+  Änderung geschützt. Bestandssitzungen bleiben gültig (Default `true`); die
+  Pflicht greift trotzdem sofort über das Layout-Tor (`/login/einrichten`
+  liegt außerhalb der `(erp)`-Gruppe, sonst Redirect-Kreis). Verworfen: ein
+  zustandsloser Challenge-Token — die Drossel und der Ausschluss verbrauchter
+  Codes brauchen ohnehin Zustand.
+- **Pflicht per Einstellung** `settings.sicherheit.zwei_faktor`
+  (`alle` | `admins` | `freiwillig`), Standard und Betreiberwunsch: **alle**.
+  Registry-Aktion `einstellungen.sicherheit_setzen`, damit das Lockern
+  auditiert ist.
+- **Vertraute Geräte 30 Tage** (Cookie `erp_geraet`, Tabelle
+  `vertraute_geraete` mit Hash) — der Benutzer sieht und widerruft sie unter
+  Konto & Sicherheit; der Admin-Reset räumt sie mit.
+- **Backup-Codes** (zehn, `xxxx-xxxx`, nur als Hash) — einmal angezeigt über
+  eine Einmal-Anzeige an der Sitzung (`sessions.einmal`, beim Lesen gelöscht),
+  neu ziehbar gegen den aktuellen App-Code.
+- **Falsche Codes zählen in derselben Drossel** wie falsche Passwörter (fünf
+  je Konto in 15 Minuten): sechs Ziffern lassen sich sonst raten. Ein Code
+  gilt nur einmal (`users.totp_letzter_schritt`, atomar gesetzt).
+- **Geheimnisse ruhen verschlüsselt** (AES-256-GCM, Schlüssel
+  `ZWEIFAKTOR_SCHLUESSEL` oder `SESSION_SECRET`; ohne Schlüssel scheitert die
+  Einrichtung laut). Folge: Rotation des Schlüssels macht alle Einrichtungen
+  unlesbar — deshalb die eigene Variable. Verworfen: Klartext wie beim
+  Druckbrücken-Token (ein TOTP-Geheimnis ist ein zweites Passwort).
+- **Konto-Aktionen sind Rahmen-Aktionen** (`login/code:*`,
+  `login/einrichten:*`, `konto:*` in `RAHMEN_AKTIONEN`), wie `login:signIn`:
+  Sitzung und Identität, kein Beleg, kein Bereich. Verworfen: ein neuer
+  Bereich `konto` in `permissions.ts` nur für zwei Knöpfe. Admin-Seite
+  (Reset, Pflicht) bleibt Registry.
+- **„Betriebsdaten löschen" verschont** `backup_codes` und
+  `vertraute_geraete` (Behalten-Liste in `demodaten_loeschen`, neu deklariert
+  mit festem `search_path`; `werkszustand_herstellen` gleich mit).
+- Neue Tabellen stehen auf der KI-Sperrliste (`sql-tool.ts`) und in
+  `VERSTECKT` (`tests/ki.test.ts`).
+
+Doku: [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)
+(Anmeldung), [go-live.md](go-live.md) §1/§4, [vercel-supabase.md](vercel-supabase.md),
+[betrieb.md](betrieb.md).
+
 ## 2026-09-19 — Reparatur end-to-end: Anfrage als Vorgang, zweiter Schreibweg ohne Sitzung, Reparatur v2 mit Rückversand
 
 Auslöser: Der Reparaturprozess hatte nur die Werkstatt-Mitte (anlegen →

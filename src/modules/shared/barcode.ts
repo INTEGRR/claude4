@@ -66,3 +66,12 @@ export async function barcodePngDataUri(
   }
   return `data:image/png;base64,${png.toString('base64')}`
 }
+
+/**
+ * QR-Code als SVG — z. B. die otpauth-URL bei der Einrichtung des zweiten
+ * Faktors. Fehlerkorrektur bleibt bei bwip-js' Standard (M); scale 4 ergibt
+ * ein Bild, das jede Telefonkamera vom Monitor liest.
+ */
+export function qrcodeSvg(text: string, opts: { scale?: number } = {}): string {
+  return toSVG({ bcid: 'qrcode', text, scale: opts.scale ?? 4 })
+}

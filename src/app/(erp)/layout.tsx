@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentUser, logout } from '@/modules/auth'
 import { type Area, ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
@@ -13,6 +14,7 @@ import { BefehlsOverlay } from '@/components/befehls-overlay'
 import { Splash } from '@/components/splash'
 import { HexcoreMark, Wortmarke } from '@/components/marke'
 import { befehlsKatalog } from '@/modules/befehle'
+import { pflichtGilt, sicherheitsEinstellung } from '@/modules/auth/zweifaktor'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
 
@@ -69,6 +71,16 @@ async function badges() {
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser()
   if (!user) redirect('/login')
+
+  // Zweiter Faktor: wer unter die Pflicht fällt und ihn noch nicht hat, richtet
+  // ihn JETZT ein — auch mit Altsitzung aus der Zeit vor der Pflicht. Die
+  // Einrichtung liegt außerhalb dieser Layout-Gruppe (kein Redirect-Kreis)
+  // und kommt VOR der Erststart-Weiche: ein frischer Admin sichert erst sein
+  // Konto, dann richtet er die Firma ein.
+  if (!user.totpAktiv) {
+    const { zwei_faktor } = await sicherheitsEinstellung(sql)
+    if (pflichtGilt(user.role, zwei_faktor)) redirect('/login/einrichten')
+  }
 
   // Erststart-Weiche: solange die Einrichtung offen ist (kein
   // settings-Schlüssel, Firmenname noch der Migrations-Default, nur ein
@@ -324,6 +336,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               {user.name}
               <br />
               <span className="mono-label">{ROLE_LABELS[user.role]}</span>
+              <br />
+              <Link className="small" href="/konto">Konto &amp; Sicherheit</Link>
             </div>
             <AbmeldenKnopf action={signOut} />
           </div>
