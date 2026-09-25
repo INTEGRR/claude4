@@ -72,6 +72,9 @@ export const AUSFUEHRUNG = {
   'einstellungen.benutzer_passwort': einstellungen.benutzerPasswort,
   'einstellungen.benutzer_zweifaktor_zuruecksetzen': einstellungen.benutzerZweifaktorZuruecksetzen,
   'einstellungen.sicherheit_setzen': einstellungen.sicherheitSetzen,
+  'einstellungen.benachrichtigungen_setzen': einstellungen.benachrichtigungenSetzen,
+  'einstellungen.telegram_test': einstellungen.telegramTest,
+  'einstellungen.telegram_chats': einstellungen.telegramChats,
 
   'fehler.ticket_melden': fehler.ticketMelden,
   'fehler.ticket_status': fehler.ticketStatus,

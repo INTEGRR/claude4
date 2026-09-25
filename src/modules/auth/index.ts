@@ -37,6 +37,16 @@ import {
   zweifaktorStatus,
 } from './zweifaktor'
 import { geheimnisErzeugen, istTotpCode, totpPruefen } from './totp'
+import { MAX_JE_KONTO, FENSTER_MINUTEN } from './drossel'
+import { ROLE_LABELS } from './permissions'
+import {
+  FEHLVERSUCH_VERZOEGERUNG_MINUTEN,
+  einreihen,
+  textFehlversuche,
+  textLogin,
+  textSperre,
+  zeitBucket,
+} from '../integrationen/benachrichtigungen'
 
 const scrypt = promisify(scryptCb) as (
   password: string,
@@ -114,12 +124,85 @@ async function ereignis(userId: string, text: string, actor: string): Promise<vo
   await sql`select log_event('user', ${userId}, 'state', ${text}, ${actor})`
 }
 
+/** Absender-Adresse im Klartext — nur für die Telegram-Meldung, nie gespeichert außer dort. */
+async function absenderAdresse(): Promise<string | null> {
+  try {
+    const h = await headers()
+    return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || null
+  } catch {
+    return null
+  }
+}
+
+async function userAgent(): Promise<string | null> {
+  try {
+    return (await headers()).get('user-agent')
+  } catch {
+    return null
+  }
+}
+
+/** Telegram: erfolgreiche Anmeldung — ein Ereignis je Sitzung. */
+async function anmeldungMelden(
+  nutzer: { id: string; name: string; role: Role },
+  sitzungsHash: string,
+  methode: string,
+): Promise<void> {
+  await einreihen(
+    sql,
+    'login',
+    `login:${sitzungsHash.slice(0, 32)}`,
+    textLogin({
+      name: nutzer.name,
+      rolle: ROLE_LABELS[nutzer.role] ?? nutzer.role,
+      ip: await absenderAdresse(),
+      geraet: geraetBezeichnung(await userAgent()),
+      methode,
+    }),
+  )
+}
+
+/**
+ * Telegram: Fehlversuch — gebündelt je Konto und Viertelstunde, mit zwei
+ * Minuten Frist, damit ein Schwall eine Nachricht mit Endstand ergibt. Erreicht
+ * der Zähler die Sperrgrenze, kommt die Sperr-Meldung sofort dazu.
+ */
+async function fehlversuchMelden(kontoHash: string, konto: string, art: 'Passwort' | 'Code'): Promise<void> {
+  const [z] = await sql<{ anzahl: number }[]>`
+    select count(*)::int as anzahl from login_versuche
+    where konto_hash = ${kontoHash}
+      and created_at > now() - (${FENSTER_MINUTEN} || ' minutes')::interval`
+  const anzahl = Number(z?.anzahl ?? 1)
+  const ip = await absenderAdresse()
+  const bucket = zeitBucket()
+  await einreihen(
+    sql,
+    'fehlversuch',
+    `fehlversuch:${kontoHash}:${bucket}`,
+    textFehlversuche({ konto, anzahl, ip, art }),
+    new Date(Date.now() + FEHLVERSUCH_VERZOEGERUNG_MINUTEN * 60_000),
+  )
+  if (anzahl >= MAX_JE_KONTO) await sperreMelden(kontoHash, konto)
+}
+
+async function sperreMelden(kontoHash: string, konto: string): Promise<void> {
+  await einreihen(
+    sql,
+    'sperre',
+    `sperre:${kontoHash}:${zeitBucket()}`,
+    textSperre({ konto, ip: await absenderAdresse(), minuten: FENSTER_MINUTEN }),
+  )
+}
+
 export async function login(email: string, password: string): Promise<LoginErgebnis> {
   // Drossel VOR der Prüfung: ein gesperrtes Konto bekommt keine Antwort
   // darauf, ob das Passwort gestimmt hätte (Entscheidungslog 2026-09-18).
   const konto = kennungHash(email)
   const absender = await absenderHash()
-  if (await loginGesperrt(sql, konto, absender)) return 'gesperrt'
+  if (await loginGesperrt(sql, konto, absender)) {
+    await sperreMelden(konto, email)
+    return 'gesperrt'
+  }
 
   const [row] = await sql<
     {
@@ -138,10 +221,12 @@ export async function login(email: string, password: string): Promise<LoginErgeb
     // Gleichbleibende Antwortzeit, damit unbekannte Konten nicht auffallen.
     await scrypt(password, randomBytes(16), 64)
     await fehlversuchMerken(sql, konto, absender)
+    await fehlversuchMelden(konto, email, 'Passwort')
     return null
   }
   if (!(await verifyPassword(password, row.password_hash))) {
     await fehlversuchMerken(sql, konto, absender)
+    await fehlversuchMelden(konto, email, 'Passwort')
     return null
   }
   await fehlversucheLoeschen(sql, konto)
@@ -158,14 +243,16 @@ export async function login(email: string, password: string): Promise<LoginErgeb
   const sitzung = async (opts: { bestaetigt: boolean; entwurf?: string | null }) => {
     const token = await sitzungErstellen(sql, row.id, opts)
     jar.set(COOKIE, token, cookieOptionen(SITZUNG_TAGE * 24 * 60 * 60))
+    return hashToken(token)
   }
 
   // Zweiter Faktor eingerichtet: vertrautes Gerät kommt durch, sonst Code.
   if (user.totpAktiv) {
     const geraet = jar.get(GERAET_COOKIE)?.value
     if (geraet && (await geraetVertraut(sql, row.id, geraet))) {
-      await sitzung({ bestaetigt: true })
+      const hash = await sitzung({ bestaetigt: true })
       await ereignis(row.id, 'Anmeldung (Passwort, vertrautes Gerät)', row.name)
+      await anmeldungMelden(row, hash, 'Passwort · vertrautes Gerät')
       return user
     }
     await sitzung({ bestaetigt: false })
@@ -178,8 +265,9 @@ export async function login(email: string, password: string): Promise<LoginErgeb
     await sitzung({ bestaetigt: false, entwurf: geheimnisErzeugen() })
     return { schritt: 'einrichten' }
   }
-  await sitzung({ bestaetigt: true })
+  const hash = await sitzung({ bestaetigt: true })
   await ereignis(row.id, 'Anmeldung (Passwort, ohne zweiten Faktor)', row.name)
+  await anmeldungMelden(row, hash, 'Passwort · ohne zweiten Faktor')
   return user
 }
 
@@ -277,7 +365,10 @@ export async function zweitenFaktorPruefen(
 
   const konto = kennungHash(wartend.email)
   const absender = await absenderHash()
-  if (await loginGesperrt(sql, konto, absender)) return 'gesperrt'
+  if (await loginGesperrt(sql, konto, absender)) {
+    await sperreMelden(konto, wartend.email)
+    return 'gesperrt'
+  }
 
   let methode: 'TOTP' | 'Backup-Code' | null = null
   if (istTotpCode(code)) {
@@ -287,6 +378,7 @@ export async function zweitenFaktorPruefen(
   }
   if (!methode) {
     await fehlversuchMerken(sql, konto, absender)
+    await fehlversuchMelden(konto, wartend.email, 'Code')
     return 'falsch'
   }
 
@@ -301,6 +393,11 @@ export async function zweitenFaktorPruefen(
     wartend.user_id,
     `Anmeldung (${methode}${geraetMerken ? ', Gerät 30 Tage vertraut' : ''})`,
     wartend.name,
+  )
+  await anmeldungMelden(
+    { id: wartend.user_id, name: wartend.name, role: wartend.role as Role },
+    hash,
+    `Passwort · ${methode}${geraetMerken ? ' · Gerät 30 Tage vertraut' : ''}`,
   )
   if (methode === 'Backup-Code') {
     const status = await zweifaktorStatus(sql, wartend.user_id)
@@ -362,12 +459,16 @@ export async function einrichtungAbschliessen(code: string): Promise<FaktorErgeb
 
   const konto = kennungHash(email)
   const absender = await absenderHash()
-  if (await loginGesperrt(sql, konto, absender)) return 'gesperrt'
+  if (await loginGesperrt(sql, konto, absender)) {
+    await sperreMelden(konto, email)
+    return 'gesperrt'
+  }
 
   const secret = wartend?.entwurf ?? (await entwurfSicherstellen(sql, hash))
   const schritt = totpPruefen(secret, code)
   if (schritt === null) {
     await fehlversuchMerken(sql, konto, absender)
+    await fehlversuchMelden(konto, email, 'Code')
     return 'falsch'
   }
 
@@ -379,6 +480,8 @@ export async function einrichtungAbschliessen(code: string): Promise<FaktorErgeb
   await fehlversucheLoeschen(sql, konto)
   await ereignis(userId, `Zweiter Faktor eingerichtet (TOTP), ${codes.length} Backup-Codes erzeugt`, name)
   await ereignis(userId, 'Anmeldung (TOTP, Einrichtung)', name)
+  const role = (wartend?.role ?? voll?.role) as Role
+  await anmeldungMelden({ id: userId, name, role }, hash, 'Passwort · TOTP eingerichtet')
   return 'ok'
 }
 

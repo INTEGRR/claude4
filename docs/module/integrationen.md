@@ -108,7 +108,30 @@ Resend + React-Email-Vorlage „Bestellung": Betreff `Bestellung {number} — {F
 
 ## Monitoring
 
-Admin-Seite „Integrationen": letzte Webhooks (Status, Fehler), offene/fehlgeschlagene Jobs mit Retry-Button, nicht zugeordnete Shopify-Zeilen, letzter Reconciliation-Lauf, DHL-Sendungsfehler/-Warnings. Fehlgeschlagene Jobs > 1 h alt ⇒ Hinweis-Banner im ERP.
+Admin-Seite „Integrationen": letzte Webhooks (Status, Fehler), offene/fehlgeschlagene Jobs mit Retry-Button, nicht zugeordnete Shopify-Zeilen, letzter Reconciliation-Lauf, DHL-Sendungsfehler/-Warnings. Jeder endgültig fehlgeschlagene Job und jede unzugeordnete Shopify-Zeile zählt in den Header-Status („n Vorgänge brauchen Aufmerksamkeit") und ins Navigations-Badge.
+
+### Telegram-Benachrichtigungen (seit 0084)
+
+Ein Telegram-Bot des Betreibers bekommt Push-Nachrichten — der einzige Kanal
+nach außen. Zugangsdaten als Umgebungsvariablen `TELEGRAM_BOT_TOKEN` und
+`TELEGRAM_CHAT_ID` (Chat-ID über Einstellungen → Benachrichtigungen →
+„Chat-IDs ermitteln", nachdem man dem Bot einmal geschrieben hat);
+`TELEGRAM_FAKE=1` sendet nichts und meldet Erfolg (Tests, lokal).
+
+| Ereignis | Schlüssel | Wann |
+|---|---|---|
+| Anmeldung (Name, Rolle, Zeit, IP, Browser · System, Methode) | `login:<sitzung>` | sofort nach der Anmeldung (`after()`), spätestens mit dem nächsten Cron |
+| Fehlversuche je Konto (Passwort oder Code falsch) | `fehlversuch:<konto>:<Viertelstunde>` | gebündelt: zwei Minuten nach dem letzten Versuch, eine Nachricht je Konto und Viertelstunde mit Endstand |
+| Kontosperre (Drossel erreicht) | `sperre:<konto>:<Viertelstunde>` | sofort |
+| Job endgültig fehlgeschlagen | `job:<id>:<versuch>` | mit dem Cron `jobs`, genau einmal je Versuchszähler |
+| Dienststörung / Entstörung | `dienst:<name>:<zustand>:<seit>` | Dienste-Wächter (0085) |
+
+Die Meldungen liegen in der Outbox `benachrichtigungen` (Status offen /
+gesendet / übersprungen / fehlgeschlagen, 30 Tage, KI-Sperrliste); der Cron
+`jobs` sendet jede Minute, Sendefehler wiederholen mit Backoff bis fünf
+Versuche. Schalter je Ereignisart unter Einstellungen → Benachrichtigungen
+gelten beim Senden. Jeder Versand steht im Transaktionslog (System
+`telegram`). Testnachricht: Knopf auf derselben Karte.
 
 ## Abnahmekriterien
 

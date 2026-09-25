@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
+import { nachAnfrageVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
 import { einrichtungAbschliessen, einrichtungKontext, logout } from '@/modules/auth'
 import { geheimnisFormatieren, otpauthUrl } from '@/modules/auth/totp'
 import { qrcodeSvg } from '@/modules/shared/barcode'
@@ -17,6 +19,9 @@ export const dynamic = 'force-dynamic'
 
 async function einrichtungBestaetigen(formData: FormData) {
   'use server'
+  // Telegram-Meldungen (Anmeldung, Fehlversuch) sofort nach der Antwort
+  // senden — die Outbox bleibt die Wahrheit, der Cron holt den Rest.
+  after(nachAnfrageVersenden)
   const ergebnis = await einrichtungAbschliessen(String(formData.get('code') ?? ''))
   if (ergebnis === 'ok') redirect('/konto?neu=1')
   if (ergebnis === 'keine_sitzung') redirect('/login?fehler=abgelaufen')

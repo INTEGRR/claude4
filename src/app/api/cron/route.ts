@@ -4,6 +4,11 @@ import { sql } from '@/db/client'
 import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen/import'
 import { runDueJobs } from '@/modules/integrationen/jobs'
 import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
+import {
+  benachrichtigungenAufraeumen,
+  fehlgeschlageneJobsMelden,
+} from '@/modules/integrationen/benachrichtigungen'
+import { benachrichtigungenVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
 import { pruneLoginVersuche, pruneSessions, pruneGeraete } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
@@ -15,7 +20,7 @@ export const maxDuration = 60
  * Sammelendpunkt für geplante Aufgaben. Aufruf über Vercel Cron:
  *
  *   /api/cron?task=webhooks      jede Minute   - Shopify-Events verarbeiten
- *   /api/cron?task=jobs          jede Minute   - Outbox abarbeiten
+ *   /api/cron?task=jobs          jede Minute   - Outbox abarbeiten, Telegram senden
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
  *   /api/cron?task=analytics     nachts        - Kennzahlen neu berechnen
@@ -45,8 +50,14 @@ export async function GET(request: Request) {
         if (!shopifyConfigured()) return NextResponse.json({ skipped: 'Shopify nicht konfiguriert' })
         return NextResponse.json({ task, ...(await processPendingWebhooks()) })
       }
-      case 'jobs':
-        return NextResponse.json({ task, ...(await runDueJobs()) })
+      case 'jobs': {
+        const jobs = await runDueJobs()
+        // Telegram: endgültig gescheiterte Jobs melden, dann die Outbox der
+        // Benachrichtigungen senden (Anmeldungen, Fehlversuche, Dienste).
+        const gemeldet = await fehlgeschlageneJobsMelden(sql)
+        const benachrichtigungen = await benachrichtigungenVersenden()
+        return NextResponse.json({ task, ...jobs, jobs_gemeldet: gemeldet, benachrichtigungen })
+      }
 
       case 'reconcile': {
         if (!shopifyConfigured()) return NextResponse.json({ skipped: 'Shopify nicht konfiguriert' })
@@ -75,6 +86,7 @@ export async function GET(request: Request) {
           geraete: await pruneGeraete(),
           tracking: await pruneTrackingData(),
           monitor: await pruneMonitorData(),
+          benachrichtigungen: await benachrichtigungenAufraeumen(sql),
           tuev: 'eingereiht',
         })
       }

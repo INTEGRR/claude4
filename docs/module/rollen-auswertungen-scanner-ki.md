@@ -79,7 +79,9 @@ Sitzungen — Seiten und API-Routen brauchen dafür nichts zu wissen.
   „Betriebsdaten löschen".
 - **Verlauf**: Anmeldungen (Methode, vertrautes Gerät), Backup-Code-Nutzung,
   Einrichtung und Resets stehen als `audit_log`-Einträge am Benutzer —
-  sichtbar unter Konto & Sicherheit.
+  sichtbar unter Konto & Sicherheit. Zusätzlich gehen Anmeldungen,
+  Fehlversuche (gebündelt) und Sperren als Telegram-Nachricht an den
+  Betreiber ([module/integrationen.md](integrationen.md), Monitoring).
 
 ## Kommentare an jedem Datensatz
 

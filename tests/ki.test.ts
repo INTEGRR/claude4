@@ -417,6 +417,7 @@ describe('KI: Schema-Doku wächst mit dem Schema (Wächter)', () => {
     'login_versuche',           // Fehlversuchs-Hashes der Login-Drossel — per Sperrliste blockiert
     'backup_codes',             // Hashes der 2FA-Notfallcodes — per Sperrliste blockiert
     'vertraute_geraete',        // Geräte-Token-Hashes (2FA) — per Sperrliste blockiert
+    'benachrichtigungen',       // Telegram-Outbox: Namen, E-Mails, IPs — per Sperrliste blockiert
     'settings',                 // API-Schlüssel möglich — per Sperrliste blockiert
     'integration_jobs',         // Outbox mit Payloads — per Sperrliste blockiert
     'sprachprotokolle',         // Gesprächsmitschnitte — per Sperrliste blockiert

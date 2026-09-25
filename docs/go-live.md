@@ -27,6 +27,11 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       steht** (Outbox, Webhooks, Shopify-Abgleich, Tracking, Aufräumen).
       Vercel schickt ihn bei eigenen Aufrufen automatisch als Bearer mit.
 - [ ] `SESSION_SECRET` ist gesetzt und nicht der Wert aus einem Beispiel.
+- [ ] **Telegram** (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`): Bot beim
+      @BotFather anlegen, Token setzen, dem Bot schreiben, dann unter
+      Einstellungen → Benachrichtigungen „Chat-IDs ermitteln" und die ID
+      setzen; „Testnachricht senden" muss auf dem Telefon ankommen. Ohne
+      die beiden Werte werden Meldungen als „übersprungen" abgehakt.
 - [ ] `ZWEIFAKTOR_SCHLUESSEL` setzen (eigener Zufallswert, `openssl rand -hex 32`):
       verschlüsselt die TOTP-Geheimnisse des zweiten Faktors. Fehlt er, nimmt
       KRNL `SESSION_SECRET` — dann darf DER sich nie mehr ändern, sonst

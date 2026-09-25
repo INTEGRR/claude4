@@ -1,7 +1,7 @@
 import { sql } from '@/db/client'
 
 /**
- * Transaktionslog für alle ausgehenden API-Aufrufe (Shopify, DHL, Mail).
+ * Transaktionslog für alle ausgehenden API-Aufrufe (Shopify, DHL, Mail, Telegram).
  * Fire-and-forget: Das Protokoll darf nie den eigentlichen Ablauf brechen —
  * Fehler beim Schreiben werden verschluckt. Zugangsdaten (Header, Tokens,
  * Passwörter) werden hier nie übergeben; Payloads werden gekürzt.
@@ -10,7 +10,7 @@ import { sql } from '@/db/client'
 const MAX_PAYLOAD_CHARS = 20_000
 
 export interface Transaktion {
-  system: 'shopify' | 'dhl' | 'mail'
+  system: 'shopify' | 'dhl' | 'mail' | 'telegram'
   kind: string
   reference?: string | null
   request?: unknown

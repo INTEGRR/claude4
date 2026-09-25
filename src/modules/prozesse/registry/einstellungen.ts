@@ -687,6 +687,63 @@ export const EINSTELLUNGEN = {
     formdata: (fd) => ({ zwei_faktor: String(fd.get('zwei_faktor') ?? 'alle') }),
     revalidate: ['/einstellungen', '/einstellungen/benutzer'],
   },
+  // --- Benachrichtigungen (Telegram) ------------------------------------------
+
+  'einstellungen.benachrichtigungen_setzen': {
+    label: 'Benachrichtigungen: was geht an Telegram',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Schalter je Ereignisart (settings.benachrichtigungen): Anmeldungen, Fehlversuche/Sperren, ' +
+      'endgültig fehlgeschlagene Jobs, Dienststörungen. Gilt beim Senden — auch für schon ' +
+      'eingereihte Meldungen. Zugangsdaten (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) sind Umgebungsvariablen.',
+    bindung: 'frei',
+    schema: z.object({
+      logins: z.boolean().default(true),
+      fehlversuche: z.boolean().default(true),
+      jobs: z.boolean().default(true),
+      dienste: z.boolean().default(true),
+    }),
+    zusammenfassung: (p) =>
+      `Telegram: ${(['logins', 'fehlversuche', 'jobs', 'dienste'] as const)
+        .filter((k) => p[k])
+        .join(', ') || 'alles aus'}`,
+    formdata: (fd) => ({
+      logins: fd.get('logins') === 'on',
+      fehlversuche: fd.get('fehlversuche') === 'on',
+      jobs: fd.get('jobs') === 'on',
+      dienste: fd.get('dienste') === 'on',
+    }),
+    revalidate: ['/einstellungen'],
+  },
+
+  'einstellungen.telegram_test': {
+    label: 'Telegram-Testnachricht senden',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Reiht eine Testnachricht ein und sendet sie sofort — prüft Token, Chat-ID und Erreichbarkeit. ' +
+      'Das Ergebnis steht im Transaktionslog (System telegram).',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: ['/einstellungen', '/integrationen/transaktionen'],
+  },
+
+  'einstellungen.telegram_chats': {
+    label: 'Telegram: Chat-IDs ermitteln',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Fragt beim Bot nach (getUpdates), welche Chats ihm zuletzt geschrieben haben — daraus liest ' +
+      'der Betreiber die TELEGRAM_CHAT_ID ab. Vorher den Bot anschreiben bzw. in die Gruppe holen.',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: [],
+  },
+
   // --- Registrierungen von der öffentlichen Startseite ----------------------
 
   'einstellungen.registrierung_status': {

@@ -80,6 +80,16 @@ ZWEIFAKTOR_SCHLUESSEL   <32 Byte Zufall, eigener Wert>
 CRON_SECRET      <24 Byte Zufall>
 ```
 
+**Telegram-Benachrichtigungen (empfohlen):**
+
+```
+TELEGRAM_BOT_TOKEN   <Token vom @BotFather>
+TELEGRAM_CHAT_ID     <Chat-ID, über Einstellungen → Benachrichtigungen ermitteln>
+```
+
+Anmeldungen, Fehlversuche, fehlgeschlagene Jobs und Dienststörungen gehen
+damit als Push-Nachricht aufs Telefon ([module/integrationen.md](module/integrationen.md)).
+
 Schützt `/api/cron/*` vor fremden Aufrufen. Vercel sendet ihn bei den eigenen
 Cron-Aufrufen automatisch als `Authorization: Bearer …` mit. Ist er auf Vercel
 nicht gesetzt, antwortet der Endpunkt seit 2026-09-18 mit 401 — dann läuft

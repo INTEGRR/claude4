@@ -9,6 +9,49 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-25 — Telegram als Betriebskanal: Outbox mit natürlichem Schlüssel statt Direktversand
+
+Der Betreiber will Push-Nachrichten auf seinen Telegram-Bot: jede Anmeldung,
+jeder Fehlversuch, Ausfälle externer Dienste. Bisher gab es keinen einzigen
+Kanal nach außen — Störungen standen nur im Ereignis-Monitor, erfolgreiche
+Anmeldungen nirgends.
+
+**Entschieden (Migration 0084, `src/modules/integrationen/{telegram,
+benachrichtigungen,benachrichtigungen-versand}.ts`):**
+
+- **Outbox statt Direktversand.** Ereignisse landen in `benachrichtigungen`
+  mit *natürlichem Schlüssel* (`login:<sitzung>`,
+  `fehlversuch:<konto>:<15-min-Bucket>`, `job:<id>:<versuch>`); der Cron
+  `jobs` sendet jede Minute, die Anmelde-Aktionen stoßen den Versand
+  zusätzlich per `after()` an. Nichts auf dem Login-Pfad wartet auf einen
+  Drittanbieter, und ein liegender Telegram-Dienst kostet keine Anmeldung.
+  Verworfen: ein Job-Typ in `integration_jobs` — dessen Dedupe-Schlüssel
+  wird nach Erledigung freigegeben und kann kein Zeitfenster blockieren.
+- **Bündelung beim Einreihen:** gleicher Schlüssel und noch offen → Text und
+  Frist werden erneuert (`benachrichtigung_einreihen`). Fehlversuche warten
+  zwei Minuten, damit ein Schwall EINE Nachricht mit Endstand ergibt; ein
+  gesendeter Schlüssel blockiert sein Viertelstunden-Fenster. Die Sperr-
+  Meldung kommt sofort, sobald der Zähler die Drossel-Grenze erreicht.
+- **Schalter gelten beim Senden** (`settings.benachrichtigungen`:
+  logins, fehlversuche, jobs, dienste) — eine Stelle, rückwirkend auch für
+  schon eingereihte Zeilen; abgeschaltete und unkonfigurierte Meldungen
+  enden als „übersprungen", Sendefehler mit Backoff bis fünf Versuche.
+- **Zugangsdaten sind Umgebungsvariablen** (`TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_CHAT_ID`), wie bei allen Diensten außer der Druckbrücke; die
+  Chat-ID liefert der Knopf „Chat-IDs ermitteln" (getUpdates). `TELEGRAM_FAKE=1`
+  für Tests und lokal.
+- **Klartext in der Nachricht:** Name, Rolle, IP, Browser/System, Methode
+  (TOTP, Backup-Code, vertrautes Gerät); bei Fehlversuchen die eingegebene
+  Konto-Adresse. Das ist das Sicherheitsprotokoll des Betreibers und
+  verlässt das System nur Richtung Telegram; in der Datenbank steht es nur
+  in der Outbox (30 Tage, KI-Sperrliste). Die Login-Drossel bleibt
+  pseudonym (2026-09-18).
+- Jeder Versand steht im Transaktionslog (`api_transactions`, System
+  `telegram`; Check-Constraint erweitert).
+
+Doku: [module/integrationen.md](module/integrationen.md) (Monitoring),
+[go-live.md](go-live.md) §1, [vercel-supabase.md](vercel-supabase.md) §3.
+
 ## 2026-09-25 — Zweiter Faktor in der App: TOTP als Sitzungszustand, Pflicht per Einstellung, vertraute Geräte
 
 Revidiert den Punkt „kein zweiter Faktor in der Anwendung" aus dem

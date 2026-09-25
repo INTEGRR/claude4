@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
+import { nachAnfrageVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
 import { currentUser, login, wartenderNutzer } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { LoginRahmen } from './rahmen'
@@ -7,6 +9,9 @@ export const dynamic = 'force-dynamic'
 
 async function signIn(formData: FormData) {
   'use server'
+  // Telegram-Meldungen (Anmeldung, Fehlversuch) sofort nach der Antwort
+  // senden — die Outbox bleibt die Wahrheit, der Cron holt den Rest.
+  after(nachAnfrageVersenden)
   const email = String(formData.get('email') ?? '')
   const password = String(formData.get('password') ?? '')
 

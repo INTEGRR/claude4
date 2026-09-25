@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
+import { nachAnfrageVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
 import { logout, wartenderNutzer, zweitenFaktorPruefen } from '@/modules/auth'
 import { LoginRahmen } from '../rahmen'
 
@@ -12,6 +14,9 @@ export const dynamic = 'force-dynamic'
 
 async function codePruefen(formData: FormData) {
   'use server'
+  // Telegram-Meldungen (Anmeldung, Fehlversuch) sofort nach der Antwort
+  // senden — die Outbox bleibt die Wahrheit, der Cron holt den Rest.
+  after(nachAnfrageVersenden)
   const code = String(formData.get('code') ?? '')
   const merken = formData.get('merken') === 'on'
   const ergebnis = await zweitenFaktorPruefen(code, merken)

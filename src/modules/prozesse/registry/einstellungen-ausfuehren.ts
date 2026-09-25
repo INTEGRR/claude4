@@ -6,6 +6,8 @@ import { EREIGNISSE } from '../ereignisse.ts'
 import { entwurfPruefen } from '../entwurf-pruefen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 import { zweifaktorZuruecksetzen } from '../../auth/zweifaktor.ts'
+import { einreihen, textTest } from '../../integrationen/benachrichtigungen.ts'
+import { telegramChatsFinden, telegramConfigured } from '../../integrationen/telegram.ts'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
 
@@ -826,6 +828,54 @@ export async function benutzerZweifaktorZuruecksetzen(
   return {
     text: `Zweiter Faktor von ${row.name} zurückgesetzt — der nächste Login richtet neu ein.`,
     recordId: userId,
+  }
+}
+
+export async function benachrichtigungenSetzen(
+  p: { logins: boolean; fehlversuche: boolean; jobs: boolean; dienste: boolean },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value) values ('benachrichtigungen', ${sql.json(p)})
+    on conflict (key) do update set value = excluded.value`
+  const an = (['logins', 'fehlversuche', 'jobs', 'dienste'] as const).filter((k) => p[k])
+  return { text: an.length ? `Telegram meldet: ${an.join(', ')}.` : 'Telegram meldet nichts mehr.' }
+}
+
+export async function telegramTest(
+  _p: Record<string, never>,
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  if (!telegramConfigured()) {
+    throw new Error('Telegram ist nicht konfiguriert — TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen')
+  }
+  await einreihen(sql, 'test', `test:${Date.now()}`, textTest())
+  // Der Versand zieht den Datenbank-Client — dynamisch, damit der Katalog
+  // unter blankem Node ladbar bleibt.
+  const { benachrichtigungenVersenden } = await import('@/modules/integrationen/benachrichtigungen-versand')
+  const bilanz = await benachrichtigungenVersenden(5)
+  if (bilanz.gesendet > 0) return { text: 'Testnachricht gesendet — bitte Telegram prüfen.' }
+  const [letzte] = await sql<{ fehler: string | null; status: string }[]>`
+    select fehler, status from benachrichtigungen where art = 'test' order by erstellt_at desc limit 1`
+  throw new Error(`Testnachricht nicht gesendet (${letzte?.status ?? '?'}): ${letzte?.fehler ?? 'unbekannt'}`)
+}
+
+export async function telegramChats(
+  _p: Record<string, never>,
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const chats = await telegramChatsFinden()
+  if (chats.length === 0) {
+    return {
+      text:
+        'Der Bot hat noch keine Nachrichten gesehen — bitte dem Bot in Telegram schreiben ' +
+        '(oder ihn in die Gruppe holen) und erneut ermitteln.',
+    }
+  }
+  return {
+    text:
+      'Gesehene Chats — die ID als TELEGRAM_CHAT_ID setzen: ' +
+      chats.map((c) => `${c.id} (${c.titel || c.art})`).join(' · '),
   }
 }
 

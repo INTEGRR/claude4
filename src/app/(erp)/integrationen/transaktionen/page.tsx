@@ -16,6 +16,7 @@ const SYSTEME = [
   { key: 'shopify', label: 'Shopify' },
   { key: 'dhl', label: 'DHL' },
   { key: 'mail', label: 'E-Mail' },
+  { key: 'telegram', label: 'Telegram' },
 ] as const
 
 function formatJson(value: unknown): string {
