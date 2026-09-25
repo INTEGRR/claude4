@@ -15,6 +15,7 @@ import { Splash } from '@/components/splash'
 import { HexcoreMark, Wortmarke } from '@/components/marke'
 import { befehlsKatalog } from '@/modules/befehle'
 import { pflichtGilt, sicherheitsEinstellung } from '@/modules/auth/zweifaktor'
+import { DIENST_LABELS, gestoerteDienste } from '@/modules/integrationen/wache'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
 
@@ -123,10 +124,16 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     where aktiv and modell = 'vorgang'
     order by name`
 
+  // Dienste-Wächter (0085): eine Störung schlägt jede Zählerei — sie steht
+  // zuerst, mit Namen, damit niemand erst den Monitor öffnen muss.
+  const stoerungen = await gestoerteDienste(sql)
   const systemzustand =
-    counts.fehler > 0
-      ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
-      : 'Alle Systeme im Normalbetrieb'
+    stoerungen.length > 0
+      ? `Störung: ${stoerungen.map((d) => DIENST_LABELS[d]).join(', ')}`
+      : counts.fehler > 0
+        ? `${counts.fehler} Vorgang/Vorgänge brauchen Aufmerksamkeit`
+        : 'Alle Systeme im Normalbetrieb'
+  const systemLed = stoerungen.length > 0 ? 'warn' : counts.fehler > 0 ? 'on' : 'ok'
 
   // Befehlsfeld überall (Strg/Cmd+K): derselbe Katalog wie auf der Übersicht,
   // plus das Lern-Gedächtnis dieses Benutzers fürs Ranking.
@@ -349,7 +356,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               Auf dem Telefon bleibt nur die Leuchte stehen — der Satz steht
               dann im title und wird von Vorlesehilfen weiterhin gelesen. */}
           <div className="mono-label systemzeile" title={systemzustand}>
-            <span className={`led ${counts.fehler > 0 ? 'on' : 'ok'}`} />
+            <span className={`led ${systemLed}`} />
             <span className="systemtext">{systemzustand}</span>
           </div>
           <div className="actions">

@@ -177,14 +177,15 @@ von der Startseite überleben beide. Danach holt die Shopify-Erstübernahme
 
 ## 5. Zeitgesteuerte Aufgaben
 
-`vercel.json` bringt sechs Cron-Einträge mit — Outbox, Webhooks, Abgleich,
-Sendungsverfolgung, Kennzahlen, Aufräumen.
+`vercel.json` bringt sieben Cron-Einträge mit — Outbox (sendet auch die
+Telegram-Meldungen), Webhooks, Abgleich, Sendungsverfolgung, Dienste-Wächter
+(alle fünf Minuten), Aufräumen, Finanz-Tageslauf.
 
 **Der Hobby-Tarif erlaubt nur zwei Cron-Jobs, und die laufen einmal täglich.**
 Das reicht für einen Testbetrieb, aber nicht für den Versandalltag: Fulfillment
 und Sendungsverfolgung hängen dann bis zum nächsten Tag fest. Zwei Wege:
 
-- **Pro-Tarif** — die sechs Einträge laufen wie hinterlegt.
+- **Pro-Tarif** — die sieben Einträge laufen wie hinterlegt.
 - **Hobby** — `vercel.json` auf zwei tägliche Einträge kürzen und die
   minütlichen Aufgaben von außen anstoßen, etwa per GitHub Action oder von
   einem beliebigen Rechner, der ohnehin läuft:

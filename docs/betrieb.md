@@ -121,7 +121,10 @@ des `db`-Dienstes.
 | Outbox abarbeiten (Fulfillment, E-Mail) | minütlich | `/api/cron?task=jobs` |
 | Bestellabgleich mit Shopify | Variante A: minütlich · B: alle 15 Min | `/api/cron?task=reconcile` |
 | DHL-Sendungsverfolgung | stündlich | `/api/cron?task=tracking` |
-| Aufräumen (Sitzungen, Trackingdaten) | täglich | `/api/cron?task=housekeeping` |
+| Dienste-Wächter (Störungen → Telegram) | alle 5 Min | `/api/cron?task=wache` |
+| Aufräumen (Sitzungen, Geräte, Trackingdaten, Benachrichtigungen) | täglich | `/api/cron?task=housekeeping` |
+| Finanz-Tageslauf (Verträge, USt-Vorschlag) | täglich | `/api/cron?task=finanzen` |
+| Kennzahlen neu berechnen (optional, sonst Housekeeping) | nachts | `/api/cron?task=analytics` |
 
 Weitere Punkte:
 - **Label-Dateien** liegen unter `STORAGE_DIR` (Standard: `./storage`). Bei

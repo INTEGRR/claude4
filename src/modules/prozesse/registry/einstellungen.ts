@@ -731,6 +731,20 @@ export const EINSTELLUNGEN = {
     revalidate: ['/einstellungen', '/integrationen/transaktionen'],
   },
 
+  'einstellungen.dienste_pruefen': {
+    label: 'Dienste jetzt prüfen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Lässt den Dienste-Wächter sofort laufen (sonst alle fünf Minuten per Cron): DHL, Shopify, ' +
+      'Resend, Anthropic, OpenAI, Telegram, Druckbrücke. Ergebnis in dienst_status; Störungen ' +
+      'ab dem zweiten Fehlschlag in Folge als Telegram-Meldung.',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: ['/integrationen'],
+  },
+
   'einstellungen.telegram_chats': {
     label: 'Telegram: Chat-IDs ermitteln',
     bereich: 'einstellungen',

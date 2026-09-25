@@ -11,9 +11,16 @@ import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { processPendingWebhooks, reconcileOrders, retryWebhookEvent } from '@/modules/integrationen/import'
 import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/jobs'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
+import { DIENST_LABELS, dienstStatusLesen } from '@/modules/integrationen/wache'
 import { actionError, actionInfo } from '@/modules/shared/action'
 
 export const dynamic = 'force-dynamic'
+
+async function pruefeDienste() {
+  'use server'
+  // Dienste-Wächter von Hand anstoßen — Registry-Aktion, auditiert.
+  return serverAktion('einstellungen.dienste_pruefen', { parameter: {} })
+}
 
 async function runJobs() {
   'use server'
@@ -255,6 +262,7 @@ export default async function IntegrationenPage() {
   )
   const druckKonfig = await druckbrueckeKonfig()
   const brueckeAktiv = druckKonfig.modus === 'bruecke' && Boolean(druckKonfig.token)
+  const dienste = await dienstStatusLesen(sql)
 
   const events = await sql<
     { id: string; topic: string; status: string; error: string | null; received_at: string; order_id: string | null }[]
@@ -419,6 +427,48 @@ export default async function IntegrationenPage() {
           )}
         </div>
       )}
+
+      <Card
+        title="Dienste (Wächter, alle fünf Minuten)"
+        actions={<ActionButton className="small" action={pruefeDienste}>Jetzt prüfen</ActionButton>}
+        tight
+      >
+        {dienste.length === 0 ? (
+          <Empty>Noch kein Lauf — der Cron „wache" prüft alle fünf Minuten, oder „Jetzt prüfen".</Empty>
+        ) : (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Dienst</th>
+                  <th>Zustand</th>
+                  <th>Seit</th>
+                  <th>Geprüft</th>
+                  <th>Antwort</th>
+                  <th>Fehler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dienste.map((d) => (
+                  <tr key={d.dienst}>
+                    <td>{DIENST_LABELS[d.dienst] ?? d.dienst}</td>
+                    <td>
+                      <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span className={d.status === 'ok' ? 'led ok' : d.status === 'gestoert' ? 'led warn' : 'led off'} />
+                        {d.status === 'ok' ? 'erreichbar' : d.status === 'gestoert' ? 'gestört' : 'nicht konfiguriert'}
+                      </span>
+                    </td>
+                    <td className="small muted mono">{d.seit ? dateTime(d.seit) : '—'}</td>
+                    <td className="small muted mono">{d.geprueft_at ? dateTime(d.geprueft_at) : '—'}</td>
+                    <td className="small muted mono">{d.dauer_ms != null ? `${d.dauer_ms} ms` : '—'}</td>
+                    <td className="small">{d.fehler ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
 
       {shopifyConfigured() && modus === 'lesen' && (
         <div className="notice warn">

@@ -75,6 +75,7 @@ export const AUSFUEHRUNG = {
   'einstellungen.benachrichtigungen_setzen': einstellungen.benachrichtigungenSetzen,
   'einstellungen.telegram_test': einstellungen.telegramTest,
   'einstellungen.telegram_chats': einstellungen.telegramChats,
+  'einstellungen.dienste_pruefen': einstellungen.dienstePruefen,
 
   'fehler.ticket_melden': fehler.ticketMelden,
   'fehler.ticket_status': fehler.ticketStatus,

@@ -9,6 +9,42 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-25 — Dienste-Wächter: aktive Sonden alle fünf Minuten, Störung erst beim zweiten Fehlschlag
+
+Bisher prüfte niemand, ob DHL, Shopify, Resend, Anthropic, OpenAI, Telegram
+oder die Druckbrücke erreichbar sind — Fehler fielen erst auf, wenn ein Job
+endgültig scheiterte. Der Betreiber will Störungen aufs Telefon.
+
+**Entschieden (Migration 0085, `src/modules/integrationen/{wache,
+wache-sonden}.ts`, Cron `wache`):**
+
+- **Aktive Sonden statt passiver Fehlerzählung:** je Dienst ein kleiner
+  authentifizierter Aufruf (DHL-Token, `{ shop { name } }`, Resend
+  `/domains`, Anthropic `models.list`, OpenAI `/v1/models`, Telegram
+  `getMe`, Druckbrücke = Agent-Heartbeat jünger als 15 min), alle parallel,
+  je 8 s Zeitlimit. Verworfen: Störung aus `api_transactions` ableiten —
+  dort stehen auch fachliche Ablehnungen (Validierung, Lesemodus) als
+  `ok=false`, und ein Dienst ohne Verkehr wäre nie „gestört".
+- **Zustand in `dienst_status`** (ok / gestoert / unbekannt, seit,
+  Fehlschläge in Folge). **Störung erst beim zweiten Fehlschlag in Folge**
+  (kein Flattern bei einem Aussetzer), **Entstörung beim ersten Erfolg** —
+  beides genau eine Meldung mit natürlichem Schlüssel
+  (`dienst:<name>:gestoert|ok:<seit>`) über die Outbox (0084). Nicht
+  konfigurierte Dienste sind „unbekannt" und melden nie.
+- **Takt alle fünf Minuten** (`vercel.json`, Hobby-Hinweis in
+  vercel-supabase.md). Kosten: DHL-Token und Shopify-Abfrage schreiben je
+  Lauf eine `api_transactions`-Zeile (~600/Tag, 30-Tage-Prune) — bewusst
+  in Kauf genommen, der Monitor zeigt damit auch die Sonden.
+- **Datenbank selbst weg:** keine Outbox, kein Zustand — der Cron sendet
+  direkt an Telegram, aber nur im ersten Fünf-Minuten-Fenster jeder
+  Viertelstunde (≤ 4 Meldungen je Stunde, stateless auf Serverless).
+- **Projektion:** Header-Status zeigt „Störung: DHL, …" vor jeder Zählerei;
+  der Ereignis-Monitor bekommt die Karte „Dienste" mit „Jetzt prüfen"
+  (Registry-Aktion `einstellungen.dienste_pruefen`).
+
+Doku: [module/integrationen.md](module/integrationen.md) (Monitoring),
+[betrieb.md](betrieb.md) (Cron-Tabelle), [vercel-supabase.md](vercel-supabase.md) §5.
+
 ## 2026-09-25 — Telegram als Betriebskanal: Outbox mit natürlichem Schlüssel statt Direktversand
 
 Der Betreiber will Push-Nachrichten auf seinen Telegram-Bot: jede Anmeldung,

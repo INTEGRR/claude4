@@ -146,6 +146,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 
 ## 7. Probelauf und Stichtag
 
+- [ ] Nach dem Deploy einmal `/integrationen` → „Jetzt prüfen": alle
+      konfigurierten Dienste grün; danach meldet der Wächter alle fünf
+      Minuten nur noch Änderungen (Störung/Entstörung) an Telegram.
+
 - [ ] Probelauf-Choreografie lokal mit **frischem** Odoo-Dump grün,
       inklusive No-Op-Beweis
       ([migration-odoo.md](migration-odoo.md#probelauf-choreografie-lokal-vor-jedem-prod-gedanken)).

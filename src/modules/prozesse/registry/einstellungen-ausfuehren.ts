@@ -860,6 +860,26 @@ export async function telegramTest(
   throw new Error(`Testnachricht nicht gesendet (${letzte?.status ?? '?'}): ${letzte?.fehler ?? 'unbekannt'}`)
 }
 
+export async function dienstePruefen(
+  _p: Record<string, never>,
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const { wacheAusfuehren } = await import('@/modules/integrationen/wache-sonden')
+  const { DIENST_LABELS } = await import('../../integrationen/wache.ts')
+  const lauf = await wacheAusfuehren()
+  const geprueft = lauf.ergebnisse.filter((e) => e.status !== 'unbekannt')
+  const gestoert = geprueft.filter((e) => e.status === 'gestoert')
+  const teile = geprueft.map(
+    (e) => `${DIENST_LABELS[e.dienst]}: ${e.status === 'ok' ? `ok (${e.dauerMs} ms)` : `${e.status} — ${e.fehler}`}`,
+  )
+  return {
+    text:
+      geprueft.length === 0
+        ? 'Kein Dienst konfiguriert — nichts zu prüfen.'
+        : `${geprueft.length} Dienst(e) geprüft, ${gestoert.length} gestört. ${teile.join(' · ')}`,
+  }
+}
+
 export async function telegramChats(
   _p: Record<string, never>,
   _ctx: AktionsKontext,

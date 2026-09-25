@@ -9,6 +9,7 @@ import {
   fehlgeschlageneJobsMelden,
 } from '@/modules/integrationen/benachrichtigungen'
 import { benachrichtigungenVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
+import { datenbankAusfallMelden, wacheAusfuehren } from '@/modules/integrationen/wache-sonden'
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
 import { pruneLoginVersuche, pruneSessions, pruneGeraete } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
@@ -70,6 +71,22 @@ export async function GET(request: Request) {
       case 'tracking': {
         if (!dhlConfigured()) return NextResponse.json({ skipped: 'DHL nicht konfiguriert' })
         return NextResponse.json({ task, ...(await syncTracking()) })
+      }
+      case 'wache': {
+        // Dienste-Wächter: erst die Datenbank selbst — ohne sie gibt es keine
+        // Outbox, dann Direktversand mit Zeitfenster (wache.ts).
+        try {
+          await sql`select 1`
+        } catch (err) {
+          const gemeldet = await datenbankAusfallMelden(err)
+          return NextResponse.json(
+            { task, error: 'Datenbank nicht erreichbar', telegram: gemeldet },
+            { status: 503 },
+          )
+        }
+        const lauf = await wacheAusfuehren()
+        const benachrichtigungen = await benachrichtigungenVersenden()
+        return NextResponse.json({ task, ...lauf, benachrichtigungen })
       }
       case 'analytics': {
         const [row] = await sql<{ refresh_analytics: string }[]>`select refresh_analytics('cron')`

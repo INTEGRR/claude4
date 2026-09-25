@@ -87,6 +87,16 @@ async function protokoll(t: {
   await logTransaction({ system: 'dhl', ...t })
 }
 
+/**
+ * Sonde des Dienste-Wächters: Anmeldung am Token-Endpunkt — scheitert ohne
+ * Zugangsdaten, mit abgelaufenem GKP-Passwort oder wenn DHL nicht antwortet.
+ * Im Fake-Betrieb erreichbar.
+ */
+export async function dhlErreichbar(): Promise<void> {
+  if (process.env.DHL_FAKE === '1') return
+  await accessToken()
+}
+
 // --- Token-Verwaltung ------------------------------------------------------
 
 let cachedToken: { value: string; expiresAt: number } | undefined

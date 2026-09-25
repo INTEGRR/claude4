@@ -133,6 +133,24 @@ Versuche. Schalter je Ereignisart unter Einstellungen → Benachrichtigungen
 gelten beim Senden. Jeder Versand steht im Transaktionslog (System
 `telegram`). Testnachricht: Knopf auf derselben Karte.
 
+### Dienste-Wächter (seit 0085)
+
+Der Cron `wache` (alle fünf Minuten, `/api/cron?task=wache`) prüft jeden
+konfigurierten Dienst aktiv — DHL (Token), Shopify (`{ shop { name } }`,
+läuft auch im Lesemodus), Resend, Anthropic, OpenAI, Telegram (`getMe`),
+Druckbrücke (Agent-Heartbeat jünger als 15 Minuten) — parallel mit 8 s
+Zeitlimit und hält den Zustand in `dienst_status`. **Gestört** gilt ein
+Dienst ab dem zweiten Fehlschlag in Folge (ein Aussetzer flattert nicht),
+**erreichbar** wieder beim ersten Erfolg; beides geht genau einmal als
+Telegram-Meldung hinaus (Schlüssel `dienst:<name>:gestoert|ok:<seit>`),
+die Entstörung mit Dauer. Nicht konfigurierte Dienste stehen als „nicht
+konfiguriert" und melden nie.
+
+Sichtbar: Header-Status („Störung: DHL, …" vor jeder Zählerei) und die Karte
+„Dienste" auf dieser Seite mit „Jetzt prüfen". Fällt die Datenbank selbst
+aus, sendet der Cron direkt an Telegram — höchstens viermal je Stunde.
+Kosten: DHL-Token und Shopify-Abfrage stehen je Lauf im Transaktionslog.
+
 ## Abnahmekriterien
 
 1. Webhook mit gültiger HMAC wird gespeichert und verarbeitet; ungültige Signatur ⇒ 401, kein Event; Duplikat (gleiche Webhook-Id) ⇒ genau ein Auftrag.
