@@ -131,3 +131,45 @@ describe('Einstellungen: Registry statt Umgehung (Schemas)', () => {
     assert.equal(v.schema.safeParse({ print_format: 'A5' }).success, false)
   })
 })
+
+describe('Einstellungen: Stammdaten über die Registry', () => {
+  const fd = (werte: Record<string, string>) => {
+    const f = new FormData()
+    for (const [k, v] of Object.entries(werte)) f.set(k, v)
+    return f
+  }
+
+  test('Steuer, Zahlungsbedingung, Kategorie: Pflichtfelder und Skonto-Regel', async () => {
+    const { REGISTRY } = await import('../src/modules/prozesse/registry/index.ts')
+    const steuer = REGISTRY['einstellungen.steuer_anlegen']
+    assert.equal(steuer.nurAdmin, true)
+    const geparst = steuer.schema.parse(steuer.formdata!(fd({ name: 'USt 7 %', amount: '7', type_tax_use: 'sale' })))
+    assert.equal(geparst.name, 'USt 7 %')
+    assert.equal(geparst.amount, 7)
+    assert.equal(geparst.type_tax_use, 'sale')
+    assert.equal(geparst.price_include, false)
+    assert.equal(geparst.description, undefined)
+    assert.equal(steuer.schema.safeParse(steuer.formdata!(fd({ name: 'x', amount: '120', type_tax_use: 'sale' }))).success, false)
+    assert.equal(steuer.schema.safeParse(steuer.formdata!(fd({ name: ' ', amount: '7', type_tax_use: 'sale' }))).success, false)
+
+    const zb = REGISTRY['einstellungen.zahlungsbedingung_anlegen']
+    assert.equal(zb.schema.safeParse(zb.formdata!(fd({ name: '30 Tage', nb_days: '30', delay_type: 'days_after' }))).success, true)
+    const ohneWerte = zb.schema.safeParse(
+      zb.formdata!(fd({ name: 'Skonto', nb_days: '30', delay_type: 'days_after', early_discount: 'on', discount_percentage: '', discount_days: '' })),
+    )
+    assert.equal(ohneWerte.success, false, 'Skonto ohne Prozent/Tage abgewiesen')
+    assert.match(JSON.stringify(ohneWerte.error?.issues), /Mit Skonto bitte Prozent und Tage angeben/, 'deutsche Regel statt Typfehler')
+    assert.equal(
+      zb.schema.safeParse(zb.formdata!(fd({
+        name: 'Skonto', nb_days: '30', delay_type: 'days_after', early_discount: 'on', discount_percentage: '2', discount_days: '10',
+      }))).success,
+      true,
+    )
+
+    const kat = REGISTRY['einstellungen.kategorie_anlegen']
+    const k = kat.schema.parse(kat.formdata!(fd({ name: 'Keycaps', parent_id: '' })))
+    assert.equal(k.name, 'Keycaps')
+    assert.equal(k.parent_id, undefined, 'leere Auswahl = oberste Ebene')
+    assert.equal(REGISTRY['einstellungen.tag_loeschen'].bindung, 'beleg')
+  })
+})

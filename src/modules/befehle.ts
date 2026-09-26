@@ -70,6 +70,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/einstellungen', label: 'Einstellungen · Firma', area: 'einstellungen' },
   { href: '/einstellungen/benutzer', label: 'Einstellungen · Benutzer verwalten', area: 'einstellungen' },
   { href: '/einstellungen/sicherheit', label: 'Einstellungen · Sicherheit (zweiter Faktor)', area: 'einstellungen' },
+  { href: '/einstellungen/stammdaten', label: 'Einstellungen · Stammdaten (Kategorien, Steuern, Zahlungsbedingungen)', area: 'einstellungen' },
   { href: '/einstellungen/belege', label: 'Einstellungen · Belege & Freigaben', area: 'einstellungen' },
   { href: '/einstellungen/versand', label: 'Einstellungen · Versand & Druck', area: 'einstellungen' },
   { href: '/einstellungen/versandregeln', label: 'Einstellungen · Versandregeln', area: 'einstellungen' },

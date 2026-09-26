@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-26 — Stammdaten-Konfiguration in die Einstellungen, nur noch für Administratoren
+
+Kategorien, Steuern, Zahlungsbedingungen und Tags lagen unter Produkte →
+Konfiguration — nur über einen Knopf erreichbar, vier Inline-Aktionen am
+Torwächter vorbei, Tag löschen ohne Rückfrage.
+
+**Entschieden:** eigener Bereich **Einstellungen → Stammdaten**
+(`/einstellungen/stammdaten`, Gruppe Organisation); Schreibwege über die
+Registry (`einstellungen.kategorie_anlegen`, `…steuer_anlegen`,
+`…zahlungsbedingung_anlegen` mit Skonto-Regel im Schema, `…tag_loeschen` mit
+Rückfrage samt Verwendungszahl); doppelte Namen kommen als Klartext zurück.
+`UI_UMGEHUNGEN` −4. `/produkte/konfiguration` bleibt als Weiterleitung.
+
+**Bewusste Rechteänderung** (Betreiber hat zugestimmt): bisher durfte jede
+Rolle mit Schreibrecht auf Produkte (`requireWrite('produkte')`, also auch
+Mitarbeiter) Steuern und Zahlungsbedingungen anlegen — das sind
+Firmeneinstellungen mit Wirkung auf jeden Beleg und gehören zum Admin. Der
+Knopf auf der Produktliste erscheint nur noch für Admins.
+
 ## 2026-09-26 — Einstellungen: ein Bereich je Thema, linke Unternavigation, jeder Schreibweg über die Registry
 
 Die Einstellungsseite war eine Sammelseite mit 774 Zeilen und 13 fachfremden

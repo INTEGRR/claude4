@@ -144,6 +144,73 @@ export async function finanzParameterSetzen(
   return { text: 'Finanz-Stellschrauben gespeichert — die Prognose rechnet ab sofort damit.' }
 }
 
+/** Eindeutiger Name schon vergeben → Klartext statt Datenbankfehler. */
+function istDoppelt(err: unknown): boolean {
+  return (err as { code?: string })?.code === '23505'
+}
+
+export async function kategorieAnlegen(
+  p: { name: string; parent_id?: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ id: string; full_path: string }[]>`
+    insert into product_categories (name, parent_id, full_path)
+    values (${p.name}, ${p.parent_id ?? null}, '')
+    returning id, full_path`
+  return { text: `Kategorie „${row.full_path}" angelegt.`, recordId: row.id }
+}
+
+export async function steuerAnlegen(
+  p: { name: string; amount: number; type_tax_use: string; price_include: boolean; description?: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      insert into taxes (name, amount, type_tax_use, price_include, description)
+      values (${p.name}, ${p.amount}, ${p.type_tax_use}, ${p.price_include}, ${p.description ?? null})
+      returning id`
+    return { text: `Steuer „${p.name}" (${p.amount} %) angelegt.`, recordId: row.id }
+  } catch (err) {
+    if (istDoppelt(err)) throw new Error(`Eine Steuer „${p.name}" gibt es schon`)
+    throw err
+  }
+}
+
+export async function zahlungsbedingungAnlegen(
+  p: {
+    name: string
+    nb_days: number
+    delay_type: string
+    early_discount: boolean
+    discount_percentage?: number
+    discount_days?: number
+  },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      insert into payment_terms
+        (name, nb_days, delay_type, early_discount, discount_percentage, discount_days)
+      values (${p.name}, ${p.nb_days}, ${p.delay_type}, ${p.early_discount},
+              ${p.early_discount ? (p.discount_percentage ?? null) : null},
+              ${p.early_discount ? (p.discount_days ?? null) : null})
+      returning id`
+    return { text: `Zahlungsbedingung „${p.name}" angelegt.`, recordId: row.id }
+  } catch (err) {
+    if (istDoppelt(err)) throw new Error(`Eine Zahlungsbedingung „${p.name}" gibt es schon`)
+    throw err
+  }
+}
+
+export async function tagLoeschen(
+  _p: Record<string, never>,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [row] = await sql<{ name: string }[]>`delete from tags where id = ${ctx.recordId!} returning name`
+  if (!row) throw new Error('Tag nicht gefunden')
+  return { text: `Tag „${row.name}" gelöscht.` }
+}
+
 export async function demodatenEinspielenAktion(
   _p: Record<string, never>,
   _ctx: AktionsKontext,

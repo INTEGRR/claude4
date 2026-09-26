@@ -283,7 +283,7 @@ weißes Case verbaut") und die Abverkaufsquote der letzten 6 Monate.
 | KI-Analyse (braucht `ANTHROPIC_API_KEY`) | KI-Analyse in der Navigation |
 | Meldebestand anlegen, Vorschlag ausführen | Lager → Beschaffung (z. B. Switches: Min 9500 / Max 12000) |
 | Seriennummern verfolgen | Produkt → Rückverfolgung auf „Seriennummern", dann fertigen; Lager → Lose & Serien |
-| Steuern, Zahlungsbedingungen, Kategorien, Tags | Produkte → Konfiguration |
+| Steuern, Zahlungsbedingungen, Kategorien, Tags | Einstellungen → Stammdaten (als Admin) |
 | API-Transaktionen und Job-Queue beobachten | Integrationen → Transaktionsprotokoll (als Admin) |
 | Bestellung beim Lieferanten, Wareneingang buchen | Einkauf → Neue Bestellung („Komponenten Handels GmbH") |
 | Lieferantenrechnung, Gutschrift | Einkauf → Bestellung → Rechnung erstellen |

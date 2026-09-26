@@ -245,11 +245,6 @@ const NOCH_NICHT_MIGRIERT = new Set<string>([
  * frueher unbemerkt, weil der Waechter nur Dateien namens actions.ts las.
  */
 const UI_UMGEHUNGEN = new Set<string>([
-  // Stammdaten-Schnellanlage aus der Konfigurationsseite
-  'produkte/konfiguration:createCategory',
-  'produkte/konfiguration:createTax',
-  'produkte/konfiguration:createPaymentTerm',
-  'produkte/konfiguration:deleteTag',
   // Integrationen: Outbox/Webhooks/Abgleich anstossen, Ersteinrichtung, Retry
   'integrationen:runJobs',
   'integrationen:processWebhooks',

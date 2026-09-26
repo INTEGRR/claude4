@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { MODELL_KATALOG, type ModellId } from '../../ki/modelle.ts'
 import type { RegistrierteAktion } from './typen.ts'
-import { DRUCKFORMATE, FINANZ_FELDER, zahlAusFormular } from '../../einstellungen/finanz-parameter.ts'
+import { DRUCKFORMATE, FINANZ_FELDER, optionaleZahl, zahlAusFormular } from '../../einstellungen/finanz-parameter.ts'
 
 // Nur geprüfte Katalog-Modelle sind wählbar — ein Freitextfeld wäre eine
 // stille Tippfehler-Falle, die erst beim nächsten KI-Aufruf explodiert.
@@ -244,6 +244,114 @@ export const EINSTELLUNGEN = {
     formdata: (fd) =>
       Object.fromEntries(FINANZ_FELDER.map((f) => [f.name, zahlAusFormular(fd.get(f.name))])),
     revalidate: ['/einstellungen/finanzen', '/finanzen'],
+  },
+
+  // --- Stammdaten-Konfiguration (Entscheidungslog 2026-09-26: admin-only) -----
+
+  'einstellungen.kategorie_anlegen': {
+    label: 'Produktkategorie anlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Legt eine Produktkategorie an, optional unter einer übergeordneten (Pfad pflegt ein Trigger).',
+    bindung: 'frei',
+    schema: z.object({
+      name: z.string().trim().min(1, 'Bitte einen Namen angeben').max(100),
+      parent_id: z.string().uuid().optional(),
+    }),
+    zusammenfassung: (p) => `Kategorie ${p.name}`,
+    formdata: (fd) => ({
+      name: String(fd.get('name') ?? ''),
+      parent_id: String(fd.get('parent_id') ?? '') || undefined,
+    }),
+    revalidate: ['/einstellungen/stammdaten'],
+  },
+
+  'einstellungen.steuer_anlegen': {
+    label: 'Steuer anlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Legt einen Steuersatz für Verkauf oder Einkauf an (Name eindeutig).',
+    bindung: 'frei',
+    schema: z.object({
+      name: z.string().trim().min(1, 'Bitte einen Namen angeben').max(100),
+      amount: z
+        .number({ invalid_type_error: 'Der Satz muss eine Zahl sein' })
+        .min(0, 'Der Satz muss ≥ 0 sein')
+        .max(100, 'Der Satz darf höchstens 100 % sein'),
+      type_tax_use: z.enum(['sale', 'purchase']),
+      price_include: z.boolean(),
+      description: z.string().trim().max(200).optional(),
+    }),
+    zusammenfassung: (p) => `Steuer ${p.name} (${p.amount} %)`,
+    formdata: (fd) => ({
+      name: String(fd.get('name') ?? ''),
+      amount: zahlAusFormular(fd.get('amount')),
+      type_tax_use: String(fd.get('type_tax_use') ?? 'sale'),
+      price_include: fd.get('price_include') === 'on',
+      description: String(fd.get('description') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/einstellungen/stammdaten'],
+  },
+
+  'einstellungen.zahlungsbedingung_anlegen': {
+    label: 'Zahlungsbedingung anlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Legt eine Zahlungsbedingung an: Tage nach Rechnung oder nach Monatsende, optional mit Skonto.',
+    bindung: 'frei',
+    schema: z
+      .object({
+        name: z.string().trim().min(1, 'Bitte einen Namen angeben').max(100),
+        nb_days: z
+          .number({ invalid_type_error: 'Tage müssen eine Zahl sein' })
+          .int('Tage bitte ganzzahlig')
+          .min(0)
+          .max(365),
+        delay_type: z.enum(['days_after', 'days_after_end_of_month']),
+        early_discount: z.boolean(),
+        discount_percentage: z
+          .number({ invalid_type_error: 'Skonto-Prozent müssen eine Zahl sein' })
+          .min(0)
+          .max(100, 'Skonto höchstens 100 %')
+          .optional(),
+        discount_days: z
+          .number({ invalid_type_error: 'Skonto-Tage müssen eine Zahl sein' })
+          .int('Skonto-Tage bitte ganzzahlig')
+          .min(0)
+          .max(365)
+          .optional(),
+      })
+      .refine((p) => !p.early_discount || (p.discount_percentage != null && p.discount_days != null), {
+        message: 'Mit Skonto bitte Prozent und Tage angeben',
+      }),
+    zusammenfassung: (p) => `Zahlungsbedingung ${p.name} (${p.nb_days} Tage)`,
+    formdata: (fd) => {
+      const skonto = fd.get('early_discount') === 'on'
+      return {
+        name: String(fd.get('name') ?? ''),
+        nb_days: zahlAusFormular(fd.get('nb_days')),
+        delay_type: String(fd.get('delay_type') ?? 'days_after'),
+        early_discount: skonto,
+        discount_percentage: skonto ? optionaleZahl(fd.get('discount_percentage')) : undefined,
+        discount_days: skonto ? optionaleZahl(fd.get('discount_days')) : undefined,
+      }
+    },
+    revalidate: ['/einstellungen/stammdaten'],
+  },
+
+  'einstellungen.tag_loeschen': {
+    label: 'Tag löschen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung: 'Löscht einen Tag; er verschwindet von allen Kontakten, Produkten, Aufträgen und Reparaturen.',
+    bindung: 'beleg',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/stammdaten'],
   },
 
   'einstellungen.ki_modelle_setzen': {

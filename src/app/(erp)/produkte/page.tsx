@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import { canAccess } from '@/modules/auth/permissions'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
@@ -13,7 +14,7 @@ export default async function ProduktePage({
 }: {
   searchParams: Promise<{ q?: string }>
 }) {
-  await requireArea('produkte')
+  const user = await requireArea('produkte')
   const { q } = await searchParams
 
   const rows = await sql<
@@ -55,7 +56,10 @@ export default async function ProduktePage({
           <>
             <Link className="btn" href="/p/artikel_anlegen">Anlage-Assistent</Link>
             <Link className="btn" href="/produkte/attribute">Attribute</Link>
-            <Link className="btn" href="/produkte/konfiguration">Konfiguration</Link>
+            {/* Kategorien, Steuern, Zahlungsbedingungen: Einstellungen → Stammdaten (nur Admin). */}
+            {canAccess(user.role, 'einstellungen', user.befugnisse) && (
+              <Link className="btn" href="/einstellungen/stammdaten">Kategorien &amp; Steuern</Link>
+            )}
           </>
         }
       />

@@ -21,7 +21,7 @@ Eine Tabelle `partners` für Kunden **und** Lieferanten (Flags), wie Odoos `res.
 
 - Produktliste (Suche über Name/SKU/Barcode, Filter Varianten/aktiv), Produktformular mit Reitern **Allgemein**, **Attribute & Varianten** (Zuordnung + generierte Variantenliste mit SKU/Barcode/Bestand), **Einkauf** (Lieferantenpreise, Richtlinie), **Lager** (Routen, Einheiten).
 - Variantenformular: SKU, Barcode, Shopify-Zuordnung, Bestandsübersicht, Bewegungsprotokoll, Etikettendruck.
-- Einstellungen: Attribute, Maßeinheiten, Nummernkreise, Steuersätze (einfache Liste), Vorgangsarten.
+- Einstellungen → Stammdaten (nur Admin, seit 2026-09-26): Produktkategorien, Steuern, Zahlungsbedingungen, Tags — alle Schreibwege über die Registry (`einstellungen.kategorie_anlegen`, `…steuer_anlegen`, `…zahlungsbedingung_anlegen`, `…tag_loeschen`); `/produkte/konfiguration` leitet dorthin weiter. Attribute unter Produkte → Attribute; Nummernkreise (nur lesen) unter Einstellungen → Belege & Freigaben; Maßeinheiten und Lagerorte ohne eigene Maske (Migrationen/Datenübernahme). Landkarte: [einstellungen.md](einstellungen.md).
 
 ## Abnahmekriterien
 

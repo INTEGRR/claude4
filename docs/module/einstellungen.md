@@ -21,6 +21,7 @@ Ereignis-Monitor (`/integrationen`).
 | Organisation | Firma | `/einstellungen` | Firmendaten = Absender auf Labels, Belegen, Mails; „Einrichtung erneut ansehen" | `settings.company` | `einstellungen.firma_speichern` |
 | | Benutzer | `/einstellungen/benutzer` | Konten, Rollen, Befugnisse, Passwort- und 2FA-Reset | `users` | `einstellungen.benutzer_*` |
 | | Sicherheit | `/einstellungen/sicherheit` | Pflicht für den zweiten Faktor, Konten ohne 2FA, Regeln der Anmeldung (Info) | `settings.sicherheit` | `einstellungen.sicherheit_setzen` |
+| | Stammdaten | `/einstellungen/stammdaten` | Produktkategorien, Steuern, Zahlungsbedingungen, Tags (löschen mit Rückfrage) | `product_categories`, `taxes`, `payment_terms`, `tags` | `einstellungen.kategorie_anlegen`, `…steuer_anlegen`, `…zahlungsbedingung_anlegen`, `…tag_loeschen` |
 | Abläufe | Belege & Freigaben | `/einstellungen/belege` | Sperren beim Bestätigen, Freigabegrenze Einkauf, Nummernkreise (nur lesen) | `settings.sales`, `settings.purchase`, `settings.freigaben` | `einstellungen.belegverhalten_setzen`, `einstellungen.freigaben_setzen` |
 | | Versand & Druck | `/einstellungen/versand` | Labelformat, Druckweg (PDF oder Druckbrücke), Agenten-Stand | `settings.dhl.print_format`, `settings.druckbruecke` | `einstellungen.versand_vorgaben_setzen`, `einstellungen.druckbruecke_setzen` |
 | | Versandregeln | `/einstellungen/versandregeln` | Produkt/Versandart je Bedingung, von oben nach unten | `shipping_rules` | `versand.versandregel_*` |
@@ -32,6 +33,11 @@ Ereignis-Monitor (`/integrationen`).
 | Verwaltung | Nutzung | `/einstellungen/nutzung` | Monatsbericht (Nutzer, Belege, KI) — Bericht, keine Einstellung | — | — |
 | | Registrierungen | `/einstellungen/registrierungen` | Posteingang der öffentlichen Startseite | `registrierungen` | `einstellungen.registrierung_status` |
 | | Gefahrenzone | `/einstellungen/gefahrenzone` | Stufe 1 Betriebsdaten löschen, Stufe 2 Werkszustand (Bestätigungswort) | — | `einstellungen.betriebsdaten_loeschen`, `einstellungen.werkszustand` |
+
+**Rechte:** Seit dem Umzug der Stammdaten-Konfiguration (2026-09-26) legen
+nur Administratoren Kategorien, Steuern und Zahlungsbedingungen an — vorher
+durfte es jede Rolle mit Schreibrecht auf Produkte. `/produkte/konfiguration`
+leitet weiter; der Knopf auf der Produktliste erscheint nur für Admins.
 
 ## Regeln
 

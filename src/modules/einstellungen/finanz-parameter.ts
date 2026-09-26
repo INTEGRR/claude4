@@ -38,6 +38,11 @@ export function zahlAusFormular(roh: FormDataEntryValue | null): number {
   return text === '' ? Number.NaN : Number(text)
 }
 
+/** Optionale Zahl aus dem Formular: leer = nicht angegeben (undefined), sonst wie zahlAusFormular. */
+export function optionaleZahl(roh: FormDataEntryValue | null): number | undefined {
+  return String(roh ?? '').trim() === '' ? undefined : zahlAusFormular(roh)
+}
+
 /** Labelformate der DHL-Etiketten — Seite und Katalog teilen die Liste. */
 export const DRUCKFORMATE = [
   { wert: '910-300-700', label: '910-300-700 (105 × 208 mm)' },

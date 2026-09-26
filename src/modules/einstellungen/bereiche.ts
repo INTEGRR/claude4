@@ -45,6 +45,12 @@ export const EINSTELLUNGS_BEREICHE: readonly Bereich[] = [
     beschreibung: 'Pflicht für den zweiten Faktor und die Regeln der Anmeldung.',
   },
   {
+    href: '/einstellungen/stammdaten',
+    label: 'Stammdaten',
+    gruppe: 'Organisation',
+    beschreibung: 'Produktkategorien, Steuern, Zahlungsbedingungen und Tags.',
+  },
+  {
     href: '/einstellungen/belege',
     label: 'Belege & Freigaben',
     gruppe: 'Abläufe',
