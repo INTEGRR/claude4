@@ -36,6 +36,26 @@ export function Badge({ state, kind, led }: { state: string; kind: keyof typeof 
   )
 }
 
+/**
+ * Gespeicherter Zustand als Leuchte plus Wort („aktiv ab 5.000 €",
+ * „nicht konfiguriert") — ein Baustein statt handgebauter led-Spans.
+ * Töne wie oben: ok = gut, warn = Ausnahme, off = neutral/aus, on = läuft.
+ */
+export function Zustand({
+  ton,
+  children,
+}: {
+  ton: 'ok' | 'warn' | 'off' | 'on'
+  children: React.ReactNode
+}) {
+  return (
+    <span className="mono-label zustand">
+      <span className={`led ${ton}`} />
+      {children}
+    </span>
+  )
+}
+
 export function Card({
   title,
   actions,

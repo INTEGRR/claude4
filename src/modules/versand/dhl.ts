@@ -241,7 +241,7 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
   if (fehltBeimAbsender.length > 0) {
     throw new DhlError(
       `Absenderdaten unvollständig (${fehltBeimAbsender.join(', ')}) — bitte unter ` +
-        'Einstellungen → Firmendaten pflegen.',
+        'Einstellungen → Firma pflegen.',
     )
   }
 

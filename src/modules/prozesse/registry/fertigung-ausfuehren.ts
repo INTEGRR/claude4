@@ -41,7 +41,7 @@ export async function beginnen(_p: object, ctx: AktionsKontext): Promise<Aktions
 export async function zettelDrucken(p: { ids: string[] }): Promise<AktionsErgebnis> {
   if (!(await druckbrueckeAktiv())) {
     return {
-      text: 'PDF-Modus — Sammeldruck im Browser geöffnet (umstellen: Einstellungen → Druckbrücke).',
+      text: 'PDF-Modus — Sammeldruck im Browser geöffnet (umstellen: Einstellungen → Versand & Druck).',
       link: `/fertigung/druck?ids=${p.ids.join(',')}`,
     }
   }

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MODELL_KATALOG, type ModellId } from '../../ki/modelle.ts'
 import type { RegistrierteAktion } from './typen.ts'
+import { DRUCKFORMATE, FINANZ_FELDER, zahlAusFormular } from '../../einstellungen/finanz-parameter.ts'
 
 // Nur geprüfte Katalog-Modelle sind wählbar — ein Freitextfeld wäre eine
 // stille Tippfehler-Falle, die erst beim nächsten KI-Aufruf explodiert.
@@ -132,7 +133,7 @@ export const EINSTELLUNGEN = {
       modus: String(fd.get('modus') ?? 'pdf'),
       token: String(fd.get('token') ?? '').trim() || undefined,
     }),
-    revalidate: ['/einstellungen', '/integrationen'],
+    revalidate: ['/einstellungen/versand', '/integrationen'],
   },
 
   'einstellungen.shopify_modus_setzen': {
@@ -155,7 +156,94 @@ export const EINSTELLUNGEN = {
     }),
     zusammenfassung: (p) => `Shopify ${p.modus === 'schreiben' ? 'schreibend (scharf)' : 'nur lesend'}`,
     formdata: (fd) => ({ modus: String(fd.get('modus') ?? 'lesen') }),
-    revalidate: ['/einstellungen', '/integrationen'],
+    revalidate: ['/einstellungen/anbindungen', '/integrationen'],
+  },
+
+  'einstellungen.versand_vorgaben_setzen': {
+    label: 'Versand: Labelformat',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Druckformat der DHL-Labels (settings.dhl.print_format). Das Versandprodukt kommt ' +
+      'nicht von hier, sondern aus den Versandregeln bzw. der Zielzone.',
+    bindung: 'frei',
+    schema: z.object({
+      print_format: z.enum(DRUCKFORMATE.map((f) => f.wert) as [string, ...string[]]),
+    }),
+    zusammenfassung: (p) => `Labelformat ${p.print_format}`,
+    formdata: (fd) => ({ print_format: String(fd.get('print_format') ?? '910-300-700') }),
+    revalidate: ['/einstellungen/versand'],
+  },
+
+  'einstellungen.belegverhalten_setzen': {
+    label: 'Belegverhalten: Sperren beim Bestätigen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Ob bestätigte Verkaufsaufträge bzw. Bestellungen automatisch gesperrt werden ' +
+      '(settings.sales / settings.purchase, lock_confirmed) — die Datenbank-Trigger lesen es.',
+    bindung: 'frei',
+    schema: z.object({ sales_lock: z.boolean(), purchase_lock: z.boolean() }),
+    zusammenfassung: (p) =>
+      `Verkauf ${p.sales_lock ? 'sperrt' : 'offen'}, Einkauf ${p.purchase_lock ? 'sperrt' : 'offen'}`,
+    formdata: (fd) => ({
+      sales_lock: fd.get('sales_lock') === 'on',
+      purchase_lock: fd.get('purchase_lock') === 'on',
+    }),
+    revalidate: ['/einstellungen/belege'],
+  },
+
+  'einstellungen.freigaben_setzen': {
+    label: 'Freigaben: Grenze im Einkauf',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Ab welcher Bestellsumme (netto) eine Bestellung erst nach Freigabe bestätigt werden kann ' +
+      '(settings.freigaben.einkauf_limit). Leer = keine Freigabepflicht; andere Schlüssel im ' +
+      'selben Eintrag bleiben erhalten.',
+    bindung: 'frei',
+    schema: z.object({
+      einkauf_limit: z
+        .number({ invalid_type_error: 'Das Limit muss eine Zahl sein — oder leer für „keine Freigabepflicht"' })
+        .nonnegative('Das Limit muss ≥ 0 sein')
+        .nullable(),
+    }),
+    zusammenfassung: (p) =>
+      p.einkauf_limit == null ? 'keine Freigabepflicht' : `Freigabe ab ${p.einkauf_limit.toFixed(2)} €`,
+    formdata: (fd) => {
+      const roh = String(fd.get('einkauf_limit') ?? '').trim()
+      return { einkauf_limit: roh === '' ? null : zahlAusFormular(roh) }
+    },
+    revalidate: ['/einstellungen/belege'],
+  },
+
+  'einstellungen.finanz_parameter_setzen': {
+    label: 'Finanzen: Stellschrauben der Prognose',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Quoten, Sätze, Zahltage, Szenario-Band und Puffer der Cashflow-Prognose ' +
+      '(settings.finanzen, gemergt — vertrag_kategorien u. a. bleiben).',
+    bindung: 'frei',
+    schema: z.object(
+      Object.fromEntries(
+        FINANZ_FELDER.map((f) => [
+          f.name,
+          z
+            .number({ invalid_type_error: `„${f.label}" muss eine Zahl sein` })
+            .min(f.min ?? Number.NEGATIVE_INFINITY, `„${f.label}" muss mindestens ${f.min} sein`)
+            .max(f.max ?? Number.POSITIVE_INFINITY, `„${f.label}" darf höchstens ${f.max} sein`),
+        ]),
+      ) as Record<string, z.ZodNumber>,
+    ),
+    zusammenfassung: () => 'Prognose-Stellschrauben gespeichert',
+    formdata: (fd) =>
+      Object.fromEntries(FINANZ_FELDER.map((f) => [f.name, zahlAusFormular(fd.get(f.name))])),
+    revalidate: ['/einstellungen/finanzen', '/finanzen'],
   },
 
   'einstellungen.ki_modelle_setzen': {
@@ -182,7 +270,7 @@ export const EINSTELLUNGEN = {
       interview: String(fd.get('interview') ?? ''),
       datenfrage: String(fd.get('datenfrage') ?? ''),
     }),
-    revalidate: ['/einstellungen'],
+    revalidate: ['/einstellungen/ki'],
   },
 
   'einstellungen.demodaten_einspielen': {
@@ -685,7 +773,7 @@ export const EINSTELLUNGEN = {
     }),
     zusammenfassung: (p) => `Zweiter Faktor: ${p.zwei_faktor}`,
     formdata: (fd) => ({ zwei_faktor: String(fd.get('zwei_faktor') ?? 'alle') }),
-    revalidate: ['/einstellungen', '/einstellungen/benutzer'],
+    revalidate: ['/einstellungen/sicherheit', '/einstellungen/benutzer'],
   },
   // --- Benachrichtigungen (Telegram) ------------------------------------------
 
@@ -715,7 +803,7 @@ export const EINSTELLUNGEN = {
       jobs: fd.get('jobs') === 'on',
       dienste: fd.get('dienste') === 'on',
     }),
-    revalidate: ['/einstellungen'],
+    revalidate: ['/einstellungen/benachrichtigungen'],
   },
 
   'einstellungen.telegram_test': {
@@ -728,7 +816,7 @@ export const EINSTELLUNGEN = {
       'Das Ergebnis steht im Transaktionslog (System telegram).',
     bindung: 'frei',
     schema: z.object({}),
-    revalidate: ['/einstellungen', '/integrationen/transaktionen'],
+    revalidate: ['/einstellungen/benachrichtigungen', '/integrationen/transaktionen'],
   },
 
   'einstellungen.dienste_pruefen': {

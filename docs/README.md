@@ -89,6 +89,8 @@ der [AGENTS.md](../AGENTS.md).
   Kennzahlen-Definitionen.
 - [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)
   — Rollen, Scanner-Arbeitsplatz, KI-Analyse (Chat).
+- [module/einstellungen.md](module/einstellungen.md) — Landkarte der
+  Einstellungen: Bereiche, wo was gespeichert ist, Regeln und Checkliste.
 - [module/odoo-vervollstaendigung.md](module/odoo-vervollstaendigung.md) —
   Abgleichliste: welche Odoo-Funktionen nachgebaut sind.
 

@@ -150,7 +150,7 @@ gespeicherten Sendung, Zettel werden beim Abholen frisch als PDF
 gerendert (src/modules/fertigung/zettel-pdf.tsx).
 
 **Der Druckweg ist eine Betreiber-Einstellung**, keine Env-Variable
-(Einstellungen → „Druckbrücke", Registry-Aktion
+(Einstellungen → Versand & Druck, Registry-Aktion
 `einstellungen.druckbruecke_setzen`, settings-Schlüssel `druckbruecke`;
 Reihenfolge wie bei den KI-Modellen: Einstellung → Env-Notausgang
 `DRUCK_AGENT_TOKEN` → Standard):
@@ -165,8 +165,9 @@ Reihenfolge wie bei den KI-Modellen: Einstellung → Env-Notausgang
 
 **Einrichtung der Agenten (nur für den Brücken-Modus):**
 
-1. Einstellungen → „Druckbrücke" auf **Druckbrücke** stellen und das
-   Token aus der Karte kopieren.
+1. Einstellungen → Versand & Druck: den Druckweg auf **Druckbrücke**
+   stellen und das Token aus der Karte kopieren (die Agenten und ihr
+   letzter Abruf stehen auf derselben Seite).
 2. Auf dem Packtisch-PC: Node ≥ 22 installieren, die Datei
    `scripts/druck-agent.ts` aus dem Repo kopieren (sie ist bewusst
    abhängigkeitsfrei — kein `npm install` nötig) und starten:

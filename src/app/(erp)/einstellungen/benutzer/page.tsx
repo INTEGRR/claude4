@@ -2,7 +2,8 @@ import { sql } from '@/db/client'
 import { requireArea, requireAdmin } from '@/modules/auth'
 import { ALLE_BEFUGNISSE, ALL_ROLES, BEFUGNISSE, ROLE_LABELS, type Role } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { Card, PageHeader, TableWrap } from '@/components/ui'
+import { Card, TableWrap } from '@/components/ui'
+import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { date as datum, dateTime } from '@/modules/shared/format'
 import { createUser, resetPassword, resetZweiFaktor, setActive, setBefugnisse, setRole } from './actions'
 
@@ -30,10 +31,7 @@ export default async function BenutzerPage() {
 
   return (
     <>
-      <PageHeader
-        title="Benutzer"
-        subtitle="Konten und Rollen. Lager- und Fertigungsrollen sehen nur ihre Bereiche. Pflicht für den zweiten Faktor: Einstellungen → Sicherheit."
-      />
+      <EinstellungenKopf href="/einstellungen/benutzer" />
 
       <Card title={`Konten (${users.length})`} tight>
         <TableWrap>

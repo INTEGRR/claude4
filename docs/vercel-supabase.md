@@ -116,7 +116,7 @@ INSTANZ_REGION           Anzeige in der Ersteinrichtung, z. B. "EU-Central · Fr
 Die Startseite `/integrationen` zeigt später, welche Anbindungen scharf sind.
 Shopify startet mit Zugangsdaten im Modus **nur lesen** (Staging: Bestellungen
 kommen herein, nichts geht hinaus); scharf schaltet ein Admin unter
-Einstellungen → Shopify-Anbindung — siehe module/integrationen.md.
+Einstellungen → Schnittstellen — siehe module/integrationen.md.
 
 ---
 
@@ -142,7 +142,7 @@ Danach ist die Anwendung erreichbar. Anmeldung:
 | E-Mail | `admin@example.com` |
 | Passwort | `erp-admin` |
 
-**Dieses Passwort sofort ändern** (Einstellungen → Benutzer verwalten). Wer es
+**Dieses Passwort sofort ändern** (Einstellungen → Benutzer). Wer es
 gar nicht erst anlegen will, setzt vor der ersten Bereitstellung
 `SEED_ADMIN_EMAIL` und `SEED_ADMIN_PASSWORD`.
 

@@ -94,6 +94,56 @@ export async function shopifyModusSetzen(
   }
 }
 
+/** Merge in einen settings-Schlüssel — andere Schlüssel im Eintrag bleiben stehen. */
+async function einstellungMergen(key: string, patch: Record<string, unknown>): Promise<void> {
+  await sql`
+    insert into settings (key, value) values (${key}, ${sql.json(patch as never)})
+    on conflict (key) do update set value = settings.value || excluded.value`
+}
+
+export async function versandVorgabenSetzen(
+  p: { print_format: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await einstellungMergen('dhl', { print_format: p.print_format })
+  return { text: `Labelformat ${p.print_format} gespeichert — gilt ab dem nächsten Label.` }
+}
+
+export async function belegverhaltenSetzen(
+  p: { sales_lock: boolean; purchase_lock: boolean },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await einstellungMergen('sales', { lock_confirmed: p.sales_lock })
+  await einstellungMergen('purchase', { lock_confirmed: p.purchase_lock })
+  return { text: 'Belegverhalten gespeichert — gilt ab der nächsten Bestätigung.' }
+}
+
+export async function freigabenSetzen(
+  p: { einkauf_limit: number | null },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  if (p.einkauf_limit == null) {
+    // Nur diesen Schlüssel entfernen — künftige Grenzen (z. B. Zahlungen)
+    // im selben Eintrag bleiben stehen.
+    await sql`
+      insert into settings (key, value) values ('freigaben', '{}'::jsonb)
+      on conflict (key) do update set value = settings.value - 'einkauf_limit'`
+    return { text: 'Freigabepflicht abgeschaltet — Bestellungen brauchen keine Freigabe mehr.' }
+  }
+  await einstellungMergen('freigaben', { einkauf_limit: p.einkauf_limit })
+  return {
+    text: `Gespeichert: Bestellungen ab ${p.einkauf_limit.toFixed(2)} € netto brauchen eine Freigabe.`,
+  }
+}
+
+export async function finanzParameterSetzen(
+  p: Record<string, number>,
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await einstellungMergen('finanzen', p)
+  return { text: 'Finanz-Stellschrauben gespeichert — die Prognose rechnet ab sofort damit.' }
+}
+
 export async function demodatenEinspielenAktion(
   _p: Record<string, never>,
   _ctx: AktionsKontext,

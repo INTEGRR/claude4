@@ -167,7 +167,7 @@ statt voll neu — bei bis zu 15 Runden je Frage der größte Kostenhebel.
 Interview und Prozess-Aufnahme cachen ihren Systemprompt genauso.
 
 **Modellwahl je Ebene ist Betreiber-Einstellung** (Einstellungen →
-„KI-Modelle", Registry-Aktion `einstellungen.ki_modelle_setzen`,
+KI-Modelle, Registry-Aktion `einstellungen.ki_modelle_setzen`,
 settings-Schlüssel `ki_modelle`): Auswertungen/SQL, Prozess-Aufnahme &
 -Entwurf, Onboarding-Interview und die schnelle Datenfrage lassen sich
 getrennt auf Opus 5, Sonnet 5 oder Haiku 4.5 stellen — nur Katalog-

@@ -1,9 +1,9 @@
-import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
-import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Card, Empty, TableWrap } from '@/components/ui'
+import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 
 export const dynamic = 'force-dynamic'
@@ -180,11 +180,7 @@ export default async function VersandregelnPage() {
 
   return (
     <>
-      <PageHeader
-        title="Versandregeln"
-        subtitle="Von oben nach unten ausgewertet — je Aktion gewinnt die erste passende Regel"
-        actions={<Link className="btn" href="/einstellungen">Zurück zu den Einstellungen</Link>}
-      />
+      <EinstellungenKopf href="/einstellungen/versandregeln" />
 
       <div className="notice info">
         Die Regeln bestimmen den <strong>Vorschlag</strong> am Packtisch (DHL-Produkt, Abrechnungsnummer,

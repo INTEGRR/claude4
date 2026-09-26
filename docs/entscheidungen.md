@@ -9,6 +9,46 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-26 — Einstellungen: ein Bereich je Thema, linke Unternavigation, jeder Schreibweg über die Registry
+
+Die Einstellungsseite war eine Sammelseite mit 774 Zeilen und 13 fachfremden
+Karten; vier Speicheraktionen schrieben `settings` roh am Torwächter vorbei
+(zwei davon ersetzten den ganzen Wert statt zu mergen), Unterseiten waren nur
+über Header-Knöpfe erreichbar, eine Einstellung („Standardprodukt") wurde nie
+gelesen. Der Betreiber will Ordnung nach Best Practices.
+
+**Entschieden (Landkarte `src/modules/einstellungen/bereiche.ts`, Doku
+[module/einstellungen.md](module/einstellungen.md)):**
+
+- **Ein Bereich je Thema, eine URL je Bereich**, gruppiert in Organisation,
+  Abläufe, Anbindungen, Verwaltung; **linke Unternavigation** (verschachteltes
+  `einstellungen/layout.tsx`, Client-Komponente mit `aria-current`, auf dem
+  Telefon eine Chip-Leiste). Verworfen: Reiter oben — bei 14 Bereichen bricht
+  die Reihe um. Bestehende Unterseiten behalten ihre Pfade (Links, Registry-
+  `revalidate`, Doku bleiben gültig).
+- **Konfiguration getrennt von Persönlichem und Betrieb**: `/konto` bleibt
+  die persönliche Seite jeder Rolle, `/prozesse` bleibt eigener Menüpunkt,
+  der Ereignis-Monitor zeigt Betrieb. Nutzungsbericht und Registrierungen sind
+  keine Einstellungen, bleiben aber (Betreiberwunsch) in der Gruppe
+  „Verwaltung" — ohne Rechteänderung.
+- **Jede Seite prüft ihren Guard selbst** (`requireArea('einstellungen')`);
+  der Guard im Layout ist Komfort, weil Layouts bei Navigation zwischen
+  Geschwistern nicht neu laufen.
+- **Registry statt Umgehung**: `einstellungen.versand_vorgaben_setzen`,
+  `…belegverhalten_setzen`, `…freigaben_setzen`, `…finanz_parameter_setzen`
+  ersetzen `saveDhl`, `savePolicies`, `saveFreigaben`, `saveFinanzen`
+  (vier Einträge weniger in `UI_UMGEHUNGEN`). Gespeichert wird per **Merge**;
+  „Freigabe leer" entfernt nur `einkauf_limit`, künftige Grenzen im selben
+  Eintrag bleiben. Die Finanz-Felder leben pur in
+  `src/modules/einstellungen/finanz-parameter.ts` (Seite und Schema teilen sie).
+- **Tote Einstellung entfernt**: „Standardprodukt" wurde nie gelesen — das
+  Produkt kommt aus den Versandregeln bzw. der Zielzone.
+- **Wächter** `tests/einstellungen.test.ts`: jede Seite unter
+  `/einstellungen` steht in der Landkarte und umgekehrt, jeder Bereich im
+  Befehlsfeld, gemeinsamer Kopf und eigener Guard je Seite, Gefahrenzone
+  zuletzt — und **kein direkter `settings`-Schreiber in `src/app`** außer dem
+  Heartbeat der Druck-Agenten.
+
 ## 2026-09-25 — Dienste-Wächter: aktive Sonden alle fünf Minuten, Störung erst beim zweiten Fehlschlag
 
 Bisher prüfte niemand, ob DHL, Shopify, Resend, Anthropic, OpenAI, Telegram

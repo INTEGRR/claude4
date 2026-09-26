@@ -1,9 +1,9 @@
-import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
-import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Card, Empty, TableWrap } from '@/components/ui'
+import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
@@ -67,7 +67,7 @@ function Formular({
           <input type="number" name="sequence" defaultValue={kartonage?.sequence ?? 10} style={{ width: 80 }} />
         </label>
       </div>
-      <div className="row" style={{ alignItems: 'flex-end' }}>
+      <div className="row">
         <label className="field shrink">
           <span>Fassungsvermögen</span>
           <input
@@ -132,11 +132,7 @@ export default async function KartonagenPage() {
 
   return (
     <>
-      <PageHeader
-        title="Kartonagen"
-        subtitle="Verpackung wählen, Gewicht mitrechnen, Verbrauch buchen"
-        actions={<Link className="btn" href="/einstellungen">Zurück zu den Einstellungen</Link>}
-      />
+      <EinstellungenKopf href="/einstellungen/kartonagen" />
 
       <div className="notice info">
         Eine Kartonage ist ein <strong>Produkt mit Zusatzangaben</strong> — Bestand, Einkaufspreis und

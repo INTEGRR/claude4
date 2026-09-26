@@ -230,7 +230,8 @@ Entscheidungslog 2026-08-25, Phase 7).
    psql -h 127.0.0.1 -p 5433 -U erp -d odoo_quelle -q -v ON_ERROR_STOP=0 -f dump.sql
    ```
 3. **Rollback-Pfad sichern**: Supabase-Backup bzw. PITR-Punkt notieren.
-4. **KRNL-Prod leerräumen**: Einstellungen → Demodaten löschen
+4. **KRNL-Prod leerräumen**: Einstellungen → Gefahrenzone → Stufe 1
+   „Betriebsdaten löschen"
    (`demodaten_loeschen()` — erhält Konfiguration, Benutzer und Prozesse;
    räumt auch `odoo_verweise`, gewollt). **Achtung:** Die Schichtvorlagen
    (FRUEH/SPAET/…, Seeds aus 0022) stehen nicht in der Behalten-Liste und
@@ -257,7 +258,7 @@ Entscheidungslog 2026-08-25, Phase 7).
    keinen Tag auf Prod überleben).
 7. **Shopify-Kopplung**: ZUERST der Produkt-Import (SKU-Match setzt
    `shopify_variant_id` an den Bestandsdaten) — der läuft schon im
-   Lesemodus —, dann unter Einstellungen → Shopify-Anbindung auf
+   Lesemodus —, dann unter Einstellungen → Schnittstellen auf
    **schreiben** stellen (bis hierhin hat KRNL nichts in den Shop
    geschrieben, siehe module/integrationen.md), dann Webhooks aktivieren;
    Order-Backfill nur für den Zeitraum ab Stichtag — ältere Bestellungen

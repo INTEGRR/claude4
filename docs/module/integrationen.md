@@ -5,7 +5,7 @@ API-Referenz: [docs/api-referenz/shopify.md](../api-referenz/shopify.md) · Vers
 ## Shopify — Lese-/Schreibmodus (Staging-Schalter)
 
 Die Anbindung hat einen Betreiber-Schalter `settings.shopify.modus`
-(Einstellungen → „Shopify-Anbindung", Registry-Aktion
+(Einstellungen → Schnittstellen, Registry-Aktion
 `einstellungen.shopify_modus_setzen`, nur Admin, auditiert):
 
 - **lesen** (Standard, auch ohne Eintrag): KRNL hängt am Live-Shop und

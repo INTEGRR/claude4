@@ -382,7 +382,7 @@ export default async function IntegrationenPage() {
           value={<Verbindung ok={brueckeAktiv} />}
           hint={
             !brueckeAktiv ? (
-              'PDF-Modus — Labels/Zettel öffnen im Browser (Einstellungen → Druckbrücke)'
+              'PDF-Modus — Labels/Zettel öffnen im Browser (Einstellungen → Versand & Druck)'
             ) : (
               <>
                 {druckAgenten.length === 0
@@ -475,7 +475,7 @@ export default async function IntegrationenPage() {
           Shopify ist verbunden, steht aber auf <strong>nur lesen</strong>: Bestellungen, Kunden
           und Produkte kommen herein, Fulfillments, Tracking, Bestände, Produktänderungen und
           Webhook-Registrierung gehen nicht hinaus (Schreibjobs werden als übersprungen abgehakt).
-          Scharfschalten unter <Link href="/einstellungen">Einstellungen → Shopify-Anbindung</Link>.
+          Scharfschalten unter <Link href="/einstellungen/anbindungen">Einstellungen → Schnittstellen</Link>.
         </div>
       )}
 

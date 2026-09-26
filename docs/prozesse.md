@@ -951,8 +951,8 @@ abschließen — der erste Ablauf entsteht dann später in der Werkstatt. Kein
 Schritt ist eine Sackgasse.
 
 **Noch einmal ansehen**: Nach dem Abschluss ist `/einrichtung` zu. Mit
-`?erneut=1` kommen Administratoren wieder hinein (Einstellungen →
-„Einrichtung ansehen") — für Vorführungen und zum Prüfen. Der Durchlauf ist
+`?erneut=1` kommen Administratoren wieder hinein (Einstellungen → Firma →
+„Einrichtung erneut ansehen") — für Vorführungen und zum Prüfen. Der Durchlauf ist
 ECHT und nicht simuliert: was dort gespeichert wird, ist gespeichert. Die
 Kopfleiste sagt das auch. Wer nur schauen will, lässt die Karte
 „Geschäftsmodell" in Schritt 01 in Ruhe (sie schaltet Prozesse um) und

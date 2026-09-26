@@ -165,8 +165,8 @@ Für die Rollen liegen zwei weitere Demo-Konten bei (Passwort jeweils
 und den Scanner; **`fertigung@example.com`** nur Fertigung, Reparatur und
 den Scanner. Eigene Konten legst du unter **Einstellungen → Benutzer** an.
 
-Wenn der echte Betrieb beginnt, entfernt **Einstellungen → „Gefahrenzone:
-alle Daten löschen (Neustart)"** die Beispieldaten restlos — samt der beiden
+Wenn der echte Betrieb beginnt, entfernt **Einstellungen → Gefahrenzone →
+„Stufe 1: Betriebsdaten löschen"** die Beispieldaten restlos — samt der beiden
 Demo-Konten und aller Buchungen; Benutzer, Lagerorte und Konfiguration
 bleiben. Zurück kommen Beispieldaten nur, wenn du sie ausdrücklich neu
 einspielst (`SEED_DEMO=true` bzw. `--demo`) — nie von selbst.
@@ -514,7 +514,7 @@ SHOPIFY_CLIENT_SECRET=…
 Die Anbindung startet im Modus **nur lesen**: Bestellungen, Kunden und
 Produkte kommen herein, aber KRNL schreibt nichts in den Shop (keine
 Fulfillments, Bestände, Produkte, Webhooks), bis ein Admin unter
-Einstellungen → Shopify-Anbindung auf „schreiben" stellt — so lässt sich
+Einstellungen → Schnittstellen auf „schreiben" stellt — so lässt sich
 auch ein Live-Shop gefahrlos anbinden (docs/module/integrationen.md).
 
 Ein Token muss nirgends kopiert werden: KRNL tauscht Client ID und Secret

@@ -131,7 +131,7 @@ export class ShopifyNurLesen extends ShopifyError {
   constructor(operation: string) {
     super(
       `Shopify steht auf „nur lesen" — ${operation} wurde nicht ausgeführt. ` +
-        'Umstellen: Einstellungen → Shopify-Anbindung.',
+        'Umstellen: Einstellungen → Schnittstellen.',
       false,
     )
     this.name = 'ShopifyNurLesen'

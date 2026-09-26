@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
-import { Card, PageHeader, TableWrap } from '@/components/ui'
+import { Card, TableWrap } from '@/components/ui'
+import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { ColumnChart } from '@/components/charts'
 
 export const dynamic = 'force-dynamic'
@@ -38,9 +39,8 @@ export default async function NutzungPage({
 
   return (
     <>
-      <PageHeader
-        title="Nutzung"
-        subtitle="Aktive Nutzer, Belege und KI-Nutzung je Monat — die Grundlage für Preisgespräche."
+      <EinstellungenKopf
+        href="/einstellungen/nutzung"
         actions={
           <>
             <Link className={`btn ${monate === 6 ? 'primary' : ''}`} href="/einstellungen/nutzung">

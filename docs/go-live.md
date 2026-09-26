@@ -63,7 +63,7 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       soll. **Gefahrlos vor dem Stichtag:** die Anbindung startet im
       Modus „nur lesen" (Staging) — Bestellungen und Produkte kommen
       herein, nichts geht hinaus, bis ein Admin unter Einstellungen →
-      Shopify-Anbindung auf „schreiben" stellt
+      Schnittstellen auf „schreiben" stellt
       ([module/integrationen.md](module/integrationen.md)).
 - [ ] **Mail**: `RESEND_API_KEY`, `MAIL_FROM` mit verifizierter Domain,
       `REGISTRIERUNG_MAIL`.

@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
-import { Card, PageHeader } from '@/components/ui'
+import { Card } from '@/components/ui'
+import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { Liste, type Registrierung } from './liste'
 
 export const dynamic = 'force-dynamic'
@@ -26,12 +27,12 @@ export default async function RegistrierungenPage() {
 
   return (
     <>
-      <PageHeader
-        title="Registrierungen"
-        subtitle={
+      <EinstellungenKopf
+        href="/einstellungen/registrierungen"
+        untertitel={
           offen > 0
-            ? `${offen} offen — Eingänge vom Formular der öffentlichen Startseite.`
-            : 'Eingänge vom Formular der öffentlichen Startseite.'
+            ? `${offen} offen — Interessenten von der öffentlichen Startseite.`
+            : undefined
         }
       />
 

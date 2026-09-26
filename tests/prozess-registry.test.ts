@@ -245,11 +245,6 @@ const NOCH_NICHT_MIGRIERT = new Set<string>([
  * frueher unbemerkt, weil der Waechter nur Dateien namens actions.ts las.
  */
 const UI_UMGEHUNGEN = new Set<string>([
-  // Einstellungen: schreiben settings-Schluessel bzw. raeumen Daten ab
-  'einstellungen:saveDhl',
-  'einstellungen:savePolicies',
-  'einstellungen:saveFreigaben',
-  'einstellungen:saveFinanzen',
   // Stammdaten-Schnellanlage aus der Konfigurationsseite
   'produkte/konfiguration:createCategory',
   'produkte/konfiguration:createTax',
