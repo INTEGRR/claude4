@@ -224,5 +224,6 @@ export const AUSFUEHRUNG = {
   'versand.versandregel_verschieben': versand.versandregelVerschieben,
 
   'integrationen.klaerfall_aufloesen': integrationen.klaerfallAufloesen,
+  'integrationen.webhooks_registrieren': integrationen.webhooksRegistrieren,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

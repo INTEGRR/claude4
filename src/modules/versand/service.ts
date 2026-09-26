@@ -213,7 +213,7 @@ export async function createLabelForPicking(
 ): Promise<CreateLabelResult> {
   if (!dhlConfigured()) {
     throw new DhlError(
-      'DHL ist nicht konfiguriert. Bitte API-Key, GKP-Zugang und Abrechnungsnummer in den Einstellungen hinterlegen.',
+      'DHL ist nicht konfiguriert — API-Key, GKP-Zugang und Abrechnungsnummer sind Umgebungsvariablen; was fehlt, zeigt Einstellungen → Schnittstellen.',
     )
   }
 
@@ -369,7 +369,7 @@ export async function createLabelForRepair(
 ): Promise<CreateLabelResult> {
   if (!dhlConfigured()) {
     throw new DhlError(
-      'DHL ist nicht konfiguriert. Bitte API-Key, GKP-Zugang und Abrechnungsnummer in den Einstellungen hinterlegen.',
+      'DHL ist nicht konfiguriert — API-Key, GKP-Zugang und Abrechnungsnummer sind Umgebungsvariablen; was fehlt, zeigt Einstellungen → Schnittstellen.',
     )
   }
 

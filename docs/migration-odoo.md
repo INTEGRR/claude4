@@ -260,7 +260,8 @@ Entscheidungslog 2026-08-25, Phase 7).
    `shopify_variant_id` an den Bestandsdaten) — der läuft schon im
    Lesemodus —, dann unter Einstellungen → Schnittstellen auf
    **schreiben** stellen (bis hierhin hat KRNL nichts in den Shop
-   geschrieben, siehe module/integrationen.md), dann Webhooks aktivieren;
+   geschrieben, siehe module/integrationen.md), dann Webhooks registrieren
+   (ebenfalls Einstellungen → Schnittstellen);
    Order-Backfill nur für den Zeitraum ab Stichtag — ältere Bestellungen
    sind bereits über die Odoo-Übernahme da (GID-Dedupe greift).
    Danach `integration_jobs` prüfen: der Import löscht wartende

@@ -113,7 +113,9 @@ REPARATUR_MAIL           Empfänger der Hinweis-Mail bei Reparaturanfragen (/ser
 INSTANZ_REGION           Anzeige in der Ersteinrichtung, z. B. "EU-Central · Frankfurt"
 ```
 
-Die Startseite `/integrationen` zeigt später, welche Anbindungen scharf sind.
+Einstellungen → Schnittstellen zeigt danach je Anbindung, welche Variablen
+gesetzt sind und was noch fehlt (nur Namen, nie Werte); der Ereignis-Monitor
+`/integrationen` zeigt den laufenden Betrieb.
 Shopify startet mit Zugangsdaten im Modus **nur lesen** (Staging: Bestellungen
 kommen herein, nichts geht hinaus); scharf schaltet ein Admin unter
 Einstellungen → Schnittstellen — siehe module/integrationen.md.

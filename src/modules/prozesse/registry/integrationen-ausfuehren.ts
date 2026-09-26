@@ -51,3 +51,20 @@ export async function klaerfallAufloesen(
   }
   return { text: 'Klärfall aufgelöst — der nächste Abgleich zieht die Position nach.' }
 }
+
+export async function webhooksRegistrieren(
+  p: { url: string },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Der Shopify-Client zieht Next-Module — dynamisch, damit der Katalog
+  // unter blankem Node ladbar bleibt.
+  if (process.env.SHOPIFY_FAKE === '1') {
+    throw new Error('Im Fake-Betrieb (SHOPIFY_FAKE=1) gibt es keinen Shop, bei dem Webhooks registriert werden könnten')
+  }
+  const { registerWebhooks, shopifyConfigured } = await import('@/modules/integrationen/shopify')
+  if (!shopifyConfigured()) throw new Error('Shopify ist nicht konfiguriert — siehe Einstellungen → Schnittstellen')
+  const r = await registerWebhooks(p.url)
+  return {
+    text: `Webhooks eingerichtet: ${r.angelegt} neu, ${r.aktualisiert} umgezogen, ${r.unveraendert} passten schon.`,
+  }
+}

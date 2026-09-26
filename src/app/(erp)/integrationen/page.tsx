@@ -125,25 +125,6 @@ async function starteUebernahme(formData: FormData) {
   return actionInfo('Übernahme läuft — Fortschritt unten in der Outbox und hier auf der Karte.')
 }
 
-async function registriereWebhooks(formData: FormData) {
-  'use server'
-  await requireAdmin()
-  const url = String(formData.get('url') ?? '').trim()
-  if (!/^https:\/\//.test(url)) {
-    return actionError('Bitte die öffentliche https-Adresse des ERP angeben.')
-  }
-  try {
-    const { registerWebhooks } = await import('@/modules/integrationen/shopify')
-    const r = await registerWebhooks(url)
-    revalidatePath('/integrationen')
-    return actionInfo(
-      `Webhooks eingerichtet: ${r.angelegt} neu, ${r.aktualisiert} umgezogen, ${r.unveraendert} passten schon.`,
-    )
-  } catch (err) {
-    return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
-  }
-}
-
 async function retry(jobId: string) {
   'use server'
   await requireAdmin()
@@ -315,18 +296,6 @@ export default async function IntegrationenPage() {
     select variant_id, sku, erp_menge, shop_menge, shop_seen_at
     from shopify_inventory_drift order by sku limit 50`
 
-  // Bei Shopify registrierte Webhooks — best effort, die Seite darf nicht an
-  // einem Netzfehler scheitern.
-  let webhooksImShop: { topic: string; callbackUrl: string | null }[] | null = null
-  if (shopifyConfigured()) {
-    try {
-      const { fetchWebhooks } = await import('@/modules/integrationen/shopify')
-      webhooksImShop = await fetchWebhooks()
-    } catch {
-      webhooksImShop = null
-    }
-  }
-
   // Stand der Erstübernahme (Kunden/Bestellungen) für die Karte.
   const uebernahme = Object.fromEntries(
     (
@@ -355,6 +324,7 @@ export default async function IntegrationenPage() {
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Stat
           label="Shopify"
+          href="/einstellungen/anbindungen"
           value={<Verbindung ok={shopifyConfigured()} />}
           hint={
             <>
@@ -370,6 +340,7 @@ export default async function IntegrationenPage() {
         />
         <Stat
           label="DHL"
+          href="/einstellungen/anbindungen"
           value={<Verbindung ok={dhlConfigured()} />}
           hint={
             dhlConfigured()
@@ -481,22 +452,8 @@ export default async function IntegrationenPage() {
 
       {!shopifyConfigured() && (
         <div className="notice warn">
-          Shopify ist nicht konfiguriert. App im{' '}
-          <a href="https://dev.shopify.com" target="_blank" rel="noreferrer">Dev Dashboard</a>{' '}
-          anlegen, Scopes geben (<code className="mono">read_orders</code>, <code className="mono">read_all_orders</code>{' '}
-          (sonst liefert Shopify nur die letzten 60 Tage!),{' '}
-          <code className="mono">write_orders</code>, <code className="mono">read_customers</code>,{' '}
-          <code className="mono">read_products</code>,{' '}
-          <code className="mono">write_merchant_managed_fulfillment_orders</code>,{' '}
-          <code className="mono">read_inventory</code>, <code className="mono">write_inventory</code>,{' '}
-          <code className="mono">read_locations</code>) und im eigenen Shop installieren. Dann{' '}
-          <code className="mono">SHOPIFY_SHOP_DOMAIN</code>, <code className="mono">SHOPIFY_CLIENT_ID</code>{' '}
-          und <code className="mono">SHOPIFY_CLIENT_SECRET</code> (Settings → Credentials) als
-          Umgebungsvariablen setzen — das Access Token holt sich das ERP selbst und erneuert es
-          automatisch. Webhooks (<code className="mono">orders/*</code>,{' '}
-          <code className="mono">inventory_levels/update</code> auf{' '}
-          <code className="mono">/api/webhooks/shopify</code>) brauchen eine öffentlich erreichbare
-          URL — lokal übernimmt der viertelstündliche Abgleich.
+          Shopify ist nicht konfiguriert — was fehlt und wie die App eingerichtet wird, steht unter{' '}
+          <Link href="/einstellungen/anbindungen">Einstellungen → Schnittstellen</Link>.
         </div>
       )}
 
@@ -612,47 +569,6 @@ export default async function IntegrationenPage() {
               )}
             </div>
           )}
-        </Card>
-      )}
-
-      {shopifyConfigured() && (
-        <Card title="Sofortmeldung aus Shopify (Webhooks)">
-          <p className="small muted" style={{ marginTop: 0 }}>
-            Mit registrierten Webhooks landen neue Bestellungen, Stornos/Erstattungen und
-            Bestandsänderungen <strong>sekundenschnell</strong> im ERP — der viertelstündliche
-            Abgleich bleibt nur Sicherheitsnetz. Voraussetzung: das ERP ist unter einer
-            öffentlichen https-Adresse erreichbar (Vercel oder Tunnel). Auf localhost kann
-            Shopify nicht zustellen.
-          </p>
-          {webhooksImShop === null ? (
-            <div className="small muted">Registrierte Webhooks konnten nicht abgerufen werden.</div>
-          ) : webhooksImShop.length === 0 ? (
-            <div className="notice warn">Noch keine Webhooks registriert — Änderungen kommen nur über den Abgleich.</div>
-          ) : (
-            <ul className="small mono" style={{ margin: '0 0 10px', paddingLeft: 18 }}>
-              {webhooksImShop.map((w) => (
-                <li key={w.topic}>
-                  {w.topic.toLowerCase()} → {w.callbackUrl ?? '—'}
-                </li>
-              ))}
-            </ul>
-          )}
-          <ActionForm action={registriereWebhooks}>
-            <div className="row">
-              <label className="field" style={{ flex: 3 }}>
-                <span>Öffentliche Adresse des ERP</span>
-                <input
-                  type="url"
-                  name="url"
-                  placeholder="https://erp.example.com"
-                  defaultValue={process.env.ERP_PUBLIC_URL ?? ''}
-                />
-              </label>
-              <div className="shrink field">
-                <button className="primary" type="submit">Webhooks registrieren</button>
-              </div>
-            </div>
-          </ActionForm>
         </Card>
       )}
 
@@ -823,29 +739,6 @@ export default async function IntegrationenPage() {
         )}
       </Card>
 
-      <Card title="Einrichtung">
-        <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
-          <li>
-            Shopify-Webhook-Ziel: <code className="mono">/api/webhooks/shopify</code> für die
-            Ereignisse <code className="mono">orders/create</code>,{' '}
-            <code className="mono">orders/paid</code>, <code className="mono">orders/updated</code>,{' '}
-            <code className="mono">orders/cancelled</code>
-          </li>
-          <li>
-            Geplante Aufgaben laufen über <code className="mono">/api/cron?task=…</code> (siehe{' '}
-            <code className="mono">vercel.json</code>): Webhooks und Jobs minütlich, Abgleich alle 15
-            Minuten, Sendungsverfolgung stündlich
-          </li>
-          <li>
-            Zugangsdaten werden als Umgebungsvariablen gesetzt — Vorlage in{' '}
-            <code className="mono">.env.example</code>
-          </li>
-          <li>
-            Produkt-Zuordnung: die <Link href="/produkte">SKU der Variante</Link> muss der Shopify-SKU
-            entsprechen
-          </li>
-        </ul>
-      </Card>
     </>
   )
 }

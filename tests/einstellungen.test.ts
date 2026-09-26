@@ -173,3 +173,36 @@ describe('Einstellungen: Stammdaten über die Registry', () => {
     assert.equal(REGISTRY['einstellungen.tag_loeschen'].bindung, 'beleg')
   })
 })
+
+describe('Einstellungen: Schnittstellen', () => {
+  test('Umgebungsstand: nur Namen, Pflicht fehlt → unvollständig, Attrappe zählt als vollständig', async () => {
+    const { ANBINDUNGEN, anbindungZu, anbindungsStand } = await import('../src/modules/einstellungen/umgebung.ts')
+    const dhl = anbindungZu('dhl')
+    const leer = anbindungsStand(dhl, {})
+    assert.equal(leer.vollstaendig, false)
+    assert.deepEqual(leer.fehlend, ['DHL_API_KEY', 'DHL_API_SECRET', 'DHL_GKP_USER', 'DHL_GKP_PASSWORD', 'DHL_BILLING_NUMBER'])
+    assert.equal(anbindungsStand(dhl, { DHL_FAKE: '1' }).vollstaendig, true)
+    const voll = anbindungsStand(dhl, {
+      DHL_API_KEY: 'k', DHL_API_SECRET: 's', DHL_GKP_USER: 'u', DHL_GKP_PASSWORD: 'p', DHL_BILLING_NUMBER: '1',
+    })
+    assert.equal(voll.vollstaendig, true)
+    assert.ok(!JSON.stringify(voll).includes('"k"'), 'Werte tauchen nirgends auf')
+    assert.equal(anbindungsStand(dhl, { DHL_API_KEY: '   ' }).variablen.find((v) => v.name === 'DHL_API_KEY')!.gesetzt, false, 'Leerzeichen gilt nicht')
+
+    const shopify = anbindungZu('shopify')
+    assert.deepEqual(anbindungsStand(shopify, { SHOPIFY_SHOP_DOMAIN: 'x', SHOPIFY_ADMIN_TOKEN: 't' }).fehlend, [],
+      'statisches Admin-Token ersetzt Client ID/Secret')
+    // Jede Anbindung des Wächters hat eine Karte (bis auf die Druckbrücke, die unter Versand & Druck steht).
+    const schluessel = new Set(ANBINDUNGEN.map((a) => a.schluessel))
+    for (const d of ['dhl', 'shopify', 'mail', 'ki', 'sprache', 'telegram']) assert.ok(schluessel.has(d as never), d)
+  })
+
+  test('Webhook-Registrierung: nur https, über die Registry', async () => {
+    const { REGISTRY } = await import('../src/modules/prozesse/registry/index.ts')
+    const a = REGISTRY['integrationen.webhooks_registrieren']
+    assert.equal(a.nurAdmin, true)
+    assert.equal(a.schema.safeParse({ url: 'https://erp.example.com' }).success, true)
+    assert.equal(a.schema.safeParse({ url: 'http://localhost:3000' }).success, false)
+    assert.equal(a.schema.safeParse({ url: 'kein link' }).success, false)
+  })
+})

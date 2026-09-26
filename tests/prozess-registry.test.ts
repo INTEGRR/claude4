@@ -251,7 +251,6 @@ const UI_UMGEHUNGEN = new Set<string>([
   'integrationen:runReconcile',
   'integrationen:starteUebernahme',
   'integrationen:starteProduktUebernahme',
-  'integrationen:registriereWebhooks',
   'integrationen:pushInventarJetzt',
   'integrationen:retry',
   'integrationen:retryWebhook',

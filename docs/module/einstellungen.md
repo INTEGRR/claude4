@@ -27,7 +27,7 @@ Ereignis-Monitor (`/integrationen`).
 | | Versandregeln | `/einstellungen/versandregeln` | Produkt/Versandart je Bedingung, von oben nach unten | `shipping_rules` | `versand.versandregel_*` |
 | | Kartonagen | `/einstellungen/kartonagen` | Verpackungen, Gewicht, Verbrauch | `packagings` | `versand.kartonage_*` |
 | | Finanzen | `/einstellungen/finanzen` | Stellschrauben der Cashflow-Prognose (14 Felder) | `settings.finanzen` (Merge) | `einstellungen.finanz_parameter_setzen` |
-| Anbindungen | Schnittstellen | `/einstellungen/anbindungen` | Shopify lesen/schreiben | `settings.shopify.modus` | `einstellungen.shopify_modus_setzen` |
+| Anbindungen | Schnittstellen | `/einstellungen/anbindungen` | je Anbindung (Shopify, DHL, E-Mail, Telegram, KI, Sprache, Betrieb): gesetzte Umgebungsvariablen (nur Namen), Wächter-Zustand, Einrichtungshinweise; Shopify lesen/schreiben und Webhook-Registrierung | `settings.shopify.modus`; Variablenliste in `src/modules/einstellungen/umgebung.ts` | `einstellungen.shopify_modus_setzen`, `integrationen.webhooks_registrieren` |
 | | Benachrichtigungen | `/einstellungen/benachrichtigungen` | Telegram: was gemeldet wird, Test, Chat-IDs, letzte Meldungen | `settings.benachrichtigungen` | `einstellungen.benachrichtigungen_setzen`, `…telegram_test`, `…telegram_chats` |
 | | KI-Modelle | `/einstellungen/ki` | Modell je KI-Ebene | `settings.ki_modelle` | `einstellungen.ki_modelle_setzen` |
 | Verwaltung | Nutzung | `/einstellungen/nutzung` | Monatsbericht (Nutzer, Belege, KI) — Bericht, keine Einstellung | — | — |

@@ -156,7 +156,8 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 - [ ] Stichtag nach dem [Cutover-Runbook](migration-odoo.md#cutover-runbook-stichtag):
       Odoo einfrieren → Dump → PITR-Punkt → Prod leerräumen → Import →
       Abnahme → Shopify → Betrieb.
-- [ ] Nach dem Import: `/integrationen` zeigt alle Anbindungen scharf,
+- [ ] Nach dem Import: Einstellungen → Schnittstellen zeigt alle Anbindungen
+      konfiguriert und erreichbar, der Ereignis-Monitor `/integrationen` ist ruhig,
       die Cron-Ergebnisse der ersten Stunde durchsehen (Outbox leer,
       Tracking ohne `fehler`).
 

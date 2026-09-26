@@ -106,9 +106,22 @@ Orten, abgerundet auf ganze Stücke) gemeldet.
 
 Resend + React-Email-Vorlage „Bestellung": Betreff `Bestellung {number} — {Firmenname}`, Bestell-PDF als Anhang, Empfänger = Lieferanten-E-Mail, Reply-To = Einkaufs-Postfach. Versand als Outbox-Job (Retry bei Fehlern), Protokoll am Beleg. Ebenfalls über diesen Kanal: DHL-Retourenlabel-Mail an Kunden (siehe Versand-Modul).
 
-## Monitoring
+## Einrichtung und Monitoring
 
-Admin-Seite „Integrationen": letzte Webhooks (Status, Fehler), offene/fehlgeschlagene Jobs mit Retry-Button, nicht zugeordnete Shopify-Zeilen, letzter Reconciliation-Lauf, DHL-Sendungsfehler/-Warnings. Jeder endgültig fehlgeschlagene Job und jede unzugeordnete Shopify-Zeile zählt in den Header-Status („n Vorgänge brauchen Aufmerksamkeit") und ins Navigations-Badge.
+**Einrichtung** steht unter Einstellungen → Schnittstellen
+(`/einstellungen/anbindungen`, seit 2026-09-26): je Anbindung, welche
+Umgebungsvariablen gesetzt sind (nur Namen, nie Werte), was der
+Dienste-Wächter zuletzt gesehen hat, der Shopify-Modus lesen/schreiben, die
+**Webhook-Registrierung** (Registry-Aktion `integrationen.webhooks_registrieren`,
+nur https, im Lesemodus gesperrt) und die Einrichtungshinweise der App.
+
+**Betrieb** zeigt der Ereignis-Monitor (`/integrationen`): letzte Webhooks
+(Status, Fehler), offene/fehlgeschlagene Jobs mit Retry-Button, nicht
+zugeordnete Shopify-Zeilen, letzter Reconciliation-Lauf, Bestandsabgleich,
+Erstübernahme, Dienste-Wächter, DHL-Sendungsfehler. Die Kacheln Shopify und DHL
+verlinken auf die Schnittstellen. Jeder endgültig fehlgeschlagene Job und jede
+unzugeordnete Shopify-Zeile zählt in den Header-Status („n Vorgänge brauchen
+Aufmerksamkeit") und ins Navigations-Badge.
 
 ### Telegram-Benachrichtigungen (seit 0084)
 

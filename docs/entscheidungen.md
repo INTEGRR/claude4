@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-26 — Einrichtung der Anbindungen in die Einstellungen, der Ereignis-Monitor zeigt nur Betrieb
+
+Der Ereignis-Monitor mischte Betrieb (Outbox, Webhooks, Abgleich) mit
+Einrichtung: einen langen Hinweistext zu Scopes und Variablen, eine Karte
+„Einrichtung" und die Webhook-Registrierung als Inline-Aktion am Torwächter
+vorbei. Zwei Stellen mussten für dieselbe Anbindung besucht werden; ob eine
+Variable fehlt, stand nur bei DHL.
+
+**Entschieden:**
+
+- **Einstellungen → Schnittstellen** (`/einstellungen/anbindungen`) zeigt je
+  Anbindung (Shopify, DHL, E-Mail, Telegram, KI, Sprache, Betrieb) den Stand
+  der Umgebungsvariablen — **nur Namen und gesetzt/fehlt, nie Werte** — aus
+  der puren Liste `src/modules/einstellungen/umgebung.ts`, dazu den
+  Wächter-Zustand, das Verhalten (Shopify lesen/schreiben) und die
+  Einrichtungshinweise. Fehlende Pflichtwerte sind nur bei Shopify, DHL und
+  Betrieb eine Warnung; KI, Sprache, Mail und Telegram sind optional.
+- **Webhook-Registrierung über die Registry** (`integrationen.webhooks_registrieren`,
+  Schema verlangt https) statt Inline-Aktion; `UI_UMGEHUNGEN` −1.
+- Der **Ereignis-Monitor** behält Betrieb (Kacheln, Dienste-Wächter, Klärfälle,
+  Erstübernahme, Bestandsabgleich, Outbox, Webhooks-Eingang); Kacheln Shopify
+  und DHL verlinken auf die Schnittstellen, der Hinweis „nicht konfiguriert"
+  ist eine Zeile mit Link. Verworfen: auch Erstübernahme und Bestandsabgleich
+  umzuziehen — das sind wiederholbare Betriebsvorgänge mit Fortschritt, keine
+  Einstellung.
+- Die Fehlermeldung „DHL-Zugangsdaten in den Einstellungen hinterlegen" war
+  falsch (es sind Umgebungsvariablen) und verweist jetzt auf die Schnittstellen.
+
 ## 2026-09-26 — Stammdaten-Konfiguration in die Einstellungen, nur noch für Administratoren
 
 Kategorien, Steuern, Zahlungsbedingungen und Tags lagen unter Produkte →
