@@ -78,8 +78,10 @@ export default async function EinrichtenSeite({
       </ol>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div
-          style={{ background: '#fff', padding: 8, borderRadius: 6, lineHeight: 0 }}
-          dangerouslySetInnerHTML={{ __html: qrcodeSvg(url, { scale: 4 }) }}
+          className="qr-code"
+          role="img"
+          aria-label="QR-Code für die Authenticator-App"
+          dangerouslySetInnerHTML={{ __html: qrcodeSvg(url) }}
         />
         <div className="small" style={{ flex: 1, minWidth: 200 }}>
           <div className="mono-label">Geheimnis (von Hand)</div>

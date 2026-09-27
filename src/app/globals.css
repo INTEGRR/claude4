@@ -308,6 +308,17 @@ a:hover { text-decoration: underline; }
 
 .content { padding: 22px 24px 60px; }
 
+/* --- QR-Code der 2FA-Einrichtung: feste Größe, weiße Ruhezone (~4 Module) --- */
+.qr-code {
+  flex: 0 0 auto;
+  background: #fff;
+  padding: 16px;
+  border-radius: 6px;
+  line-height: 0;
+  align-self: flex-start;
+}
+.qr-code svg { display: block; }
+
 /* --- Zustand: Leuchte plus Wort ------------------------------------------- */
 .zustand { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -908,6 +919,9 @@ label.field > span {
 
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
+
+  /* 2FA-Einrichtung: QR-Code mittig über dem Geheimnis. */
+  .qr-code { align-self: center; margin: 0 auto; }
 
   /* Einstellungen: die Unternavigation wird zur waagerechten Chip-Leiste. */
   .einstellungen { grid-template-columns: 1fr; gap: 14px; }

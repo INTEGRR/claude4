@@ -1,5 +1,6 @@
 import 'server-only'
 import { toBuffer, toSVG } from 'bwip-js/node'
+import { svgMitGroesse } from './svg'
 
 /**
  * Erzeugt Barcodes als SVG - dadurch sind sie in Druckansichten gestochen
@@ -68,10 +69,11 @@ export async function barcodePngDataUri(
 }
 
 /**
- * QR-Code als SVG — z. B. die otpauth-URL bei der Einrichtung des zweiten
- * Faktors. Fehlerkorrektur bleibt bei bwip-js' Standard (M); scale 4 ergibt
- * ein Bild, das jede Telefonkamera vom Monitor liest.
+ * QR-Code als SVG mit fester Größe — z. B. die otpauth-URL bei der
+ * Einrichtung des zweiten Faktors. bwip-js liefert nur eine viewBox; ohne
+ * width/height schrumpft das SVG im Layout auf 0 px (svgMitGroesse). Die
+ * Ruhezone (weißer Rand) setzt der Rahmen der Seite (.qr-code).
  */
-export function qrcodeSvg(text: string, opts: { scale?: number } = {}): string {
-  return toSVG({ bcid: 'qrcode', text, scale: opts.scale ?? 4 })
+export function qrcodeSvg(text: string, opts: { groesse?: number } = {}): string {
+  return svgMitGroesse(toSVG({ bcid: 'qrcode', text, scale: 4 }), opts.groesse ?? 224)
 }
