@@ -13,10 +13,9 @@ import {
 after(closeDb)
 
 /**
- * Kennzahlen. Die materialisierten Sichten lassen sich in einer Transaktion
- * nicht neu berechnen (REFRESH sperrt und sieht ohnehin nur festgeschriebene
- * Daten), deshalb prüfen die Tests die Rechenvorschrift direkt gegen dieselbe
- * Abfrage — und zusätzlich, dass die Sichten selbst benutzbar sind.
+ * Kennzahlen. Seit Migration 0088 sind die Sichten mv_* normale Sichten —
+ * sie rechnen bei jeder Abfrage live und sehen deshalb auch Daten der
+ * laufenden Transaktion. Die Tests fragen sie direkt ab.
  */
 let counter = 0
 
@@ -49,30 +48,28 @@ async function verkaufMitLieferung(
   return { variant, order: order.id, picking: picking.confirm_sales_order, uom, kunde: kunde.id }
 }
 
-/** Rechenvorschrift des Deckungsbeitrags — identisch zu mv_contribution_margin. */
+/** Deckungsbeitrag einer Variante — direkt aus der live gerechneten Sicht. */
 const MARGE_SQL = (t: TransactionSql, variant: string) => t<
   { qty: number; revenue: number; cost: number }[]
 >`
-  select sum(bewegung.vorzeichen * m.qty_done) as qty,
-         sum(round(bewegung.vorzeichen * m.qty_done
-                   * coalesce(zeile.price_unit, 0)
-                   * (1 - coalesce(zeile.discount, 0) / 100.0), 4)) as revenue,
-         sum(coalesce(-wert.value, 0)) as cost
-  from stock_moves m
-  join stock_pickings p on p.id = m.picking_id and p.origin_model = 'sales_order'
-  join lateral (
-    select case
-             when (select type from stock_locations where id = m.dest_location_id) = 'customer' then 1
-             when (select type from stock_locations where id = m.src_location_id) = 'customer' then -1
-           end as vorzeichen
-  ) bewegung on bewegung.vorzeichen is not null
-  left join lateral (
-    select l.price_unit, l.discount from sales_order_lines l
-    where l.order_id = p.origin_id and l.variant_id = m.variant_id
-    order by l.sequence limit 1) zeile on true
-  left join lateral (
-    select sum(v.value) as value from stock_valuation_layers v where v.move_id = m.id) wert on true
-  where m.state = 'done' and m.variant_id = ${variant}`
+  select sum(qty) as qty, sum(revenue) as revenue, sum(cost) as cost
+  from mv_contribution_margin where variant_id = ${variant}`
+
+/** Bewerteter Bestand einer Variante (Summe der Wertschichten). */
+async function bewertung(t: TransactionSql, variant: string) {
+  const [v] = await t<{ valued_qty: number; valuation_total: number; moving_avg_cost: number }[]>`
+    select valued_qty, valuation_total, moving_avg_cost from product_variants where id = ${variant}`
+  return {
+    menge: Number(v.valued_qty),
+    wert: Number(v.valuation_total),
+    schnitt: Number(v.moving_avg_cost),
+  }
+}
+
+async function einkaufspreis(t: TransactionSql, variant: string, preis: number) {
+  await t`update product_templates set standard_cost = ${preis}
+          where id = (select template_id from product_variants where id = ${variant})`
+}
 
 describe('Deckungsbeitrag', () => {
   test('Umsatz minus tatsächlicher Wareneinsatz', async () => {
@@ -82,7 +79,7 @@ describe('Deckungsbeitrag', () => {
 
       assert.equal(Number(row.qty), 4)
       assert.equal(Number(row.revenue), 400, '4 × 100 €')
-      assert.equal(Number(row.cost), 120, '4 × 30 € Einstand aus der Wertschicht')
+      assert.equal(Number(row.cost), 120, '4 × 30 € Einstand')
     })
   })
 
@@ -182,6 +179,104 @@ describe('Lieferantentreue', () => {
   })
 })
 
+describe('Echtzeit (0088)', () => {
+  test('Inventur zu 0 €, danach Einkaufspreis setzen: der Bestand ist sofort bewertet', async () => {
+    await withRollback(async (t) => {
+      const variant = await makeProduct(t, `Deskmat ${++counter}`)
+      await stockUp(t, variant, 10)
+      assert.deepEqual(await bewertung(t, variant), { menge: 10, wert: 0, schnitt: 0 })
+
+      await einkaufspreis(t, variant, 12)
+      assert.deepEqual(await bewertung(t, variant), { menge: 10, wert: 120, schnitt: 12 })
+
+      const [schicht] = await t<{ layer_type: string; quantity: number; value: number }[]>`
+        select layer_type, quantity, value from stock_valuation_layers
+        where variant_id = ${variant} order by seq desc limit 1`
+      assert.equal(schicht.layer_type, 'revaluation')
+      assert.equal(Number(schicht.quantity), 0, 'reine Wertbuchung')
+      assert.equal(Number(schicht.value), 120)
+
+      const [umschlag] = await t<{ value_now: number }[]>`
+        select value_now from mv_inventory_turnover where variant_id = ${variant}`
+      assert.equal(Number(umschlag.value_now), 120, 'Kennzahl ohne Neuberechnung aktuell')
+      const [wert] = await t<{ value_end: number }[]>`
+        select value_end from mv_stock_value_history
+        where variant_id = ${variant} and monat = date_trunc('month', current_date)::date`
+      assert.equal(Number(wert.value_end), 120, 'Wertverlauf ebenso')
+    })
+  })
+
+  test('Preisänderung bei vorhandenem Durchschnitt: Neubewertung um die Differenz', async () => {
+    await withRollback(async (t) => {
+      const variant = await makeProduct(t, `Keycaps ${++counter}`)
+      await einkaufspreis(t, variant, 10)
+      await stockUp(t, variant, 5)
+      assert.equal((await bewertung(t, variant)).wert, 50)
+
+      await einkaufspreis(t, variant, 14)
+      assert.deepEqual(await bewertung(t, variant), { menge: 5, wert: 70, schnitt: 14 })
+
+      // Ein leerer Preis heißt „unbekannt" — er wertet nicht ab.
+      await einkaufspreis(t, variant, 0)
+      assert.deepEqual(await bewertung(t, variant), { menge: 5, wert: 70, schnitt: 14 })
+
+      // Ohne Bestand merkt sich die Variante nur den Preis für den nächsten Zugang.
+      const leer = await makeProduct(t, `Leer ${++counter}`)
+      await einkaufspreis(t, leer, 9)
+      assert.deepEqual(await bewertung(t, leer), { menge: 0, wert: 0, schnitt: 9 })
+    })
+  })
+
+  test('der Deckungsbeitrag folgt dem Einkaufspreis sofort', async () => {
+    await withRollback(async (t) => {
+      const s = await verkaufMitLieferung(t, { einstand: 30, preis: 100, menge: 4 })
+      assert.equal(Number((await MARGE_SQL(t, s.variant))[0].cost), 120)
+      await einkaufspreis(t, s.variant, 40)
+      assert.equal(Number((await MARGE_SQL(t, s.variant))[0].cost), 160, '4 × 40 € — heutiger Einstand')
+    })
+  })
+
+  test('Aufträge ohne Lieferschein (historisch übernommen) zählen am Auftragsdatum', async () => {
+    await withRollback(async (t) => {
+      const uom = await uomStueck(t)
+      const variant = await makeProduct(t, `Historisch ${++counter}`)
+      await einkaufspreis(t, variant, 20)
+      const [kunde] = await t<{ id: string }[]>`
+        insert into partners (name, is_customer) values ('Altkunde', true) returning id`
+      const [order] = await t<{ id: string }[]>`
+        insert into sales_orders (number, partner_id, state, delivery_status, order_date)
+        values (next_sequence('sale'), ${kunde.id}, 'sale', 'full', '2024-03-15')
+        returning id`
+      await t`
+        insert into sales_order_lines (order_id, variant_id, name, qty, uom_id, price_unit, discount)
+        values (${order.id}, ${variant}, 'Alt', 3, ${uom}, 50, 10)`
+      const [row] = await t<{ monat: string; qty: number; revenue: number; cost: number }[]>`
+        select monat::text, qty, revenue, cost from mv_contribution_margin where variant_id = ${variant}`
+      assert.equal(row.monat, '2024-03-01')
+      assert.equal(Number(row.qty), 3)
+      assert.equal(Number(row.revenue), 135, '3 × 50 € − 10 %')
+      assert.equal(Number(row.cost), 60, '3 × 20 € heutiger Einstand')
+    })
+  })
+
+  test('ohne Durchschnitt und Einkaufspreis: Stücklistenkosten', async () => {
+    await withRollback(async (t) => {
+      const uom = await uomStueck(t)
+      const teil = await makeProduct(t, `Switch ${++counter}`)
+      await einkaufspreis(t, teil, 0.5)
+      const tastatur = await makeProduct(t, `Board ${++counter}`)
+      const [bom] = await t<{ id: string }[]>`
+        insert into boms (template_id, qty, uom_id)
+        values ((select template_id from product_variants where id = ${tastatur}), 1, ${uom})
+        returning id`
+      await t`insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+              values (${bom.id}, 10, ${teil}, 70, ${uom})`
+      const [p] = await t<{ preis: number }[]>`select einstandspreis_aktuell(${tastatur}) as preis`
+      assert.equal(Number(p.preis), 35, '70 Switches × 0,50 €')
+    })
+  })
+})
+
 describe('Kennzahlensichten', () => {
   test('alle Sichten sind vorhanden und abfragbar', async () => {
     await withRollback(async (t) => {
@@ -195,12 +290,11 @@ describe('Kennzahlensichten', () => {
       ]
       for (const sicht of sichten) {
         const [row] = await t<{ c: number }[]>`
-          select count(*)::int as c from pg_matviews where matviewname = ${sicht}`
-        assert.equal(row.c, 1, `${sicht} fehlt`)
+          select count(*)::int as c from pg_views where viewname = ${sicht}`
+        assert.equal(row.c, 1, `${sicht} fehlt (normale Sicht seit 0088)`)
       }
 
-      // Stichprobe: die Sicht liefert die erwarteten Spalten. Materialisierte
-      // Sichten stehen nicht im information_schema — deshalb pg_attribute.
+      // Stichprobe: die Sicht liefert die erwarteten Spalten.
       const spalten = await t<{ name: string }[]>`
         select a.attname as name
         from pg_attribute a
@@ -237,17 +331,10 @@ describe('Kennzahlensichten', () => {
     })
   })
 
-  test('refresh_analytics läuft durch und vermerkt den Zeitpunkt', async () => {
-    const [dauer] = await (await import('./helpers.ts')).db()<{ refresh_analytics: string }[]>`
-      select refresh_analytics('test')`
-    assert.ok(dauer.refresh_analytics, 'liefert eine Dauer')
-
-    const [row] = await (await import('./helpers.ts')).db()<{ refreshed_at: string }[]>`
-      select value ->> 'refreshed_at' as refreshed_at from settings where key = 'analytics'`
-    assert.ok(row.refreshed_at, 'Zeitpunkt ist vermerkt')
-    assert.ok(
-      Date.now() - new Date(row.refreshed_at).getTime() < 60_000,
-      'der Zeitpunkt ist frisch',
-    )
+  test('refresh_analytics bleibt für Altaufrufer aufrufbar, rechnet aber nichts mehr', async () => {
+    await withRollback(async (t) => {
+      const [row] = await t<{ dauer: string }[]>`select refresh_analytics('test')::text as dauer`
+      assert.equal(row.dauer, '00:00:00')
+    })
   })
 })

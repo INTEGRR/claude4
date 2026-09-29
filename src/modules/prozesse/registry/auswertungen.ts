@@ -1,19 +1,9 @@
-import { z } from 'zod'
 import type { RegistrierteAktion } from './typen.ts'
 
-/** Aktionen der Auswertungen. */
+/**
+ * Aktionen der Auswertungen. Seit Migration 0088 rechnen die Kennzahlen
+ * live — die frühere Aktion „Kennzahlen aktualisieren" ist entfallen.
+ */
 export const AUSWERTUNGEN = {
-  'auswertungen.kennzahlen_aktualisieren': {
-    label: 'Kennzahlen aktualisieren',
-    bereich: 'auswertungen',
-    ki: true,
-    beschreibung:
-      'Berechnet die Kennzahlen sofort neu — der Cron macht das ohnehin nachts.',
-    bindung: 'frei',
-    prozessfrei: true,
-    schema: z.object({}),
-    zusammenfassung: () => 'Alle Kennzahlen sofort neu berechnen',
-    revalidate: ['/auswertungen/kennzahlen', '/auswertungen'],
-  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

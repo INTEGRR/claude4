@@ -1,6 +1,5 @@
 import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
-import * as auswertungen from './registry/auswertungen-ausfuehren.ts'
 import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
@@ -25,7 +24,6 @@ import * as vorgang from './registry/vorgang-ausfuehren.ts'
  * den Typecheck — nicht erst den Klick.
  */
 export const AUSFUEHRUNG = {
-  'auswertungen.kennzahlen_aktualisieren': auswertungen.kennzahlenAktualisieren,
 
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,

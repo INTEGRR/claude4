@@ -97,9 +97,10 @@ Existenzprüfung; kommentieren darf, wer den Bereich sehen kann.
 Zeitraumfilter (Standard: letzte 6 Monate), vier Karten — reine
 SQL-Aggregationen über das Bewegungs-Ledger, keine Chart-Bibliothek:
 
-- **Inventarwert**: Bestand × Einstandskosten je Variante. Produkte ohne
-  gepflegte Kosten werden über die Summe der Stücklisten-Komponentenkosten
-  ihrer Variante bewertet (`bom_components_for_variant`).
+- **Inventarwert**: Bestandswert laut Bewertung (`stock_value`, gleitender
+  Durchschnitt aus den Wertschichten). Ein geänderter Einkaufspreis bewertet
+  den Bestand sofort neu (Neubewertungsschicht, Migration 0088) — auch
+  Bestand, der mit 0 € eingebucht wurde.
 - **Produktion je Endvariante**: `stock_moves` mit `reference='Fertigmeldung'`,
   `state='done'`, gruppiert nach Variante und Monat.
 - **Verbaute Komponenten**: dieselbe Quelle mit

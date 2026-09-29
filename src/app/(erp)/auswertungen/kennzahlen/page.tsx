@@ -1,19 +1,17 @@
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
-import { canWrite } from '@/modules/auth/permissions'
-import { ActionButton } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
-import { dateTime, money, pct, qty } from '@/modules/shared/format'
-import { refreshAnalytics } from '../actions'
+import { money, pct, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Kennzahlen aus den materialisierten Sichten (Migration 0023). Die Zahlen
- * sind so frisch wie der letzte Lauf — das steht bewusst im Kopf der Seite,
- * damit niemand eine Momentaufnahme für Echtzeit hält.
+ * Kennzahlen aus den Sichten mv_* — seit Migration 0088 normale Sichten:
+ * jede Anzeige rechnet live aus Bewegungen, Wertschichten und Aufträgen.
+ * Wareneinsatz und Bestandswert zu heutigen Einstandspreisen
+ * (einstandspreis_aktuell), damit Inventur und Preispflege sofort wirken.
  */
 
 function monat(iso: string): string {
@@ -27,11 +25,7 @@ function anteil(zaehler: number, nenner: number): string {
 }
 
 export default async function KennzahlenPage() {
-  const user = await requireArea('auswertungen')
-  const darfRechnen = canWrite(user.role, 'auswertungen')
-
-  const [stand] = await sql<{ refreshed_at: string | null }[]>`
-    select value ->> 'refreshed_at' as refreshed_at from settings where key = 'analytics'`
+  await requireArea('auswertungen')
 
   // --- Bestandswert im Zeitverlauf (letzte 12 Monate) ----------------------
   const wertverlauf = await sql<{ monat: string; value_end: number }[]>`
@@ -174,24 +168,11 @@ export default async function KennzahlenPage() {
         title="Kennzahlen"
         subtitle={
           <>
-            Deckungsbeitrag, Umschlag, Liefertreue und RMA-Quote — berechnet aus dem
-            Bewegungs- und Wertschichten-Ledger
-            {stand?.refreshed_at && (
-              <>
-                {' · Stand '}
-                <span className="mono">{dateTime(stand.refreshed_at)}</span>
-              </>
-            )}
+            Deckungsbeitrag, Umschlag, Liefertreue und RMA-Quote — live aus Bewegungen und
+            Aufträgen, Wareneinsatz zu heutigen Einstandspreisen
           </>
         }
-        actions={
-          <>
-            {darfRechnen && (
-              <ActionButton action={refreshAnalytics}>Neu berechnen</ActionButton>
-            )}
-            <Link className="btn" href="/auswertungen">Zu den Mengen</Link>
-          </>
-        }
+        actions={<Link className="btn" href="/auswertungen">Zu den Mengen</Link>}
       />
 
       <div className="grid-3" style={{ marginBottom: 16 }}>
@@ -205,7 +186,7 @@ export default async function KennzahlenPage() {
           value={anteil(umsatz12 - einsatz12, umsatz12)}
           hint="Deckungsbeitrag je Euro Umsatz"
         />
-        <Stat label="Bestandswert" value={money(bestandswert)} hint="bewerteter Bestand heute" />
+        <Stat label="Bestandswert" value={money(bestandswert)} hint="Bestand × heutiger Einstandspreis" />
       </div>
 
       <div className="grid-3" style={{ marginBottom: 16 }}>

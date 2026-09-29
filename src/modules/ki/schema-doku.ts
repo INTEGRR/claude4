@@ -70,14 +70,14 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **shipments**: DHL-Sendungen (shipment_number, picking_id ODER repair_order_id — genau eins: Lieferung oder Rückversand einer Reparatur —, sales_order_id, state 'created'|'manifested'|'transit'|'delivered'|'failure'|'cancelled', tracking_url).
 - **shipping_ready** (View): versandbereite Lieferungen (Lieferung 'assigned', keine offenen MOs).
 
-### Kennzahlen (materialisierte Sichten, per Cron neu berechnet)
+### Kennzahlen (Sichten, live gerechnet — die Namen mv_* sind historisch)
 - **mv_stock_value_history**: Bestandsmenge und -wert je Variante zum Monatsende (monat, variant_id, qty_end, value_end).
-- **mv_contribution_margin**: Deckungsbeitrag je Monat und Variante (monat, variant_id, qty, revenue, cost). Realisiert bei der Auslieferung, Retouren gegengerechnet.
-- **mv_inventory_turnover**: je Variante on_hand, value_now, avg_value_12m, cogs_12m, revenue_12m, margin_12m, turnover (Umschlag), daily_use, days_of_supply (Reichweite in Tagen).
+- **mv_contribution_margin**: Deckungsbeitrag je Monat und Variante (monat, variant_id, qty, revenue, cost). Realisiert bei der Auslieferung (Retouren gegengerechnet), Aufträge ohne Lieferschein (historisch übernommen) am Auftragsdatum; cost = Menge × einstandspreis_aktuell(variant).
+- **mv_inventory_turnover**: je Variante on_hand, value_now (Bestand × heutiger Einstandspreis), avg_value_12m, cogs_12m, revenue_12m, margin_12m, turnover (Umschlag), daily_use, days_of_supply (Reichweite in Tagen).
 - **mv_supplier_otd**: Liefertreue je Lieferant und Monat (vendor_id, vendor, lines, delivered, on_time, overdue, avg_delay_days, qty_ordered, qty_received).
 - **mv_rma_analysis**: RMA je Monat und Variante (rma_count, repaired, cancelled, parts_used, qty_delivered, rma_rate in Prozent).
 - **mv_labor_hours**: Minuten und Lohnkosten je Monat, Mitarbeiter, Art und Arbeitsplatz.
-- Stand der Berechnung: settings.value ->> 'refreshed_at' für key = 'analytics'.
+- **einstandspreis_aktuell(variant_id)**: Funktion — gleitender Durchschnitt, sonst Einkaufspreis (product_templates.standard_cost), sonst Stücklistenkosten. Ein geänderter Einkaufspreis bucht eine Neubewertungsschicht (stock_valuation_layers.layer_type 'revaluation').
 
 ### Prozesse & Vorgänge (das ERP ist prozessgetrieben — Abläufe sind Daten)
 - **prozesse**: Prozesskopf (code z. B. 'einkauf_wareneingang_rechnung', name, bereich, aktiv). **prozess_versionen** (prozess_id, nr, aktiv) mit **prozess_schritte** (schluessel, art 'start'|'aktion'|'ende'|'teilprozess', aktion = Registry-Name, zustand, optional, befugnis) und **prozess_uebergaenge** (von/nach, bedingung).

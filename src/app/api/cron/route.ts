@@ -24,7 +24,6 @@ export const maxDuration = 60
  *   /api/cron?task=jobs          jede Minute   - Outbox abarbeiten, Telegram senden
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
- *   /api/cron?task=analytics     nachts        - Kennzahlen neu berechnen
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
  */
 export async function GET(request: Request) {
@@ -87,10 +86,6 @@ export async function GET(request: Request) {
         const lauf = await wacheAusfuehren()
         const benachrichtigungen = await benachrichtigungenVersenden()
         return NextResponse.json({ task, ...lauf, benachrichtigungen })
-      }
-      case 'analytics': {
-        const [row] = await sql<{ refresh_analytics: string }[]>`select refresh_analytics('cron')`
-        return NextResponse.json({ task, dauer: row.refresh_analytics })
       }
       case 'housekeeping': {
         // Daten-TÜV über die Outbox (Retry + Monitor-Sichtbarkeit inklusive);

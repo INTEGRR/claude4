@@ -102,10 +102,10 @@ describe('Auswertungen', () => {
     })
   })
 
-  test('Inventarwert: Kosten direkt oder als Stücklisten-Summe', async () => {
+  test('Einstandspreis: Kosten direkt oder als Stücklisten-Summe der Variante', async () => {
     await withRollback(async (t) => {
       const s = await szenario(t)
-      // Komponenten bekommen Einstandskosten, das Endprodukt bewusst keine.
+      // Komponenten bekommen Einkaufspreise, das Endprodukt bewusst keinen.
       await t`update product_templates pt set standard_cost = 20
               from product_variants pv
               where pv.template_id = pt.id and pv.id = ${s.gehaeuseWeiss}`
@@ -113,18 +113,9 @@ describe('Auswertungen', () => {
               from product_variants pv
               where pv.template_id = pt.id and pv.id = ${s.platine}`
 
+      // Dieselbe Funktion rechnet Deckungsbeitrag und Bestandswert (0088).
       const [kosten] = await t<{ unit_cost: number }[]>`
-        select case
-          when pt.standard_cost > 0 then pt.standard_cost
-          else coalesce((
-            select sum(comp.qty * cpt.standard_cost)
-            from bom_components_for_variant(resolve_bom(pv.id), pv.id) comp
-            join product_variants cpv on cpv.id = comp.component_variant_id
-            join product_templates cpt on cpt.id = cpv.template_id), 0)
-          end as unit_cost
-        from product_variants pv join product_templates pt on pt.id = pv.template_id
-        where pv.id = ${s.weiss}`
-
+        select einstandspreis_aktuell(${s.weiss}) as unit_cost`
       // Weiße Variante: weißes Gehäuse (20) + Platine (30); schwarzes zählt nicht.
       assert.equal(Number(kosten.unit_cost), 50)
     })

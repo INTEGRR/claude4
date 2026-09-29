@@ -9,6 +9,36 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Auswertungen in Echtzeit, Einkaufspreis bewertet den Bestand neu
+
+Revidiert „gleitender Durchschnitt, Schichten nie überschreiben" vom
+2026-08-07 in einem Punkt. Befund im Parallelbetrieb: nach Inventur und
+Preispflege (Deskmats, Keycaps) bewegten sich die Auswertungen nicht.
+Drei Ursachen: die Kennzahlen waren materialisierte Sichten, die auf
+Vercel nie neu berechnet wurden; ein geänderter Einkaufspreis bewertete
+den Bestand nicht neu (der Durchschnitt hatte Vorrang); was mit 0 €
+eingebucht war, blieb bei 0 €.
+
+**Entschieden (Betreiber: „alles auf Basis dessen, was in der Datenbank
+steht"):**
+
+- Die sechs Kennzahlen-Sichten sind **normale Sichten** (Migration 0088,
+  Namen `mv_*` bleiben). Kein Stand, kein „Neu berechnen", kein Cron;
+  `refresh_analytics()` bleibt als leere Hülle.
+- **Der Einkaufspreis ist führend:** Seine Änderung bucht per Trigger eine
+  Neubewertungsschicht (Menge × neuer Preis − bisheriger Wert) und
+  bewertet unbewertete Menge mit. Die Schichten bleiben unveränderlich —
+  die Korrektur ist eine neue Schicht, wie die Regel es verlangt. Preis 0
+  wertet nicht ab.
+- Deckungsbeitrag und Bestandswert der Kennzahlen rechnen **zu heutigen
+  Einstandspreisen** (`einstandspreis_aktuell`: Durchschnitt, sonst
+  Einkaufspreis, sonst Stücklistenkosten) und zählen Aufträge ohne
+  Lieferschein (historisch übernommen) am Auftragsdatum. Der bilanzielle
+  Wert der Abgänge bleibt in den Schichten (Lager → Bewertung).
+
+Nachweis: `tests/kennzahlen.test.ts` „Echtzeit (0088)",
+`tests/auswertungen.test.ts`. Doku: [module/kennzahlen.md](module/kennzahlen.md).
+
 ## 2026-09-29 — Arbeitsplätze mit Druckern: jeder Druck kommt am Platz des PCs heraus
 
 ANVIL hat zwei Packtische mit je einem Labeldrucker (verschiedene

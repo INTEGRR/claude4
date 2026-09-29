@@ -33,7 +33,6 @@ while true; do
   ruf webhooks
   if [ $((i % 15)) -eq 0 ]; then ruf reconcile; fi
   if [ $((i % 60)) -eq 0 ]; then ruf tracking; fi
-  if [ $((i % 360)) -eq 0 ]; then ruf analytics; fi
   if [ $((i % 1440)) -eq 0 ]; then ruf housekeeping; fi
   i=$((i + 1))
   sleep 60

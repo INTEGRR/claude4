@@ -443,8 +443,8 @@ export default async function AuswertungenPage({
           </>
         )}
         <div className="small muted" style={{ padding: '8px 12px' }}>
-          Kostenbasis: Einstandskosten des Produkts; ohne gepflegte Kosten wird die Summe der
-          Stücklisten-Komponentenkosten der Variante angesetzt.
+          Kostenbasis: Bestandswert laut Bewertung (gleitender Durchschnitt). Ein geänderter
+          Einkaufspreis bewertet den Bestand sofort neu — auch Bestand, der mit 0 € eingebucht wurde.
         </div>
       </Card>
     </>
