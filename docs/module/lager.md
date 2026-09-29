@@ -49,6 +49,7 @@ Je Vorgangsart: Reservierungsmethode (`at_confirm` Default, `manual` möglich), 
 ## Inventur & Ausschuss
 
 - **Inventur**: Zeile (Ort, Variante, gezählte Menge) → **Anwenden** bucht Differenz gegen `Virtuell/Inventurdifferenz` und setzt On Hand auf den Zählwert. Warnung, wenn sich der Buchbestand zwischen Zählung und Anwenden geändert hat.
+  Danach reserviert KRNL **wartende Lieferungen dieses Artikels** neu (älteste zuerst, nur Bewegungen im Zustand „wartet auf Ware", nicht solche, die auf die Fertigung warten) — sonst blieben sie trotz Ware auf „wartet" und erschienen nie im Versand. Die Meldung nennt, wie viele Lieferungen dadurch versandbereit wurden (Registry `lager.zaehlung_buchen`, Entscheidungslog 2026-09-29).
 - **Ausschuss**: eigenes Mini-Formular (Variante, Menge, Quellort) → Move nach `Virtuell/Ausschuss`; auch aus MO/Reparatur heraus aufrufbar.
 
 ## Barcode-Unterstützung

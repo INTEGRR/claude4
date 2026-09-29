@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Inventur reserviert wartende Lieferungen neu
+
+Gefunden im Parallelbetrieb: Aufträge aus Shopify wurden bei Bestand 0
+bestätigt, ihre Lieferungen warteten auf Ware. Eine Inventur buchte danach
+480 Stück ein — die Lieferungen blieben trotzdem auf „wartet" und tauchten
+nicht im Versand auf, bis jemand je Lieferung „Verfügbarkeit prüfen"
+drückte. `inventory_apply` reserviert nichts; nur die Fertigmeldung zog
+bisher wartende Lieferungen nach.
+
+**Entschieden:** Nach dem Buchen einer Zählung (`lager.zaehlung_buchen`)
+reserviert KRNL die wartenden Lieferungen dieses Artikels neu — älteste
+zuerst, nur Bewegungen im Zustand `confirmed` (wartet auf Ware); `waiting`
+(wartet auf einen Vorgänger wie die Fertigung) bleibt unberührt. Reicht die
+Ware nicht für alle, gilt die übliche Teilreservierung. Umgesetzt im
+Executor (`wartendeLieferungenReservieren`), nicht in `inventory_apply`
+selbst: der Odoo-Import bucht Bestand vor den offenen Aufträgen und braucht
+das nicht, und die SQL-Funktion bleibt unverändert. Nachweis:
+`tests/prozesse/inventur-reservierung.test.ts`; Doku in
+[module/lager.md](module/lager.md).
+
 ## 2026-09-26 — Einrichtung der Anbindungen in die Einstellungen, der Ereignis-Monitor zeigt nur Betrieb
 
 Der Ereignis-Monitor mischte Betrieb (Outbox, Webhooks, Abgleich) mit
