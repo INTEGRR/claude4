@@ -9,6 +9,32 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Druckbrücke als fertiges Paket zum Download im Tool
+
+Der Agent lag nur im Repository (`scripts/druck-agent.ts`); wer einen
+Packtisch-PC einrichten wollte, brauchte Repo-Zugang und fünf
+Umgebungsvariablen von Hand. Wunsch des Betreibers: im Tool auf den PCs
+herunterladen.
+
+**Entschieden:** Einstellungen → Versand & Druck bekommt die Karte
+„Druckbrücke auf einem PC einrichten": Name, Ziel und Drucker wählen, ZIP
+laden (`GET /api/druck/paket`). Darin der Agent **unverändert aus
+`scripts/`** (eine Quelle, per `outputFileTracingIncludes` in die Funktion
+gebündelt), ein Startskript mit Adresse, Token, Name, Ziel und Drucker
+bereits eingetragen und Neustart-Schleife, ein Autostart-Skript, ein
+Shell-Skript für Linux/macOS und eine Anleitung.
+
+- **Nur Administratoren**, weil das Paket das Agent-Token enthält; ohne
+  aktive Druckbrücke antwortet die Route 409.
+- ZIP ohne Bibliothek (`src/modules/shared/zip.ts`, Node-Bordmittel);
+  Freitext wird für die Skripte entschärft (`skriptSicher`).
+- Node-Aufruf mit `--experimental-strip-types`: der Agent bleibt
+  TypeScript und läuft ab Node 22.6 ohne Übersetzen.
+
+Nachweis `tests/druckbruecke-paket.test.ts` (ZIP-Rücklesen, Skriptinhalt,
+Entschärfung, echter Agent-Start mit den Flags des Skripts). Doku:
+[module/versand.md](module/versand.md) „Druckbrücke".
+
 ## 2026-09-29 — Live-Reservierung in der Datenbank statt Nachlauf in der Inventur
 
 Revidiert den Eintrag „Inventur reserviert wartende Lieferungen neu" vom

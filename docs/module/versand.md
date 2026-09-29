@@ -166,25 +166,28 @@ Reihenfolge wie bei den KI-Modellen: Einstellung → Env-Notausgang
 **Einrichtung der Agenten (nur für den Brücken-Modus):**
 
 1. Einstellungen → Versand & Druck: den Druckweg auf **Druckbrücke**
-   stellen und das Token aus der Karte kopieren (die Agenten und ihr
-   letzter Abruf stehen auf derselben Seite).
-2. Auf dem Packtisch-PC: Node ≥ 22 installieren, die Datei
-   `scripts/druck-agent.ts` aus dem Repo kopieren (sie ist bewusst
-   abhängigkeitsfrei — kein `npm install` nötig) und starten:
+   stellen (erzeugt das Agent-Token).
+2. Karte **„Druckbrücke auf einem PC einrichten"**: Name des PCs, was er
+   druckt (Labeldrucker / Zetteldrucker / alles) und optional den
+   Druckernamen wählen → **„Paket herunterladen (ZIP)"**. Das Paket
+   (`GET /api/druck/paket`, nur Administratoren — es enthält das Token)
+   bringt mit: `druck-agent.ts` (unverändert aus `scripts/`),
+   `druckbruecke-starten.cmd` mit Adresse, Token, Name, Ziel und Drucker
+   bereits eingetragen (startet den Agenten nach einem Absturz neu),
+   `autostart-einrichten.cmd` (Verknüpfung im Autostart-Ordner),
+   `druckbruecke-starten.sh` für Linux/macOS und `LIESMICH.txt`.
+3. Auf dem PC: Node.js (LTS) und SumatraPDF installieren, ZIP entpacken,
+   `druckbruecke-starten.cmd` doppelklicken, einmal
+   `autostart-einrichten.cmd`. Der PC erscheint unter „Druck-Agenten".
+4. Windows druckt über **SumatraPDF** (`-print-to … -silent`; das
+   Startskript sucht es an den üblichen Installationsorten), Linux/macOS
+   über `lp`. Ein eigenes Kommando geht über `DRUCK_KOMMANDO` mit den
+   Platzhaltern `{datei}` und `{drucker}` (im Startskript ergänzen).
 
-   ```powershell
-   $env:KRNL_URL = "https://<instanz>.vercel.app"
-   $env:DRUCK_AGENT_TOKEN = "<dasselbe Token>"
-   $env:DRUCKER = "Zebra GK420d"       # optional, sonst Standarddrucker
-   $env:DRUCK_ZIELE = "labeldrucker"   # optional: nur diese Ziele ziehen
-   $env:DRUCK_AGENT_NAME = "packtisch" # optional: Name auf der Integrationen-Karte
-   node druck-agent.ts
-   ```
-
-3. Windows druckt standardmäßig über **SumatraPDF**
-   (`SumatraPDF -print-to … -silent`, muss im PATH liegen),
-   Linux/macOS über `lp`. Ein eigenes Kommando geht über
-   `DRUCK_KOMMANDO` mit den Platzhaltern `{datei}` und `{drucker}`.
+Von Hand geht es weiterhin: `scripts/druck-agent.ts` mit Node ≥ 22.6
+(`node --experimental-strip-types druck-agent.ts`) und den Variablen
+`KRNL_URL`, `DRUCK_AGENT_TOKEN`, optional `DRUCKER`, `DRUCK_ZIELE`,
+`DRUCK_AGENT_NAME`.
 
 Der Agent fragt alle 3 Sekunden (`DRUCK_INTERVALL_MS`) nach den ältesten
 offenen Aufträgen seiner Ziele (`GET /api/druck/abholen?ziele=…&name=…`,

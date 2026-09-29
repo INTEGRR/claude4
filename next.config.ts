@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
   // @react-pdf/renderer: als externes Paket laden — gebündelt stolpert
   // sein Yoga-Layout (WASM) im Serverless-Build.
   serverExternalPackages: ['postgres', 'bwip-js', '@react-pdf/renderer'],
+  // Das Druckbrücken-Paket liefert den Agenten unverändert aus dem Repo aus
+  // (eine Quelle) — die Datei muss dafür in die Funktion der Route.
+  outputFileTracingIncludes: {
+    '/api/druck/paket': ['./scripts/druck-agent.ts'],
+  },
   experimental: {
     // Alle Änderungen laufen über Server Actions; das Limit ist großzügig
     // gewählt, weil Label-PDFs von DHL durchgereicht werden.

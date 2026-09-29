@@ -7,6 +7,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { DRUCKFORMATE } from '@/modules/einstellungen/finanz-parameter'
 import { dateTime } from '@/modules/shared/format'
+import { DRUCK_ZIELE } from '@/modules/versand/druckbruecke-paket'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,9 +96,63 @@ export default async function VersandPage() {
           </div>
         </ActionForm>
         <p className="small muted" style={{ margin: '10px 0 0' }}>
-          Gilt sofort. Für die Brücke auf jedem Druck-PC einen Agenten mit diesem Token starten
-          (<span className="mono">scripts/druck-agent.ts</span>, Anleitung in docs/module/versand.md).
+          Gilt sofort. Für die Brücke auf jedem Druck-PC einen Agenten einrichten — das fertige Paket
+          gibt es direkt darunter.
         </p>
+      </Card>
+
+      <Card title="Druckbrücke auf einem PC einrichten">
+        {druckModus !== 'bruecke' || !druck.token ? (
+          <p className="small muted" style={{ margin: 0 }}>
+            Erst oben den Druckweg auf <strong>Druckbrücke</strong> stellen und speichern — dann gibt es
+            hier das Paket für die Druck-PCs.
+          </p>
+        ) : (
+          <>
+            {/* GET-Download: das ZIP enthält Adresse und Token, nur für Administratoren (Route prüft). */}
+            <form method="get" action="/api/druck/paket" className="row" style={{ alignItems: 'flex-end' }}>
+              <label className="field">
+                <span>Name des PCs</span>
+                <input name="name" defaultValue="packtisch" required maxLength={40} />
+              </label>
+              <label className="field">
+                <span>Dieser PC druckt</span>
+                <select name="ziel" defaultValue="labeldrucker">
+                  {DRUCK_ZIELE.map((z) => (
+                    <option key={z.wert} value={z.wert}>{z.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Druckername (leer = Standarddrucker)</span>
+                <input name="drucker" placeholder="z. B. Zebra GK420d" maxLength={80} />
+              </label>
+              <div className="shrink field">
+                <button className="primary" type="submit">Paket herunterladen (ZIP)</button>
+              </div>
+            </form>
+            <ol className="small" style={{ margin: '12px 0 0', paddingLeft: 18 }}>
+              <li>
+                Auf dem PC <a href="https://nodejs.org" target="_blank" rel="noreferrer">Node.js (LTS)</a> und{' '}
+                <a href="https://www.sumatrapdfreader.org" target="_blank" rel="noreferrer">SumatraPDF</a>{' '}
+                installieren (Standardeinstellungen).
+              </li>
+              <li>Paket herunterladen und entpacken, z. B. nach <span className="mono">C:\KRNL-Druckbruecke</span>.</li>
+              <li>
+                <span className="mono">druckbruecke-starten.cmd</span> doppelklicken — das Fenster zeigt
+                „Druckbrücke aktiv" und bleibt offen. Der PC erscheint unten bei den Druck-Agenten.
+              </li>
+              <li>
+                Einmal <span className="mono">autostart-einrichten.cmd</span> doppelklicken — dann startet die
+                Brücke mit Windows.
+              </li>
+            </ol>
+            <p className="small muted" style={{ margin: '8px 0 0' }}>
+              Das Paket enthält das Agent-Token: nicht weitergeben. Ein Paket je PC; für zwei Drucker am selben
+              PC zwei Pakete mit verschiedenem Namen. Wird das Token geändert, die Pakete neu laden.
+            </p>
+          </>
+        )}
       </Card>
 
       <Card title={`Druck-Agenten (${agenten.length})`} tight>
