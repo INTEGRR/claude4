@@ -32,6 +32,12 @@ export default async function VersandPage({
   }
   const gefiltert = Object.values(filter).some(Boolean)
   const ready = await versandbereitMitVorschlag(filter)
+  // Live gezählt: was noch auf Ware wartet, erscheint von selbst, sobald
+  // Bestand gebucht ist (Live-Reservierung, Migration 0086).
+  const [{ wartend }] = await sql<{ wartend: number }[]>`
+    select count(*)::int as wartend
+    from stock_pickings p join operation_types ot on ot.id = p.operation_type_id
+    where ot.kind = 'delivery' and p.state in ('waiting', 'confirmed')`
 
   const shipments = await sql<
     {
@@ -92,6 +98,14 @@ export default async function VersandPage({
         <div className="notice warn">
           DHL ist noch nicht konfiguriert. Hinterlege API-Key, GKP-Zugangsdaten und Abrechnungsnummer
           als Umgebungsvariablen (siehe <code className="mono">.env.example</code>), dann lassen sich hier Labels erzeugen.
+        </div>
+      )}
+
+      {wartend > 0 && (
+        <div className="notice">
+          {wartend} Lieferung(en) warten auf Ware. Sie erscheinen hier von selbst, sobald Bestand
+          gebucht ist (Wareneingang, Inventur, Fertigmeldung, Storno) —{' '}
+          <Link href="/lager?art=delivery">Warenausgänge ansehen</Link>.
         </div>
       )}
 

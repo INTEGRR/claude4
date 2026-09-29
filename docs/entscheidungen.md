@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Live-Reservierung in der Datenbank statt Nachlauf in der Inventur
+
+Revidiert den Eintrag „Inventur reserviert wartende Lieferungen neu" vom
+selben Tag. Der Nachlauf im Executor deckte nur die Inventur über die App
+ab; Wareneingang, Storno, Retoure und Fertigmeldung für andere Aufträge
+ließen den Status weiter veralten. Ein Cron (erwogen: alle fünf Minuten)
+hätte das nur verzögert repariert. Vorgabe des Betreibers: Status darf nie
+veraltet sein — gerade bei Stücklisten und Fertigung.
+
+**Entschieden:** Die Reservierung folgt dem Bestand **live, in der
+Datenbank** (Migration 0086). Ein Constraint-Trigger auf `stock_quants`
+erkennt, dass an einem internen Ort Ware frei wurde (Bestand rauf oder
+Reservierung runter), und ruft `wartende_bewegungen_reservieren(variant,
+ort)`: Transfers mit Reservierung „bei Bestätigung" und Komponenten
+laufender Fertigungsaufträge, ältester Termin zuerst, sonst
+Teilreservierung. `stock_quants` wird nur über `quant_apply` geschrieben —
+der Trigger erfasst damit jeden Buchungsweg, auch künftige.
+
+- **INITIALLY DEFERRED**, also am Ende der Transaktion: ausdrückliche
+  Reservierungen derselben Buchung haben Vorrang. Ohne das nähme sich bei
+  einer Fertigmeldung für Auftrag A ein älterer wartender Auftrag B die
+  Ware, und A bliebe trotz Fertigung ohne Reservierung (per Test belegt).
+- Transfers mit Reservierung „manuell" und „nach Datum" bleiben unberührt.
+- Einmaliger Nachlauf in der Migration für alles, was schon wartet.
+- Der Executor-Nachlauf aus `lager.zaehlung_buchen` ist wieder entfernt,
+  ein Cron entfällt. Der Versand zeigt live, wie viele Lieferungen auf Ware
+  warten.
+
+Nachweis: `tests/prozesse/live-reservierung.test.ts` (Inventur, Storno,
+Fertigungskomponenten, Vorrang des eigenen Auftrags; ohne Trigger bzw.
+ohne Verzögerung rot). Doku: [module/lager.md](module/lager.md),
+[module/fertigung.md](module/fertigung.md),
+[module/versand.md](module/versand.md).
+
 ## 2026-09-29 — Shopify-Bundles: eine SKU, ein Artikel, Bundle-Listen als Zweitangebot
 
 Gefunden im Parallelbetrieb: Der Produktimport legte „NATIVE 75% (QWERTZ)

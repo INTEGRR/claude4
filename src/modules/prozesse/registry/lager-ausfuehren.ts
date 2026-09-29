@@ -106,44 +106,7 @@ export async function zaehlungErfassen(
 
 export async function zaehlungBuchen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select inventory_apply(${ctx.recordId!}, ${ctx.actor})`
-  const [zaehlung] = await sql<{ variant_id: string }[]>`
-    select variant_id from inventory_counts where id = ${ctx.recordId!}`
-  const bereit = zaehlung ? await wartendeLieferungenReservieren(zaehlung.variant_id) : 0
-  return {
-    recordId: ctx.recordId,
-    text: bereit > 0
-      ? `Differenz gebucht — ${bereit} wartende Lieferung(en) jetzt versandbereit.`
-      : undefined,
-  }
-}
-
-/**
- * Wartende Lieferungen eines Artikels neu reservieren — nach einer Zählung
- * mit Mehrbestand. inventory_apply reserviert selbst nichts (anders als die
- * Fertigmeldung); ohne diesen Schritt blieben Lieferungen trotz Ware auf
- * „wartet" und tauchten nie im Versand auf. Älteste Lieferung zuerst, nur
- * Bewegungen im Zustand „confirmed" (wartet auf Ware) — „waiting" wartet auf
- * einen Vorgänger wie die Fertigung und bleibt unberührt.
- *
- * Rückgabe: Anzahl der Lieferungen, die danach versandbereit sind.
- */
-export async function wartendeLieferungenReservieren(variantId: string): Promise<number> {
-  const bewegungen = await sql<{ id: string; picking_id: string }[]>`
-    select m.id, m.picking_id
-    from stock_moves m
-    join stock_pickings p on p.id = m.picking_id
-    join operation_types ot on ot.id = p.operation_type_id
-    where m.variant_id = ${variantId} and m.state = 'confirmed'
-      and ot.kind = 'delivery' and p.state not in ('done', 'cancel')
-    order by p.scheduled_date, p.created_at, m.id`
-  const lieferungen = [...new Set(bewegungen.map((b) => b.picking_id))]
-  for (const b of bewegungen) await sql`select move_reserve(${b.id})`
-  for (const id of lieferungen) await sql`select picking_recompute_state(${id})`
-  if (lieferungen.length === 0) return 0
-  const [{ bereit }] = await sql<{ bereit: number }[]>`
-    select count(*)::int as bereit from stock_pickings
-    where id in ${sql(lieferungen)} and state = 'assigned'`
-  return bereit
+  return { recordId: ctx.recordId }
 }
 
 export async function zaehlungLoeschen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {

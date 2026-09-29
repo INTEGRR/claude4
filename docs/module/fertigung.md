@@ -24,6 +24,7 @@ Status-Maschine (Odoo 18): `draft → confirmed → progress → to_close → do
 
 - **Anlage**: Variante wählen → BoM wird automatisch aufgelöst → Komponentenbedarf wird **eingefroren** (Snapshot der gefilterten BoM-Zeilen als `stock_moves` mit `production_id`), Menge skaliert proportional (`qty_to_produce / bom.qty`). Komponenten manuell ergänzbar. MOs aus Verkaufsauftrag (MTO) entstehen direkt in `confirmed`.
 - **Bestätigen**: Komponenten-Moves → `confirmed`, Reservierung versuchen (`assigned` bei Verfügbarkeit); Verfügbarkeits-Ampel je Komponente (on_hand/reserviert/fehlt), Button „Verfügbarkeit prüfen".
+  Fehlende Komponenten werden **live** reserviert, sobald Ware frei wird (Wareneingang, Inventur, Storno — Migration 0086, ältester Termin zuerst, gemeinsam mit den Lieferungen); die Ampel veraltet nicht mehr. Siehe [lager.md](lager.md), „Live-Reservierung".
 - **Starten**: Status `progress` (Zeitstempel). Arbeitsgänge werden einzeln gestartet und beendet — das Starten des ersten Arbeitsgangs startet auch den Auftrag.
 - **Produzieren** (`produce_mo`): produzierte Menge erfassen (Default = Sollmenge).
   - Bucht Komponentenverbrauch `WH/Stock → Virtuell/Produktion` (anteilig zur produzierten Menge) und Fertigprodukt-Zugang `Virtuell/Produktion → WH/Stock`.

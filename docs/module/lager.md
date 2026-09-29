@@ -36,6 +36,7 @@ Je Vorgangsart: Reservierungsmethode (`at_confirm` Default, `manual` möglich), 
 
 - Status: `draft → confirmed → assigned (Bereit) → done`, dazu `waiting` (fehlende Verfügbarkeit/Vorgänger) und `cancel`.
 - **Reservierung**: `assigned`, wenn `on_hand − reserved` am Quellort ausreicht; Button „Verfügbarkeit prüfen"; Reservierung erhöht `stock_quants.reserved`.
+- **Live-Reservierung** (seit 0086): Wird an einem internen Ort Ware frei — Bestand rauf (Inventur, Wareneingang, Fertigmeldung, Retoure) oder Reservierung runter (Storno) —, reserviert die Datenbank sofort die wartenden Bewegungen desselben Artikels: Transfers mit Reservierung „bei Bestätigung" und Komponenten laufender Fertigungsaufträge, ältester Termin zuerst, sonst Teilreservierung. Constraint-Trigger auf `stock_quants`, am Ende der Transaktion — ausdrückliche Reservierungen derselben Buchung haben Vorrang (die Fertigmeldung bedient zuerst ihren Auftrag). Ein Status „wartet" veraltet damit nicht mehr; „Verfügbarkeit prüfen" bleibt als Knopf, ist aber nicht mehr nötig. Funktion `wartende_bewegungen_reservieren(variant, ort)`; Entscheidungslog 2026-09-29.
 - **Validieren** (`validate_picking`): Ist-Mengen erfassen (Default = Soll) → Moves `done`, Quants fortgeschrieben (Quelle −, Ziel +; nur interne Orte wirken auf den Bestand), Rückschreibung in Quellbeleg (`qty_received` / `qty_delivered`), Backorder-Dialog bei Teilmengen.
 - **Stornieren**: nur nicht-erledigte Transfers; Reservierungen werden freigegeben. **Erledigte Transfers sind unveränderlich** — Korrektur ausschließlich per **Retoure** (Button „Retoure": erzeugt Gegen-Picking mit getauschten Orten, verknüpft über `return_of_id`).
 - Bewegungsarten im Protokoll unterscheidbar über Quelle/Ziel bzw. Verknüpfung: Wareneingang, Warenausgang, interner Transfer, **Fertigungsverbrauch/-zugang** (`production_id`), **Demontage** (`unbuild_id`), **Reparatur** (`repair_id`), **Inventur** (Gegenort Inventurdifferenz), **Ausschuss** (Ziel Ausschuss-Ort).
@@ -49,7 +50,7 @@ Je Vorgangsart: Reservierungsmethode (`at_confirm` Default, `manual` möglich), 
 ## Inventur & Ausschuss
 
 - **Inventur**: Zeile (Ort, Variante, gezählte Menge) → **Anwenden** bucht Differenz gegen `Virtuell/Inventurdifferenz` und setzt On Hand auf den Zählwert. Warnung, wenn sich der Buchbestand zwischen Zählung und Anwenden geändert hat.
-  Danach reserviert KRNL **wartende Lieferungen dieses Artikels** neu (älteste zuerst, nur Bewegungen im Zustand „wartet auf Ware", nicht solche, die auf die Fertigung warten) — sonst blieben sie trotz Ware auf „wartet" und erschienen nie im Versand. Die Meldung nennt, wie viele Lieferungen dadurch versandbereit wurden (Registry `lager.zaehlung_buchen`, Entscheidungslog 2026-09-29).
+  Mehrbestand erreicht wartende Lieferungen und Fertigungskomponenten sofort (Live-Reservierung, siehe oben).
 - **Ausschuss**: eigenes Mini-Formular (Variante, Menge, Quellort) → Move nach `Virtuell/Ausschuss`; auch aus MO/Reparatur heraus aufrufbar.
 
 ## Barcode-Unterstützung
