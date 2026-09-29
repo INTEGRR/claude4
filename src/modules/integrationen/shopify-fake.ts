@@ -31,6 +31,13 @@ export function fakeOrderHinterlegen(order: { id: string }): void {
  */
 let FAKE_PRODUKTE: unknown[] = []
 
+/** Letzte Variablen je Operation — damit Tests prüfen können, was angefragt wurde. */
+const FAKE_AUFRUFE = new Map<string, Record<string, unknown>>()
+
+export function fakeLetzterAufruf(operation: string): Record<string, unknown> | undefined {
+  return FAKE_AUFRUFE.get(operation)
+}
+
 export function fakeProdukteHinterlegen(produkte: unknown[]): void {
   FAKE_PRODUKTE = produkte
 }
@@ -40,6 +47,7 @@ export async function fakeShopifyGraphQL<T>(
   variables: Record<string, unknown> = {},
 ): Promise<T> {
   const op = operation(query)
+  FAKE_AUFRUFE.set(op, variables)
 
   const antwort = (() => {
     // Beide Order-Anfragen beginnen mit `order(id:)` — unterschieden wird
@@ -98,6 +106,8 @@ export async function fakeShopifyGraphQL<T>(
       }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }
+      case 'customers':
+        return { customers: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } }
       case 'products':
         return { products: { nodes: FAKE_PRODUKTE, pageInfo: { hasNextPage: false, endCursor: null } } }
       case 'orderCancel': {

@@ -542,8 +542,8 @@ export default async function IntegrationenPage() {
               <label className="field">
                 <span>Was</span>
                 <select name="was" defaultValue="beides">
-                  <option value="beides">Kunden und Bestellungen</option>
-                  <option value="kunden">Nur Kunden</option>
+                  <option value="beides">Kunden (mit Bestellung) und Bestellungen</option>
+                  <option value="kunden">Nur Kunden (mit Bestellung)</option>
                   <option value="bestellungen">Nur Bestellungen</option>
                 </select>
               </label>

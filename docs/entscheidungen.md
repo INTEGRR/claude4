@@ -9,6 +9,21 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Kunden aus Shopify nur mit Bestellung übernehmen
+
+Die Kunden-Erstübernahme holte alle Shopify-Kunden: 7.567 Kontakte, davon
+7.464 ohne eine einzige Bestellung. Das waren Newsletter-Anmeldungen,
+US-SMS-Gateways (`…@vtext.com`, `…@txt.att.net`) und Bot-Anmeldungen
+(`…_generic_…_www.nvil.gg@…`). Shopify führt jede Anmeldung als Kunde.
+
+**Entschieden:** Die Erstübernahme fragt nur Kunden mit mindestens einer
+Bestellung an (`orders_count:>0`, Konstante `KUNDEN_MIT_BESTELLUNG` in
+`shopify.ts`). Kunden aus Bestellungen legt der Order-Import ohnehin an.
+**Bestehende Kontakte bleiben** (Betreiber-Entscheidung); bereinigt wird
+beim nächsten Neuaufsetzen bzw. am Stichtag, wenn Prod ohnehin geleert
+wird. Nachweis: `tests/prozesse/fakes.test.ts` (der Fake zeichnet die
+Anfrage auf). Doku: [module/integrationen.md](module/integrationen.md).
+
 ## 2026-09-29 — Druckbrücke als fertiges Paket zum Download im Tool
 
 Der Agent lag nur im Repository (`scripts/druck-agent.ts`); wer einen

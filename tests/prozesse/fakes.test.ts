@@ -53,6 +53,14 @@ describe('Fake-Weichen', () => {
     await shopify.addOrderTags('gid://shopify/Order/1', ['erp:versendet'])
   })
 
+  test('Kundenimport fragt nur Kunden mit Bestellung an (keine Newsletter-, SMS- und Bot-Anmeldungen)', async () => {
+    const { fakeLetzterAufruf } = await import('../../src/modules/integrationen/shopify-fake.ts')
+    const seite = await shopify.fetchCustomersPage(null)
+    assert.deepEqual(seite.customers, [])
+    assert.equal(fakeLetzterAufruf('customers')?.query, 'orders_count:>0')
+    assert.equal(shopify.KUNDEN_MIT_BESTELLUNG, 'orders_count:>0')
+  })
+
   test('eine unbekannte Shopify-Operation wirft laut', async () => {
     await assert.rejects(
       () => shopify.shopifyGraphQL('query { productVariants(first: 1) { nodes { id } } }'),

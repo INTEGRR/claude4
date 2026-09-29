@@ -354,6 +354,14 @@ export interface ShopifyCustomer {
   } | null
 }
 
+/**
+ * Nur Kunden mit mindestens einer Bestellung. Shopify führt auch Newsletter-,
+ * SMS- und Bot-Anmeldungen als Kunden — beim ersten Import von ANVIL waren
+ * 7.464 von 7.567 Kontakten ohne jede Bestellung (Entscheidungslog
+ * 2026-09-29). Wer bestellt, kommt ohnehin mit der Bestellung.
+ */
+export const KUNDEN_MIT_BESTELLUNG = 'orders_count:>0'
+
 /** Eine Kunden-Seite für die Erstübernahme. */
 export async function fetchCustomersPage(
   after: string | null,
@@ -361,8 +369,8 @@ export async function fetchCustomersPage(
   const data: {
     customers: { nodes: ShopifyCustomer[]; pageInfo: { hasNextPage: boolean; endCursor: string } }
   } = await shopifyGraphQL(
-    `query($after: String) {
-       customers(first: 100, after: $after, sortKey: CREATED_AT) {
+    `query($after: String, $query: String) {
+       customers(first: 100, after: $after, sortKey: CREATED_AT, query: $query) {
          nodes {
            id firstName lastName
            defaultEmailAddress { emailAddress }
@@ -372,7 +380,7 @@ export async function fetchCustomersPage(
          pageInfo { hasNextPage endCursor }
        }
      }`,
-    { after },
+    { after, query: KUNDEN_MIT_BESTELLUNG },
   )
   return {
     customers: data.customers.nodes,

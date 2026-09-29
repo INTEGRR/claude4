@@ -47,6 +47,12 @@ Entscheidungslog 2026-09-18.
 - `orders/cancelled`: zugehörigen Auftrag stornieren (Regeln des Verkaufsmoduls); nicht manifestierte DHL-Sendungen der Lieferung werden storniert (siehe Versand-Modul).
 - `orders/updated`: Adress-/Tag-Änderungen nachziehen; Mengenänderungen nur solange kein MO `done` und kein Label erstellt ist, sonst Warn-Aktivität.
 
+**Kunden-Erstübernahme** (Monitor → „Kunden (mit Bestellung) und Bestellungen"): holt nur
+Shopify-Kunden mit mindestens einer Bestellung (`customers(query: "orders_count:>0")`,
+`KUNDEN_MIT_BESTELLUNG`). Shopify führt auch Newsletter-, SMS-Gateway- und Bot-Anmeldungen als
+Kunden — beim ersten ANVIL-Import waren 7.464 von 7.567 Kontakten ohne Bestellung
+(Entscheidungslog 2026-09-29). Kunden aus Bestellungen entstehen ohnehin beim Order-Import.
+
 **Reconciliation (Sicherheitsnetz, Cron alle 15 min):** GraphQL `orders(query: "updated_at:>{last_sync}")` paginiert abholen und mit `shopify_order_id` abgleichen — fängt verlorene Webhooks ab (Shopify garantiert keine Zustellung). `last_reconciliation_at` in `shopify_sync_state`.
 
 *Vergleich: Sendcloud hätte Shopify nur alle ~5 Minuten gepollt und nur ein 30-Tage-Fenster synchronisiert — unser Webhook+Reconciliation-Ansatz ist schneller und lückenlos.*
