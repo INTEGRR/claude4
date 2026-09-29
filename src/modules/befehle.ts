@@ -78,6 +78,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/einstellungen/kartonagen', label: 'Einstellungen · Kartonagen', area: 'einstellungen' },
   { href: '/einstellungen/finanzen', label: 'Einstellungen · Finanz-Stellschrauben', area: 'einstellungen' },
   { href: '/einstellungen/anbindungen', label: 'Einstellungen · Schnittstellen (Shopify, DHL, …)', area: 'einstellungen' },
+  { href: '/einstellungen/odoo', label: 'Einstellungen · Odoo-Übernahme (Stücklisten)', area: 'einstellungen' },
   { href: '/einstellungen/benachrichtigungen', label: 'Einstellungen · Benachrichtigungen (Telegram)', area: 'einstellungen' },
   { href: '/einstellungen/ki', label: 'Einstellungen · KI-Modelle', area: 'einstellungen' },
   { href: '/einstellungen/nutzung', label: 'Einstellungen · Nutzungsbericht', area: 'einstellungen' },

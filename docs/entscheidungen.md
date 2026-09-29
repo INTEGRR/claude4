@@ -9,6 +9,35 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Odoo selektiv per API: nur Stücklisten, Komponenten, Lieferanten, Bestand
+
+Revidiert „Odoo ist die Wahrheit für offene Arbeit, der finale Lauf geht
+immer in eine leergeräumte Instanz" (2026-08-25): KRNL läuft produktiv im
+Parallelbetrieb, Kunden und Bestellungen kommen aus Shopify. Der
+Dump-Importer passt dazu nicht — er bricht bei vorhandenen Produkten ab,
+ordnet nicht per SKU zu (Tastaturen entstünden doppelt), verwirft
+Variantenfilter still und überspringt fehlende Komponenten still.
+
+**Entschieden (Betreiber):**
+
+- **Live per Odoo-API, nur lesend** (JSON-RPC, API-Schlüssel), Vorschau
+  und Übernahme per Knopf unter Einstellungen → Odoo-Übernahme; die Naht
+  `odooLesen` lässt nur lesende Methoden durch.
+- **Umfang:** Stücklisten an die per SKU zugeordneten Tastaturen und
+  Switch-Tester; Komponenten (anlegen, wo unbekannt); Einkaufspreis und
+  Bestand nur, wo KRNL 0 hat; Lieferanten mit Preisen; Routen wie in Odoo
+  (Fertigen/Auf Auftrag) — nur bei vollständig abgedeckten Artikeln.
+  **Keine** Kunden, **keine** Belege.
+- **Schreiben** je Vorlage oder je Variante (statt Filter); hart statt
+  still (Blockade mit Grund); Hand-Stücklisten bleiben; wiederholbar ohne
+  Doppel (Migration 0090: `boms.herkunft`, `odoo_verweise.herkunft`).
+- Dabei gefunden und korrigiert: `resolve_bom`/`resolve_kit` bevorzugten
+  die Varianten-Stückliste einer Geschwister-Variante.
+
+Nachweis: `tests/odoo-stuecklisten.test.ts` (Planung),
+`tests/prozesse/odoo-stuecklisten.test.ts` (Übernahme, zweiter Lauf,
+Resolver, Schreibsperre). Doku: [migration-odoo.md](migration-odoo.md).
+
 ## 2026-09-29 — Shopify-Historie aus dem CSV-Export, Umsätze netto
 
 Revidiert „Historie kommt aus dem Odoo-Import" (api-referenz/shopify.md):

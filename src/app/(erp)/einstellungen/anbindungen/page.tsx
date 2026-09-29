@@ -260,6 +260,16 @@ export default async function SchnittstellenPage() {
         </Card>
       </div>
 
+      <Card title="Odoo (nur lesend)">
+        <Stand stand={stand.odoo} />
+        <p className="small muted" style={{ margin: 0 }}>
+          KRNL liest aus dem laufenden Odoo nur Stücklisten, Komponenten, Lieferanten und Bestände —
+          es schreibt nie zurück. Übernahme mit Vorschau:{' '}
+          <Link href="/einstellungen/odoo">Odoo-Übernahme</Link>.
+        </p>
+        <Variablen stand={stand.odoo} />
+      </Card>
+
       <Card title="Betrieb (Zeitsteuerung und Schlüssel)">
         <Stand stand={stand.system} />
         <p className="small muted" style={{ margin: 0 }}>

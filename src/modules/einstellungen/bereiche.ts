@@ -94,6 +94,13 @@ export const EINSTELLUNGS_BEREICHE: readonly Bereich[] = [
     beschreibung: 'Shopify, DHL, E-Mail, KI und Telegram: Stand der Anbindung und ihr Verhalten.',
   },
   {
+    href: '/einstellungen/odoo',
+    label: 'Odoo-Übernahme',
+    gruppe: 'Anbindungen',
+    beschreibung:
+      'Stücklisten, Komponenten, Lieferanten und Bestände aus Odoo — mit Vorschau, nur lesend, ohne Doppel.',
+  },
+  {
     href: '/einstellungen/benachrichtigungen',
     label: 'Benachrichtigungen',
     gruppe: 'Anbindungen',

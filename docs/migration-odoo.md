@@ -1,5 +1,70 @@
 # Datenübernahme aus Odoo 18 (ANVIL → KRNL)
 
+> **Stand 2026-09-29 — der gewählte Weg ist die selektive Übernahme per API**
+> (Abschnitt direkt darunter). KRNL läuft bereits produktiv im
+> Parallelbetrieb; Kunden und Bestellungen kommen aus Shopify (inkl.
+> CSV-Historie). Aus Odoo werden nur noch **Stücklisten, ihre Komponenten,
+> Lieferanten und Bestände** übernommen. Der Dump-Importer weiter unten
+> bleibt als Werkzeug für einen Komplettlauf in eine leere Instanz —
+> gegen das laufende KRNL bricht er ab (fremde Produkte vorhanden).
+
+## Stücklisten per API (seit 0090)
+
+**Einstellungen → Odoo-Übernahme** (nur Administratoren). KRNL liest das
+laufende Odoo per JSON-RPC (`src/modules/migration/odoo/api.ts`) — **nur
+lesend**: `odooLesen` weist jede andere Methode als `search_read`, `read`,
+`search_count`, `fields_get` vor dem Netz ab (Wächter im Prozesstest).
+Zugang: `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_API_KEY` (API-Schlüssel
+unter Odoo → Einstellungen → Benutzer → Kontosicherheit); `ODOO_FAKE=1` =
+Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
+`category_id`/`factor`).
+
+1. **Vorschau** (`integrationen.odoo_vorschau`, schreibt nichts) liest
+   `mrp.bom`, `mrp.bom.line`, die Varianten der Fertigprodukte und
+   Komponenten, Attribute, Einheiten, Routen (`stock.rule`: `manufacture`
+   bzw. `make_to_order`), Lieferantenpreise und Bestände an internen
+   Lagerorten — und plant (`stuecklisten-plan.ts`, pur, getestet):
+   - **Fertigprodukte** werden per SKU (sonst Barcode) den KRNL-Varianten
+     zugeordnet, die schon aus Shopify da sind. Fehlt eine: gemeldet,
+     **nichts angelegt**.
+   - **Je Odoo-Variante** wird die Stückliste aufgelöst wie in Odoo:
+     Varianten- vor Vorlagen-Stückliste; eine Zeile mit Filter gilt, wenn
+     die Variante **je Attribut** einen der Filterwerte trägt. Mengen auf
+     1 Stück normiert, Einheiten umgerechnet (auch kg → g).
+   - **Geschrieben** wird je KRNL-Vorlage eine Stückliste, wenn alle
+     aktiven Varianten dieselbe Liste brauchen — sonst je Variante eine
+     (keine Filter, die anders gelesen werden könnten).
+   - **Komponenten**: per SKU/Barcode zugeordnet (bleiben wie sie sind)
+     oder neu angelegt (nicht verkäuflich, einkaufbar, Einheit/Gewicht
+     aus Odoo; ohne SKU markiert). Einkaufspreis (Standardpreis, sonst
+     Lieferantenpreis) und Bestand **nur, wo KRNL 0 hat**; Lieferanten per
+     Name/E-Mail zugeordnet oder angelegt, dazu ihre Preise.
+   - **Routen** Fertigen/Auf Auftrag wie in Odoo — nur, wenn jede aktive
+     Variante der KRNL-Vorlage eine Stückliste bekommt (sonst liefe eine
+     Shopify-Bestellung ins Leere). Ab dann erzeugt jede Shopify-Bestellung
+     einen Fertigungsauftrag.
+   - **Hart statt still**: unbekannte Einheit oder eine von Hand angelegte
+     KRNL-Stückliste → diese Stückliste wird nicht geschrieben, sondern mit
+     Grund gezeigt.
+2. **Übernehmen** (`integrationen.odoo_stuecklisten_uebernehmen`) liest
+   neu, plant neu und schreibt alles in **einer** Transaktion: Komponenten,
+   Preise, Lieferanten, dann Bestände (Preis vor Bestand — richtig
+   bewertet), Stücklisten (`boms.herkunft = 'odoo'`), Routen.
+   `odoo_verweise` merkt jede Zuordnung (`herkunft` angelegt/zugeordnet).
+3. **Wiederholbar**: ein zweiter Lauf erkennt alles (auch Komponenten ohne
+   SKU über die Verweise), legt nichts doppelt an und ersetzt nur eigene
+   Stücklisten, die sich in Odoo geändert haben (die alte wird
+   deaktiviert — Fertigungsaufträge verweisen darauf).
+
+Nebenbei korrigiert (0090): `resolve_bom`/`resolve_kit` nahmen für eine
+Variante ohne eigene Stückliste die Varianten-Stückliste einer
+Geschwister-Variante (sogar vor der Vorlagen-Stückliste). Eine
+Varianten-Stückliste gilt jetzt nur für ihre Variante.
+
+---
+
+## Komplettlauf aus dem Dump (Werkzeug, nicht der aktuelle Weg)
+
 ANVIL zieht von Odoo 18 Enterprise (Odoo.sh) nach KRNL um — **alle Daten,
 inklusive Historie**, wiederholbar: Probeläufe lokal, der finale Lauf am
 Stichtag mit frischem Dump auf die leergeräumte Prod-Instanz. Diese Datei

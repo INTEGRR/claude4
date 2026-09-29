@@ -8,6 +8,14 @@ Tastaturen (und künftig weitere Produkte) anhand von Stücklisten fertigen. Ker
 
 ## Stücklisten (BoM)
 
+**Aus Odoo übernommen** (seit 0090, Einstellungen → Odoo-Übernahme):
+Stücklisten mit `herkunft = 'odoo'` stammen aus dem laufenden Odoo — je
+KRNL-Vorlage eine, oder je Variante, wo die Varianten verschiedene Listen
+brauchen ([migration-odoo.md](../migration-odoo.md) „Stücklisten per API").
+Von Hand angelegte (`herkunft` leer) fasst die Übernahme nie an. Eine
+Varianten-Stückliste gilt nur für ihre Variante (`resolve_bom`, korrigiert
+in 0090).
+
 - Kopf: Produkt (Vorlage), optionale exklusive Variante, Referenzmenge + Maßeinheit, Typ (`manufacture` oder `kit`/Phantom), Verbrauchsregel (`blocked`/`allowed`/`warning`).
 - Positionen: Komponente (Variante), Menge, Maßeinheit, Verbrauchsart (`backflush` = wird bei der Fertigmeldung automatisch verbraucht, `manual` = muss erfasst werden).
 - **„Auf Varianten anwenden"** (Kernfeature, Odoo-18-Semantik):

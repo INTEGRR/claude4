@@ -122,5 +122,35 @@ export const INTEGRATIONEN = {
     revalidate: ['/verkauf', '/auswertungen', '/integrationen'],
   },
 
+  // --- Odoo-Stücklisten (0090) ------------------------------------------------
+
+  'integrationen.odoo_vorschau': {
+    label: 'Odoo-Übernahme: Vorschau',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Liest Stücklisten, Komponenten, Lieferanten und Bestände aus Odoo und zeigt, was die ' +
+      'Übernahme täte: zugeordnet per SKU, neu anzulegen, blockiert mit Grund. Schreibt nichts.',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: [],
+  },
+
+  'integrationen.odoo_stuecklisten_uebernehmen': {
+    label: 'Odoo-Stücklisten übernehmen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Übernimmt aus Odoo die Stücklisten an die per SKU zugeordneten Tastaturen und Switch-Tester, ' +
+      'legt fehlende Komponenten an, setzt Einkaufspreis und Bestand nur, wo KRNL 0 hat, ' +
+      'übernimmt Lieferantenpreise und die Routen Fertigen/Auf Auftrag. Eine Transaktion; ' +
+      'ein zweiter Lauf legt nichts doppelt an. Kunden und Belege nicht.',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/odoo', '/fertigung/stuecklisten', '/produkte'],
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

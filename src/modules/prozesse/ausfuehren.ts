@@ -230,5 +230,7 @@ export const AUSFUEHRUNG = {
   'integrationen.historie_pruefen': integrationen.historiePruefenAktion,
   'integrationen.historie_importieren': integrationen.historieImportierenAktion,
   'integrationen.shopify_preise_nachziehen': integrationen.shopifyPreiseNachziehen,
+  'integrationen.odoo_vorschau': integrationen.odooVorschau,
+  'integrationen.odoo_stuecklisten_uebernehmen': integrationen.odooStuecklistenUebernehmen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

@@ -163,3 +163,56 @@ export async function shopifyPreiseNachziehen(): Promise<AktionsErgebnis> {
       (fehler.length ? ` — Fehler: ${fehler.slice(0, 2).join(' | ')}` : '') + '.',
   }
 }
+
+// --- Odoo-Stücklisten (0090) -------------------------------------------------
+
+export async function odooVorschau(): Promise<AktionsErgebnis> {
+  const { stuecklistenVorschau } = await import('../../migration/odoo/stuecklisten-uebernahme.ts')
+  const { plan, uebersicht } = await stuecklistenVorschau()
+  const komp = new Map(plan.komponenten.map((k) => [k.odooId, k]))
+  return {
+    text:
+      `${uebersicht.stuecklisten} Stückliste(n) für ${uebersicht.fertigZugeordnet} zugeordnete Varianten, ` +
+      `${uebersicht.komponentenNeu} neue Komponente(n), ${uebersicht.blockiert} blockiert.`,
+    daten: {
+      uebersicht,
+      fertigprodukte: plan.fertigprodukte,
+      blockiert: plan.blockiert,
+      routen: plan.routen.map((r) => ({ skus: r.skus, fertigen: r.fertigen, aufAuftrag: r.aufAuftrag })),
+      komponenten: plan.komponenten.map((k) => ({
+        code: k.code,
+        name: k.name,
+        vorhanden: Boolean(k.krnlId),
+        uom: k.uomName,
+        preis: k.preis,
+        bestand: k.bestand,
+        lieferanten: k.lieferanten.map((l) => `${l.partnerName} ${l.preis} ${l.waehrung}`),
+      })),
+      stuecklisten: plan.stuecklisten.map((s) => ({
+        skus: s.skus,
+        jeVariante: s.variantId !== null,
+        zeilen: s.zeilen.map((z) => ({
+          komponente: komp.get(z.komponente)?.code ?? komp.get(z.komponente)?.name ?? String(z.komponente),
+          menge: z.menge,
+          uom: z.uomName,
+        })),
+      })),
+    },
+  }
+}
+
+export async function odooStuecklistenUebernehmen(
+  _p: object,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const { stuecklistenUebernehmen } = await import('../../migration/odoo/stuecklisten-uebernahme.ts')
+  const b = await stuecklistenUebernehmen(ctx.actor)
+  return {
+    text:
+      `${b.stuecklistenNeu} Stückliste(n) geschrieben, ${b.stuecklistenUnveraendert} unverändert; ` +
+      `${b.komponentenNeu} Komponente(n) angelegt, ${b.komponentenZugeordnet} zugeordnet; ` +
+      `${b.preise} Preis(e), ${b.lieferantenpreise} Lieferantenpreis(e), ${b.bestand} Bestand/Bestände, ` +
+      `${b.routen} Route(n)` + (b.blockiert ? `; ${b.blockiert} blockiert (siehe Vorschau).` : '.'),
+    daten: { ...b },
+  }
+}

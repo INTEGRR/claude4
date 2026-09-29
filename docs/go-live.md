@@ -139,6 +139,17 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       Paket laden und am PC starten, an jedem PC oben im Kopf einmal den
       Arbeitsplatz wählen.
 
+## 5b. Odoo-Stücklisten (selektiv, per API)
+
+- [ ] In Vercel `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_API_KEY` setzen
+      (API-Schlüssel: Odoo → Einstellungen → Benutzer → Kontosicherheit),
+      neu deployen; Einstellungen → Schnittstellen zeigt „Odoo" vollständig.
+- [ ] Einstellungen → Odoo-Übernahme → **Vorschau** gemeinsam durchgehen:
+      fehlende SKUs, blockierte Stücklisten, Routen-Warnung (ab dann
+      erzeugt jede Shopify-Bestellung einen Fertigungsauftrag).
+- [ ] **Übernehmen**, dann an zwei, drei Tastaturen die Stückliste prüfen
+      (Karte „Vorschau je Variante").
+
 ## 6. Shopify (im Runbook, Schritt 7)
 
 - [ ] Staging: Produkt-Import gegen Prod im Lesemodus (SKU-Match setzt

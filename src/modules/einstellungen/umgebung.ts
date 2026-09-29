@@ -17,7 +17,7 @@ export interface Variable {
 }
 
 export interface Anbindung {
-  schluessel: 'shopify' | 'dhl' | 'mail' | 'ki' | 'sprache' | 'telegram' | 'system'
+  schluessel: 'shopify' | 'dhl' | 'mail' | 'ki' | 'sprache' | 'telegram' | 'odoo' | 'system'
   titel: string
   /** Umgebungsvariable, die die Anbindung durch eine Attrappe ersetzt (Tests, Staging). */
   fake?: string
@@ -79,6 +79,17 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
     variablen: [
       { name: 'TELEGRAM_BOT_TOKEN', pflicht: true, zweck: 'Token vom @BotFather' },
       { name: 'TELEGRAM_CHAT_ID', pflicht: true, zweck: 'Ziel-Chat — über Benachrichtigungen → „Chat-IDs ermitteln"' },
+    ],
+  },
+  {
+    schluessel: 'odoo',
+    titel: 'Odoo (nur lesend)',
+    fake: 'ODOO_FAKE',
+    variablen: [
+      { name: 'ODOO_URL', pflicht: true, zweck: 'Adresse des Odoo, z. B. https://firma.odoo.com' },
+      { name: 'ODOO_DB', pflicht: true, zweck: 'Name der Odoo-Datenbank' },
+      { name: 'ODOO_USER', pflicht: true, zweck: 'Login (E-Mail) des Odoo-Benutzers' },
+      { name: 'ODOO_API_KEY', pflicht: true, zweck: 'API-Schlüssel: Odoo → Einstellungen → Benutzer → Kontosicherheit' },
     ],
   },
   {
