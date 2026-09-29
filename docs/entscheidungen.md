@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Shopify-Bundles: eine SKU, ein Artikel, Bundle-Listen als Zweitangebot
+
+Gefunden im Parallelbetrieb: Der Produktimport legte „NATIVE 75% (QWERTZ)
+Nexus White" nicht an — „duplicate key … product_variants_sku_key". Zehn
+seiner SKUs trägt auch „ANVIL NATIVE 75 - Black Week Editions", die
+Bestandteil-Liste eines Bundles aus Shopifys Bundles-App (Tastatur +
+Deskmat), und die kam in Shopify zuerst. Das ganze Produkt scheiterte,
+auch seine 20 eindeutigen Varianten; das Bundle selbst wurde als
+SKU-loser Scheinartikel angelegt.
+
+**Entschieden:**
+
+- **Eine SKU ist genau ein Artikel.** Weitere Shop-Angebote mit derselben
+  SKU sind *Zweitangebote*: nicht anlegen (bzw. am neuen Produkt
+  archivieren), Bestellungen finden den Artikel über die SKU — so ordnet
+  `matchVariant` ohnehin schon zu. Doppelte SKUs innerhalb eines Produkts
+  ebenso; Varianten ohne SKU sind nie Duplikate.
+- **Der Artikel gehört dem normalen Produkt:** Die Erstübernahme läuft in
+  zwei Durchgängen, erst eigenständige Produkte, dann Bundle-Bestandteile
+  (`productParents`). Shopify liefert beides; ein Tag oder eine Pflege im
+  Shop ist nicht nötig.
+- **Bundles sind keine Artikel** (`hasVariantsThatRequiresComponents`):
+  Bestellungen bringen die Bestandteile als eigene Positionen.
+- **Kein Alias-Speicher jetzt.** Die Zuordnung über die SKU reicht für
+  Bestellungen. Offen bleibt der Bestands-Push an Zweitangebote — nötig erst
+  im Schreibmodus, als Punkt in [go-live.md](go-live.md) §6.
+
+Umgesetzt in `produkt-import.ts`/`produkt-import-logik.ts` und dem Job
+`shopify_product_import`; Nachweis `tests/prozesse/produkt-import.test.ts`
+(stellt den Fall nach, mit dem alten Code rot) und Unit-Tests in
+`tests/produkt-import.test.ts`. Doku:
+[module/integrationen.md](module/integrationen.md),
+[api-referenz/shopify.md](api-referenz/shopify.md).
+
 ## 2026-09-29 — Inventur reserviert wartende Lieferungen neu
 
 Gefunden im Parallelbetrieb: Aufträge aus Shopify wurden bei Bestand 0

@@ -140,6 +140,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 - [ ] Staging: Produkt-Import gegen Prod im Lesemodus (SKU-Match setzt
       `shopify_variant_id`), Bestellungen per 15-Minuten-Abgleich
       mitlesen und mit Odoo vergleichen.
+- [ ] KRNL, vor dem Schreibmodus: Bestand auch an **Zweitangebote** melden
+      (Bundle-Bestandteile mit derselben SKU, z. B. „Black Week Editions").
+      Heute bekommt nur das verknüpfte Angebot den Bestand; die Bundles-App
+      rechnet die Bundle-Verfügbarkeit aber aus den Bestandteilen.
 - [ ] Stichtag: Shopify-Modus auf **schreiben** stellen, dann Webhooks
       registrieren, einmal „Mit Shopify abgleichen" (Bestand), Order-
       Backfill nur ab Stichtag.

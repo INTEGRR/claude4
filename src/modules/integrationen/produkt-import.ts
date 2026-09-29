@@ -2,9 +2,12 @@ import { sql, tx } from '@/db/client'
 import { shopifyGraphQL } from './shopify'
 import {
   type ShopVarianteRoh,
+  bundleRolle,
   echteOptionen,
+  imDurchgang,
   ordneVariantenZu,
   preisAufteilung,
+  teileZweitangebote,
 } from './produkt-import-logik'
 
 /**
@@ -17,6 +20,14 @@ import {
  *      Optionen werden zu Attributen, generate_variants baut die Varianten,
  *      und die Zuordnung läuft über die Attributwerte.
  *
+ * Eine SKU ist genau ein Artikel. Führt ein zweites Shop-Angebot dieselbe
+ * SKU (Bundle-Bestandteil, Aktions-Edition), wird es nicht doppelt angelegt:
+ * Bestellungen finden den Artikel über die SKU (Zweitangebot). Damit der
+ * Artikel dem normalen Produkt gehört und nicht der Bundle-Liste, laufen
+ * zwei Durchgänge: erst die eigenständigen Produkte, dann die Bundle-
+ * Bestandteile. Bundles selbst (Shopifys Bundles-App) sind kein Artikel —
+ * ihre Bestellungen bringen die Bestandteile als eigene Positionen.
+ *
  * Läuft als Job in Häppchen (25 Produkte je Seite), beliebig wiederholbar.
  */
 
@@ -24,6 +35,8 @@ interface ShopProdukt {
   id: string
   title: string
   descriptionHtml: string | null
+  hasVariantsThatRequiresComponents?: boolean | null
+  productParents?: { nodes: { id: string }[] } | null
   options: { name: string; values: string[] }[]
   variants: {
     nodes: {
@@ -47,6 +60,8 @@ async function fetchProductsPage(
        products(first: 25, after: $after, sortKey: CREATED_AT) {
          nodes {
            id title descriptionHtml
+           hasVariantsThatRequiresComponents
+           productParents(first: 1) { nodes { id } }
            options { name values }
            variants(first: 100) {
              nodes { id sku barcode price selectedOptions { name value } inventoryItem { id } }
@@ -67,43 +82,87 @@ export interface ProduktImportErgebnis {
   verknuepft: number
   angelegt: number
   uebersprungen: number
+  /** Shop-Varianten, deren SKU schon einem Artikel gehört (Zweitangebote). */
+  zweitangebote: number
+  /** Bundles der Bundles-App — kein eigener Artikel. */
+  bundles: number
   probleme: string[]
   nextCursor: string | null
 }
 
-export async function importProdukteChunk(cursor: string | null): Promise<ProduktImportErgebnis> {
+type Verarbeitung = {
+  ergebnis: 'verknuepft' | 'angelegt' | 'uebersprungen'
+  zweitangebote: number
+}
+
+/**
+ * Eine Seite Produkte in einem Durchgang: 1 = eigenständige Produkte,
+ * 2 = Bundle-Bestandteile (siehe Kopfkommentar). Bundles zählt nur
+ * Durchgang 1, damit sie im Ergebnis nicht doppelt erscheinen.
+ */
+export async function importProdukteChunk(
+  cursor: string | null,
+  durchgang: 1 | 2 = 1,
+): Promise<ProduktImportErgebnis> {
   const { produkte, endCursor } = await fetchProductsPage(cursor)
   let verknuepft = 0
   let angelegt = 0
   let uebersprungen = 0
+  let zweitangebote = 0
+  let bundles = 0
   const probleme: string[] = []
 
   for (const p of produkte) {
+    const rolle = bundleRolle(p)
+    if (rolle === 'bundle' && durchgang === 1) bundles++
+    if (!imDurchgang(rolle, durchgang)) continue
     try {
-      const ergebnis = await verarbeiteProdukt(p)
-      if (ergebnis === 'verknuepft') verknuepft++
-      else if (ergebnis === 'angelegt') angelegt++
+      const v = await verarbeiteProdukt(p)
+      zweitangebote += v.zweitangebote
+      if (v.ergebnis === 'verknuepft') verknuepft++
+      else if (v.ergebnis === 'angelegt') angelegt++
       else uebersprungen++
     } catch (err) {
       probleme.push(`${p.title}: ${(err instanceof Error ? err.message : String(err)).slice(0, 120)}`)
     }
   }
 
-  const [alt] = await sql<{ value: { verknuepft?: number; angelegt?: number } }[]>`
+  const [alt] = await sql<{ value: { verknuepft?: number; angelegt?: number; zweitangebote?: number; bundles?: number } }[]>`
     select value from shopify_sync_state where key = 'backfill_products'`
   await sql`
     insert into shopify_sync_state (key, value)
     values ('backfill_products', ${sql.json({
       verknuepft: (alt?.value?.verknuepft ?? 0) + verknuepft,
       angelegt: (alt?.value?.angelegt ?? 0) + angelegt,
-      fertig: endCursor === null,
+      zweitangebote: (alt?.value?.zweitangebote ?? 0) + zweitangebote,
+      bundles: (alt?.value?.bundles ?? 0) + bundles,
+      fertig: endCursor === null && durchgang === 2,
     })})
     on conflict (key) do update set value = excluded.value, updated_at = now()`
 
-  return { verknuepft, angelegt, uebersprungen, probleme, nextCursor: endCursor }
+  return { verknuepft, angelegt, uebersprungen, zweitangebote, bundles, probleme, nextCursor: endCursor }
 }
 
-async function verarbeiteProdukt(p: ShopProdukt): Promise<'verknuepft' | 'angelegt' | 'uebersprungen'> {
+/**
+ * SKUs und Barcodes der Shop-Varianten, die im ERP schon einem Artikel
+ * gehören — Grundlage für die Zweitangebote.
+ */
+async function vergebeneKennungen(
+  varianten: ShopVarianteRoh[],
+): Promise<{ skus: Set<string>; barcodes: Set<string> }> {
+  const skus = varianten.map((v) => v.sku?.trim()).filter((x): x is string => Boolean(x))
+  const barcodes = varianten.map((v) => v.barcode?.trim()).filter((x): x is string => Boolean(x))
+  if (skus.length === 0 && barcodes.length === 0) return { skus: new Set(), barcodes: new Set() }
+  const zeilen = await sql<{ sku: string | null; barcode: string | null }[]>`
+    select sku, barcode from product_variants
+    where sku = any(${skus}::text[]) or barcode = any(${barcodes}::text[])`
+  return {
+    skus: new Set(zeilen.map((z) => z.sku).filter((x): x is string => x !== null && skus.includes(x))),
+    barcodes: new Set(zeilen.map((z) => z.barcode).filter((x): x is string => x !== null && barcodes.includes(x))),
+  }
+}
+
+async function verarbeiteProdukt(p: ShopProdukt): Promise<Verarbeitung> {
   const shopVarianten: ShopVarianteRoh[] = p.variants.nodes.map((v) => ({
     id: v.id,
     sku: v.sku,
@@ -117,12 +176,12 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<'verknuepft' | 'angele
   const verknuepfte = await sql<{ shopify_variant_id: string }[]>`
     select shopify_variant_id from product_variants
     where shopify_variant_id in ${sql(gids)}`
-  if (verknuepfte.length === shopVarianten.length) return 'uebersprungen'
+  if (verknuepfte.length === shopVarianten.length) return { ergebnis: 'uebersprungen', zweitangebote: 0 }
   const schonVerknuepft = new Set(verknuepfte.map((r) => r.shopify_variant_id))
 
   // Stufe 1: über SKU oder Barcode an bestehende ERP-Varianten koppeln.
   const inventoryItemJeGid = new Map(p.variants.nodes.map((v) => [v.id, v.inventoryItem.id]))
-  let getroffen = 0
+  const getroffen = new Set<string>()
   for (const sv of shopVarianten) {
     if (schonVerknuepft.has(sv.id)) continue
     const [treffer] = await sql<{ id: string }[]>`
@@ -136,13 +195,24 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<'verknuepft' | 'angele
                 set shopify_variant_id = ${sv.id},
                     shopify_inventory_item_gid = ${inventoryItemJeGid.get(sv.id) ?? null}
                 where id = ${treffer.id}`
-      getroffen++
+      getroffen.add(sv.id)
     }
   }
-  if (getroffen > 0 || schonVerknuepft.size > 0) return 'verknuepft'
+  // Was jetzt noch offen ist und dessen SKU einem anderen Artikel gehört,
+  // ist ein Zweitangebot — es wird nie angelegt.
+  const offen = shopVarianten.filter((sv) => !schonVerknuepft.has(sv.id) && !getroffen.has(sv.id))
+  const { neu, zweit } = teileZweitangebote(offen, await vergebeneKennungen(offen))
+  if (getroffen.size > 0) return { ergebnis: 'verknuepft', zweitangebote: zweit.length }
+  if (schonVerknuepft.size > 0) {
+    // Das Produkt steht schon im ERP; übrig sind Zweitangebote oder neue
+    // Shop-Varianten ohne Gegenstück (die meldet der laufende Abgleich).
+    return { ergebnis: neu.length === 0 ? 'uebersprungen' : 'verknuepft', zweitangebote: zweit.length }
+  }
+  if (neu.length === 0) return { ergebnis: 'uebersprungen', zweitangebote: zweit.length }
 
   // Stufe 2: im ERP anlegen — Optionen werden Attribute, Werte inklusive.
-  return tx(async (t): Promise<'angelegt'> => {
+  const zweitIds = new Set(zweit.map((v) => v.id))
+  return tx(async (t): Promise<Verarbeitung> => {
     const optionen = echteOptionen(p.options)
     const { basis, extra } = preisAufteilung(shopVarianten)
 
@@ -197,6 +267,12 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<'verknuepft' | 'angele
       shopVarianten,
     )
     for (const paar of paare) {
+      if (zweitIds.has(paar.shop.id)) {
+        // Zweitangebot: die Kombination existiert als Attribut, der Artikel
+        // aber schon anderswo — archivieren statt die SKU doppelt zu vergeben.
+        await t`update product_variants set active = false where id = ${paar.erpId}`
+        continue
+      }
       const item = p.variants.nodes.find((v) => v.id === paar.shop.id)
       await t`update product_variants
               set sku = coalesce(${paar.shop.sku}, sku),
@@ -211,9 +287,14 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<'verknuepft' | 'angele
         ${`${ohnePartner.length} Shopify-Variante(n) ohne Gegenstück: ${ohnePartner.map((v) => v.sku ?? v.id).join(', ')}`},
         'shopify')`
     }
+    if (zweit.length > 0) {
+      await t`select log_event('product_template', ${tpl.id}, 'note',
+        ${`${zweit.length} Variante(n) sind schon Artikel eines anderen Shop-Angebots (Zweitangebot, z. B. Bundle-Bestandteil) und hier archiviert — Bestellungen landen über die SKU beim vorhandenen Artikel: ${zweit.map((v) => v.sku ?? v.id).join(', ')}`},
+        'shopify')`
+    }
     await t`select log_event('product_template', ${tpl.id}, 'note',
       'Aus Shopify übernommen.', 'shopify')`
-    return 'angelegt'
+    return { ergebnis: 'angelegt', zweitangebote: zweit.length }
   })
 }
 
@@ -235,6 +316,8 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
        node(id: $id) {
          ... on Product {
            id title descriptionHtml
+           hasVariantsThatRequiresComponents
+           productParents(first: 1) { nodes { id } }
            options { name values }
            variants(first: 100) {
              nodes { id sku barcode price selectedOptions { name value } inventoryItem { id } }
@@ -253,8 +336,12 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
     where shopify_variant_id in ${sql(gids)}`
 
   if (verknuepfte.length === 0) {
-    const ergebnis = await verarbeiteProdukt(p)
-    return `„${p.title}" ${ergebnis === 'angelegt' ? 'im ERP angelegt' : ergebnis === 'verknuepft' ? 'verknüpft' : 'unverändert'}`
+    if (bundleRolle(p) === 'bundle') {
+      return `„${p.title}" ist ein Bundle — kein eigener Artikel, Bestellungen bringen die Bestandteile`
+    }
+    const { ergebnis, zweitangebote } = await verarbeiteProdukt(p)
+    const zweit = zweitangebote ? `, ${zweitangebote} Zweitangebot(e)` : ''
+    return `„${p.title}" ${ergebnis === 'angelegt' ? 'im ERP angelegt' : ergebnis === 'verknuepft' ? 'verknüpft' : 'unverändert'}${zweit}`
   }
 
   const templateId = verknuepfte[0].template_id

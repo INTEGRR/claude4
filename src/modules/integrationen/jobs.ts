@@ -233,19 +233,34 @@ const handlers = {
     return aktualisiereProduktInShopify(String(payload.template_id))
   },
 
-  /** Produkte aus Shopify verknüpfen/übernehmen, ein Häppchen je Lauf. */
+  /**
+   * Produkte aus Shopify verknüpfen/übernehmen, ein Häppchen je Lauf. Zwei
+   * Durchgänge über alle Seiten: erst eigenständige Produkte, dann Bundle-
+   * Bestandteile (produkt-import.ts, Kopfkommentar).
+   */
   async shopify_product_import(payload) {
     const { importProdukteChunk } = await import('./produkt-import')
     const cursor = payload.cursor ? String(payload.cursor) : null
-    const r = await importProdukteChunk(cursor)
+    const durchgang = payload.durchgang === 2 ? 2 : 1
+    const r = await importProdukteChunk(cursor, durchgang)
     if (r.nextCursor) {
       await sql`select enqueue_job('shopify_product_import',
-        ${sql.json({ cursor: r.nextCursor })}, ${`produkt-import:${r.nextCursor}`})`
+        ${sql.json({ cursor: r.nextCursor, durchgang })}, ${`produkt-import:${durchgang}:${r.nextCursor}`})`
+    } else if (durchgang === 1) {
+      await sql`select enqueue_job('shopify_product_import',
+        ${sql.json({ durchgang: 2 })}, 'produkt-import:2:start')`
     }
+    const zusatz = [
+      r.zweitangebote ? `${r.zweitangebote} Zweitangebot(e) per SKU verknüpft` : '',
+      r.bundles ? `${r.bundles} Bundle(s) ohne eigenen Artikel` : '',
+    ].filter(Boolean).join(', ')
     const problem = r.probleme.length ? ` — Probleme: ${r.probleme.join(' | ')}` : ''
+    const weiter = r.nextCursor
+      ? ' — nächste Seite eingereiht'
+      : durchgang === 1 ? ' — weiter mit den Bundle-Bestandteilen' : ' — Übernahme abgeschlossen'
     return (
-      `${r.verknuepft} verknüpft, ${r.angelegt} im ERP angelegt, ${r.uebersprungen} unverändert` +
-      (r.nextCursor ? ' — nächste Seite eingereiht' : ' — Übernahme abgeschlossen') + problem
+      `Durchgang ${durchgang}: ${r.verknuepft} verknüpft, ${r.angelegt} im ERP angelegt, ${r.uebersprungen} unverändert` +
+      (zusatz ? `, ${zusatz}` : '') + weiter + problem
     )
   },
 

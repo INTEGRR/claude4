@@ -78,3 +78,63 @@ export function preisAufteilung(shop: ShopVarianteRoh[]): {
     extra: new Map(shop.map((v) => [v.id, Number((Number(v.price) - basis).toFixed(2))])),
   }
 }
+
+/**
+ * Rolle eines Shopify-Produkts in Shopifys Bundles-App:
+ *   - `bundle`: das Bundle selbst (Varianten verlangen Bestandteile). Kein
+ *     physischer Artikel — Bestellungen bringen die Bestandteile als eigene
+ *     Positionen (LineItem.lineItemGroup), deshalb legt KRNL es nicht an.
+ *   - `bestandteil`: steckt in mindestens einem Bundle (productParents).
+ *     Solche Listen tragen oft die SKUs der eigentlichen Artikel und werden
+ *     deshalb erst NACH den eigenständigen Produkten übernommen — der
+ *     Artikel gehört dem normalen Produkt, nicht der Bundle-Liste.
+ *   - `eigenstaendig`: alles andere.
+ */
+export type BundleRolle = 'bundle' | 'bestandteil' | 'eigenstaendig'
+
+export function bundleRolle(p: {
+  hasVariantsThatRequiresComponents?: boolean | null
+  productParents?: { nodes: unknown[] } | null
+}): BundleRolle {
+  if (p.hasVariantsThatRequiresComponents) return 'bundle'
+  if ((p.productParents?.nodes.length ?? 0) > 0) return 'bestandteil'
+  return 'eigenstaendig'
+}
+
+/** Durchgang 1 übernimmt eigenständige Produkte, Durchgang 2 Bundle-Bestandteile; Bundles nie. */
+export function imDurchgang(rolle: BundleRolle, durchgang: 1 | 2): boolean {
+  if (rolle === 'eigenstaendig') return durchgang === 1
+  if (rolle === 'bestandteil') return durchgang === 2
+  return false
+}
+
+/**
+ * Eine SKU ist genau ein Artikel. Teilt die Shop-Varianten eines neu
+ * anzulegenden Produkts in neue Artikel und Zweitangebote: gehört die SKU
+ * (oder der Barcode) schon einem Artikel im ERP — oder kam sie im selben
+ * Produkt schon vor —, wird sie nicht doppelt angelegt. Bestellungen über
+ * ein Zweitangebot finden den Artikel über die SKU.
+ */
+export function teileZweitangebote(
+  shop: ShopVarianteRoh[],
+  vergeben: { skus: ReadonlySet<string>; barcodes: ReadonlySet<string> },
+): { neu: ShopVarianteRoh[]; zweit: ShopVarianteRoh[] } {
+  const skus = new Set(vergeben.skus)
+  const barcodes = new Set(vergeben.barcodes)
+  const neu: ShopVarianteRoh[] = []
+  const zweit: ShopVarianteRoh[] = []
+  // Leere Kennungen sind keine: zwei Varianten ohne SKU sind kein Duplikat.
+  const kennung = (s: string | null) => (s?.trim() ? s.trim() : null)
+  for (const sv of shop) {
+    const sku = kennung(sv.sku)
+    const barcode = kennung(sv.barcode)
+    if ((sku && skus.has(sku)) || (barcode && barcodes.has(barcode))) {
+      zweit.push(sv)
+      continue
+    }
+    neu.push(sv)
+    if (sku) skus.add(sku)
+    if (barcode) barcodes.add(barcode)
+  }
+  return { neu, zweit }
+}

@@ -303,7 +303,11 @@ export default async function IntegrationenPage() {
         select key, value from shopify_sync_state
         where key in ('backfill_customers', 'backfill_orders', 'backfill_products')`
     ).map((r) => [r.key, r.value]),
-  ) as Record<string, { importiert?: number; verknuepft?: number; angelegt?: number; fertig: boolean } | undefined>
+  ) as Record<
+    string,
+    | { importiert?: number; verknuepft?: number; angelegt?: number; zweitangebote?: number; bundles?: number; fertig: boolean }
+    | undefined
+  >
 
   return (
     <>
@@ -523,6 +527,12 @@ export default async function IntegrationenPage() {
                 <span className={`led ${uebernahme.backfill_products.fertig ? 'ok' : 'on'}`} style={{ marginRight: 6 }} />
                 {qty(uebernahme.backfill_products.verknuepft ?? 0)} verknüpft,{' '}
                 {qty(uebernahme.backfill_products.angelegt ?? 0)} angelegt
+                {uebernahme.backfill_products.zweitangebote
+                  ? `, ${qty(uebernahme.backfill_products.zweitangebote)} Zweitangebote per SKU`
+                  : ''}
+                {uebernahme.backfill_products.bundles
+                  ? `, ${qty(uebernahme.backfill_products.bundles)} Bundles ohne eigenen Artikel`
+                  : ''}
                 {uebernahme.backfill_products.fertig ? ' — abgeschlossen' : ' — läuft'}
               </span>
             )}

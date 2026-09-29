@@ -25,6 +25,16 @@ export function fakeOrderHinterlegen(order: { id: string }): void {
   FAKE_BESTELLUNGEN.set(order.id, order)
 }
 
+/**
+ * Produkte, die der Fake auf die Seitenabfrage des Produktimports liefert —
+ * in der Reihenfolge der Hinterlegung, eine einzige Seite.
+ */
+let FAKE_PRODUKTE: unknown[] = []
+
+export function fakeProdukteHinterlegen(produkte: unknown[]): void {
+  FAKE_PRODUKTE = produkte
+}
+
 export async function fakeShopifyGraphQL<T>(
   query: string,
   variables: Record<string, unknown> = {},
@@ -88,6 +98,8 @@ export async function fakeShopifyGraphQL<T>(
       }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }
+      case 'products':
+        return { products: { nodes: FAKE_PRODUKTE, pageInfo: { hasNextPage: false, endCursor: null } } }
       case 'orderCancel': {
         // Wie im echten Shop: die Bestellung gilt danach als storniert.
         const bestellung = FAKE_BESTELLUNGEN.get(String(variables.orderId)) as

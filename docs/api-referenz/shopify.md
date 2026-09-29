@@ -13,7 +13,7 @@ Stand: 2026-08-05. Aktuelle stabile Shopify-API-Version: **2026-07**.
 - Custom Apps werden über das **Dev Dashboard** bzw. Shopify CLI erstellt (nicht mehr direkt im Shopify-Admin).
 
 **Benötigte Scopes:**
-- Lesen: `read_orders`. Standardmäßig nur die **letzten 60 Tage** abrufbar; ältere Orders benötigen `read_all_orders`.
+- Lesen: `read_orders`. Standardmäßig nur die **letzten 60 Tage** abrufbar; ältere Orders benötigen `read_all_orders`. Das ist ein **geschützter Scope**: er muss bei Shopify separat beantragt werden, bis zur Freigabe weist das Dev Dashboard ihn als ungültig ab (2026-09-29). KRNL braucht ihn nicht — die Historie kommt aus dem Odoo-Import.
 - Schreiben: `write_orders` (Tags/Order-Update), `write_merchant_managed_fulfillment_orders` (+ ggf. `write_assigned_fulfillment_orders`) für Fulfillments.
 
 **Webhooks (Order-Topics):** `orders/create`, `orders/paid`, `orders/updated`, `orders/cancelled`, `orders/fulfilled`, `orders/partially_fulfilled`, `orders/edited`, `orders/delete`. Payload = volles Order-JSON. Subscription per `webhookSubscriptionCreate`-Mutation oder `shopify.app.toml`. Zustellung an HTTPS-Endpoint (alternativ Pub/Sub, EventBridge).
@@ -77,6 +77,13 @@ mutation {
 - `displayFinancialStatus` (PAID, PENDING, REFUNDED …), `displayFulfillmentStatus` (UNFULFILLED, FULFILLED, PARTIALLY_FULFILLED …)
 - `totalPriceSet`, `fulfillmentOrders`
 
+## 6. Bundles (Shopifys Bundles-App)
+
+- Das Bundle ist ein eigenes Produkt, dessen Varianten Bestandteile verlangen: `Product.hasVariantsThatRequiresComponents` bzw. `ProductVariant.requiresComponents`. Es ist kein Lagerartikel.
+- Bestandteile erkennt man an `Product.productParents` / `ProductVariant.productParents` (die Bundles, in denen sie stecken).
+- In Bestellungen stehen die **Bestandteile als eigene Positionen**, gruppiert über `LineItem.lineItemGroup`; der Preis des Bundles ist auf sie verteilt.
+- Bestandteil-Listen tragen oft die SKUs der eigentlichen Artikel (bei ANVIL: „ANVIL NATIVE 75 - Black Week Editions" mit den SKUs der weißen Tastaturen). Wie KRNL damit umgeht: [module/integrationen.md](../module/integrationen.md), „Eine SKU, ein Artikel".
+
 ## Quellen
 
 - https://shopify.dev/docs/apps/build/webhooks
@@ -91,5 +98,7 @@ mutation {
 - https://shopify.dev/docs/api/admin-graphql/latest/input-objects/FulfillmentInput
 - https://shopify.dev/docs/apps/build/orders-fulfillment/order-management-apps/build-fulfillment-solutions
 - https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/generate-app-access-tokens-admin
+- https://shopify.dev/docs/api/admin-graphql/latest/objects/Product (hasVariantsThatRequiresComponents, productParents)
+- https://shopify.dev/docs/api/admin-graphql/latest/objects/LineItem (lineItemGroup)
 
 Hinweis: Der frühere Sendcloud-Teil dieser Referenz wurde entfernt — Sendcloud wird nicht eingesetzt (Entscheidung: DHL-Direktanbindung). Was die Sendcloud-Shopify-Integration geleistet hätte, dokumentiert [sendcloud-shopify-funktionsumfang.md](sendcloud-shopify-funktionsumfang.md) als Nachbau-Vorlage.

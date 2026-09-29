@@ -101,6 +101,27 @@ Orten, abgerundet auf ganze Stücke) gemeldet.
   unbekannte Produkte laufen durch Verknüpfen/Anlegen wie die Erstübernahme.
 - **Erstübernahme**: Knopf auf dem Monitor holt den kompletten Shop-Katalog
   in Häppchen (verknüpfen per SKU/Barcode, sonst anlegen inkl. Attributen).
+- **Eine SKU, ein Artikel — Bundles und Zweitangebote** (Entscheidungslog
+  2026-09-29): Führen zwei Shop-Angebote dieselbe SKU (typisch: die
+  Bestandteil-Liste eines Bundles aus Shopifys Bundles-App trägt die SKUs
+  der eigentlichen Tastaturen), wird die SKU nur **einmal** Artikel. Das
+  weitere Angebot ist ein *Zweitangebot*: seine Variante wird nicht angelegt
+  bzw. am neuen Produkt archiviert, Bestellungen finden den Artikel über die
+  SKU (`matchVariant`). Früher scheiterte daran das ganze Produkt am
+  Eindeutigkeits-Index — samt seiner eindeutigen Varianten.
+  - Die Erstübernahme läuft in **zwei Durchgängen**: erst eigenständige
+    Produkte, dann Bundle-Bestandteile (`productParents` nicht leer). So
+    gehört der Artikel dem normalen Produkt, nicht der Bundle-Liste.
+  - **Bundles selbst** (`hasVariantsThatRequiresComponents`) werden nie
+    angelegt: Shopify liefert in Bestellungen die Bestandteile als eigene
+    Positionen (`LineItem.lineItemGroup`), das Bundle ist kein Lagerartikel.
+  - Doppelte SKUs **innerhalb** eines Produkts: die erste Variante wird
+    Artikel, die weitere archiviert. Varianten ohne SKU sind nie Duplikate.
+  - Das Ergebnis (Monitor-Karte, Job-Protokoll) nennt Zweitangebote und
+    Bundles; am angelegten Produkt steht ein Protokolleintrag mit den SKUs.
+  - **Offen bis zum Schreibmodus:** Der Bestands-Push meldet nur an das
+    verknüpfte Angebot, nicht an Zweitangebote (siehe
+    [go-live.md](../go-live.md) §6).
 
 ## E-Mail (Einkauf)
 
