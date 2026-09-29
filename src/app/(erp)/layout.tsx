@@ -115,6 +115,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       select distinct bereich from prozesse where aktiv`).map((b) => b.bereich),
   )
   const prozessAktiv = (bereich: string) => prozessBereiche.has(bereich)
+  const [{ kommissionierenAktiv }] = await sql<{ kommissionierenAktiv: boolean }[]>`
+    select prozessschritt_aktiv('shopify_bestellung_versand', 'kommissionieren') as "kommissionierenAktiv"`
 
   // …und die Projektion geht weiter: ein LAUFZEIT-Prozess (modell 'vorgang')
   // bekommt einen eigenen Menüpunkt in SEINEM Bereich, mit eigener Liste.
@@ -177,6 +179,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ...(sees('versand') && prozessAktiv('versand')
           ? [
               { href: '/versand', label: 'Versand', count: counts.versandbereit },
+              // Optionaler Prozessschritt (0091): abgeschaltet → kein Menüpunkt.
+              ...(kommissionierenAktiv ? [{ href: '/kommissionieren', label: 'Kommissionieren' }] : []),
               { href: '/packtisch', label: 'Packtisch' },
             ]
           : []),

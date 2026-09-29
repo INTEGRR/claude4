@@ -9,6 +9,41 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Kommissionieren: Packzettel auf Papier und Sammel-Screen am Handy
+
+Im Versand ging bisher nur „filtern und Labels drucken". Es fehlte das
+Abarbeiten Bestellung für Bestellung: mit dem Packzettel durchs Lager
+(analog) oder mit dem Handy/Tablet (digital), danach zum Packtisch.
+
+**Entschieden (Betreiber):**
+
+- **Reihenfolge:** kommt nach Shopify-Historie und Odoo-Übernahme.
+- **Packtisch bleibt Kontrolle:** dort wird weiter jeder Artikel gescannt;
+  er zeigt nur „kommissioniert von … am …".
+- **Vorerst kein Lagerplatz:** Laufreihenfolge nach Artikelname.
+- **Scannen mit Handykamera und Bluetooth-Handscanner.** Dafür erlaubt
+  `Permissions-Policy` die Kamera jetzt für KRNL selbst (`camera=(self)`,
+  vorher ganz aus); Kamera-Scan über den eingebauten `BarcodeDetector`,
+  sonst `@zxing/browser` (nur bei Bedarf geladen, neue Abhängigkeit).
+
+**Modell (Migration 0091):** optionaler Prozessschritt `kommissionieren`
+(Aktion `lager.kommissionieren`) zwischen Verfügbarkeit und Packtisch,
+je Firma abschaltbar. Belegstatus bleibt die einzige Wahrheit: die
+Lieferung bleibt `assigned`, „kommissioniert" ist eine Tatsache am Beleg
+(`kommissioniert_am/_von`); der Fortschritt steht je Bewegung in
+`stock_moves.qty_kommissioniert`, getrennt von `qty_done`. Eine Sperre
+(`kommissionierung_von/_seit`, 30 Minuten) verhindert zwei Sammler an
+einer Bestellung. Fehlt Ware, nur „unvollständig" mit Vermerk — ohne
+Marke, mit Fehlereintrag am Beleg. Packzettel aus einer Datenquelle für
+HTML, Sammeldruck und Brücken-PDF (`versand.packzettel_drucken`, Auswahl
+in der Versand-Liste).
+
+Nachweis: `tests/kommissionier-logik.test.ts`,
+`tests/prozesse/kommissionieren.test.ts`, Fixture-Lauf
+„Kommissionieren: Ware sammeln, dann Packtisch". Doku:
+[module/versand.md](module/versand.md) „Kommissionieren",
+[module/lager.md](module/lager.md), [prozesse.md](prozesse.md).
+
 ## 2026-09-29 — Odoo selektiv per API: nur Stücklisten, Komponenten, Lieferanten, Bestand
 
 Revidiert „Odoo ist die Wahrheit für offene Arbeit, der finale Lauf geht

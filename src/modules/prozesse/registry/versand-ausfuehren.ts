@@ -235,6 +235,31 @@ export async function massendruck(
   return { text: teile.join(' — ') + '.', link: `/api/label/sammel?ids=${shipmentIds.join(',')}` }
 }
 
+/**
+ * Packzettel der Auswahl drucken (0091): am A4-Drucker des Arbeitsplatzes
+ * bzw. Ersatz — sonst der Sammeldruck im Browser. Der Zeitpunkt steht an
+ * der Lieferung (Marke „Zettel gedruckt" im Versand).
+ */
+export async function packzettelDrucken(
+  p: { ids: string[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'packzettel')
+  let meldung: string | null = null
+  if (ziel) {
+    for (const pickingId of p.ids) {
+      const druck = await drucken('packzettel', { art: 'packzettel', pickingId }, { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor }, ziel)
+      if (druck.gedruckt) meldung = druck.meldung
+    }
+  }
+  await sql`update stock_pickings set packzettel_gedruckt_am = now() where id = any(${p.ids}::uuid[])`
+  if (meldung) return { text: `${p.ids.length} Packzettel: ${meldung}` }
+  return {
+    text: `${p.ids.length} Packzettel — kein Drucker für Packzettel am Arbeitsplatz, Sammeldruck im Browser.`,
+    link: `/versand/packzettel?ids=${p.ids.join(',')}`,
+  }
+}
+
 export async function retourenlabelErstellen(p: {
   partner_id: string
   reference?: string

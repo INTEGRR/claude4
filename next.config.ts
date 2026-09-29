@@ -13,8 +13,9 @@ const SICHERHEITS_HEADER = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Mikrofon für Diktat und Sprachmodus, sonst nichts.
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=()' },
+  // Mikrofon für Diktat und Sprachmodus, Kamera für den Barcode-Scan beim
+  // Kommissionieren am Handy (0091) — beides nur für KRNL selbst.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(), payment=()' },
 ]
 
 const nextConfig: NextConfig = {

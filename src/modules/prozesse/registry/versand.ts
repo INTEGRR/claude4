@@ -26,6 +26,23 @@ export const VERSAND = {
     revalidate: ['/versand', '/lager/:id'],
   },
 
+  'versand.packzettel_drucken': {
+    label: 'Packzettel drucken (Auswahl)',
+    bereich: 'versand',
+    beschreibung:
+      'Druckt die Packzettel der ausgewählten Lieferungen — auf dem A4-Drucker des ' +
+      'Arbeitsplatzes, sonst auf dem Ersatzdrucker; ohne Drucker öffnet der Sammeldruck ' +
+      'im Browser. Der Packzettel ist zugleich der Kommissionierbeleg.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      ids: z.array(z.string().uuid()).min(1, 'Bitte mindestens eine Lieferung auswählen').max(100),
+    }),
+    zusammenfassung: (p) => `${p.ids.length} Packzettel`,
+    formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
+    revalidate: ['/versand'],
+  },
+
   'versand.packtisch_abschliessen': {
     label: 'Packtisch: Sendung abschließen',
     bereich: 'versand',

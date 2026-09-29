@@ -802,6 +802,117 @@ label.field > span {
 .scanner-foot .big { font-size: 16px; padding: 11px 22px; }
 .scanner-done { font-size: 22px; font-weight: 600; color: var(--success); }
 
+/* --- Kommissionieren (0091) ----------------------------------------------- */
+/* Handy zuerst: eine große Karte je Artikel, Daumen-Knöpfe unten. */
+.kommi-start { margin: 0 0 16px; }
+.kommi-start .big { font-size: 17px; padding: 14px 22px; }
+.kommi-liste { list-style: none; margin: 0; padding: 0; }
+.kommi-eintrag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.kommi-eintrag:last-child { border-bottom: 0; }
+.kommi-eintrag-text { min-width: 0; }
+.kommi-eintrag-knopf { flex: none; }
+.kommi-zurueck { margin: 0 0 8px; font-size: 14px; }
+
+.scanner.kommi { min-height: 0; }
+.kommi-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.kommi-stand { display: flex; flex-direction: column; align-items: flex-end; }
+.kommi-stand .mono { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kommi-balken { height: 4px; background: var(--border); }
+.kommi-balken > div { height: 100%; background: var(--success); transition: width 0.2s ease; }
+
+.kommi-karte {
+  margin: 12px;
+  padding: 18px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kommi-karte.complete { border-left-color: var(--success); background: var(--success-soft); }
+.kommi-karte-name { font-size: 22px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.kommi-karte-menge {
+  font-family: var(--font-mono), monospace;
+  font-size: 44px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kommi-karte-menge .ok { color: var(--success); }
+.kommi-karte-knoepfe { display: flex; gap: 8px; flex-wrap: wrap; }
+.kommi-karte-knoepfe button { flex: 1; min-height: 48px; font-size: 16px; }
+
+.kommi-kamera { margin: 12px; display: flex; flex-direction: column; gap: 8px; }
+.kommi-kamera video {
+  width: 100%;
+  max-height: 42vh;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: #000;
+}
+.kommi-kamera-zeile { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.kommi-uebersicht { list-style: none; margin: 0; padding: 0; }
+.kommi-uebersicht li { border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
+.kommi-uebersicht li.complete { background: var(--success-soft); border-left-color: var(--success); }
+.kommi-uebersicht li.fehlt { background: var(--warn-soft); border-left-color: var(--warn); }
+.kommi-uebersicht-knopf {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  min-height: 48px;
+}
+.kommi-uebersicht-name { font-weight: 550; overflow-wrap: anywhere; }
+
+.kommi-abschluss { display: flex; flex-direction: column; gap: 12px; padding: 0 0 16px; }
+.kommi-abschluss > .field, .kommi-abschluss > button { margin: 0 16px; }
+.kommi-breit { min-height: 52px; font-size: 17px; }
+
+.kommi-fuss {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.kommi-fuss > button { min-height: 44px; }
+.kommi-tippen { display: flex; gap: 6px; flex: 1 1 200px; min-width: 0; }
+.kommi-tippen input { flex: 1; min-width: 0; }
+
+@media (max-width: 560px) {
+  .kommi-eintrag { flex-wrap: wrap; }
+  .kommi-eintrag-knopf { width: 100%; }
+  .kommi-eintrag-knopf button { width: 100%; min-height: 44px; }
+  .kommi-start .big { width: 100%; }
+  .kommi-fuss > button { flex: 1 1 40%; }
+  .kommi-tippen { flex-basis: 100%; order: -1; }
+}
+
 /* --- KI-Analyse ------------------------------------------------------------ */
 .ki-chat {
   background: var(--surface);

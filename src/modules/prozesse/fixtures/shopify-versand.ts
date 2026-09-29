@@ -491,5 +491,37 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
         assert.equal(druck.status, 'offen')
       },
     },
+    {
+      // Kommissionieren (0091): erst die Ware sammeln (Handy oder
+      // Packzettel), dann am Packtisch kontrollieren und abschließen. Der
+      // Beleg bleibt dazwischen 'assigned' — gesammelt ist eine Tatsache
+      // am Beleg, kein zweiter Zustand.
+      name: 'Kommissionieren: Ware sammeln, dann Packtisch',
+      pfad: ['bestellung', 'kommissionieren', 'packtisch', 'fulfillment'],
+      ereignisse: { bestellung: bestellungEinspeisen },
+      eingaben: {
+        kommissionieren: async (ctx, sql) => {
+          const zeilen = await sql<{ variant_id: string; qty: number }[]>`
+            select variant_id, sum(qty)::float as qty from sales_order_lines
+            where order_id = ${ctx.p4AuftragId} and variant_id is not null
+            group by variant_id`
+          return { gesammelt: Object.fromEntries(zeilen.map((z) => [z.variant_id, Number(z.qty)])) }
+        },
+        packtisch: { gepackt: { 'PT-TEIL': 2 } },
+      },
+      pruefen: async (sql, _ctx, pickingId) => {
+        const [picking] = await sql<
+          { state: string; kommissioniert_am: string | null; kommissioniert_von: string | null }[]
+        >`
+          select state, kommissioniert_am, kommissioniert_von from stock_pickings where id = ${pickingId}`
+        assert.equal(picking.state, 'done')
+        assert.ok(picking.kommissioniert_am, 'die Kommissionier-Marke muss gesetzt sein')
+        assert.ok(picking.kommissioniert_von)
+        const [{ gesammelt }] = await sql<{ gesammelt: number }[]>`
+          select coalesce(sum(qty_kommissioniert), 0)::float as gesammelt
+          from stock_moves where picking_id = ${pickingId}`
+        assert.equal(Number(gesammelt), 2)
+      },
+    },
   ],
 }

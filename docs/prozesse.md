@@ -1248,6 +1248,28 @@ beweist die Kette Bestellung → Fertigung → Packtisch-Scan → picking done +
 Label + shopify_fulfillment_id + voll geliefert. Arbeitsplatz-Seite und
 Druckbrücke: docs/module/versand.md (folgt mit den nächsten Paketen).
 
+## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
+
+Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der
+**optionale** Schritt `kommissionieren` (Aktion `lager.kommissionieren`,
+Kanten „Ware sammeln" und „zum Packtisch"). Wie der Packtisch trägt er
+**keinen eigenen `zustand`** und deklariert **keinen `uebergang`**: die
+Lieferung bleibt `assigned`, gesammelt ist eine Tatsache am Beleg
+(`stock_pickings.kommissioniert_am/_von`, je Bewegung
+`qty_kommissioniert`) — kein zweites Token-Modell. Der direkte Weg
+Verfügbarkeit → Packtisch bleibt; abgeschaltet
+(`einstellungen.prozessschritt_schalten`) verschwinden Schritt und
+Menüpunkt, `prozessschritt_aktiv` steuert beides.
+
+Die Knöpfe sind registrierte Aktionen: `lager.kommissionierung_starten`
+(prozessfrei, Sperre gegen zwei Sammler), `lager.kommissionieren`
+(Schrittaktion, harter Mengenabgleich aus `kommissionier-logik.ts` —
+derselbe, den der Handy-Screen rechnet) und `versand.packzettel_drucken`
+(prozessfrei, Auswahl in der Versand-Liste). Fixture-Lauf 5 („Ware
+sammeln, dann Packtisch") beweist Bestellung → Sammeln → Packtisch →
+Shop-Rückmeldung mit gesetzter Marke. Oberfläche und Bedienung:
+docs/module/versand.md, Abschnitt „Kommissionieren".
+
 ## Reparatur end-to-end: Kundenformular → Anfrage → Reparatur → Rückversand (Migrationen 0081/0082, umgesetzt)
 
 Der Reparaturprozess bekommt beide Enden per Post, und die Anfrage des

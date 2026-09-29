@@ -91,6 +91,42 @@ export const LAGER = {
     revalidate: ['/lager', '/lager/:ergebnis'],
   },
 
+  // --- Kommissionieren (0091) ----------------------------------------------
+
+  'lager.kommissionierung_starten': {
+    label: 'Kommissionierung beginnen',
+    bereich: 'lager',
+    beschreibung:
+      'Beansprucht eine versandbereite Lieferung zum Sammeln — solange jemand sammelt ' +
+      '(bis 30 Minuten ohne Abschluss), kann niemand sonst dieselbe Bestellung beginnen.',
+    bindung: 'beleg',
+    modell: 'stock_picking',
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/kommissionieren', '/versand'],
+  },
+
+  'lager.kommissionieren': {
+    label: 'Kommissioniert (Ware gesammelt)',
+    bereich: 'lager',
+    beschreibung:
+      'Meldet eine Lieferung als gesammelt: die Mengen je Artikel werden gegen die ' +
+      'Lieferung geprüft und als Sammelfortschritt gespeichert — ohne Buchung, die ' +
+      'Lieferung bleibt versandbereit für den Packtisch. Fehlt etwas, nur mit ' +
+      '„unvollständig" und Vermerk (dann ohne Kommissioniert-Marke).',
+    bindung: 'beleg',
+    modell: 'stock_picking',
+    schema: z.object({
+      gesammelt: z
+        .record(z.string().uuid(), z.number().nonnegative())
+        .default({})
+        .describe('Gesammelte Menge je Variante'),
+      unvollstaendig: z.boolean().default(false),
+      vermerk: z.string().max(500).optional(),
+    }),
+    revalidate: ['/kommissionieren', '/versand', '/lager/:id', '/packtisch'],
+  },
+
   'lager.transfer_details': {
     label: 'Verantwortlichen/Priorität setzen',
     bereich: 'lager',

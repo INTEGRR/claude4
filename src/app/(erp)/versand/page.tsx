@@ -2,11 +2,13 @@ import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap, Zustand } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { dhlConfigured, productForCountry } from '@/modules/versand/dhl'
+import { sammelMarken } from '@/modules/versand/kommissionieren'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import { cancelLabel, createLabel, massLabels, refreshTracking } from './actions'
+import { AuswahlAlle, AuswahlBereich, AuswahlBox, PackzettelLeiste } from './packzettel-auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +34,8 @@ export default async function VersandPage({
   }
   const gefiltert = Object.values(filter).some(Boolean)
   const ready = await versandbereitMitVorschlag(filter)
+  // Kommissionier-Marken (0091): Zettel gedruckt, wird gesammelt, kommissioniert.
+  const marken = await sammelMarken(ready.map((r) => r.picking_id))
   // Live gezählt: was noch auf Ware wartet, erscheint von selbst, sobald
   // Bestand gebucht ist (Live-Reservierung, Migration 0086).
   const [{ wartend }] = await sql<{ wartend: number }[]>`
@@ -88,6 +92,7 @@ export default async function VersandPage({
                 {configured ? 'DHL verbunden' : 'DHL nicht konfiguriert'}
               </span>
             </span>
+            <Link className="btn" href="/kommissionieren">Kommissionieren</Link>
             <Link className="btn" href="/versand/retouren">Retourenlabels</Link>
             <ActionButton action={refreshTracking}>Tracking aktualisieren</ActionButton>
           </>
@@ -109,6 +114,7 @@ export default async function VersandPage({
         </div>
       )}
 
+      <AuswahlBereich ids={ready.map((r) => r.picking_id)}>
       <Card title={`Versandbereit (${ready.length})`} tight>
         {/* Filter als GET-Formular: die Adresszeile IST der Filterzustand,
             und der Massendruck druckt exakt diese Liste. */}
@@ -150,10 +156,15 @@ export default async function VersandPage({
               : 'Nichts versandbereit. Lieferungen erscheinen hier, sobald sie reserviert sind und keine Fertigungsaufträge mehr offen sind.'}
           </Empty>
         ) : (
+          <>
+          <PackzettelLeiste />
           <TableWrap>
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 28 }}>
+                    <AuswahlAlle />
+                  </th>
                   <th>Lieferung</th>
                   <th>Auftrag</th>
                   <th>Kunde</th>
@@ -167,8 +178,12 @@ export default async function VersandPage({
                   const vorschlag = r.vorschlag
                   const produktVorschlag =
                     vorschlag?.product ?? productForCountry(r.ship_country_code)
+                  const marke = marken.get(r.picking_id)
                   return (
                   <tr key={r.picking_id}>
+                    <td>
+                      <AuswahlBox id={r.picking_id} label={r.picking_number} />
+                    </td>
                     <td className="mono">
                       <Link href={`/lager/${r.picking_id}`}>{r.picking_number}</Link>{' '}
                       <a
@@ -180,6 +195,16 @@ export default async function VersandPage({
                       >
                         🖨
                       </a>
+                      {marke && (marke.packzettelGedrucktAm || marke.sammler || marke.kommissioniertAm) && (
+                        <div className="actions" style={{ gap: 6, marginTop: 2 }}>
+                          {marke.kommissioniertAm ? (
+                            <Zustand ton="ok">kommissioniert</Zustand>
+                          ) : marke.sammler ? (
+                            <Zustand ton="on">sammelt: {marke.sammler}</Zustand>
+                          ) : null}
+                          {marke.packzettelGedrucktAm && <Zustand ton="off">Zettel gedruckt</Zustand>}
+                        </div>
+                      )}
                     </td>
                     <td className="mono small">
                       {r.sales_order_id ? (
@@ -280,6 +305,7 @@ export default async function VersandPage({
               </tbody>
             </table>
           </TableWrap>
+          </>
         )}
         {ready.some((r) => Number(r.shipment_count) === 0) && (
           <div style={{ padding: '0 12px 12px' }}>
@@ -305,6 +331,7 @@ export default async function VersandPage({
           </div>
         )}
       </Card>
+      </AuswahlBereich>
 
       <Card title="Sendungen" tight>
         {shipments.length === 0 ? (

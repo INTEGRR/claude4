@@ -88,12 +88,71 @@ Inhalts und die Kleinpaket-Tauglichkeit.
 Jede Lieferung hat eine Druckansicht `/lager/<id>/druck` (Knopf
 „Packzettel" an der Lieferung, 🖨 in der Versandbereit-Liste): oben der
 beschriftete **VERSAND-Barcode** (Lieferungsnummer — öffnet die Sendung
-am Packtisch), dazu Auftrag/Shopify-Nummer/Kunde, die Lieferadresse und
-die Positionsliste mit **Artikel-Code je Zeile** (EAN bzw. Code 128 der
-SKU) zum Gegenscannen. Für Bestellungen mit Fertigung übernimmt der
-Fertigungszettel diese Rolle (zwei Barcodes, docs/module/fertigung.md);
-der Packzettel ist das Gegenstück für reine Lager-Bestellungen — und
-zugleich der Kommissionierbeleg.
+am Packtisch), dazu Auftrag/Shopify-Nummer/Kunde, die Lieferadresse, die
+**Kundennotiz** und die Positionsliste mit **Artikel-Code je Zeile** (EAN
+bzw. Code 128 der SKU) zum Gegenscannen, dem Belegtext „Lieferschein"
+des Artikels (`description_picking`) und einem Abhak-Kästchen. Die
+Positionen stehen **nach Artikelname** — die Laufreihenfolge beim
+Sammeln (Lagerplätze gibt es vorerst nicht). Unten zwei Felder
+„Gesammelt von" und „Gepackt von". Für Bestellungen mit Fertigung
+übernimmt der Fertigungszettel diese Rolle (zwei Barcodes,
+docs/module/fertigung.md); der Packzettel ist das Gegenstück für reine
+Lager-Bestellungen — und zugleich der Kommissionierbeleg.
+
+Eine Datenquelle für alle Wege: `src/modules/versand/packzettel-daten.ts`
+speist die HTML-Ansicht, den **Sammeldruck** `/versand/packzettel?ids=…`
+(bis 100 Zettel in einem Dokument, Seitenumbruch je Lieferung) und das
+**PDF der Druckbrücke** (`packzettel-pdf.tsx`, A4). Gedruckt wird aus der
+Versand-Liste: Zeilen anhaken (oder „Alle auswählen") → **„Packzettel
+drucken (N)"** führt `versand.packzettel_drucken` aus — auf dem
+A4-Drucker des Arbeitsplatzes (Druckart `packzettel`, sonst Ersatz),
+ohne Drucker öffnet der Sammeldruck im Browser. Die Lieferung merkt sich
+`packzettel_gedruckt_am` (Marke „Zettel gedruckt").
+
+## Kommissionieren (/kommissionieren, seit 0091)
+
+Bestellung für Bestellung die Ware im Lager sammeln und zum Packtisch
+bringen — **analog** mit dem Packzettel oder **digital** am Handy/Tablet.
+Der Packtisch scannt danach wie gewohnt jeden Artikel noch einmal als
+Kontrolle; Kommissionieren bucht nichts.
+
+- **Prozess:** optionaler Schritt `kommissionieren` im Versandprozess
+  zwischen Verfügbarkeit und Packtisch (Aktion `lager.kommissionieren`).
+  Abschaltbar je Firma (Prozesse → Versand); dann verschwindet der
+  Menüpunkt und der Ablauf geht direkt zum Packtisch. Die Lieferung
+  bleibt `assigned` — „kommissioniert" ist eine Tatsache am Beleg
+  (`kommissioniert_am/_von`), kein zweiter Zustand.
+- **Arbeitsvorrat** (`/kommissionieren`, Menü neben „Packtisch"):
+  versandbereite Lieferungen, Priorität und ältestes Datum zuerst, mit
+  Marken „sammelt: Name", „teilweise 2/5", „Zettel gedruckt".
+  **„Nächste Bestellung"** beansprucht die nächste freie (oder die eigene
+  angefangene) und öffnet sie. Bereits kommissionierte stehen darunter
+  („wartet am Packtisch").
+- **Sperre:** `lager.kommissionierung_starten` setzt
+  `kommissionierung_von/_seit`. Solange jemand sammelt (bis 30 Minuten
+  ohne Abschluss), wird ein Zweiter mit Namen abgewiesen — auch beim
+  Melden.
+- **Sammel-Screen** (`/kommissionieren/<id>`, fürs Handy gebaut): eine
+  große Karte je Artikel mit Name, SKU/Barcode, Belegtext und „0 / 2",
+  geführt in Laufreihenfolge. Gescannt wird mit dem **Bluetooth-
+  Handscanner** (unsichtbares Feld ohne Bildschirmtastatur) oder der
+  **Kamera** (eingebauter `BarcodeDetector`, sonst — etwa auf iPhone —
+  `@zxing/browser`, erst bei Bedarf geladen); SKU eintippen geht immer.
+  Fremde Artikel: Fehlerton und Vibration. „+1 ohne Scan" gibt es nur für
+  Artikel ohne SKU und Barcode (wird am Beleg vermerkt), „Fehlt" markiert
+  und springt weiter, „Übersicht" zeigt alle Positionen. Der Fortschritt
+  liegt zusätzlich im Browser — ein Reload verliert nichts. Packzettel
+  drucken geht vom Handy auf den Drucker des Arbeitsplatzes.
+- **Abschluss:** `lager.kommissionieren` prüft serverseitig dieselbe
+  Rechnung wie der Screen (`kommissionier-logik.ts`): nichts Fremdes,
+  nicht zu viel, und vollständig — sonst nur mit **„unvollständig"** und
+  Vermerk. Gespeichert wird je Bewegung `stock_moves.qty_kommissioniert`
+  (Fortschritt, getrennt von `qty_done`); vollständig setzt die Marke,
+  unvollständig schreibt „fehlt: …" als Fehler in den Verlauf der
+  Lieferung und lässt sie im Vorrat. Die Sperre fällt in beiden Fällen.
+- **Anzeige:** Die Versand-Liste zeigt je Zeile „kommissioniert" bzw.
+  „sammelt: Name" und „Zettel gedruckt"; der Packtisch zeigt nach dem
+  Scan „kommissioniert von … am …".
 
 ## Packtisch-Arbeitsplatz (/packtisch)
 
@@ -306,7 +365,7 @@ Aus dem Reparatur-/Retourenprozess heraus: Button „DHL-Retourenlabel erstellen
 
 ## UI
 
-- **Versandbereit-Liste**: alle reservierten, unversandten Lieferungen (Auftrag, Kunde, Shopify-Name, Fertigungsstatus) — die Packstation-Arbeitsliste. Darüber steht live, wie viele Lieferungen noch auf Ware warten; sie rücken von selbst nach, sobald Bestand gebucht ist (Live-Reservierung, [lager.md](lager.md)).
+- **Versandbereit-Liste**: alle reservierten, unversandten Lieferungen (Auftrag, Kunde, Shopify-Name, Fertigungsstatus) — die Packstation-Arbeitsliste, mit Auswahl für den Packzettel-Druck und den Kommissionier-Marken. Darüber steht live, wie viele Lieferungen noch auf Ware warten; sie rücken von selbst nach, sobald Bestand gebucht ist (Live-Reservierung, [lager.md](lager.md)).
 - **Lieferungs-Formular**: Abschnitt „Versand" mit Paketgewicht, DHL-Produkt, Buttons „Label erstellen"/„Label drucken"/„Sendung stornieren", Tracking-Status-Badge + Link, Shopify-Rückmeldestatus.
 - **Sendungsliste**: alle Sendungen mit Status-Filter; Fehler-Feed (fehlgeschlagene Fulfillment-Jobs, DHL-Warnings).
 - **Einstellungen**: DHL-Zugangsdaten-Check (Test-Call), Abrechnungsnummern je Produkt, Default-Produkt/-Format, Absenderadresse (`shipperRef`), Status-Tag an/aus.

@@ -38,6 +38,7 @@ Je Vorgangsart: Reservierungsmethode (`at_confirm` Default, `manual` möglich), 
 - **Reservierung**: `assigned`, wenn `on_hand − reserved` am Quellort ausreicht; Button „Verfügbarkeit prüfen"; Reservierung erhöht `stock_quants.reserved`.
 - **Live-Reservierung** (seit 0086): Wird an einem internen Ort Ware frei — Bestand rauf (Inventur, Wareneingang, Fertigmeldung, Retoure) oder Reservierung runter (Storno) —, reserviert die Datenbank sofort die wartenden Bewegungen desselben Artikels: Transfers mit Reservierung „bei Bestätigung" und Komponenten laufender Fertigungsaufträge, ältester Termin zuerst, sonst Teilreservierung. Constraint-Trigger auf `stock_quants`, am Ende der Transaktion — ausdrückliche Reservierungen derselben Buchung haben Vorrang (die Fertigmeldung bedient zuerst ihren Auftrag). Ein Status „wartet" veraltet damit nicht mehr; „Verfügbarkeit prüfen" bleibt als Knopf, ist aber nicht mehr nötig. Funktion `wartende_bewegungen_reservieren(variant, ort)`; Entscheidungslog 2026-09-29.
 - **Validieren** (`validate_picking`): Ist-Mengen erfassen (Default = Soll) → Moves `done`, Quants fortgeschrieben (Quelle −, Ziel +; nur interne Orte wirken auf den Bestand), Rückschreibung in Quellbeleg (`qty_received` / `qty_delivered`), Backorder-Dialog bei Teilmengen.
+- **Kommissionieren** (seit 0091): Lieferungen im Status `assigned` können vor dem Packtisch gesammelt werden (Handy/Tablet oder Packzettel). Der Fortschritt steht je Bewegung in `stock_moves.qty_kommissioniert` — getrennt von `qty_done`, gebucht wird erst beim Warenausgang. Die Lieferung trägt `kommissioniert_am/_von` als Tatsache, der Status bleibt `assigned`; `kommissionierung_von/_seit` ist die Sperre gegen zwei Sammler (30 Minuten). Ablauf und Oberfläche: [versand.md](versand.md), Abschnitt „Kommissionieren".
 - **Stornieren**: nur nicht-erledigte Transfers; Reservierungen werden freigegeben. **Erledigte Transfers sind unveränderlich** — Korrektur ausschließlich per **Retoure** (Button „Retoure": erzeugt Gegen-Picking mit getauschten Orten, verknüpft über `return_of_id`).
 - Bewegungsarten im Protokoll unterscheidbar über Quelle/Ziel bzw. Verknüpfung: Wareneingang, Warenausgang, interner Transfer, **Fertigungsverbrauch/-zugang** (`production_id`), **Demontage** (`unbuild_id`), **Reparatur** (`repair_id`), **Inventur** (Gegenort Inventurdifferenz), **Ausschuss** (Ziel Ausschuss-Ort).
 
@@ -60,7 +61,7 @@ Pragmatischer Ansatz statt vollständiger Odoo-Barcode-App: **USB-Scanner (Keybo
 - Globales Scan-Feld im Lagerbereich: Scan einer Belegnummer (`WH/IN/00001`, `MO/00001`) öffnet den Beleg; Scan eines Produkt-Barcodes öffnet die Variante.
 - In der Transfer-Validierung: Produkt-Scan zählt die Ist-Menge der passenden Zeile hoch (+1 je Scan, Odoo-Verhalten), unbekannter Barcode ⇒ Fehlerton/Meldung.
 - Etikettendruck: Produkt-Etiketten (Name, Variante, SKU, Barcode) und Lagerort-Etiketten als PDF.
-- Erweiterung später: eigene mobile Scan-Ansicht (PWA) für kompletten pickinglosen Ablauf.
+- Mobile Scan-Ansicht fürs Sammeln: `/kommissionieren` (Handscanner per Bluetooth oder Handykamera, seit 0091). Lagerplätze je Artikel sind noch nicht modelliert — gesammelt wird nach Artikelname.
 
 ## Abnahmekriterien
 

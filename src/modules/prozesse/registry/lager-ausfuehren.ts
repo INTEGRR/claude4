@@ -1,4 +1,5 @@
-import { sql } from '@/db/client'
+import { SPERRE_MINUTEN, sammelAbgleich } from '../../versand/kommissionier-logik.ts'
+import { sql, tx } from '@/db/client'
 import { parseLotSpec } from '@/modules/shared/form'
 import { consumePackagingForPicking, queueFulfillmentForPicking } from '@/modules/versand/service'
 import { varianteAufloesen } from './aufloesen.ts'
@@ -202,4 +203,96 @@ export async function beschaffungAusfuehren(
 export async function eroeffnungsbewertung(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select valuation_initialize(null, ${ctx.actor})`
   return {}
+}
+
+// --- Kommissionieren (0091) ----------------------------------------------------
+
+async function sammelSperre(pickingId: string, actor: string) {
+  const [p] = await sql<
+    { number: string; state: string; von: string | null; seit: string | null; frisch: boolean }[]
+  >`
+    select number, state::text, kommissionierung_von as von, kommissionierung_seit::text as seit,
+           coalesce(kommissionierung_seit > now() - make_interval(mins => ${SPERRE_MINUTEN}), false) as frisch
+    from stock_pickings where id = ${pickingId}`
+  if (!p) throw new Error('Lieferung nicht gefunden.')
+  if (p.state !== 'assigned') {
+    throw new Error(`Lieferung ${p.number} ist nicht versandbereit (Status ${p.state}).`)
+  }
+  if (p.von && p.von !== actor && p.frisch) {
+    throw new Error(
+      `${p.number} wird gerade von ${p.von} gesammelt (seit ${new Date(p.seit!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })}).`,
+    )
+  }
+  return p
+}
+
+export async function kommissionierungStarten(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const pickingId = ctx.recordId!
+  const p = await sammelSperre(pickingId, ctx.actor)
+  await sql`update stock_pickings
+            set kommissionierung_von = ${ctx.actor}, kommissionierung_seit = now()
+            where id = ${pickingId}`
+  return { text: `${p.number}: Sammeln begonnen.`, recordId: pickingId, link: `/kommissionieren/${pickingId}` }
+}
+
+export async function kommissionieren(
+  p: { gesammelt: Record<string, number>; unvollstaendig: boolean; vermerk?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const pickingId = ctx.recordId!
+  const kopf = await sammelSperre(pickingId, ctx.actor)
+  const moves = await sql<{ id: string; variant_id: string; qty: number; name: string; sku: string | null }[]>`
+    select m.id, m.variant_id, m.qty::float as qty, variant_display_name(m.variant_id) as name, pv.sku
+    from stock_moves m join product_variants pv on pv.id = m.variant_id
+    where m.picking_id = ${pickingId} and m.state <> 'cancel'
+    order by m.created_at`
+  const positionen = [...new Map(moves.map((m) => [m.variant_id, m])).values()].map((m) => ({
+    variantId: m.variant_id,
+    name: m.name,
+    sku: m.sku,
+    barcode: null,
+    soll: moves.filter((x) => x.variant_id === m.variant_id).reduce((s, x) => s + Number(x.qty), 0),
+    uom: '',
+  }))
+  const abgleich = sammelAbgleich(positionen, p.gesammelt)
+  if (abgleich.fremd.length > 0) throw new Error('Gemeldete Artikel gehören nicht zu dieser Lieferung.')
+  if (abgleich.zuViel.length > 0) throw new Error(`Mehr gesammelt als bestellt: ${abgleich.zuViel.join(', ')}.`)
+  if (abgleich.fehlend.length > 0 && !p.unvollstaendig) {
+    throw new Error(
+      `Noch nicht vollständig gesammelt: ${abgleich.fehlend.join(', ')} — gesammelt wird unter ` +
+        '„Kommissionieren" (Handy/Tablet), oder mit „unvollständig" und Vermerk speichern.',
+    )
+  }
+
+  await tx(async (t) => {
+    // Menge je Variante auf die Bewegungen verteilen (Reihenfolge der Anlage).
+    for (const pos of positionen) {
+      let rest = Number(p.gesammelt[pos.variantId] ?? 0)
+      for (const m of moves.filter((x) => x.variant_id === pos.variantId)) {
+        const teil = Math.min(rest, Number(m.qty))
+        await t`update stock_moves set qty_kommissioniert = ${teil} where id = ${m.id}`
+        rest -= teil
+      }
+    }
+    await t`update stock_pickings
+            set kommissioniert_am = case when ${abgleich.vollstaendig} then now() end,
+                kommissioniert_von = ${abgleich.vollstaendig ? ctx.actor : null},
+                kommissionierung_von = null, kommissionierung_seit = null
+            where id = ${pickingId}`
+    if (!abgleich.vollstaendig) {
+      await t`select log_event('stock_picking', ${pickingId}, 'error',
+        ${`Kommissionierung unvollständig — fehlt: ${abgleich.fehlend.join(', ')}${p.vermerk ? ` (${p.vermerk})` : ''}`},
+        ${ctx.actor})`
+    } else if (p.vermerk) {
+      await t`select log_event('stock_picking', ${pickingId}, 'note',
+        ${`Kommissioniert — ${p.vermerk}`}, ${ctx.actor})`
+    }
+  })
+
+  return {
+    text: abgleich.vollstaendig
+      ? `${kopf.number} kommissioniert — Ware zum Packtisch.`
+      : `${kopf.number}: Fortschritt gespeichert, es fehlt ${abgleich.fehlend.join(', ')}.`,
+    recordId: pickingId,
+  }
 }

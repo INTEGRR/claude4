@@ -87,6 +87,13 @@ export async function auftragsPdf(
         dateiname: `${(job.mo_number ?? 'zettel').replaceAll('/', '-')}.pdf`,
       }
     }
+    case 'packzettel': {
+      const { packzettelPdf } = await import('@/modules/versand/packzettel-pdf')
+      return {
+        pdf: await packzettelPdf([job.picking_id!]),
+        dateiname: `packzettel-${job.picking_id!.slice(0, 8)}.pdf`,
+      }
+    }
     default:
       throw new Error(`Druckart „${job.art}" kann diese Version noch nicht drucken`)
   }

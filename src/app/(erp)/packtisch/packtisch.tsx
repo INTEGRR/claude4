@@ -369,6 +369,19 @@ export function Packtisch() {
               <div className="muted small">
                 {[doc.auftrag, doc.shopify, doc.kunde].filter(Boolean).join(' · ')}
               </div>
+              {doc.kommissioniert && (
+                <div className="small" style={{ color: 'var(--display-text)', marginTop: 4 }}>
+                  <span className="led ok" /> kommissioniert
+                  {doc.kommissioniert.von ? ` von ${doc.kommissioniert.von}` : ''} am{' '}
+                  {new Date(doc.kommissioniert.am).toLocaleString('de-DE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Europe/Berlin',
+                  })}
+                </div>
+              )}
             </div>
             <div className="actions" style={{ gap: 16 }}>
               <div>

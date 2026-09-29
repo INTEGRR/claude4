@@ -37,6 +37,8 @@ export interface PacktischDoc {
   weightG: number | null
   dhlProduct: string | null
   labelVorhanden: boolean
+  /** Gesammelt beim Kommissionieren (0091) — nur Hinweis, gescannt wird trotzdem. */
+  kommissioniert: { am: string; von: string | null } | null
   lines: PacktischZeile[]
 }
 
@@ -69,9 +71,12 @@ export async function GET(request: Request) {
       ship_zip: string | null
       ship_city: string | null
       ship_country_code: string | null
+      kommissioniert_am: string | null
+      kommissioniert_von: string | null
     }[]
   >`
     select p.id, p.number, p.state, ot.kind,
+           p.kommissioniert_am::text as kommissioniert_am, p.kommissioniert_von,
            so.number as auftrag, so.shopify_order_name as shopify,
            part.name as kunde,
            so.ship_name, so.ship_street, so.ship_house_number,
@@ -185,6 +190,9 @@ export async function GET(request: Request) {
     weightG: vorschlag ? vorschlag.weightG : null,
     dhlProduct: vorschlag?.product ?? null,
     labelVorhanden: Boolean(label),
+    kommissioniert: picking.kommissioniert_am
+      ? { am: picking.kommissioniert_am, von: picking.kommissioniert_von }
+      : null,
     lines,
   }
   return NextResponse.json(doc)
