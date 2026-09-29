@@ -34,6 +34,8 @@ type Phase = 'sammeln' | 'abschluss' | 'sendet' | 'fertig'
 interface Rueckmeldung {
   text: ReactNode
   ton: 'ok' | 'warn' | 'error' | 'info'
+  /** Knopf in der Meldung, z. B. „Rückgängig" — verschwindet mit der nächsten Meldung. */
+  aktion?: { label: string; ausfuehren: () => void }
 }
 
 interface Ablage {
@@ -152,8 +154,8 @@ export function Sammeln({
     fokus()
   }, [fokus, phase, kamera])
 
-  const sag = useCallback((text: ReactNode, ton: Rueckmeldung['ton']) => {
-    setMeldung({ text, ton })
+  const sag = useCallback((text: ReactNode, ton: Rueckmeldung['ton'], aktion?: Rueckmeldung['aktion']) => {
+    setMeldung({ text, ton, aktion })
     if (ton !== 'info') piep(ton)
     setBlitz(ton === 'ok' ? 'ok' : ton === 'error' ? 'error' : null)
     setTimeout(() => setBlitz(null), 350)
@@ -236,7 +238,25 @@ export function Sammeln({
     setFehlt((f) => new Set(f).add(variantId))
     if (auswahl === variantId) setAuswahl(null)
     const pos = positionen.find((p) => p.variantId === variantId)!
-    sag(`${pos.name} als fehlend markiert`, 'warn')
+    sag(`${pos.name} als fehlend markiert`, 'warn', {
+      label: 'Rückgängig',
+      ausfuehren: () => fehltAufheben(variantId),
+    })
+    fokus()
+  }
+
+  /** „Fehlt" zurücknehmen: Markierung weg, der Artikel steht wieder als Karte da. */
+  function fehltAufheben(variantId: string) {
+    setFehlt((f) => {
+      const n = new Set(f)
+      n.delete(variantId)
+      return n
+    })
+    setAuswahl(variantId)
+    setListe(false)
+    setPhase('sammeln')
+    const pos = positionen.find((p) => p.variantId === variantId)!
+    sag(`${pos.name}: „fehlt" aufgehoben — weiter sammeln`, 'info')
     fokus()
   }
 
@@ -373,7 +393,12 @@ export function Sammeln({
 
       {meldung && (
         <div className={`scanner-feedback ${meldung.ton}`} role="status">
-          <span>{meldung.text}</span>
+          <span style={{ flex: 1 }}>{meldung.text}</span>
+          {meldung.aktion && (
+            <button type="button" className="small" onClick={meldung.aktion.ausfuehren}>
+              {meldung.aktion.label}
+            </button>
+          )}
         </div>
       )}
 
@@ -406,6 +431,7 @@ export function Sammeln({
             fokus()
           }}
           onFehlt={() => alsFehlend(aktuell.variantId)}
+          onDochDa={() => fehltAufheben(aktuell.variantId)}
         />
       )}
 
@@ -417,6 +443,19 @@ export function Sammeln({
               ? 'Alle Artikel sind gesammelt.'
               : `Es fehlt noch: ${abgleich.fehlend.join(', ')}`}
           </p>
+          {/* Versehentlich „Fehlt" gedrückt? Hier direkt zurücknehmen. */}
+          {positionen
+            .filter((p) => fehlt.has(p.variantId))
+            .map((p) => (
+              <button
+                key={p.variantId}
+                type="button"
+                className="kommi-breit"
+                onClick={() => fehltAufheben(p.variantId)}
+              >
+                {p.name}: doch da — weiter sammeln
+              </button>
+            ))}
           <button type="button" className="primary big" onClick={() => setPhase('abschluss')}>
             Weiter zum Abschluss
           </button>
@@ -461,12 +500,27 @@ export function Sammeln({
               const ist = gesammelt[p.variantId] ?? 0
               return (
                 <li key={p.variantId} className={ist >= p.soll ? 'complete' : 'fehlt'}>
-                  <div className="kommi-uebersicht-knopf">
-                    <span className="kommi-uebersicht-name">{p.name}</span>
-                    <span className="mono">
-                      {ist}/{p.soll}
-                    </span>
-                  </div>
+                  {ist >= p.soll ? (
+                    <div className="kommi-uebersicht-knopf">
+                      <span className="kommi-uebersicht-name">{p.name}</span>
+                      <span className="mono">
+                        {ist}/{p.soll}
+                      </span>
+                    </div>
+                  ) : (
+                    // Offene Zeile antippen = zurück zu diesem Artikel.
+                    <button
+                      type="button"
+                      className="kommi-uebersicht-knopf"
+                      disabled={phase === 'sendet'}
+                      onClick={() => fehltAufheben(p.variantId)}
+                    >
+                      <span className="kommi-uebersicht-name">{p.name}</span>
+                      <span className="mono">
+                        {ist}/{p.soll} · weiter sammeln
+                      </span>
+                    </button>
+                  )}
                 </li>
               )
             })}
@@ -581,6 +635,7 @@ function SammelKarte({
   onAlle,
   onMinus,
   onFehlt,
+  onDochDa,
 }: {
   pos: SammelDoc['positionen'][number]
   ist: number
@@ -590,6 +645,7 @@ function SammelKarte({
   onAlle: () => void
   onMinus: () => void
   onFehlt: () => void
+  onDochDa: () => void
 }) {
   const ohneCode = !pos.sku && !pos.barcode
   const perKnopf = manuell || ohneCode
@@ -633,9 +689,15 @@ function SammelKarte({
         <button type="button" onClick={onMinus} disabled={ist === 0} aria-label="eins weniger">
           −1
         </button>
-        <button type="button" onClick={onFehlt} disabled={voll}>
-          Fehlt
-        </button>
+        {fehltMarkiert ? (
+          <button type="button" onClick={onDochDa}>
+            Doch da
+          </button>
+        ) : (
+          <button type="button" onClick={onFehlt} disabled={voll}>
+            Fehlt
+          </button>
+        )}
       </div>
       {!voll && (manuell || !ohneCode) && (
         <div className="muted small">

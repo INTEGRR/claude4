@@ -140,7 +140,10 @@ Kontrolle; Kommissionieren bucht nichts.
   `@zxing/browser`, erst bei Bedarf geladen); SKU eintippen geht immer.
   Fremde Artikel: Fehlerton und Vibration. „+1 ohne Scan" gibt es nur für
   Artikel ohne SKU und Barcode (wird am Beleg vermerkt), „Fehlt" markiert
-  und springt weiter, „Übersicht" zeigt alle Positionen.
+  und springt weiter, „Übersicht" zeigt alle Positionen. „Fehlt" lässt
+  sich jederzeit zurücknehmen: „Rückgängig" in der Meldung, „Doch da" an
+  der Karte (über die Übersicht erreichbar), die Liste unter „Alles durch"
+  oder die offene Zeile im Abschluss antippen.
 - **Ohne Scan bestätigen (Einstellung, für den Start ohne Barcodes):**
   Einstellungen → Versand & Druck → Kommissionieren
   (`einstellungen.kommissionieren_setzen`,
