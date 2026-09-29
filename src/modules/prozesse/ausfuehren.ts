@@ -71,6 +71,7 @@ export const AUSFUEHRUNG = {
   'einstellungen.benutzer_zweifaktor_zuruecksetzen': einstellungen.benutzerZweifaktorZuruecksetzen,
   'einstellungen.sicherheit_setzen': einstellungen.sicherheitSetzen,
   'einstellungen.versand_vorgaben_setzen': einstellungen.versandVorgabenSetzen,
+  'einstellungen.kommissionieren_setzen': einstellungen.kommissionierenSetzen,
   'einstellungen.belegverhalten_setzen': einstellungen.belegverhaltenSetzen,
   'einstellungen.freigaben_setzen': einstellungen.freigabenSetzen,
   'einstellungen.finanz_parameter_setzen': einstellungen.finanzParameterSetzen,

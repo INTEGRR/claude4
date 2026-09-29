@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireArea } from '@/modules/auth'
 import { PageHeader } from '@/components/ui'
+import { einstellung } from '@/modules/einstellungen/lesen'
 import { sammelDoc } from '@/modules/versand/kommissionieren'
 import { Sammeln } from './sammeln'
 
@@ -21,6 +22,7 @@ export default async function SammelnPage({ params }: { params: Promise<{ id: st
   if (!UUID.test(id)) notFound()
   const doc = await sammelDoc(id)
   if (!doc) notFound()
+  const einstellungen = await einstellung<{ manuell_bestaetigen: boolean }>('kommissionieren')
 
   const kopf = (
     <PageHeader
@@ -70,7 +72,11 @@ export default async function SammelnPage({ params }: { params: Promise<{ id: st
       <div className="kommi-zurueck">
         <Link href="/kommissionieren">← Vorrat</Link>
       </div>
-      <Sammeln doc={doc} beansprucht={doc.sammler === user.name} />
+      <Sammeln
+        doc={doc}
+        beansprucht={doc.sammler === user.name}
+        manuell={Boolean(einstellungen.manuell_bestaetigen)}
+      />
     </>
   )
 }

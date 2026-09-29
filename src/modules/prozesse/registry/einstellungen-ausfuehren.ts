@@ -109,6 +109,18 @@ export async function versandVorgabenSetzen(
   return { text: `Labelformat ${p.print_format} gespeichert — gilt ab dem nächsten Label.` }
 }
 
+export async function kommissionierenSetzen(
+  p: { manuell_bestaetigen: boolean },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await einstellungMergen('kommissionieren', { manuell_bestaetigen: p.manuell_bestaetigen })
+  return {
+    text: p.manuell_bestaetigen
+      ? 'Kommissionieren: Artikel lassen sich jetzt ohne Scan per Knopf bestätigen.'
+      : 'Kommissionieren: wieder scannen — ohne Scan nur noch Artikel ohne SKU und Barcode.',
+  }
+}
+
 export async function belegverhaltenSetzen(
   p: { sales_lock: boolean; purchase_lock: boolean },
   _ctx: AktionsKontext,

@@ -177,6 +177,22 @@ export const EINSTELLUNGEN = {
     revalidate: ['/einstellungen/versand'],
   },
 
+  'einstellungen.kommissionieren_setzen': {
+    label: 'Kommissionieren: ohne Scan bestätigen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Ob beim Kommissionieren jeder Artikel per Knopf bestätigt werden darf („+1" und ' +
+      '„alle") statt gescannt — für den Start, solange die Artikel keine Barcodes tragen ' +
+      '(settings.kommissionieren.manuell_bestaetigen). Aus: nur Artikel ohne SKU und Barcode.',
+    bindung: 'frei',
+    schema: z.object({ manuell_bestaetigen: z.boolean() }),
+    zusammenfassung: (p) => `ohne Scan bestätigen ${p.manuell_bestaetigen ? 'an' : 'aus'}`,
+    formdata: (fd) => ({ manuell_bestaetigen: fd.get('manuell_bestaetigen') === 'on' }),
+    revalidate: ['/einstellungen/versand', '/kommissionieren'],
+  },
+
   'einstellungen.belegverhalten_setzen': {
     label: 'Belegverhalten: Sperren beim Bestätigen',
     bereich: 'einstellungen',

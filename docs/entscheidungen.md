@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Kommissionieren: „ohne Scan bestätigen" als Einstellung für den Start
+
+Ergänzt den Eintrag „Kommissionieren: Packzettel auf Papier und
+Sammel-Screen am Handy" (gleicher Tag). Zum Start tragen die Artikel noch
+keine Barcodes, und SKUs eintippen dauert zu lange (Betreiber).
+
+**Entschieden:** Ein Schalter unter Einstellungen → Versand & Druck
+(`settings.kommissionieren.manuell_bestaetigen`, Registry-Aktion
+`einstellungen.kommissionieren_setzen`, nur Admin). An: jede Sammelkarte
+hat „+1" und „Alle n", Scannen bleibt möglich; „ohne Scan" wird dann
+nicht mehr je Lieferung vermerkt (es ist die Regel, nicht die Ausnahme).
+Aus (Vorgabe): Scan-Pflicht, ohne Scan nur Artikel ohne SKU und Barcode.
+Die Serverprüfung von `lager.kommissionieren` bleibt unverändert — sie
+prüft Mengen, nicht den Weg der Erfassung. Der Packtisch hakt Artikel
+unabhängig davon per +/− ab. Sobald Barcodes kleben, wieder ausschalten.
+
+Nachweis: `tests/prozesse/kommissionieren.test.ts` (Einstellung). Doku:
+[module/versand.md](module/versand.md) „Kommissionieren",
+[module/einstellungen.md](module/einstellungen.md).
+
 ## 2026-09-29 — Kommissionieren: Packzettel auf Papier und Sammel-Screen am Handy
 
 Im Versand ging bisher nur „filtern und Labels drucken". Es fehlte das

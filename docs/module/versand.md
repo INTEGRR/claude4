@@ -140,7 +140,15 @@ Kontrolle; Kommissionieren bucht nichts.
   `@zxing/browser`, erst bei Bedarf geladen); SKU eintippen geht immer.
   Fremde Artikel: Fehlerton und Vibration. „+1 ohne Scan" gibt es nur für
   Artikel ohne SKU und Barcode (wird am Beleg vermerkt), „Fehlt" markiert
-  und springt weiter, „Übersicht" zeigt alle Positionen. Der Fortschritt
+  und springt weiter, „Übersicht" zeigt alle Positionen.
+- **Ohne Scan bestätigen (Einstellung, für den Start ohne Barcodes):**
+  Einstellungen → Versand & Druck → Kommissionieren
+  (`einstellungen.kommissionieren_setzen`,
+  `settings.kommissionieren.manuell_bestaetigen`). An: jede Karte hat
+  „+1" und „Alle n" (setzt die offene Menge auf einmal), Scannen geht
+  weiterhin; im Handbetrieb wird „ohne Scan" nicht an jeder Lieferung
+  vermerkt. Der Arbeitsvorrat zeigt die Betriebsart („ohne Scan erlaubt"
+  bzw. „Scan-Pflicht"). Aus: Scan-Pflicht bis auf Artikel ohne Code. Der Fortschritt
   liegt zusätzlich im Browser — ein Reload verliert nichts. Packzettel
   drucken geht vom Handy auf den Drucker des Arbeitsplatzes.
 - **Abschluss:** `lager.kommissionieren` prüft serverseitig dieselbe

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
+import { einstellung } from '@/modules/einstellungen/lesen'
 import { Card, Empty, PageHeader, Zustand } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { naechsteFuer, sammelVorrat, type VorratZeile } from '@/modules/versand/kommissionieren'
@@ -20,6 +21,9 @@ export default async function KommissionierenPage() {
   const vorrat = await sammelVorrat()
   const [{ aktiv }] = await sql<{ aktiv: boolean }[]>`
     select prozessschritt_aktiv('shopify_bestellung_versand', 'kommissionieren') as aktiv`
+  const { manuell_bestaetigen: manuell } = await einstellung<{ manuell_bestaetigen: boolean }>(
+    'kommissionieren',
+  )
   const naechste = naechsteFuer(vorrat, user.name)
   const offen = vorrat.filter((z) => !z.kommissioniertAm)
   const gesammelt = vorrat.filter((z) => z.kommissioniertAm)
@@ -30,9 +34,17 @@ export default async function KommissionierenPage() {
         title="Kommissionieren"
         subtitle="Bestellung für Bestellung die Ware sammeln — am Handy scannen oder mit dem Packzettel, danach zum Packtisch"
         actions={
-          <Link className="btn" href="/packtisch">
-            Packtisch
-          </Link>
+          <>
+            {/* Die Betriebsart ist ein Zustand — sichtbar, wo gesammelt wird. */}
+            <Link href="/einstellungen/versand" title="Einstellungen → Versand & Druck">
+              <Zustand ton={manuell ? 'warn' : 'ok'}>
+                {manuell ? 'ohne Scan erlaubt' : 'Scan-Pflicht'}
+              </Zustand>
+            </Link>
+            <Link className="btn" href="/packtisch">
+              Packtisch
+            </Link>
+          </>
         }
       />
 

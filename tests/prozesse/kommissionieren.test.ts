@@ -261,6 +261,33 @@ describe('Kommissionieren', () => {
     assert.equal(zettel.zeilen[0].sku, 'KOMMI-A')
   })
 
+  test('Einstellung „ohne Scan bestätigen": nur Admin, landet in settings.kommissionieren', async () => {
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'einstellungen.kommissionieren_setzen',
+        { parameter: { manuell_bestaetigen: true } },
+        ANNA,
+      ),
+      /Administratoren vorbehalten/,
+    )
+    const an = await aktionAusfuehrenGeprueft(
+      'einstellungen.kommissionieren_setzen',
+      { parameter: { manuell_bestaetigen: true } },
+      ADMIN,
+    )
+    assert.match(an.text ?? '', /ohne Scan per Knopf/)
+    const wert = async () =>
+      (await h.sql<{ value: { manuell_bestaetigen?: boolean } }[]>`
+        select value from settings where key = 'kommissionieren'`)[0]?.value
+    assert.deepEqual(await wert(), { manuell_bestaetigen: true })
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.kommissionieren_setzen',
+      { formData: new FormData() },
+      ADMIN,
+    )
+    assert.deepEqual(await wert(), { manuell_bestaetigen: false }, 'Häkchen weg = aus')
+  })
+
   test('Schritt abgeschaltet: von der Verfügbarkeit geht es direkt zum Packtisch', async () => {
     const l = await neueLieferung([[v.b, 1]])
     const naechste = async () =>

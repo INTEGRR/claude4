@@ -18,6 +18,11 @@ async function versandVorgabenSpeichern(formData: FormData) {
   return serverAktion('einstellungen.versand_vorgaben_setzen', { formData })
 }
 
+async function kommissionierenSpeichern(formData: FormData) {
+  'use server'
+  return serverAktion('einstellungen.kommissionieren_setzen', { formData })
+}
+
 async function druckbrueckeSpeichern(formData: FormData) {
   'use server'
   return serverAktion('einstellungen.druckbruecke_setzen', { formData })
@@ -27,6 +32,7 @@ export default async function VersandPage() {
   await requireArea('einstellungen')
   const dhl = await einstellung<{ print_format: string }>('dhl')
   const druck = await einstellung<{ modus: string; token: string; agenten: Record<string, string> }>('druckbruecke')
+  const kommi = await einstellung<{ manuell_bestaetigen: boolean }>('kommissionieren')
   const druckModus = druck.modus === 'bruecke' ? 'bruecke' : 'pdf'
   const agenten = Object.entries(druck.agenten ?? {}).sort((a, b) => (a[1] < b[1] ? 1 : -1))
   const jetzt = Date.now()
@@ -56,6 +62,35 @@ export default async function VersandPage() {
           <Link href="/einstellungen/versandregeln">Versandregeln</Link> (ohne Treffer: nach Zielzone).
           Zugangsdaten sind Umgebungsvariablen — ihren Stand zeigt{' '}
           <Link href="/einstellungen/anbindungen">Schnittstellen</Link>.
+        </p>
+      </Card>
+
+      <Card
+        title="Kommissionieren"
+        actions={
+          <Zustand ton={kommi.manuell_bestaetigen ? 'warn' : 'ok'}>
+            {kommi.manuell_bestaetigen ? 'ohne Scan erlaubt' : 'Scan-Pflicht'}
+          </Zustand>
+        }
+      >
+        <ActionForm action={kommissionierenSpeichern}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              name="manuell_bestaetigen"
+              defaultChecked={Boolean(kommi.manuell_bestaetigen)}
+            />
+            <span>
+              <strong>Artikel ohne Scan bestätigen</strong> — beim Sammeln hat jede Karte die Knöpfe
+              „+1" und „alle", Scannen geht weiterhin. Für den Start, solange die Artikel noch keine
+              Barcodes tragen.
+            </span>
+          </label>
+          <button className="primary" type="submit">Speichern</button>
+        </ActionForm>
+        <p className="small muted" style={{ margin: '10px 0 0' }}>
+          Aus: ohne Scan nur Artikel ohne SKU und Barcode (wird an der Lieferung vermerkt). Der{' '}
+          <Link href="/packtisch">Packtisch</Link> hakt Artikel unabhängig davon auch per +/− ab.
         </p>
       </Card>
 

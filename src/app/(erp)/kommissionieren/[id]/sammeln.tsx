@@ -81,7 +81,16 @@ function fokusBleibtFrei(el: EventTarget | null): boolean {
   return el instanceof Element && Boolean(el.closest('input, button, select, textarea, a, label'))
 }
 
-export function Sammeln({ doc, beansprucht }: { doc: SammelDoc; beansprucht: boolean }) {
+export function Sammeln({
+  doc,
+  beansprucht,
+  manuell,
+}: {
+  doc: SammelDoc
+  beansprucht: boolean
+  /** Einstellung „ohne Scan bestätigen" (Start ohne Barcodes): +1/alle an jeder Karte. */
+  manuell: boolean
+}) {
   const positionen = doc.positionen
   const scanRef = useRef<HTMLInputElement>(null)
   // Neu sammeln nach einer Kommissionierung beginnt bei null; sonst mit dem
@@ -203,12 +212,23 @@ export function Sammeln({ doc, beansprucht }: { doc: SammelDoc; beansprucht: boo
     )
   }
 
-  function ohneScanPlus(variantId: string) {
+  /** Per Knopf bestätigen: +1 oder alles Offene („alle"). */
+  function ohneScanPlus(variantId: string, alle = false) {
     const pos = positionen.find((p) => p.variantId === variantId)!
-    const neu = Math.min((gesammelt[variantId] ?? 0) + 1, pos.soll)
+    const neu = alle ? pos.soll : Math.min((gesammelt[variantId] ?? 0) + 1, pos.soll)
     setzen(variantId, neu)
-    setOhneScan((s) => new Set(s).add(variantId))
-    sag(`${pos.name}: ${neu} / ${pos.soll} (ohne Scan)`, 'ok')
+    if (fehlt.has(variantId)) {
+      setFehlt((f) => {
+        const n = new Set(f)
+        n.delete(variantId)
+        return n
+      })
+    }
+    if (neu >= pos.soll && auswahl === variantId) setAuswahl(null)
+    // Vermerkt wird nur die Ausnahme: im Handbetrieb (Einstellung) ist
+    // „ohne Scan" die Regel und gehört nicht an jede Lieferung.
+    if (!manuell) setOhneScan((s) => new Set(s).add(variantId))
+    sag(`${pos.name}: ${neu} / ${pos.soll}${manuell ? '' : ' (ohne Scan)'}`, 'ok')
     fokus()
   }
 
@@ -378,7 +398,9 @@ export function Sammeln({ doc, beansprucht }: { doc: SammelDoc; beansprucht: boo
           pos={aktuell}
           ist={gesammelt[aktuell.variantId] ?? 0}
           fehltMarkiert={fehlt.has(aktuell.variantId)}
+          manuell={manuell}
           onPlus={() => ohneScanPlus(aktuell.variantId)}
+          onAlle={() => ohneScanPlus(aktuell.variantId, true)}
           onMinus={() => {
             setzen(aktuell.variantId, (gesammelt[aktuell.variantId] ?? 0) - 1)
             fokus()
@@ -554,19 +576,25 @@ function SammelKarte({
   pos,
   ist,
   fehltMarkiert,
+  manuell,
   onPlus,
+  onAlle,
   onMinus,
   onFehlt,
 }: {
   pos: SammelDoc['positionen'][number]
   ist: number
   fehltMarkiert: boolean
+  manuell: boolean
   onPlus: () => void
+  onAlle: () => void
   onMinus: () => void
   onFehlt: () => void
 }) {
   const ohneCode = !pos.sku && !pos.barcode
+  const perKnopf = manuell || ohneCode
   const voll = ist >= pos.soll
+  const rest = pos.soll - ist
   return (
     <section className={`kommi-karte${voll ? ' complete' : ''}`}>
       <div className="kommi-karte-name">{pos.name}</div>
@@ -591,19 +619,29 @@ function SammelKarte({
       </div>
       {fehltMarkiert && <div className="mono-label" style={{ color: 'var(--warn)' }}>als fehlend markiert</div>}
       <div className="kommi-karte-knoepfe">
+        {/* Daumen-Knöpfe zuerst: bestätigen oben, korrigieren darunter. */}
+        {perKnopf && (
+          <button type="button" className="primary" onClick={onPlus} disabled={voll}>
+            {manuell ? '+1' : '+1 ohne Scan'}
+          </button>
+        )}
+        {perKnopf && rest > 1 && (
+          <button type="button" className="primary" onClick={onAlle}>
+            Alle {rest}
+          </button>
+        )}
         <button type="button" onClick={onMinus} disabled={ist === 0} aria-label="eins weniger">
           −1
         </button>
-        {ohneCode && (
-          <button type="button" className="primary" onClick={onPlus} disabled={voll}>
-            +1 ohne Scan
-          </button>
-        )}
         <button type="button" onClick={onFehlt} disabled={voll}>
           Fehlt
         </button>
       </div>
-      {!ohneCode && !voll && <div className="muted small">Artikel scannen (Handscanner oder Kamera)</div>}
+      {!voll && (manuell || !ohneCode) && (
+        <div className="muted small">
+          {manuell ? 'Per Knopf bestätigen — oder scannen' : 'Artikel scannen (Handscanner oder Kamera)'}
+        </div>
+      )}
     </section>
   )
 }
