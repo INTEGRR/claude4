@@ -87,6 +87,8 @@ export interface AktionsErgebnis {
   text?: string
   link?: string
   recordId?: string
+  /** Strukturierte Antwort für Oberflächen, die mehr als einen Satz brauchen (Vorschau, Fortschritt). */
+  daten?: Record<string, unknown>
 }
 
 export type AktionsFn<S extends z.ZodTypeAny = z.ZodTypeAny> = (

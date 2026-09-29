@@ -244,6 +244,14 @@ export interface ShopifyOrder {
   id: string
   name: string
   createdAt: string
+  /** Für den Abgleich: bis wohin gelesen wurde (0089). */
+  updatedAt?: string
+  /** Preise inkl. Steuer? (0089 — Netto-Preise am Beleg) */
+  taxesIncluded?: boolean | null
+  shippingLine?: {
+    discountedPriceSet: { shopMoney: { amount: string } }
+    taxLines: { rate: number | null }[]
+  } | null
   email: string | null
   tags: string[]
   displayFinancialStatus: string | null
@@ -274,6 +282,9 @@ export interface ShopifyOrder {
       quantity: number
       variant: { id: string } | null
       originalUnitPriceSet: { shopMoney: { amount: string } }
+      /** Stückpreis nach allen Rabatten (Position und Auftrag). */
+      discountedUnitPriceAfterAllDiscountsSet?: { shopMoney: { amount: string } } | null
+      taxLines?: { rate: number | null }[]
     }[]
   }
 }
@@ -282,6 +293,8 @@ const ORDER_FIELDS = `
   id
   name
   createdAt
+  updatedAt
+  taxesIncluded
   email
   tags
   displayFinancialStatus
@@ -290,11 +303,14 @@ const ORDER_FIELDS = `
   totalPriceSet { shopMoney { amount currencyCode } }
   customer { id firstName lastName defaultEmailAddress { emailAddress } }
   shippingAddress { name address1 address2 zip city countryCodeV2 phone }
+  shippingLine { discountedPriceSet { shopMoney { amount } } taxLines { rate } }
   lineItems(first: 100) {
     nodes {
       id title sku currentQuantity quantity
       variant { id }
       originalUnitPriceSet { shopMoney { amount } }
+      discountedUnitPriceAfterAllDiscountsSet { shopMoney { amount } }
+      taxLines { rate }
     }
   }
 `
@@ -307,10 +323,6 @@ export async function fetchOrder(gid: string): Promise<ShopifyOrder | null> {
   return data.order
 }
 
-/**
- * Holt Orders, die seit `since` geändert wurden - das Sicherheitsnetz gegen
- * verlorene Webhooks (Shopify garantiert keine Zustellung).
- */
 /**
  * Eine einzelne Bestellungs-Seite — für die Erstübernahme, die als Job in
  * Häppchen arbeitet und den Cursor zwischen den Läufen mitnimmt.
@@ -388,10 +400,18 @@ export async function fetchCustomersPage(
   }
 }
 
+/**
+ * Holt Orders, die seit `since` geändert wurden — das Sicherheitsnetz gegen
+ * verlorene Webhooks (Shopify garantiert keine Zustellung). Sortiert nach
+ * `updatedAt` aufsteigend und blättert bis `limit`; `mehr` sagt, ob noch
+ * Seiten übrig sind — dann setzt der Abgleich seine Marke nur bis zur
+ * letzten gelesenen Order und holt den Rest im nächsten Lauf (bis 0089
+ * endete er nach 50 und übersprang den Rest für immer).
+ */
 export async function fetchOrdersUpdatedSince(
   since: Date,
-  limit = 50,
-): Promise<ShopifyOrder[]> {
+  limit = 500,
+): Promise<{ orders: ShopifyOrder[]; mehr: boolean }> {
   const query = `updated_at:>'${since.toISOString()}'`
   const out: ShopifyOrder[] = []
   let cursor: string | null = null
@@ -412,7 +432,7 @@ export async function fetchOrdersUpdatedSince(
     cursor = data.orders.pageInfo.hasNextPage ? data.orders.pageInfo.endCursor : null
   } while (cursor && out.length < limit)
 
-  return out
+  return { orders: out, mehr: cursor !== null }
 }
 
 // --- Fulfillment schreiben -------------------------------------------------

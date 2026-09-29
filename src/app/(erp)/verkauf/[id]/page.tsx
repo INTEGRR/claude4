@@ -47,6 +47,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       net: number
       tax: number
       gross: number
+      historisch: boolean
+      versandkosten: number
     }[]
   >`
     select so.*, p.name as partner_name,
@@ -148,6 +150,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <>
             {order.partner_name} · <span className="mono">{date(order.order_date)}</span>
             {order.source === 'shopify' && <> · aus Shopify importiert</>}
+            {order.historisch && <> · Historie (ohne Lieferung/Fertigung)</>}
           </>
         }
         actions={
@@ -373,6 +376,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <td className="num">{money(order.gross, order.currency)}</td>
                   {editable && <td />}
                 </tr>
+                {Number(order.versandkosten) > 0 && (
+                  <tr>
+                    <td colSpan={6} className="num mono-label">zzgl. Versand netto (Shopify)</td>
+                    <td className="num muted">{money(order.versandkosten, order.currency)}</td>
+                    {editable && <td />}
+                  </tr>
+                )}
               </tfoot>
             </table>
           </TableWrap>

@@ -3,6 +3,7 @@ import type { TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
 import { splitStreet } from '@/modules/shared/address'
 import { fetchOrder, type ShopifyOrder } from './shopify'
+import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
 
 export { splitStreet }
 
@@ -28,14 +29,21 @@ async function upsertCustomer(t: TransactionSql, order: ShopifyOrder): Promise<s
     const [existing] = await t<{ id: string }[]>`
       select id from partners where shopify_customer_id = ${shopifyCustomerId}`
     if (existing) {
+      // Nur Lücken füllen (0089): was im ERP steht, bleibt — sonst schrieb
+      // eine alte Bestellung (Erstübernahme läuft ältestes zuerst) eine
+      // veraltete Adresse über die aktuelle. Die Lieferadresse steht ohnehin
+      // eingefroren am Auftrag.
       await t`
         update partners set
-          name = ${name}, email = coalesce(${email}, email),
-          street = ${street}, house_number = ${houseNumber},
-          street2 = ${addr?.address2 ?? null}, zip = ${addr?.zip ?? null},
-          city = ${addr?.city ?? null},
-          country_code = coalesce(${addr?.countryCodeV2 ?? null}, country_code),
-          phone = coalesce(${addr?.phone ?? null}, phone), is_customer = true
+          email = coalesce(email, ${email ?? null}),
+          street = coalesce(street, ${street}),
+          house_number = coalesce(house_number, ${houseNumber}),
+          street2 = coalesce(street2, ${addr?.address2 ?? null}),
+          zip = coalesce(zip, ${addr?.zip ?? null}),
+          city = coalesce(city, ${addr?.city ?? null}),
+          country_code = coalesce(country_code, ${addr?.countryCodeV2 ?? null}),
+          phone = coalesce(phone, ${addr?.phone ?? null}),
+          is_customer = true
         where id = ${existing.id}`
       return existing.id
     }
@@ -77,6 +85,40 @@ async function matchVariant(
     }
   }
   return null
+}
+
+type Position = ShopifyOrder['lineItems']['nodes'][number]
+
+/** Netto-Stückpreis nach Rabatt und Steuersatz einer Shopify-Position (0089). */
+export function positionsPreis(
+  item: Position,
+  taxesIncluded: boolean | null | undefined,
+): { stueckNetto: number; steuersatz: number } {
+  return positionNetto(
+    {
+      menge: item.currentQuantity ?? item.quantity,
+      listenpreis: Number(item.originalUnitPriceSet.shopMoney.amount),
+      nachRabatt: item.discountedUnitPriceAfterAllDiscountsSet
+        ? Number(item.discountedUnitPriceAfterAllDiscountsSet.shopMoney.amount)
+        : null,
+      satz: item.taxLines ? satzAusSteuerzeilen(item.taxLines) : null,
+    },
+    taxesIncluded,
+  )
+}
+
+/** Versandkosten netto nach Rabatt (0 ohne Versandzeile). */
+export function versandNetto(order: ShopifyOrder): number {
+  const zeile = order.shippingLine
+  if (!zeile) return 0
+  return runden(
+    netto(
+      Number(zeile.discountedPriceSet.shopMoney.amount),
+      satzAusSteuerzeilen(zeile.taxLines),
+      Boolean(order.taxesIncluded),
+    ),
+    2,
+  )
 }
 
 export interface ImportResult {
@@ -169,14 +211,16 @@ export async function importShopifyOrder(
           select pt.uom_id from product_variants pv
           join product_templates pt on pt.id = pv.template_id
           where pv.id = ${zeile.resolved_variant}`
+        const preis = positionsPreis(item, order.taxesIncluded)
         await t`
-          insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit)
+          insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id,
+                                         price_unit, tax_rate)
           values (
             ${existing.id},
             coalesce((select max(sequence) + 10 from sales_order_lines
                       where order_id = ${existing.id}), 10),
             ${zeile.resolved_variant}, ${item.title}, ${zeile.qty},
-            ${uomRow.uom_id}, ${Number(item.originalUnitPriceSet.shopMoney.amount)})`
+            ${uomRow.uom_id}, ${preis.stueckNetto}, ${preis.steuersatz})`
         await t`update shopify_unmatched_lines set attached_at = now() where id = ${zeile.id}`
         nachgezogen++
       }
@@ -215,12 +259,12 @@ export async function importShopifyOrder(
     const [created] = await t<{ id: string }[]>`
       insert into sales_orders (
         number, partner_id, source, shopify_order_id, shopify_order_name,
-        order_date, currency,
+        order_date, currency, versandkosten,
         ship_name, ship_street, ship_house_number, ship_street2,
         ship_zip, ship_city, ship_country_code, ship_phone, ship_email)
       values (
         next_sequence('sale'), ${partnerId}, 'shopify', ${order.id}, ${order.name},
-        ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode},
+        ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode}, ${versandNetto(order)},
         ${addr?.name ?? null}, ${street}, ${houseNumber}, ${addr?.address2 ?? null},
         ${addr?.zip ?? null}, ${addr?.city ?? null}, ${addr?.countryCodeV2 ?? 'DE'},
         ${addr?.phone ?? null}, ${order.email ?? null})
@@ -249,10 +293,12 @@ export async function importShopifyOrder(
         select pt.uom_id from product_variants pv
         join product_templates pt on pt.id = pv.template_id where pv.id = ${variantId}`
 
+      const preis = positionsPreis(item, order.taxesIncluded)
       await t`
-        insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit)
+        insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id,
+                                       price_unit, tax_rate)
         values (${created.id}, ${sequence}, ${variantId}, ${item.title}, ${qty},
-                ${uomRow.uom_id}, ${Number(item.originalUnitPriceSet.shopMoney.amount)})`
+                ${uomRow.uom_id}, ${preis.stueckNetto}, ${preis.steuersatz})`
       sequence += 10
     }
 
@@ -283,8 +329,11 @@ export async function importShopifyOrder(
     // die längst beim Kunden ist.
     if (order.displayFulfillmentStatus === 'FULFILLED') {
       await t`update sales_orders
-              set state = 'sale', delivery_status = 'full'
+              set state = 'sale', delivery_status = 'full', historisch = true,
+                  confirmed_at = ${order.createdAt}
               where id = ${created.id}`
+      await t`update sales_order_lines set qty_delivered = qty
+              where order_id = ${created.id} and variant_id is not null`
       await t`select log_event('sales_order', ${created.id}, 'note',
         'Historisch übernommen — in Shopify bereits versandt, keine Lieferung erzeugt.',
         'shopify')`
@@ -516,13 +565,14 @@ export async function retryWebhookEvent(eventId: string): Promise<void> {
  * Abgleich mit Shopify als Sicherheitsnetz: holt geänderte Orders und legt
  * fehlende an. Fängt Webhooks ab, die nie ankamen.
  */
-export async function reconcileOrders(): Promise<{ checked: number; imported: number }> {
+export async function reconcileOrders(): Promise<{ checked: number; imported: number; mehr: boolean }> {
   const [state] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`
   const since = new Date(state?.value ?? Date.now() - 24 * 60 * 60 * 1000)
+  const beginn = new Date()
 
   const { fetchOrdersUpdatedSince } = await import('./shopify')
-  const orders = await fetchOrdersUpdatedSince(since)
+  const { orders, mehr } = await fetchOrdersUpdatedSince(since)
 
   let imported = 0
   for (const order of orders) {
@@ -530,12 +580,17 @@ export async function reconcileOrders(): Promise<{ checked: number; imported: nu
     if (result.created) imported++
   }
 
+  // Marke: bei weiteren Seiten nur bis zur letzten gelesenen Änderung
+  // (aufsteigend sortiert) — der nächste Lauf macht dort weiter. Sonst bis
+  // zum Beginn dieses Laufs, damit nichts zwischen Abfrage und Marke fällt.
+  const letzte = orders.at(-1)?.updatedAt
+  const marke = mehr && letzte ? letzte : beginn.toISOString()
   await sql`
-    update shopify_sync_state
-    set value = to_jsonb(${new Date().toISOString()}::text), updated_at = now()
-    where key = 'last_reconciliation_at'`
+    insert into shopify_sync_state (key, value)
+    values ('last_reconciliation_at', to_jsonb(${marke}::text))
+    on conflict (key) do update set value = excluded.value, updated_at = now()`
 
-  return { checked: orders.length, imported }
+  return { checked: orders.length, imported, mehr }
 }
 
 /** Holt genau eine Bestellung frisch von Shopify und importiert sie. */

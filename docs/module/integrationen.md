@@ -41,9 +41,10 @@ Entscheidungslog 2026-09-18.
 
 **Verarbeitung (Job-Runner, Vercel Cron im Minutentakt):**
 - `orders/create` / `orders/paid`:
-  1. Kunde per `shopify_customer_id` upserten (Name, E-Mail, Lieferadresse — **Straße/Hausnummer beim Import trennen**, DHL braucht sie getrennt).
+  1. Kunde per `shopify_customer_id` anlegen bzw. **nur Lücken füllen** (seit 0089 — im ERP Gepflegtes bleibt; die Lieferadresse steht eingefroren am Auftrag). **Straße/Hausnummer beim Import trennen**, DHL braucht sie getrennt.
   2. Positionen mappen: Shopify-`sku` bzw. `variant_id` → `product_variants` (Felder `sku`, `shopify_variant_id`). **Kein Treffer ⇒ Zeile in `shopify_unmatched_lines`**, Order wird mit Hinweis-Status angelegt, manuelle Zuordnung in der UI (lernt: Mapping wird an der Variante gespeichert).
-  3. Verkaufsauftrag anlegen (`source = 'shopify'`, `shopify_order_id` unique ⇒ Upsert statt Duplikat). Bezahlte Order (`financial_status = paid`) ⇒ direkt `confirm_sales_order` (Status `sale`, Lieferung + Fertigungsaufträge entstehen automatisch).
+  3. Verkaufsauftrag anlegen (`source = 'shopify'`, `shopify_order_id` unique ⇒ Upsert statt Duplikat). Bezahlte Order (`financial_status = paid`) ⇒ direkt `confirm_sales_order` (Status `sale`, Lieferung + Fertigungsaufträge entstehen automatisch). In Shopify bereits versandte Orders werden **historisch** übernommen (`historisch = true`, geliefert, ohne Lieferung/Fertigung).
+  4. **Preise netto (seit 0089):** An der Position steht der Netto-Stückpreis **nach allen Rabatten** (`discountedUnitPriceAfterAllDiscountsSet`, bei `taxesIncluded` mit herausgerechneter Steuer) und der Steuersatz aus den `taxLines`; die Versandkosten netto am Auftrag (`sales_orders.versandkosten`, nicht Teil von `sales_order_total` = Warenumsatz). Bis 0089 stand dort der Brutto-Listenpreis vor Rabatt — Umsätze waren um Steuer und Rabatte zu hoch. Alt-Aufträge korrigiert die Aktion `integrationen.shopify_preise_nachziehen` (Integrationen → Historie aus Shopify, je Klick 30, liest nur).
 - `orders/cancelled`: zugehörigen Auftrag stornieren (Regeln des Verkaufsmoduls); nicht manifestierte DHL-Sendungen der Lieferung werden storniert (siehe Versand-Modul).
 - `orders/updated`: Adress-/Tag-Änderungen nachziehen; Mengenänderungen nur solange kein MO `done` und kein Label erstellt ist, sonst Warn-Aktivität.
 
@@ -53,7 +54,18 @@ Shopify-Kunden mit mindestens einer Bestellung (`customers(query: "orders_count:
 Kunden — beim ersten ANVIL-Import waren 7.464 von 7.567 Kontakten ohne Bestellung
 (Entscheidungslog 2026-09-29). Kunden aus Bestellungen entstehen ohnehin beim Order-Import.
 
-**Reconciliation (Sicherheitsnetz, Cron alle 15 min):** GraphQL `orders(query: "updated_at:>{last_sync}")` paginiert abholen und mit `shopify_order_id` abgleichen — fängt verlorene Webhooks ab (Shopify garantiert keine Zustellung). `last_reconciliation_at` in `shopify_sync_state`.
+**Reconciliation (Sicherheitsnetz, Cron alle 15 min):** GraphQL `orders(query: "updated_at:>{last_sync}", sortKey: UPDATED_AT)` paginiert abholen (bis 500 je Lauf) und mit `shopify_order_id` abgleichen — fängt verlorene Webhooks ab (Shopify garantiert keine Zustellung). `last_reconciliation_at` in `shopify_sync_state` rückt bei weiteren Seiten nur bis zur letzten gelesenen Änderung vor (bis 0089 las der Abgleich nur 50 und übersprang den Rest).
+
+**Historie aus dem CSV-Export (seit 0089, Integrationen → Historie aus Shopify):** Die Schnittstelle liefert ohne den geschützten Scope `read_all_orders` nur die **letzten 60 Tage** — die Erstübernahme endete deshalb bei rund 100 Bestellungen. Die ältere Historie kommt aus dem Export des Shop-Admins (Bestellungen → Exportieren → „Alle Bestellungen", CSV):
+
+- Der Browser liest die Datei (`src/modules/integrationen/shopify-csv.ts`, RFC 4180, Zeilen je Bestellung gruppiert), zeigt eine Vorschau (Zeitraum, Anzahl, Warenumsatz netto, unbekannte SKUs — `integrationen.historie_pruefen`) und überträgt in Paketen zu 100 (`integrationen.historie_importieren`, nur Admin; anhalten und fortsetzen gefahrlos).
+- **Netto-Preise:** Steuer inklusive oder nicht wird aus Zwischensumme, Versand, Steuern und Gesamt abgeleitet; Zeilen- und Auftragsrabatte werden anteilig verteilt (`exportPositionenNetto`, Summe trifft die Zwischensumme). Steuersatz aus „Tax 1 Name".
+- **Übernommen werden** erfüllte und stornierte/erstattete Bestellungen sowie offene, die älter als 60 Tage sind; offene der letzten 60 Tage bleiben dem Live-Import (Lieferung, Fertigung).
+- **Als Historie:** `historisch = true`, Nummer = Shopify-Name (`#38690`, schont den Nummernkreis), `sale`/`full` bzw. `cancel`, `qty_delivered` = Menge — keine Lieferung, Reservierung oder Fertigung (`confirm_sales_order` tut für `sale` nichts). Zählt in Abverkauf, Umsatz und Deckungsbeitrag am Bestelldatum.
+- **Doppel-Schutz** über Shopify-ID und Bestellname; ein zweiter Lauf legt nichts doppelt an.
+- **Kontakte** per E-Mail zugeordnet, sonst mit Name, E-Mail und Land angelegt — bestehende werden nie geändert.
+- **Unbekannte SKUs** (gelöschte Produkte) werden archivierte Historie-Artikel (`product_templates.zusatz.historie = 'artikel'`, inaktiv, nicht verkäuflich); Positionen ohne SKU (Gutschein, Trinkgeld) laufen auf einen Sammelartikel, der Text bleibt an der Position. Kein Klärfall, kein Dashboard-Alarm.
+- „Betriebsdaten löschen" löscht auch die Historie.
 
 *Vergleich: Sendcloud hätte Shopify nur alle ~5 Minuten gepollt und nur ein 30-Tage-Fenster synchronisiert — unser Webhook+Reconciliation-Ansatz ist schneller und lückenlos.*
 

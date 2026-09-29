@@ -58,9 +58,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       [lokal-starten.md](lokal-starten.md)), dann `SHOPIFY_SHOP_DOMAIN`,
       `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`,
       `SHOPIFY_WEBHOOK_SECRET` — siehe
-      [api-referenz/shopify.md](api-referenz/shopify.md); Scope
-      `read_all_orders`, falls der Backfill weiter als 60 Tage zurück
-      soll. **Gefahrlos vor dem Stichtag:** die Anbindung startet im
+      [api-referenz/shopify.md](api-referenz/shopify.md). Die
+      Schnittstelle liefert Bestellungen der letzten 60 Tage; die Historie
+      davor kommt aus dem CSV-Export (Integrationen → Historie aus
+      Shopify). **Gefahrlos vor dem Stichtag:** die Anbindung startet im
       Modus „nur lesen" (Staging) — Bestellungen und Produkte kommen
       herein, nichts geht hinaus, bis ein Admin unter Einstellungen →
       Schnittstellen auf „schreiben" stellt

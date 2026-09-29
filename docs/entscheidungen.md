@@ -9,6 +9,36 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Shopify-Historie aus dem CSV-Export, Umsätze netto
+
+Revidiert „Historie kommt aus dem Odoo-Import" (api-referenz/shopify.md):
+der Betreiber übernimmt aus Odoo nur Stücklisten (Kunden sind aus Shopify
+da). Die Erstübernahme per Schnittstelle endete bei rund 100
+Bestellungen — ohne den geschützten Scope `read_all_orders` liefert
+Shopify still nur 60 Tage. Beim Nachsehen fiel auf: der Import speicherte
+den Brutto-Listenpreis vor Rabatt als Nettopreis.
+
+**Entschieden:**
+
+- **Historie per CSV-Export** (Integrationen → Historie aus Shopify,
+  Migration 0089): im Browser gelesen, Vorschau, Pakete zu 100 über zwei
+  Registry-Aktionen. Übernommen als `historisch` — ohne Lieferung,
+  Reservierung, Fertigung; Nummer = Shopify-Name; Doppel-Schutz über ID
+  und Name; offene Bestellungen der letzten 60 Tage bleiben dem
+  Live-Import. Unbekannte SKUs werden archivierte Historie-Artikel, damit
+  die Umsätze vollständig bleiben — ohne Klärfälle.
+- **Netto an der Position:** Stückpreis nach allen Rabatten, Steuer
+  herausgerechnet, Satz aus den Steuerzeilen; Versandkosten getrennt am
+  Auftrag (nicht Warenumsatz). Alt-Aufträge per
+  `integrationen.shopify_preise_nachziehen` (lesend, 30 je Klick).
+- Nebenbei behoben: Abgleich blätterte nur 50 Bestellungen und übersprang
+  den Rest; leere Suchanfrage wurde `created_at:>'undefined'`; Bestellungen
+  überschrieben Kontaktdaten (jetzt nur Lücken füllen).
+
+Nachweis: `tests/shopify-historie.test.ts`,
+`tests/prozesse/shopify-historie.test.ts`. Doku:
+[module/integrationen.md](module/integrationen.md).
+
 ## 2026-09-29 — Auswertungen in Echtzeit, Einkaufspreis bewertet den Bestand neu
 
 Revidiert „gleitender Durchschnitt, Schichten nie überschreiben" vom

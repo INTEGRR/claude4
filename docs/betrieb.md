@@ -137,5 +137,7 @@ Weitere Punkte:
   bei stündlichem Sync reicht das für rund 2.000 offene Sendungen.
   Nur der Rückfall `DHL_TRACKING_API=unified` hat die enge Grenze von
   250 Abfragen pro Tag.
-- **Shopify-Zugriff:** Orders älter als 60 Tage brauchen den zusätzlichen Scope
-  `read_all_orders`.
+- **Shopify-Zugriff:** Per Schnittstelle kommen nur Orders der letzten 60 Tage
+  (`read_all_orders` ist ein geschützter Scope, den Shopify erst nach Antrag
+  freigibt). Die ältere Historie kommt aus dem CSV-Export: Integrationen →
+  Historie aus Shopify.

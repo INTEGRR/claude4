@@ -25,6 +25,11 @@ export function fakeOrderHinterlegen(order: { id: string }): void {
   FAKE_BESTELLUNGEN.set(order.id, order)
 }
 
+/** Alle hinterlegten Bestellungen vergessen (Tests mit eigenem Bestand). */
+export function fakeBestellungenLeeren(): void {
+  FAKE_BESTELLUNGEN.clear()
+}
+
 /**
  * Produkte, die der Fake auf die Seitenabfrage des Produktimports liefert —
  * in der Reihenfolge der Hinterlegung, eine einzige Seite.
@@ -70,7 +75,7 @@ export async function fakeShopifyGraphQL<T>(
         },
       }
     }
-    if (query.includes('displayFinancialStatus')) {
+    if (op === 'order' && query.includes('displayFinancialStatus')) {
       // fetchOrder: die von der Fixture hinterlegte Bestellung (oder null).
       return { order: FAKE_BESTELLUNGEN.get(String(variables.id)) ?? null }
     }
@@ -108,6 +113,24 @@ export async function fakeShopifyGraphQL<T>(
         return { tagsAdd: { userErrors: [] } }
       case 'customers':
         return { customers: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } }
+      case 'orders': {
+        // Seitenweise wie der echte Shop (50 je Seite, Cursor = Position):
+        // die hinterlegten Bestellungen, nach updatedAt aufsteigend.
+        const alle = [...FAKE_BESTELLUNGEN.values()].sort((a, b) =>
+          String((a as { updatedAt?: string }).updatedAt ?? '').localeCompare(
+            String((b as { updatedAt?: string }).updatedAt ?? ''),
+          ),
+        )
+        const ab = variables.after ? Number(variables.after) : 0
+        const seite = alle.slice(ab, ab + 50)
+        const weiter = ab + 50 < alle.length
+        return {
+          orders: {
+            nodes: seite,
+            pageInfo: { hasNextPage: weiter, endCursor: weiter ? String(ab + 50) : null },
+          },
+        }
+      }
       case 'products':
         return { products: { nodes: FAKE_PRODUKTE, pageInfo: { hasNextPage: false, endCursor: null } } }
       case 'orderCancel': {

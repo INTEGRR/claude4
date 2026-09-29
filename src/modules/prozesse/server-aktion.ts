@@ -47,5 +47,5 @@ export async function serverAktion(
     if (!aufgeloest.endsWith('/')) revalidatePath(aufgeloest)
   }
 
-  if (ergebnis.text) return actionInfo(ergebnis.text, ergebnis.link)
+  if (ergebnis.text) return actionInfo(ergebnis.text, ergebnis.link, ergebnis.daten)
 }

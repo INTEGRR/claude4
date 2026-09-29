@@ -227,5 +227,8 @@ export const AUSFUEHRUNG = {
 
   'integrationen.klaerfall_aufloesen': integrationen.klaerfallAufloesen,
   'integrationen.webhooks_registrieren': integrationen.webhooksRegistrieren,
+  'integrationen.historie_pruefen': integrationen.historiePruefenAktion,
+  'integrationen.historie_importieren': integrationen.historieImportierenAktion,
+  'integrationen.shopify_preise_nachziehen': integrationen.shopifyPreiseNachziehen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

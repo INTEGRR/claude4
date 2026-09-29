@@ -268,7 +268,10 @@ const handlers = {
   async shopify_order_backfill(payload) {
     const { backfillOrdersChunk } = await import('./import')
     // Alte Jobs tragen noch ein Startdatum (seit); neue eine fertige Anfrage.
-    const q = payload.q ? String(payload.q) : `created_at:>'${String(payload.seit)}'`
+    // Eine leere Anfrage ('') heißt „alle" — nicht auf das Startdatum
+    // zurückfallen (bis 0089 wurde daraus created_at:>'undefined').
+    const q =
+      typeof payload.q === 'string' ? payload.q : `created_at:>'${String(payload.seit)}'`
     const cursor = payload.cursor ? String(payload.cursor) : null
     const r = await backfillOrdersChunk(q, cursor)
     if (r.nextCursor) {

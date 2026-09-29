@@ -517,6 +517,8 @@ export default async function IntegrationenPage() {
         <Card title="Erstübernahme aus Shopify">
           <p className="small muted" style={{ marginTop: 0 }}>
             Gezielt einzelne Bestellungen ansehen und übernehmen: <Link href="/integrationen/import">Shopify-Import</Link>.
+            Per Schnittstelle liefert Shopify nur die <strong>letzten 60 Tage</strong> — die ältere Historie kommt aus dem
+            CSV-Export: <Link href="/integrationen/historie">Historie aus Shopify</Link>.
             Diese Karte holt dagegen alles auf einmal — Kunden und vergangene Bestellungen in Häppchen über die Outbox. In Shopify bereits
             versandte Bestellungen werden als historische Belege übernommen — <strong>ohne</strong>{' '}
             Lieferungen oder Fertigungsaufträge anzustoßen. Bereits Importiertes wird erkannt und

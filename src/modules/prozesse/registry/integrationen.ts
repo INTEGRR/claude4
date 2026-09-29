@@ -44,5 +44,83 @@ export const INTEGRATIONEN = {
     formdata: (fd) => ({ url: String(fd.get('url') ?? '') }),
     revalidate: ['/einstellungen/anbindungen', '/integrationen'],
   },
+  // --- Shopify-Historie und Netto-Preise (0089) -----------------------------
+
+  'integrationen.historie_pruefen': {
+    label: 'Shopify-Historie prüfen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Vorschau des CSV-Historie-Imports: welche SKUs des Exports KRNL nicht kennt (sie werden ' +
+      'als archivierte Historie-Artikel angelegt) und wie viele Bestellungen schon da sind. ' +
+      'Schreibt nichts.',
+    bindung: 'frei',
+    schema: z.object({
+      skus: z.array(z.string().max(200)).max(50_000),
+      namen: z.array(z.string().max(100)).max(200_000),
+    }),
+    zusammenfassung: (p) => `${p.namen.length} Bestellungen, ${p.skus.length} SKUs geprüft`,
+    revalidate: [],
+  },
+
+  'integrationen.historie_importieren': {
+    label: 'Shopify-Historie übernehmen (Paket)',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Übernimmt ein Paket Bestellungen aus dem Shopify-CSV-Export als historische Aufträge — ' +
+      'Netto-Preise, ohne Lieferung, Reservierung oder Fertigung. Bereits vorhandene ' +
+      '(Shopify-ID oder Bestellname) werden übersprungen; offene Bestellungen der letzten 60 ' +
+      'Tage bleiben dem Live-Import.',
+    bindung: 'frei',
+    schema: z.object({
+      bestellungen: z
+        .array(
+          z.object({
+            id: z.string().regex(/^\d+$/).nullable(),
+            name: z.string().min(1).max(100),
+            datum: z.string().min(10).max(40),
+            email: z.string().max(300).nullable(),
+            kunde: z.string().min(1).max(300),
+            land: z.string().length(2).nullable(),
+            status: z.enum(['erfuellt', 'storniert', 'offen']),
+            waehrung: z.string().min(3).max(3),
+            steuersatz: z.number().min(0).max(100),
+            versandNetto: z.number().min(0),
+            positionen: z
+              .array(
+                z.object({
+                  sku: z.string().max(200).nullable(),
+                  name: z.string().min(1).max(500),
+                  menge: z.number().positive(),
+                  stueckNetto: z.number(),
+                }),
+              )
+              .max(500),
+          }),
+        )
+        .min(1)
+        .max(250),
+    }),
+    zusammenfassung: (p) => `${p.bestellungen.length} Bestellungen (${p.bestellungen[0]?.name} …)`,
+    revalidate: ['/verkauf', '/auswertungen', '/integrationen/historie'],
+  },
+
+  'integrationen.shopify_preise_nachziehen': {
+    label: 'Shopify-Preise netto nachziehen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Holt bereits importierte Shopify-Aufträge frisch aus dem Shop (lesend) und setzt ihre ' +
+      'Positionen auf Netto-Preise nach Rabatt samt Steuersatz, dazu die Versandkosten. Bis ' +
+      'Migration 0089 stand dort der Brutto-Listenpreis. Je Lauf bis zu 30 Aufträge.',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: ['/verkauf', '/auswertungen', '/integrationen'],
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

@@ -300,6 +300,10 @@ a:hover { text-decoration: underline; }
 .arbeitsplatz-waehler select { padding: 4px 8px; font-size: 13px; max-width: 200px; }
 .arbeitsplatz-waehler.offen select { border-color: var(--warn); }
 
+/* Fortschritt des Historie-Imports (Integrationen → Historie aus Shopify). */
+.historie-fortschritt { flex: 1; min-width: 120px; max-width: 360px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.historie-fortschritt > div { height: 100%; background: var(--accent); transition: width 0.3s; }
+
 /* Druckwege-Matrix (Einstellungen → Arbeitsplätze): eine Auswahl je Zelle. */
 .druckwege td { vertical-align: top; }
 .druckweg-wahl { width: 100%; min-width: 150px; padding: 4px 6px; font-size: 13px; color: var(--text-muted); }

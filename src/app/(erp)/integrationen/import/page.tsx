@@ -172,9 +172,9 @@ export default async function ImportUebersicht({
 
       {!fehler && orders.length === 0 && (
         <Empty>
-          Keine Treffer. Falls ältere Bestellungen fehlen: ohne den Scope{' '}
-          <code className="mono">read_all_orders</code> liefert Shopify nur die letzten 60 Tage —
-          ältere erscheinen dann gar nicht. Scope in der App ergänzen und neu installieren.
+          Keine Treffer. Falls ältere Bestellungen fehlen: per Schnittstelle liefert Shopify nur die
+          letzten 60 Tage (der Scope <code className="mono">read_all_orders</code> ist geschützt). Die
+          ältere Historie kommt aus dem CSV-Export: <Link href="/integrationen/historie">Historie aus Shopify</Link>.
         </Empty>
       )}
 

@@ -200,8 +200,9 @@ export default async function SchnittstellenPage() {
           <summary className="small" style={{ cursor: 'pointer' }}>App im Shop einrichten</summary>
           <p className="small" style={{ margin: '6px 0 0' }}>
             App im <a href="https://dev.shopify.com" target="_blank" rel="noreferrer">Dev Dashboard</a> anlegen,
-            Scopes geben (<span className="mono">read_orders</span>, <span className="mono">read_all_orders</span> —
-            sonst nur die letzten 60 Tage —, <span className="mono">write_orders</span>,{' '}
+            Scopes geben (<span className="mono">read_orders</span> — liefert die letzten 60 Tage, ältere
+            Bestellungen über <a href="/integrationen/historie">Historie aus Shopify</a> —,{' '}
+            <span className="mono">write_orders</span>,{' '}
             <span className="mono">read_customers</span>, <span className="mono">read_products</span>,{' '}
             <span className="mono">write_merchant_managed_fulfillment_orders</span>,{' '}
             <span className="mono">read_inventory</span>, <span className="mono">write_inventory</span>,{' '}

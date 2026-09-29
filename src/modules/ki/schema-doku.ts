@@ -40,7 +40,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **currencies** / **exchange_rates**: Fremdwährung; Kurs zum Stichtag: exchange_rate_at(code, datum). purchase_orders.exchange_rate friert den Kurs bei Bestätigung ein.
 
 ### Verkauf
-- **sales_orders**: number ('S00001'), partner_id, state ('draft','sent','sale','cancel'), locked, delivery_status ('nothing','partial','full'), invoice_status, order_date, source ('manuell'|'shopify'), shopify_order_id/name, ship_*-Adressfelder, origin_model/origin_id/origin_label (Herkunftsbeleg, z. B. ein Vorgang — Grundlage der Teilprozess-Verkettung). Summen: sales_order_total(order_id) → (net, tax, gross).
+- **sales_orders**: number ('S00001'), partner_id, state ('draft','sent','sale','cancel'), locked, delivery_status ('nothing','partial','full'), invoice_status, order_date, source ('manuell'|'shopify'), shopify_order_id/name, historisch (übernommene Historie ohne Lieferung/Fertigung — zählt in Umsatz und Deckungsbeitrag am order_date), versandkosten (netto, NICHT in sales_order_total), ship_*-Adressfelder, origin_model/origin_id/origin_label (Herkunftsbeleg, z. B. ein Vorgang — Grundlage der Teilprozess-Verkettung). Summen: sales_order_total(order_id) → (net, tax, gross).
 - **sales_order_lines**: order_id, variant_id, name, qty, qty_delivered, uom_id, price_unit, discount, tax_rate. Netto je Zeile: sale_line_subtotal(zeile).
 
 ### Fertigung
