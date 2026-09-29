@@ -156,11 +156,13 @@ async function dhlLabelErzeugen(input: {
   billingNumber: string
   insuredValue: number | null
   customs: ZollDaten | null
+  /** Format des Zieldruckers (0087); sonst der Standard aus settings.dhl. */
+  printFormat?: string
 }): Promise<{ result: CreatedShipment; labelPath: string | null; printFormat: string }> {
   const company = await companySettings()
   const [settings] = await sql<{ print_format: string | null }[]>`
     select value ->> 'print_format' as print_format from settings where key = 'dhl'`
-  const printFormat = settings?.print_format ?? '910-300-700'
+  const printFormat = input.printFormat || settings?.print_format || '910-300-700'
   const e = input.empfaenger
 
   const result = await createShipment({
@@ -209,7 +211,7 @@ async function dhlLabelErzeugen(input: {
  */
 export async function createLabelForPicking(
   pickingId: string,
-  opts: { weightG?: number; product?: string } = {},
+  opts: { weightG?: number; product?: string; printFormat?: string } = {},
 ): Promise<CreateLabelResult> {
   if (!dhlConfigured()) {
     throw new DhlError(
@@ -306,6 +308,7 @@ export async function createLabelForPicking(
     : null
 
   const { result, labelPath, printFormat } = await dhlLabelErzeugen({
+    printFormat: opts.printFormat,
     empfaenger: {
       name,
       street,
@@ -365,7 +368,7 @@ export async function createLabelForPicking(
  */
 export async function createLabelForRepair(
   repairId: string,
-  opts: { weightG?: number; product?: string } = {},
+  opts: { weightG?: number; product?: string; printFormat?: string } = {},
 ): Promise<CreateLabelResult> {
   if (!dhlConfigured()) {
     throw new DhlError(
@@ -449,6 +452,7 @@ export async function createLabelForRepair(
     : null
 
   const { result, labelPath, printFormat } = await dhlLabelErzeugen({
+    printFormat: opts.printFormat,
     empfaenger: {
       name,
       street,

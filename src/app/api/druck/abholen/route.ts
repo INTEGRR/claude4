@@ -1,23 +1,25 @@
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
-import { moZettelPdf } from '@/modules/fertigung/zettel-pdf'
+import {
+  auftraegeAbholen,
+  auftragFehlgeschlagen,
+  auftragsPdf,
+  druckerMeldetSich,
+} from '@/modules/druck/abholen'
+import { idOderNull } from '@/modules/druck/routing'
 import { agentBerechtigt, zieleAusAnfrage } from '@/modules/versand/druckbruecke'
 
 /**
- * Abholstelle der Druckbrücke: der Agent auf dem Packtisch-/Werkstatt-PC
+ * Abholstelle der Druckbrücke: der Agent am Arbeitsplatz-PC
  * (scripts/druck-agent.ts) fragt hier im Takt nach offenen Druckaufträgen
  * und bekommt die PDFs gleich mitgeliefert (base64) — Pull-Modell, weil
  * die App die LAN-Drucker nie erreichen kann.
  *
- * Mehrstationig (0078): jeder Auftrag trägt ein ZIEL (labeldrucker,
- * zetteldrucker, …), und der Agent nennt per ?ziele=… die Ziele, die er
- * bedient — ein Agent je Drucker, beliebig viele Agenten/PCs. Ohne
- * ziele-Parameter zieht er alles (Ein-PC-Aufbau). Labels kommen aus der
- * gespeicherten Sendung, Zettel werden frisch als PDF gerendert.
- *
- * Jeder Abruf hinterlegt seinen Zeitstempel je Agent in
- * settings.druckbruecke — die Integrationen-Seite zeigt daran, welche
- * Agenten leben.
+ * Seit 0087 bedient ein Agent genau EINEN Drucker (?drucker=<id>) und
+ * zieht nur dessen Aufträge — gesperrt, damit nichts doppelt druckt
+ * (modules/druck/abholen.ts). Sein Herzschlag landet am Drucker
+ * (zuletzt_gesehen). Alt-Agenten mit ?ziele=… (0078) ziehen weiterhin die
+ * Aufträge ohne Drucker; ihr Herzschlag steht in settings.druckbruecke.
  */
 
 export async function GET(request: Request) {
@@ -26,68 +28,55 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url)
-  const ziele = zieleAusAnfrage(url.searchParams.get('ziele'))
-  const agent = (url.searchParams.get('name') ?? '').trim() || (ziele?.join('+') ?? 'agent')
+  const druckerParam = url.searchParams.get('drucker')
+  let jobs: Awaited<ReturnType<typeof auftraegeAbholen>>
 
-  // Herzschlag je Agent — der Schlüssel trägt auch die Betreiber-Konfig
-  // (modus/token), deshalb mergen statt ersetzen.
-  await sql`
-    insert into settings (key, value)
-    values ('druckbruecke', jsonb_build_object('agenten', jsonb_build_object(${agent}::text, now())))
-    on conflict (key) do update set value = jsonb_set(
-      settings.value || jsonb_build_object(
-        'agenten', coalesce(settings.value -> 'agenten', '{}'::jsonb)),
-      array['agenten', ${agent}::text], to_jsonb(now()))`
+  if (druckerParam) {
+    const druckerId = idOderNull(druckerParam)
+    const drucker = druckerId ? await druckerMeldetSich(druckerId) : null
+    if (!drucker) {
+      return NextResponse.json(
+        { error: 'Drucker unbekannt — Paket unter Einstellungen → Arbeitsplätze neu laden' },
+        { status: 404 },
+      )
+    }
+    jobs = drucker.aktiv ? await auftraegeAbholen({ druckerId: drucker.id }) : []
+  } else {
+    const ziele = zieleAusAnfrage(url.searchParams.get('ziele'))
+    const agent = (url.searchParams.get('name') ?? '').trim() || (ziele?.join('+') ?? 'agent')
+    // Herzschlag je Alt-Agent — der Schlüssel trägt auch die Betreiber-
+    // Konfig (modus/token), deshalb mergen statt ersetzen.
+    await sql`
+      insert into settings (key, value)
+      values ('druckbruecke', jsonb_build_object('agenten', jsonb_build_object(${agent}::text, now())))
+      on conflict (key) do update set value = jsonb_set(
+        settings.value || jsonb_build_object(
+          'agenten', coalesce(settings.value -> 'agenten', '{}'::jsonb)),
+        array['agenten', ${agent}::text], to_jsonb(now()))`
+    jobs = await auftraegeAbholen({ ziele })
+  }
 
-  const jobs = await sql<
-    {
-      id: string
-      art: string
-      ziel: string
-      mo_id: string | null
-      shipment_number: string | null
-      mo_number: string | null
-      label_pdf: Uint8Array | null
-    }[]
-  >`
-    select d.id, d.art, d.ziel, d.mo_id,
-           s.shipment_number, mo.number as mo_number, s.label_pdf
-    from druckauftraege d
-    left join shipments s on s.id = d.shipment_id
-    left join manufacturing_orders mo on mo.id = d.mo_id
-    where d.status = 'offen'
-      and (${ziele}::text[] is null or d.ziel = any(${ziele}::text[]))
-    order by d.created_at
-    limit 3`
-
-  const druckbar: { id: string; art: string; ziel: string; dateiname: string; pdfBase64: string }[] = []
+  const druckbar: {
+    id: string
+    art: string
+    ziel: string
+    dateiname: string
+    pdfBase64: string
+    druckerTyp: 'label' | 'a4' | null
+  }[] = []
   for (const job of jobs) {
     try {
-      let pdf: Buffer
-      let name: string
-      if (job.art === 'label') {
-        // Ein Label-Auftrag ohne gespeichertes PDF ist nicht druckbar —
-        // sofort als Fehler quittieren statt den Agenten ewig dieselbe
-        // Leiche ziehen lassen.
-        if (!job.label_pdf) throw new Error('Kein Label-PDF an der Sendung gespeichert')
-        pdf = Buffer.from(job.label_pdf)
-        name = `${job.shipment_number}.pdf`
-      } else {
-        pdf = await moZettelPdf([job.mo_id!])
-        name = `${(job.mo_number ?? 'zettel').replaceAll('/', '-')}.pdf`
-      }
+      const { pdf, dateiname } = await auftragsPdf(job)
       druckbar.push({
         id: job.id,
         art: job.art,
         ziel: job.ziel,
-        dateiname: name,
+        dateiname,
         pdfBase64: pdf.toString('base64'),
+        druckerTyp: job.drucker_typ,
       })
     } catch (err) {
-      await sql`update druckauftraege
-        set status = 'fehler',
-            fehler = ${(err instanceof Error ? err.message : String(err)).slice(0, 500)}
-        where id = ${job.id}`
+      await auftragFehlgeschlagen(job.id, err)
     }
   }
 

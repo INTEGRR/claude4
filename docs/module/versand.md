@@ -123,14 +123,16 @@ Teilmengen: ein Paket ist erst dann ein Paket, wenn alles drin ist.
    serverseitig noch einmal — der Arbeitsplatz ist nur die Hülle um die
    Registry-Aktion (docs/prozesse.md, Abschnitt „Packtisch").
 
-Ist die Druckbrücke konfiguriert, kommt das Label still aus dem
-Labeldrucker; sonst (und zusätzlich, als Zweitausdruck) öffnet es sich
-als Tab und über den Knopf „Label öffnen". Im Kopf der Seite zeigt ein
+Druckt die Brücke am Platz des PCs (siehe „Arbeitsplätze und Drucker"),
+kommt das Label still aus dem Labeldrucker des Tisches — **ohne**
+zusätzlichen Tab (früher öffnete er immer, das ergab Doppeldrucke); die
+Meldung sagt, auf welchem Drucker. Nur ohne Drucker öffnet es sich als
+Tab und über den Knopf „Label öffnen". Im Kopf der Seite zeigt ein
 Typenschild, ob DHL konfiguriert ist (sonst mit den Namen der fehlenden
 Variablen). Der Scan des nächsten Zettels im „Versandfertig"-Zustand
 startet direkt das nächste Paket.
 
-## Druckbrücke (stiller Labeldruck am Packtisch)
+## Druckbrücke (stiller Druck am Arbeitsplatz)
 
 Die App (Vercel) erreicht die LAN-Drucker nie — deshalb ein
 **Pull-Modell**: Aktionen reihen Druckaufträge ein (Tabelle
@@ -138,16 +140,6 @@ Die App (Vercel) erreicht die LAN-Drucker nie — deshalb ein
 auf den Arbeitsplatz-PCs holen ab, drucken und quittieren. Kein
 Benutzer-Login auf den Geräten; authentifiziert wird über das gemeinsame
 Token.
-
-Die Brücke ist **mehrstationig** (Migration 0078): jeder Auftrag trägt
-eine Art (`label` = DHL-Label vom Packtisch-Abschluss, `zettel` =
-Fertigungszettel aus dem Bulk-Druck) und ein **Ziel** (`labeldrucker`
-bzw. `zetteldrucker`). Ein Agent bedient EINEN Drucker und nennt per
-`DRUCK_ZIELE` die Ziele, die er zieht — beliebig viele Agenten und PCs;
-für zwei Drucker am selben PC laufen zwei Agenten. Ohne `DRUCK_ZIELE`
-zieht ein Agent alles (Ein-PC-Aufbau). Labels kommen aus der
-gespeicherten Sendung, Zettel werden beim Abholen frisch als PDF
-gerendert (src/modules/fertigung/zettel-pdf.tsx).
 
 **Der Druckweg ist eine Betreiber-Einstellung**, keine Env-Variable
 (Einstellungen → Versand & Druck, Registry-Aktion
@@ -163,49 +155,99 @@ Reihenfolge wie bei den KI-Modellen: Einstellung → Env-Notausgang
   automatisch; es steht in der Karte zum Kopieren. Gilt sofort, kein
   Redeploy.
 
-**Einrichtung der Agenten (nur für den Brücken-Modus):**
+### Arbeitsplätze und Drucker (0087)
+
+Jeder Druck kommt am Platz des PCs heraus — zwei Packtische mit je
+eigenem Labeldrucker (verschiedene Formate), der Etikettendrucker für
+Fertigungsaufträge und der A4-Drucker der Werkstatt. Gepflegt unter
+**Einstellungen → Arbeitsplätze & Drucker** (nur Administratoren):
+
+- **Arbeitsplätze** sind die Arbeitsplätze der Fertigung (`work_centers`,
+  eine Liste für alles) mit einer **Art**: Fertigung (Montagetisch),
+  Versand (Packtisch), Lager, Sonstiges. Angelegt/geändert über
+  `fertigung.arbeitsplatz_anlegen/_aendern`.
+- **Drucker** (`drucker`): Name, Standort, Name unter Windows, Typ
+  (Etikett oder A4), Etikettenmaße in mm (bei Etiketten Pflicht) und
+  optional das **DHL-Format** für Labels auf diesem Drucker — das Label
+  wird schon beim Erzeugen in diesem Format bei DHL bestellt
+  (`shipments.label_format`); ohne Angabe gilt das Standardformat aus
+  Versand & Druck. Aktionen `einstellungen.drucker_speichern/_schalten/
+  _loeschen` (Löschen storniert offene Aufträge des Druckers).
+- **Druckwege** (`arbeitsplatz_druckwege`): je Arbeitsplatz und Druckart
+  ein Drucker — Druckarten `versandlabel`, `packzettel`,
+  `fertigungszettel`, `fertigungsetikett`, `artikeletikett`. Die Zeile
+  **„Ersatz"** (Weg ohne Arbeitsplatz) springt für alle Plätze ohne
+  eigenen Weg ein. Aktion `einstellungen.druckweg_setzen`.
+
+**Wo bin ich?** Jeder PC wählt **einmal oben im Kopf** seinen
+Arbeitsplatz (Cookie `erp_arbeitsplatz`, 400 Tage, übersteht das
+Abmelden). Ab dann druckt jede Anmeldung an diesem PC auf die Drucker des
+Platzes; umschalten geht jederzeit im Kopf. `serverAktion` gibt den Platz
+als `arbeitsplatzId` an die Aktionen weiter.
+
+**Auflösung je Druck** (`src/modules/druck/`): Weg des Platzes → Ersatz →
+PDF im Browser. Die Meldung sagt, wo gedruckt wurde, z. B. „Gedruckt auf
+HP Werkstatt (Montagetisch 1) — Ersatzdrucker, Packtisch 1 hat keinen
+Drucker für Fertigungszettel." Ein abgeschalteter Drucker oder
+Arbeitsplatz zählt wie keiner.
+
+**Übergang:** Solange **kein** Drucker angelegt ist, läuft die Brücke wie
+vor 0087 über die festen Ziele `labeldrucker`/`zetteldrucker` (Alt-Agenten
+mit `DRUCK_ZIELE` drucken weiter). Sobald der erste Drucker existiert,
+gehen Aufträge nur noch an Drucker — alte Pakete je PC dann durch die
+Pakete je Drucker ersetzen.
+
+### Einrichtung der Agenten (ein Agent je Drucker)
 
 1. Einstellungen → Versand & Druck: den Druckweg auf **Druckbrücke**
    stellen (erzeugt das Agent-Token).
-2. Karte **„Druckbrücke auf einem PC einrichten"**: Name des PCs, was er
-   druckt (Labeldrucker / Zetteldrucker / alles) und optional den
-   Druckernamen wählen → **„Paket herunterladen (ZIP)"**. Das Paket
-   (`GET /api/druck/paket`, nur Administratoren — es enthält das Token)
-   bringt mit: `druck-agent.ts` (unverändert aus `scripts/`),
-   `druckbruecke-starten.cmd` mit Adresse, Token, Name, Ziel und Drucker
-   bereits eingetragen (startet den Agenten nach einem Absturz neu),
-   `autostart-einrichten.cmd` (Verknüpfung im Autostart-Ordner),
-   `druckbruecke-starten.sh` für Linux/macOS und `LIESMICH.txt`.
-3. Auf dem PC: Node.js (LTS) und SumatraPDF installieren, ZIP entpacken,
-   `druckbruecke-starten.cmd` doppelklicken, einmal
-   `autostart-einrichten.cmd`. Der PC erscheint unter „Druck-Agenten".
-4. Windows druckt über **SumatraPDF** (`-print-to … -silent`; das
-   Startskript sucht es an den üblichen Installationsorten), Linux/macOS
-   über `lp`. Ein eigenes Kommando geht über `DRUCK_KOMMANDO` mit den
-   Platzhaltern `{datei}` und `{drucker}` (im Startskript ergänzen).
+2. Einstellungen → Arbeitsplätze & Drucker: Plätze, Drucker und Wege
+   anlegen; an der Druckerzeile **„Paket laden"**
+   (`GET /api/druck/paket?drucker_id=…`, nur Administratoren — es enthält
+   das Token). Darin: `druck-agent.ts` (unverändert aus `scripts/`),
+   `druckbruecke-starten.cmd` mit Adresse, Token, Drucker-ID und
+   Windows-Druckername bereits eingetragen (startet nach einem Absturz
+   neu), `autostart-einrichten.cmd` (Verknüpfung mit dem Druckernamen —
+   zwei Drucker an einem PC stören sich nicht), `druckbruecke-starten.sh`
+   für Linux/macOS und `LIESMICH.txt`.
+3. Auf dem PC: Node.js (LTS) und SumatraPDF installieren, ZIP je Drucker
+   in einen eigenen Ordner entpacken, `druckbruecke-starten.cmd`
+   doppelklicken, einmal `autostart-einrichten.cmd`. Bei „Agent" steht
+   an der Druckerzeile dann „aktiv".
+4. Windows druckt über **SumatraPDF** — Etiketten mit
+   `-print-settings fit` (auf das Etikett eingepasst), A4 mit `shrink`;
+   Linux/macOS über `lp` (Etiketten mit `-o fit-to-page`). Ein eigenes
+   Kommando geht über `DRUCK_KOMMANDO` mit den Platzhaltern `{datei}`,
+   `{drucker}` und `{skalierung}`.
 
 Von Hand geht es weiterhin: `scripts/druck-agent.ts` mit Node ≥ 22.6
 (`node --experimental-strip-types druck-agent.ts`) und den Variablen
-`KRNL_URL`, `DRUCK_AGENT_TOKEN`, optional `DRUCKER`, `DRUCK_ZIELE`,
-`DRUCK_AGENT_NAME`.
+`KRNL_URL`, `DRUCK_AGENT_TOKEN`, `DRUCK_DRUCKER_ID`, optional `DRUCKER`.
+Ohne `DRUCK_DRUCKER_ID` läuft der Agent im Alt-Betrieb (`DRUCK_ZIELE`,
+`DRUCK_AGENT_NAME`).
 
-Der Agent fragt alle 3 Sekunden (`DRUCK_INTERVALL_MS`) nach den ältesten
-offenen Aufträgen seiner Ziele (`GET /api/druck/abholen?ziele=…&name=…`,
-Bearer-Token; liefert die PDFs base64), druckt und meldet je Auftrag
-ok/fehler (`POST /api/druck/quittieren`). Solange Aufträge kommen, zieht
-er ohne Pause weiter (Fließband). Diagnose auf der Integrationen-Seite:
-Karte „Druckbrücke" mit letztem Abruf **je Agent**, offenen Aufträgen und
-Fehlern der letzten 7 Tage. Ein Label-Auftrag ohne gespeichertes PDF wird
+**Abholen mit Sperre:** Der Agent fragt alle 3 Sekunden
+(`DRUCK_INTERVALL_MS`) `GET /api/druck/abholen?drucker=<id>` (Bearer-Token;
+liefert die PDFs base64 und den Druckertyp), druckt und meldet je Auftrag
+ok/fehler (`POST /api/druck/quittieren`). Abgeholt wird mit `for update
+skip locked` und Zeitstempel `abgeholt_am` — zwei Agenten bekommen nie
+denselben Auftrag; bleibt die Quittung zwei Minuten aus, wird er erneut
+angeboten (`src/modules/druck/abholen.ts`). Jeder Abruf setzt
+`drucker.zuletzt_gesehen`. Solange Aufträge kommen, zieht der Agent ohne
+Pause weiter (Fließband). Ein Label-Auftrag ohne gespeichertes PDF wird
 serverseitig sofort als Fehler quittiert, ein Zettel-Auftrag ebenso, wenn
-sein Rendern scheitert.
+sein Rendern scheitert. Diagnose: Druckerzeile (Agent, offene Aufträge,
+Fehler der letzten 7 Tage) und die Karte „Druckbrücke" auf der
+Integrationen-Seite.
 
 ## Massendruck (Fließband am Packtisch)
 
 Die Versandbereit-Liste ist filterbar (nur Einzelpositions-Aufträge, SKU,
 Zielland, DHL-Produkt laut Regel) — „alle Single-Line mit SKU KC-*" ist ein
 Filter plus ein Klick. Der Massendruck erstellt Labels für die gefilterte
-Liste nach Regelvorschlag (bis 25 je Lauf), liefert ein **Sammel-PDF** über
-`/api/label/sammel?ids=…` und bucht auf Wunsch je Lauf direkt aus
+Liste nach Regelvorschlag (bis 25 je Lauf) und druckt sie am Labeldrucker
+des Arbeitsplatzes (im Format dieses Druckers); ohne Drucker liefert er ein
+**Sammel-PDF** über `/api/label/sammel?ids=…`. Auf Wunsch bucht er je Lauf direkt aus
 (Warenausgang + Shopify-Fulfillment); Standard ist „nur Labels", ausgebucht
 wird beim Packen. Fehler einzelner Lieferungen brechen den Lauf nicht ab und
 stehen am jeweiligen Beleg.

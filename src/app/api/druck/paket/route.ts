@@ -2,14 +2,17 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/modules/auth'
+import { sql } from '@/db/client'
+import { idOderNull } from '@/modules/druck/routing'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { druckbrueckePaket, oeffentlicheAdresse, skriptSicher, zielWert } from '@/modules/versand/druckbruecke-paket'
 import { zipErstellen } from '@/modules/shared/zip'
 
 /**
- * GET /api/druck/paket?name=…&ziel=…&drucker=… — das Druckbrücken-Paket
- * für einen Arbeitsplatz-PC als ZIP: Agent, Startskript mit Adresse und
- * Token, Autostart, Anleitung. Nur für Administratoren, weil das Paket das
+ * GET /api/druck/paket?drucker_id=… — das Druckbrücken-Paket für EINEN
+ * Drucker (0087) als ZIP: Agent, Startskript mit Adresse, Token,
+ * Drucker-ID und Windows-Druckername, Autostart, Anleitung. Ohne
+ * drucker_id das Alt-Paket je PC (?name=…&ziel=…&drucker=…). Nur für Administratoren, weil das Paket das
  * Agent-Token enthält; ohne aktive Druckbrücke gibt es nichts zu laden.
  *
  * Der Agent kommt unverändert aus scripts/druck-agent.ts (eine Quelle) —
@@ -32,7 +35,20 @@ export async function GET(request: Request) {
   }
 
   const anfrage = new URL(request.url)
-  const name = skriptSicher(anfrage.searchParams.get('name') ?? '') || 'druck-pc'
+  let name = skriptSicher(anfrage.searchParams.get('name') ?? '') || 'druck-pc'
+  let windowsDrucker = anfrage.searchParams.get('drucker') ?? ''
+  let druckerId: string | null = null
+  if (anfrage.searchParams.has('drucker_id')) {
+    const id = idOderNull(anfrage.searchParams.get('drucker_id'))
+    const [d] = id
+      ? await sql<{ id: string; name: string; druckername: string | null }[]>`
+          select id, name, druckername from drucker where id = ${id}`
+      : []
+    if (!d) return NextResponse.json({ error: 'Drucker unbekannt' }, { status: 404 })
+    druckerId = d.id
+    name = skriptSicher(d.name) || 'drucker'
+    windowsDrucker = d.druckername ?? ''
+  }
   const agentQuelle = await readFile(path.join(process.cwd(), 'scripts', 'druck-agent.ts'), 'utf8')
   const erstellt = new Date()
   const zip = zipErstellen(
@@ -40,8 +56,9 @@ export async function GET(request: Request) {
       url: oeffentlicheAdresse(process.env, request.headers, anfrage.origin),
       token: konfig.token,
       name,
+      druckerId,
       ziel: zielWert(anfrage.searchParams.get('ziel')),
-      drucker: anfrage.searchParams.get('drucker') ?? '',
+      drucker: windowsDrucker,
       agentQuelle,
       erstellt,
     }),

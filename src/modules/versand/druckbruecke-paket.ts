@@ -1,11 +1,13 @@
 import type { ZipDatei } from '../shared/zip.ts'
 
 /**
- * Das Druckbrücken-Paket für einen Arbeitsplatz-PC: der Agent
+ * Das Druckbrücken-Paket für EINEN Drucker (0087): der Agent
  * (scripts/druck-agent.ts, unverändert) plus Startskript mit Adresse,
- * Token, Name, Zielen und Drucker bereits eingetragen, ein Skript für den
- * Autostart und eine Anleitung. Download unter Einstellungen → Versand &
- * Druck (nur Administratoren, das Paket enthält das Agent-Token).
+ * Token, Drucker-ID und Windows-Druckername bereits eingetragen, ein
+ * Skript für den Autostart und eine Anleitung. Download an der
+ * Druckerzeile unter Einstellungen → Arbeitsplätze (nur Administratoren,
+ * das Paket enthält das Agent-Token). Ohne Drucker-ID entsteht das
+ * Alt-Paket je PC mit Zielen (vor 0087).
  *
  * Pur, unter blankem Node testbar. Windows-Skripte mit CRLF und ohne
  * Umlaute (die Konsole liest sie in der OEM-Codepage).
@@ -22,8 +24,11 @@ export const DRUCK_ZIELE: { wert: DruckZiel; label: string }[] = [
 export interface PaketAngaben {
   url: string
   token: string
-  /** Name des Agenten auf der Einstellungs- und Integrationen-Seite. */
+  /** Name des Druckers bzw. (Alt-Paket) des Agenten. */
   name: string
+  /** Drucker aus Einstellungen → Arbeitsplätze; dann gilt `ziel` nicht. */
+  druckerId?: string | null
+  /** Nur Alt-Paket ohne Drucker-ID: welche Aufträge der Agent zieht. */
   ziel: DruckZiel
   /** Druckername wie in Windows; leer = Standarddrucker. */
   drucker: string
@@ -71,7 +76,8 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
   const drucker = skriptSicher(a.drucker)
   const url = skriptSicher(a.url.replace(/\/$/, ''), 200)
   const token = skriptSicher(a.token, 200)
-  const ziele = a.ziel === 'alle' ? '' : a.ziel
+  const druckerId = a.druckerId ? skriptSicher(a.druckerId, 36) : ''
+  const ziele = druckerId || a.ziel === 'alle' ? '' : a.ziel
   const stand = a.erstellt.toISOString().slice(0, 10)
 
   const starten = crlf([
@@ -83,6 +89,7 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     `set "KRNL_URL=${url}"`,
     `set "DRUCK_AGENT_TOKEN=${token}"`,
     `set "DRUCK_AGENT_NAME=${name}"`,
+    `set "DRUCK_DRUCKER_ID=${druckerId}"`,
     `set "DRUCK_ZIELE=${ziele}"`,
     `set "DRUCKER=${drucker}"`,
     'rem SumatraPDF an den ueblichen Installationsorten finden.',
@@ -100,7 +107,8 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     '@echo off',
     'rem Legt eine Verknuepfung im Autostart-Ordner an: die Druckbruecke startet',
     'rem ab jetzt mit der Windows-Anmeldung (minimiert).',
-    'powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath(\'Startup\')+\'\\KRNL Druckbruecke.lnk\'); $s.TargetPath=\'%~dp0druckbruecke-starten.cmd\'; $s.WorkingDirectory=\'%~dp0\'; $s.WindowStyle=7; $s.Save()"',
+    // Name in der Verknüpfung: zwei Drucker am selben PC = zwei Autostarts.
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Startup')+'\\KRNL Druckbruecke ${name}.lnk'); $s.TargetPath='%~dp0druckbruecke-starten.cmd'; $s.WorkingDirectory='%~dp0'; $s.WindowStyle=7; $s.Save()"`,
     'if errorlevel 1 (echo Autostart konnte nicht eingerichtet werden. & pause & exit /b 1)',
     'echo Autostart eingerichtet. Entfernen: Win+R, shell:startup, Verknuepfung loeschen.',
     'pause',
@@ -113,6 +121,7 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     `export KRNL_URL='${url}'`,
     `export DRUCK_AGENT_TOKEN='${token}'`,
     `export DRUCK_AGENT_NAME='${name}'`,
+    `export DRUCK_DRUCKER_ID='${druckerId}'`,
     `export DRUCK_ZIELE='${ziele}'`,
     `export DRUCKER='${drucker}'`,
     'while true; do',
@@ -123,7 +132,18 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     '',
   ].join('\n')
 
-  const zielText = DRUCK_ZIELE.find((z) => z.wert === a.ziel)?.label ?? 'Alles'
+  const zielText = druckerId
+    ? 'die Aufträge des Druckers laut Einstellungen → Arbeitsplätze → Druckwege'
+    : (DRUCK_ZIELE.find((z) => z.wert === a.ziel)?.label ?? 'Alles')
+  const kontrolle = druckerId
+    ? [
+        '5. Kontrolle in KRNL: Einstellungen → Arbeitsplätze → Drucker.',
+        `   Bei „${name}" steht unter „zuletzt gesehen" gerade eben.`,
+      ]
+    : [
+        '5. Kontrolle in KRNL: Einstellungen → Versand & Druck → Druck-Agenten.',
+        `   Dort erscheint „${name}" mit dem Zustand „aktiv".`,
+      ]
   const liesmich = `\uFEFF${crlf([
     `KRNL Druckbrücke — Paket für „${name}"`,
     `Erzeugt am ${stand} für ${url}`,
@@ -140,8 +160,7 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     '3. Dieses ZIP entpacken, z. B. nach C:\\KRNL-Druckbruecke.',
     '4. „druckbruecke-starten.cmd" doppelklicken. Im Fenster steht',
     '   „Druckbrücke aktiv" — das Fenster offen lassen (minimieren geht).',
-    '5. Kontrolle in KRNL: Einstellungen → Versand & Druck → Druck-Agenten.',
-    `   Dort erscheint „${name}" mit dem Zustand „aktiv".`,
+    ...kontrolle,
     '6. Damit die Brücke nach einem Neustart von selbst läuft:',
     '   „autostart-einrichten.cmd" einmal doppelklicken.',
     '',
@@ -151,6 +170,9 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     '',
     'Das Paket enthält das Agent-Token. Nicht weitergeben. Wird das Token in',
     'KRNL geändert, das Paket neu herunterladen.',
+    '',
+    'Zwei Drucker an einem PC: je Drucker ein eigenes Paket in einen eigenen',
+    'Ordner entpacken und beide starten.',
     '',
     'Linux/macOS: druckbruecke-starten.sh (druckt über lp).',
   ])}`

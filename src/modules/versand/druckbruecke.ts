@@ -55,39 +55,6 @@ export async function agentBerechtigt(request: Request): Promise<boolean> {
 }
 
 /**
- * Label-Druckauftrag einreihen — idempotent: solange für die Sendung schon
- * ein OFFENER Auftrag wartet, entsteht kein zweiter (Doppelscan am Tisch
- * soll nicht zwei Ausdrucke erzeugen; ein quittierter Auftrag darf dagegen
- * bewusst neu eingereiht werden, etwa nach Papierstau).
- */
-export async function labelDruckEinreihen(shipmentId: string): Promise<void> {
-  await sql`
-    insert into druckauftraege (art, shipment_id, ziel)
-    select 'label', ${shipmentId}, 'labeldrucker'
-    where not exists (
-      select 1 from druckauftraege
-      where shipment_id = ${shipmentId} and status = 'offen')`
-}
-
-/**
- * Fertigungszettel einreihen (Ziel „zetteldrucker" — A4-Drucker der
- * Werkstatt), gleiche Idempotenz je Auftrag. Liefert, wie viele wirklich
- * neu eingereiht wurden.
- */
-export async function zettelDruckEinreihen(moIds: string[]): Promise<number> {
-  if (moIds.length === 0) return 0
-  const result = await sql`
-    insert into druckauftraege (art, mo_id, ziel)
-    select 'zettel', mo.id, 'zetteldrucker'
-    from manufacturing_orders mo
-    where mo.id = any(${moIds})
-      and not exists (
-        select 1 from druckauftraege
-        where mo_id = mo.id and status = 'offen')`
-  return result.count
-}
-
-/**
  * Die Ziele eines Agenten aus seiner Anfrage (?ziele=labeldrucker,…).
  * Ohne Angabe bedient er ALLE Ziele — so bleiben Ein-PC-Aufbauten ohne
  * weitere Konfiguration lauffähig.

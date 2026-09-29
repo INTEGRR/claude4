@@ -60,7 +60,14 @@ export const EINSTELLUNGS_BEREICHE: readonly Bereich[] = [
     href: '/einstellungen/versand',
     label: 'Versand & Druck',
     gruppe: 'Abläufe',
-    beschreibung: 'Labelformat und Druckweg für Labels und Fertigungszettel.',
+    beschreibung: 'Standard-Labelformat, Druckbrücke an/aus und das Agent-Token.',
+  },
+  {
+    href: '/einstellungen/arbeitsplaetze',
+    label: 'Arbeitsplätze & Drucker',
+    gruppe: 'Abläufe',
+    beschreibung:
+      'Packtische, Montagetische und ihre Drucker — jeder Druck kommt am Platz des PCs heraus.',
   },
   {
     href: '/einstellungen/versandregeln',

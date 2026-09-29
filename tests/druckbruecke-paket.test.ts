@@ -131,4 +131,28 @@ describe('Druckbrücken-Paket', () => {
       return true
     })
   })
+  test('Paket je Drucker (0087): Drucker-ID statt Zielen, eigener Autostart je Drucker', () => {
+    const id = '33333333-3333-4333-8333-333333333333'
+    const dateien = new Map(
+      druckbrueckePaket({ ...ANGABEN, name: 'QL Packtisch 1', druckerId: id, drucker: 'Brother QL-1100' })
+        .map((d) => [d.name, String(d.inhalt)]),
+    )
+    const cmd = dateien.get('druckbruecke-starten.cmd')!
+    for (const zeile of [
+      `set "DRUCK_DRUCKER_ID=${id}"`,
+      'set "DRUCK_ZIELE="',
+      'set "DRUCKER=Brother QL-1100"',
+    ]) {
+      assert.ok(cmd.includes(`${zeile}\r\n`), `fehlt: ${zeile}`)
+    }
+    assert.ok(dateien.get('druckbruecke-starten.sh')!.includes(`export DRUCK_DRUCKER_ID='${id}'`))
+    // Zwei Drucker an einem PC dürfen sich die Verknüpfung nicht überschreiben.
+    assert.ok(dateien.get('autostart-einrichten.cmd')!.includes('KRNL Druckbruecke QL Packtisch 1.lnk'))
+    assert.ok(dateien.get('LIESMICH.txt')!.includes('Einstellungen → Arbeitsplätze → Drucker'))
+
+    // Ohne Drucker-ID bleibt das Alt-Paket mit Zielen.
+    const alt = String(druckbrueckePaket(ANGABEN)[0].inhalt)
+    assert.ok(alt.includes('set "DRUCK_DRUCKER_ID="\r\n'))
+    assert.ok(alt.includes('set "DRUCK_ZIELE=labeldrucker"\r\n'))
+  })
 })

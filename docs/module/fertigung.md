@@ -43,7 +43,7 @@ Eine Baugruppe mit `bom_type = 'kit'` existiert nur auf dem Papier — sie liegt
 
 ## Arbeitsplätze und Arbeitsgänge (Ausbau 3, Migration 0021)
 
-- **`work_centers`** (mrp.workcenter): Kürzel, Name, **Stundensatz**, Plätze, Leistung in Prozent (80 % = braucht 25 % länger). Gepflegt unter *Fertigung → Arbeitsplätze*.
+- **`work_centers`** (mrp.workcenter): Kürzel, Name, **Stundensatz**, Plätze, Leistung in Prozent (80 % = braucht 25 % länger). Gepflegt unter *Fertigung → Arbeitsplätze*. Seit 0087 mit **Art** (Fertigung, Versand, Lager, Sonstiges) — Packtische und Montagetische stehen in derselben Liste und tragen die Drucker (*Einstellungen → Arbeitsplätze & Drucker*, docs/module/versand.md).
 - **`bom_operations`** (mrp.routing.workcenter): Arbeitsgänge der Stückliste mit Zeit je Referenzmenge und einmaliger Rüstzeit je Auftrag.
 - **`mo_operations`** (mrp.workorder): Kopie am Auftrag mit **eingefrorenem Stundensatz**. Vorgabezeit = (Rüstzeit + Zeit × Menge) ÷ Leistung.
 - Erfassung: „Starten" setzt die Uhr, „Fertig" beendet den Gang — mit Minutenangabe oder automatisch aus der gelaufenen Zeit. Bei der Fertigmeldung werden noch offene Gänge mit ihrer anteiligen Vorgabezeit geschlossen (`mo_operations_finalize`), damit auch eine Teilfertigung ihre Lohnkosten trägt.
@@ -74,7 +74,10 @@ Der Zettel existiert in zwei Ausgaben aus EINER Datenquelle
 (`src/modules/fertigung/zettel-daten.ts`): als HTML-Druckansicht
 (`/fertigung/<id>/druck`, `window.print()`; Sammeldruck mehrerer Zettel:
 `/fertigung/druck?ids=…`) und als PDF für die **Druckbrücke**
-(react-pdf, Ziel „zetteldrucker" — docs/module/versand.md). Barcodes
+(react-pdf — docs/module/versand.md). Der Knopf **„Drucken"** am Auftrag
+und der Bulk-Druck laufen über `fertigung.zettel_drucken`: auf dem
+Fertigungszettel-Drucker des Arbeitsplatzes, sonst auf dem Ersatzdrucker,
+sonst im Browser; „Ansicht" öffnet die HTML-Druckansicht. Barcodes
 serverseitig über bwip-js (SVG im HTML, PNG im PDF); keine Datei-Ablage,
 der Beleg entsteht bei jedem Aufruf frisch:
 
@@ -101,8 +104,9 @@ reserviert); startbare Aufträge sind anhakbar, „Alle auswählen" nimmt die
 gefilterte Liste. Der Abschluss ist eine **2-Stufen-Maske**:
 
 1. **Zettel drucken** (`fertigung.zettel_drucken`): reiht die
-   Fertigungszettel an der Druckbrücke ein (Ziel „zetteldrucker",
-   idempotent je Auftrag). Ohne konfigurierte Druckbrücke öffnet
+   Fertigungszettel am Drucker des Arbeitsplatzes bzw. am Ersatzdrucker
+   ein (idempotent je Auftrag und Drucker; vor dem ersten angelegten
+   Drucker über das Alt-Ziel „zetteldrucker"). Ohne Drucker öffnet
    stattdessen der Sammeldruck `/fertigung/druck?ids=…` im Tab.
 2. **Druck ok → Produktion starten** (`fertigung.massenstart`) — erst
    nach Stufe 1 frei; jede Änderung der Auswahl setzt zurück auf Stufe 1.

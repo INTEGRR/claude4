@@ -31,6 +31,11 @@ export async function bulkZettel(formData: FormData): Promise<ActionResult> {
   return serverAktion('fertigung.zettel_drucken', { formData })
 }
 
+/** Knopf am Auftrag: derselbe Druckweg wie der Bulk-Zettel (0087). */
+export async function zettelDrucken(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.zettel_drucken', { parameter: { ids: [moId] } })
+}
+
 export async function bulkStart(formData: FormData): Promise<ActionResult> {
   return serverAktion('fertigung.massenstart', { formData })
 }

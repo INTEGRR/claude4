@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { sql } from '@/db/client'
 import { dhlConfigured, dhlErreichbar } from '@/modules/versand/dhl'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
+import { aktiveDruckerVorhanden, stilleDrucker } from '@/modules/druck/abholen'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
 import { mailConfigured } from './mail'
@@ -67,6 +68,23 @@ export function standardSonden(): Sonde[] {
       dienst: 'druckbruecke',
       konfiguriert: false, // wird unten gesetzt (braucht die Datenbank)
       pruefen: async () => {
+        // Seit 0087 meldet sich jeder Agent an SEINEM Drucker — dann muss
+        // jeder aktive Drucker leben; ohne Drucker gilt der Alt-Herzschlag.
+        if (await aktiveDruckerVorhanden()) {
+          const still = await stilleDrucker(DRUCKBRUECKE_HEARTBEAT_MINUTEN)
+          if (still.length > 0) {
+            throw new Error(
+              `kein Agent: ${still
+                .map((d) =>
+                  d.zuletzt_gesehen
+                    ? `${d.name} (zuletzt ${zeitFormat(d.zuletzt_gesehen)})`
+                    : `${d.name} (nie gemeldet)`,
+                )
+                .join(', ')}`,
+            )
+          }
+          return
+        }
         const [row] = await sql<{ letzter: string | null }[]>`
           select max(value) as letzter
           from settings, jsonb_each_text(value -> 'agenten')

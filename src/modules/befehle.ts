@@ -73,6 +73,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/einstellungen/stammdaten', label: 'Einstellungen · Stammdaten (Kategorien, Steuern, Zahlungsbedingungen)', area: 'einstellungen' },
   { href: '/einstellungen/belege', label: 'Einstellungen · Belege & Freigaben', area: 'einstellungen' },
   { href: '/einstellungen/versand', label: 'Einstellungen · Versand & Druck', area: 'einstellungen' },
+  { href: '/einstellungen/arbeitsplaetze', label: 'Einstellungen · Arbeitsplätze & Drucker', area: 'einstellungen' },
   { href: '/einstellungen/versandregeln', label: 'Einstellungen · Versandregeln', area: 'einstellungen' },
   { href: '/einstellungen/kartonagen', label: 'Einstellungen · Kartonagen', area: 'einstellungen' },
   { href: '/einstellungen/finanzen', label: 'Einstellungen · Finanz-Stellschrauben', area: 'einstellungen' },

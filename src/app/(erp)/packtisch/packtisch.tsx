@@ -209,13 +209,15 @@ export function Packtisch() {
       const link = result && 'link' in result ? (result.link ?? null) : null
       setLabelLink(link)
       setPhase('done')
-      // Tab-Fallback bis zur Druckbrücke: das Label sofort öffnen, damit
-      // am Tisch gedruckt werden kann. Popup-Blocker fangen wir mit dem
-      // Knopf darunter ab.
+      // Ein Link kommt nur, wenn KEIN Drucker am Platz druckt (0087) — dann
+      // das Label sofort im Tab öffnen; Popup-Blocker fängt der Knopf
+      // darunter ab. Druckt die Brücke, öffnet nichts (kein Doppeldruck).
       if (link) window.open(link, '_blank', 'noopener')
+      const druckText = !link && result && 'info' in result ? result.info : null
       say(
         <>
-          <span className="mono">{doc.number}</span> versandfertig — Label bereit
+          <span className="mono">{doc.number}</span> versandfertig —{' '}
+          {druckText ?? 'Label bereit'}
         </>,
         'ok',
       )

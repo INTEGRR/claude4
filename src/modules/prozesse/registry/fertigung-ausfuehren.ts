@@ -1,5 +1,5 @@
 import { sql } from '@/db/client'
-import { druckbrueckeAktiv, zettelDruckEinreihen } from '@/modules/versand/druckbruecke'
+import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
@@ -34,25 +34,33 @@ export async function beginnen(_p: object, ctx: AktionsKontext): Promise<Aktions
 }
 
 /**
- * Bulk-Zettel: Druckaufträge fürs Ziel „zetteldrucker" einreihen. Ohne
- * konfigurierte Druckbrücke gibt es stattdessen den Link auf den
- * Browser-Sammeldruck — der Knopf tut dann sichtbar das Nächstbeste.
+ * Fertigungszettel drucken (Bulk und Knopf am Auftrag): je Auftrag an den
+ * A4-Drucker des Arbeitsplatzes, sonst an den Ersatz (0087). Ohne Drucker
+ * gibt es den Link auf den Browser-Sammeldruck — der Knopf tut dann
+ * sichtbar das Nächstbeste.
  */
-export async function zettelDrucken(p: { ids: string[] }): Promise<AktionsErgebnis> {
-  if (!(await druckbrueckeAktiv())) {
-    return {
-      text: 'PDF-Modus — Sammeldruck im Browser geöffnet (umstellen: Einstellungen → Versand & Druck).',
-      link: `/fertigung/druck?ids=${p.ids.join(',')}`,
+export async function zettelDrucken(
+  p: { ids: string[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'fertigungszettel')
+  let meldung: string | null = null
+  for (const moId of p.ids) {
+    const druck = await drucken(
+      'fertigungszettel',
+      { art: 'zettel', moId },
+      { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+      ziel,
+    )
+    if (!druck.gedruckt) {
+      return {
+        text: 'Kein Drucker für Fertigungszettel — Sammeldruck im Browser geöffnet (einrichten: Einstellungen → Arbeitsplätze).',
+        link: `/fertigung/druck?ids=${p.ids.join(',')}`,
+      }
     }
+    meldung = druck.meldung
   }
-  const eingereiht = await zettelDruckEinreihen(p.ids)
-  const doppelt = p.ids.length - eingereiht
-  return {
-    text:
-      `${eingereiht} Zettel an der Druckbrücke eingereiht` +
-      (doppelt > 0 ? ` (${doppelt} warteten dort schon)` : '') +
-      '.',
-  }
+  return { text: `${p.ids.length} Zettel: ${meldung ?? 'nichts zu drucken.'}` }
 }
 
 /**
@@ -307,6 +315,7 @@ export async function auftragDetails(
 export async function arbeitsplatzAnlegen(p: {
   code: string
   name: string
+  art: string
   cost_per_hour: number
   capacity: number
   time_efficiency: number
@@ -316,8 +325,8 @@ export async function arbeitsplatzAnlegen(p: {
   // Kürzel in beliebiger Schreibweise.
   const code = p.code.toUpperCase()
   await sql`
-    insert into work_centers (code, name, cost_per_hour, capacity, time_efficiency, note)
-    values (${code}, ${p.name}, ${p.cost_per_hour}, ${p.capacity}, ${p.time_efficiency},
+    insert into work_centers (code, name, art, cost_per_hour, capacity, time_efficiency, note)
+    values (${code}, ${p.name}, ${p.art}, ${p.cost_per_hour}, ${p.capacity}, ${p.time_efficiency},
             ${p.note ?? null})`
   return { text: `Arbeitsplatz ${code} angelegt.` }
 }
@@ -325,6 +334,7 @@ export async function arbeitsplatzAnlegen(p: {
 export async function arbeitsplatzAendern(
   p: {
     name: string
+    art?: string
     cost_per_hour: number
     capacity: number
     time_efficiency: number
@@ -336,6 +346,7 @@ export async function arbeitsplatzAendern(
   await sql`
     update work_centers set
       name = ${p.name},
+      art = coalesce(${p.art ?? null}, art),
       cost_per_hour = ${p.cost_per_hour},
       capacity = ${p.capacity},
       time_efficiency = ${p.time_efficiency},

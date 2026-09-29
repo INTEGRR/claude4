@@ -53,7 +53,12 @@ export default async function WorkCentersPage() {
       <PageHeader
         title="Arbeitsplätze"
         subtitle="Stundensatz und Leistung je Arbeitsplatz — die Grundlage der Lohnkosten in der Fertigung"
-        actions={<Link className="btn" href="/fertigung/stuecklisten">Zu den Stücklisten</Link>}
+        actions={
+          <>
+            <Link className="btn" href="/einstellungen/arbeitsplaetze">Arten &amp; Drucker</Link>
+            <Link className="btn" href="/fertigung/stuecklisten">Zu den Stücklisten</Link>
+          </>
+        }
       />
 
       <div className="grid-3" style={{ marginBottom: 16 }}>

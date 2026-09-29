@@ -9,6 +9,42 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-29 — Arbeitsplätze mit Druckern: jeder Druck kommt am Platz des PCs heraus
+
+ANVIL hat zwei Packtische mit je einem Labeldrucker (verschiedene
+Formate), einen Etikettendrucker für Fertigungsaufträge und einen
+A4-Drucker. Die Druckbrücke kannte nur zwei feste Ziele — bei zwei Tischen
+druckte der Agent, der zuerst abholte; das DHL-Format galt global; zwei
+Agenten konnten denselben Auftrag ziehen; der Packtisch öffnete zusätzlich
+immer einen Tab (Doppeldruck).
+
+**Entschieden (Interview mit dem Betreiber):**
+
+- **Eine Liste für alles:** Packtische, Montagetische usw. SIND die
+  Arbeitsplätze der Fertigung (`work_centers`), erweitert um eine Art
+  (Migration 0087). Dazu Tabellen `drucker` (Typ, Maße, DHL-Format,
+  Windows-Name, Herzschlag) und `arbeitsplatz_druckwege` (Platz × Druckart
+  → Drucker; Platz leer = **Ersatzdrucker**). Gibt es weder Weg noch
+  Ersatz, öffnet das PDF im Browser.
+- **Der PC merkt sich seinen Platz** (Cookie `erp_arbeitsplatz`, 400
+  Tage), sichtbar und umschaltbar im Kopf; jede Anmeldung dort druckt auf
+  seinen Druckern. Die Wahl ist eine Rahmen-Aktion (Geräteeinstellung),
+  `serverAktion` reicht die ID als `arbeitsplatzId` an die Executoren.
+- **Ein Agent je Drucker** (`?drucker=<id>`), Abholen mit `for update skip
+  locked` und `abgeholt_am` (nach zwei Minuten ohne Quittung erneut
+  angeboten); Paket je Drucker unter Einstellungen → Arbeitsplätze &
+  Drucker. Alt-Agenten mit Zielen laufen weiter, bis der erste Drucker
+  angelegt ist. Der Dienste-Wächter prüft dann jeden aktiven Drucker.
+- **DHL-Format je Drucker** schon beim Erzeugen des Labels; **kein Tab**
+  am Packtisch, wenn die Brücke druckt.
+- Fertigungsaufträge Montagetischen zuweisen ist der nächste Schritt.
+
+Nachweis: `tests/prozesse/druckwege.test.ts` (zwei Tische, Formate,
+Ersatz, Browser-Fallback, parallele Abholer, Alt-Agent, Wächter),
+`tests/druck-routing.test.ts`, `tests/druckbruecke-paket.test.ts`,
+`tests/demodaten.test.ts`. Doku: [module/versand.md](module/versand.md)
+„Druckbrücke", [module/einstellungen.md](module/einstellungen.md).
+
 ## 2026-09-29 — Kunden aus Shopify nur mit Bestellung übernehmen
 
 Die Kunden-Erstübernahme holte alle Shopify-Kunden: 7.567 Kontakte, davon

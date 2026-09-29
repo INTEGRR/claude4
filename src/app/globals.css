@@ -295,6 +295,17 @@ a:hover { text-decoration: underline; }
 .systemzeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .systemzeile .systemtext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Arbeitsplatz dieses PCs (0087): Leuchte plus Auswahl, ohne Wahl in Warnfarbe. */
+.arbeitsplatz-waehler { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.arbeitsplatz-waehler select { padding: 4px 8px; font-size: 13px; max-width: 200px; }
+.arbeitsplatz-waehler.offen select { border-color: var(--warn); }
+
+/* Druckwege-Matrix (Einstellungen → Arbeitsplätze): eine Auswahl je Zelle. */
+.druckwege td { vertical-align: top; }
+.druckweg-wahl { width: 100%; min-width: 150px; padding: 4px 6px; font-size: 13px; color: var(--text-muted); }
+.druckweg-wahl.gesetzt { color: inherit; }
+.druckweg-wahl[aria-invalid] { border-color: var(--danger); }
+
 .scan-form { flex-wrap: nowrap; min-width: 0; }
 .scan-zustand { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .scan-form input { width: 280px; min-width: 90px; }
@@ -1026,10 +1037,10 @@ label.field > span {
      damit deren Kinder direkt im Raster liegen. */
   .topbar {
     display: grid;
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto auto 1fr auto auto;
     grid-template-areas:
-      'schalter zustand befehle thema'
-      'scan     scan    scan    scan';
+      'schalter zustand platz befehle thema'
+      'scan     scan    scan  scan    scan';
     align-items: center;
     gap: 10px;
   }
@@ -1039,6 +1050,9 @@ label.field > span {
   .befehls-knopf { grid-area: befehle; }
   .theme-toggle { grid-area: thema; }
   .scan-form { grid-area: scan; }
+  .arbeitsplatz-waehler { grid-area: platz; }
+  .arbeitsplatz-waehler { min-width: 0; }
+  .arbeitsplatz-waehler select { flex: 1; min-width: 0; max-width: none; }
   .scan-form input { flex: 1; width: auto; }
   /* Ohne Tastatur ist der F2-Hinweis nur Ballast. */
   .scan-taste { display: none; }

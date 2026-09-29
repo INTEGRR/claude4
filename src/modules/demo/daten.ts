@@ -245,7 +245,10 @@ export async function demodatenEinspielen(sql: Client): Promise<string[]> {
   for (const w of workCenters) {
     const [row] = await sql<{ id: string }[]>`
       insert into work_centers (code, name, cost_per_hour)
-      values (${w.code}, ${w.name}, ${w.rate}) returning id`
+      values (${w.code}, ${w.name}, ${w.rate})
+      -- Arbeitsplätze überstehen „Betriebsdaten löschen" (0087): vorhandene wiederverwenden.
+      on conflict (code) do update set name = excluded.name
+      returning id`
     wcIds.set(w.code, row.id)
   }
 

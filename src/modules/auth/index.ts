@@ -91,7 +91,8 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 /** Im Cookie steht ein Zufallswert, in der Datenbank nur dessen Hash (zweifaktor.ts). */
 const hashToken = tokenHash
 
-function cookieOptionen(maxAgeSekunden: number) {
+/** Cookie-Optionen der App — auch für das Arbeitsplatz-Cookie des Geräts (druck/arbeitsplatz.ts). */
+export function cookieOptionen(maxAgeSekunden: number) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,

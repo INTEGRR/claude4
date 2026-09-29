@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { MODELL_KATALOG, type ModellId } from '../../ki/modelle.ts'
 import type { RegistrierteAktion } from './typen.ts'
 import { DRUCKFORMATE, FINANZ_FELDER, optionaleZahl, zahlAusFormular } from '../../einstellungen/finanz-parameter.ts'
+import { DRUCKART_LABELS, DRUCKARTEN, type Druckart } from '../../druck/routing.ts'
 
 // Nur geprüfte Katalog-Modelle sind wählbar — ein Freitextfeld wäre eine
 // stille Tippfehler-Falle, die erst beim nächsten KI-Aufruf explodiert.
@@ -976,6 +977,100 @@ export const EINSTELLUNGEN = {
       notiz: String(fd.get('notiz') ?? '').trim() || undefined,
     }),
     revalidate: ['/einstellungen/registrierungen'],
+  },
+
+  // --- Arbeitsplätze und Drucker (0087) --------------------------------------
+  // Die Arbeitsplätze selbst pflegen fertigung.arbeitsplatz_anlegen/_aendern
+  // (eine Liste für alles); hier kommen Drucker und Druckwege dazu.
+
+  'einstellungen.drucker_speichern': {
+    label: 'Drucker speichern',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Legt einen Drucker der Druckbrücke an oder ändert ihn (mit id): Standort, Name unter ' +
+      'Windows, Typ (Etikett oder A4), Etikettenmaße und das DHL-Format für Versandlabels, ' +
+      'die auf ihm gedruckt werden.',
+    bindung: 'frei',
+    schema: z.object({
+      id: z.string().uuid().optional().describe('leer = neu anlegen'),
+      name: z.string().min(1, 'Der Drucker braucht einen Namen.').max(100),
+      work_center_id: z.string().uuid().optional().describe('Standort (Arbeitsplatz)'),
+      druckername: z.string().max(200).optional().describe('Name unter Windows; leer = Standarddrucker'),
+      typ: z.enum(['label', 'a4']),
+      breite_mm: z.number().positive().max(1000).optional(),
+      hoehe_mm: z.number().positive().max(1000).optional(),
+      dhl_format: z
+        .enum(DRUCKFORMATE.map((f) => f.wert) as [string, ...string[]])
+        .optional()
+        .describe('leer = Standardformat aus Versand & Druck'),
+    }),
+    zusammenfassung: (p) =>
+      `${p.name} (${p.typ === 'a4' ? 'A4' : `Etikett ${p.breite_mm ?? '?'} × ${p.hoehe_mm ?? '?'} mm`})`,
+    formdata: (fd) => ({
+      id: String(fd.get('id') ?? '') || undefined,
+      name: String(fd.get('name') ?? '').trim(),
+      work_center_id: String(fd.get('work_center_id') ?? '') || undefined,
+      druckername: String(fd.get('druckername') ?? '').trim() || undefined,
+      typ: String(fd.get('typ') ?? 'label'),
+      breite_mm: optionaleZahl(fd.get('breite_mm')),
+      hoehe_mm: optionaleZahl(fd.get('hoehe_mm')),
+      dhl_format: String(fd.get('dhl_format') ?? '') || undefined,
+    }),
+    revalidate: ['/einstellungen/arbeitsplaetze'],
+  },
+
+  'einstellungen.drucker_schalten': {
+    label: 'Drucker an/aus',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Schaltet einen Drucker ab oder wieder an. Abgeschaltet bekommt er keine Aufträge — ' +
+      'seine Druckwege fallen auf den Ersatzdrucker bzw. den Browser zurück.',
+    bindung: 'beleg',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/arbeitsplaetze'],
+  },
+
+  'einstellungen.drucker_loeschen': {
+    label: 'Drucker löschen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Löscht einen Drucker samt seiner Druckwege. Offene Aufträge an ihm werden storniert ' +
+      '(als Fehler vermerkt); erledigte behalten ihren Verlauf ohne Drucker.',
+    bindung: 'beleg',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/arbeitsplaetze'],
+  },
+
+  'einstellungen.druckweg_setzen': {
+    label: 'Druckweg setzen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Legt fest, auf welchem Drucker ein Arbeitsplatz eine Druckart druckt — ohne ' +
+      'Arbeitsplatz ist es der Ersatzdrucker für alle Plätze ohne eigenen Weg. Ohne Drucker ' +
+      'wird der Weg entfernt.',
+    bindung: 'frei',
+    schema: z.object({
+      work_center_id: z.string().uuid().optional().describe('leer = Ersatz für alle Plätze'),
+      druckart: z.enum(DRUCKARTEN),
+      drucker_id: z.string().uuid().optional().describe('leer = Weg entfernen'),
+    }),
+    zusammenfassung: (p) =>
+      `${DRUCKART_LABELS[p.druckart as Druckart]}: ${p.drucker_id ? 'Drucker gesetzt' : 'Weg entfernt'}` +
+      (p.work_center_id ? '' : ' (Ersatz)'),
+    formdata: (fd) => ({
+      work_center_id: String(fd.get('work_center_id') ?? '') || undefined,
+      druckart: String(fd.get('druckart') ?? ''),
+      drucker_id: String(fd.get('drucker_id') ?? '') || undefined,
+    }),
+    revalidate: ['/einstellungen/arbeitsplaetze'],
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

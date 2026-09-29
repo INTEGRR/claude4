@@ -238,9 +238,14 @@ export default async function IntegrationenPage() {
       (select count(*) from druckauftraege where status = 'offen')::int as offen,
       (select count(*) from druckauftraege where status = 'fehler'
         and created_at > now() - interval '7 days')::int as fehler`
-  const druckAgenten = Object.entries(druck.agenten ?? {}).sort(
-    (a, b) => (a[1] < b[1] ? 1 : -1),
-  )
+  // Agenten je Drucker (0087) melden sich am Drucker, Alt-Agenten in settings.
+  const druckerAgenten = await sql<{ name: string; zuletzt: string }[]>`
+    select name, zuletzt_gesehen::text as zuletzt from drucker
+    where aktiv and zuletzt_gesehen is not null`
+  const druckAgenten = [
+    ...Object.entries(druck.agenten ?? {}),
+    ...druckerAgenten.map((d) => [d.name, d.zuletzt] as [string, string]),
+  ].sort((a, b) => (new Date(a[1]) < new Date(b[1]) ? 1 : -1))
   const druckKonfig = await druckbrueckeKonfig()
   const brueckeAktiv = druckKonfig.modus === 'bruecke' && Boolean(druckKonfig.token)
   const dienste = await dienstStatusLesen(sql)

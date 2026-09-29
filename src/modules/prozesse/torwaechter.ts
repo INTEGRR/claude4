@@ -22,6 +22,8 @@ export interface AktionsAufruf {
   parameter?: unknown
   formData?: FormData
   recordId?: string
+  /** Arbeitsplatz des Geräts (Cookie, 0087) — Kontext wie der Benutzer, kein Parameter. */
+  arbeitsplatzId?: string
 }
 
 /**
@@ -184,6 +186,10 @@ export async function aktionAusfuehrenGeprueft(
         role: nutzer.role,
         recordId,
         userId: nutzer.id,
+        arbeitsplatzId:
+          aufruf.arbeitsplatzId && UUID_MUSTER.test(aufruf.arbeitsplatzId)
+            ? aufruf.arbeitsplatzId
+            : undefined,
       })) ?? {}
   } catch (err) {
     // Fachliche Fehler aus den SQL-Funktionen (raise exception) verständlich

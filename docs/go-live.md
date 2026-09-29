@@ -131,9 +131,12 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       Testanfrage abschicken, im ERP annehmen, Retourenlabel mit RMA-Nummer
       im Geschäftskundenportal sichtbar; Rückversand-Label aus einer
       Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
-- [ ] Druckbrücke am Packtisch-Rechner einrichten
-      ([module/versand.md „Druckbrücke"](module/versand.md)); KRNL liefert
-      die Schritt-für-Schritt-Anleitung.
+- [ ] Druckbrücke einrichten
+      ([module/versand.md „Druckbrücke"](module/versand.md)): unter
+      Einstellungen → Arbeitsplätze & Drucker Packtische, Montagetische,
+      Drucker (Etikettenmaße messen) und Druckwege anlegen, je Drucker das
+      Paket laden und am PC starten, an jedem PC oben im Kopf einmal den
+      Arbeitsplatz wählen.
 
 ## 6. Shopify (im Runbook, Schritt 7)
 

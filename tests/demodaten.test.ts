@@ -97,7 +97,22 @@ describe('Neustart: demodaten_loeschen', () => {
   })
 
   test('löscht Bewegungs- und Stammdaten, behält Struktur und Konten', async () => {
+    // Arbeitsplatz mit Drucker und Druckweg (0087) — Konfiguration, die bleibt.
+    const [platz] = await sql<{ id: string }[]>`
+      insert into work_centers (code, name, art) values ('PACK1', 'Packtisch 1', 'versand')
+      on conflict (code) do update set name = excluded.name returning id`
+    const [drucker] = await sql<{ id: string }[]>`
+      insert into drucker (name, work_center_id, typ, breite_mm, hoehe_mm, dhl_format)
+      values ('Brother Packtisch 1', ${platz.id}, 'label', 103, 150, '910-300-400') returning id`
+    await sql`insert into arbeitsplatz_druckwege (work_center_id, druckart, drucker_id)
+              values (${platz.id}, 'versandlabel', ${drucker.id})`
+
     await sql`select demodaten_loeschen()`
+
+    for (const tabelle of ['work_centers', 'drucker', 'arbeitsplatz_druckwege']) {
+      const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from ${sql(tabelle)}`
+      assert.ok(n > 0, `${tabelle} ist Konfiguration und muss erhalten bleiben`)
+    }
 
     for (const tabelle of ['product_templates', 'partners', 'sales_orders',
                            'stock_moves', 'stock_quants', 'stock_valuation_layers',
@@ -221,6 +236,10 @@ describe('Neustart: demodaten_loeschen', () => {
     const [{ orte }] = await sql<{ orte: number }[]>`
       select count(*)::int as orte from stock_locations`
     assert.ok(orte > 0, 'Lagerorte bleiben')
+    for (const tabelle of ['work_centers', 'drucker', 'arbeitsplatz_druckwege']) {
+      const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from ${sql(tabelle)}`
+      assert.equal(n, 0, `${tabelle} gehört zum Betrieb und fällt beim Werkszustand`)
+    }
   })
 
   test('Werkszustand verweigert sich ohne gültiges Admin-Konto', async () => {

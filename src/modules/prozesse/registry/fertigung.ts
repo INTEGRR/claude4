@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { parseQtyMap } from '../../shared/form.ts'
 import { geld, type RegistrierteAktion } from './typen.ts'
+import { ARBEITSPLATZ_ARTEN } from '../../druck/routing.ts'
 
 /**
  * Aktionen der Fertigung: Fertigungsaufträge, Demontage, Stücklisten,
@@ -58,12 +59,12 @@ export const FERTIGUNG = {
   },
 
   'fertigung.zettel_drucken': {
-    label: 'Fertigungszettel drucken (Auswahl)',
+    label: 'Fertigungszettel drucken',
     bereich: 'fertigung',
     beschreibung:
-      'Reiht die Fertigungszettel der ausgewählten Aufträge an der Druckbrücke ein ' +
-      '(Ziel „zetteldrucker"). Ohne konfigurierte Druckbrücke öffnet stattdessen der ' +
-      'Sammeldruck im Browser.',
+      'Druckt die Fertigungszettel der Aufträge über die Druckbrücke — auf dem A4-Drucker ' +
+      'des Arbeitsplatzes, sonst auf dem Ersatzdrucker. Ohne Drucker öffnet stattdessen ' +
+      'der Sammeldruck im Browser.',
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
@@ -304,12 +305,15 @@ export const FERTIGUNG = {
     label: 'Arbeitsplatz anlegen',
     bereich: 'fertigung',
     ki: true,
-    beschreibung: 'Legt einen Arbeitsplatz mit Kostensatz, Kapazität und Effizienz an.',
+    beschreibung:
+      'Legt einen Arbeitsplatz an — Montagetisch, Packtisch, Lagerplatz … (Art) mit ' +
+      'Kostensatz, Kapazität und Effizienz. Drucker und Druckwege hängen daran.',
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
       code: z.string().min(1, 'Bitte ein Kürzel vergeben').max(20),
       name: z.string().min(1, 'Bitte einen Namen vergeben').max(100),
+      art: z.enum(ARBEITSPLATZ_ARTEN).default('fertigung'),
       cost_per_hour: z.number().nonnegative().default(0),
       capacity: z.number().positive().default(1),
       time_efficiency: z.number().positive().default(100).describe('in Prozent, Standard 100'),
@@ -320,22 +324,25 @@ export const FERTIGUNG = {
     formdata: (fd) => ({
       code: String(fd.get('code') ?? '').trim().toUpperCase(),
       name: String(fd.get('name') ?? '').trim(),
+      art: String(fd.get('art') ?? '') || undefined,
       cost_per_hour: Number(fd.get('cost_per_hour') ?? 0) || 0,
       capacity: Number(fd.get('capacity') ?? 1) || 1,
       time_efficiency: Number(fd.get('time_efficiency') ?? 100) || 100,
       note: String(fd.get('note') ?? '').trim() || undefined,
     }),
-    revalidate: ['/fertigung/arbeitsplaetze'],
+    revalidate: ['/fertigung/arbeitsplaetze', '/einstellungen/arbeitsplaetze'],
   },
 
   'fertigung.arbeitsplatz_aendern': {
     label: 'Arbeitsplatz ändern',
     bereich: 'fertigung',
-    beschreibung: 'Ändert Name, Kostensatz, Kapazität, Effizienz und Aktiv-Status eines Arbeitsplatzes.',
+    beschreibung:
+      'Ändert Name, Art, Kostensatz, Kapazität, Effizienz und Aktiv-Status eines Arbeitsplatzes.',
     bindung: 'beleg',
     prozessfrei: true,
     schema: z.object({
       name: z.string().min(1).max(100),
+      art: z.enum(ARBEITSPLATZ_ARTEN).optional().describe('leer = unverändert'),
       cost_per_hour: z.number().nonnegative().default(0),
       capacity: z.number().positive().default(1),
       time_efficiency: z.number().positive().default(100),
@@ -344,13 +351,14 @@ export const FERTIGUNG = {
     }),
     formdata: (fd) => ({
       name: String(fd.get('name') ?? '').trim(),
+      art: String(fd.get('art') ?? '') || undefined,
       cost_per_hour: Number(fd.get('cost_per_hour') ?? 0) || 0,
       capacity: Number(fd.get('capacity') ?? 1) || 1,
       time_efficiency: Number(fd.get('time_efficiency') ?? 100) || 100,
       active: fd.get('active') === 'on',
       note: String(fd.get('note') ?? '').trim() || undefined,
     }),
-    revalidate: ['/fertigung/arbeitsplaetze'],
+    revalidate: ['/fertigung/arbeitsplaetze', '/einstellungen/arbeitsplaetze'],
   },
 
   'fertigung.arbeitsgang_hinzufuegen': {

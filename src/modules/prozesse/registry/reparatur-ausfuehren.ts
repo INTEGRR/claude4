@@ -1,4 +1,5 @@
 import { sql, tx } from '@/db/client'
+import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { createLabelForRepair, createReturnLabelForPartner } from '@/modules/versand/service'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
@@ -227,9 +228,15 @@ export async function rueckversandLabel(
     await sql`select repair_ship(${id}, ${ctx.actor}, ${p.vermerk ?? 'ohne Versandlabel (Abholung/Eigenversand)'})`
     text = 'Rückgabe ohne Versandlabel vermerkt — der Auftrag ist abgeschlossen.'
   } else {
+    // Labeldrucker des Platzes: bestimmt das DHL-Format und druckt (0087).
+    const ziel = await zielDrucker(ctx.arbeitsplatzId, 'versandlabel')
     let label: Awaited<ReturnType<typeof createLabelForRepair>>
     try {
-      label = await createLabelForRepair(id, { weightG: p.weight_g, product: p.dhl_product })
+      label = await createLabelForRepair(id, {
+        weightG: p.weight_g,
+        product: p.dhl_product,
+        printFormat: ziel?.dhlFormat ?? undefined,
+      })
     } catch (err) {
       const grund = (err instanceof Error ? err.message : String(err)).replace(/^error: /, '')
       await sql`select log_event('repair_order', ${id}::uuid, 'error',
@@ -238,6 +245,13 @@ export async function rueckversandLabel(
     }
     await sql`select repair_ship(${id}, ${ctx.actor}, ${p.vermerk ?? `DHL ${label.shipmentNumber}`})`
     text = `DHL-Label ${label.shipmentNumber} (${label.product}) erstellt — der Auftrag ist versendet.`
+    const druck = await drucken(
+      'versandlabel',
+      { art: 'label', shipmentId: label.shipmentId },
+      { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+      ziel,
+    )
+    if (druck.gedruckt) text += ` ${druck.meldung}`
   }
   return { text, recordId: id }
 }

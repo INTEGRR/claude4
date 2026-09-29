@@ -23,7 +23,8 @@ Ereignis-Monitor (`/integrationen`).
 | | Sicherheit | `/einstellungen/sicherheit` | Pflicht für den zweiten Faktor, Konten ohne 2FA, Regeln der Anmeldung (Info) | `settings.sicherheit` | `einstellungen.sicherheit_setzen` |
 | | Stammdaten | `/einstellungen/stammdaten` | Produktkategorien, Steuern, Zahlungsbedingungen, Tags (löschen mit Rückfrage) | `product_categories`, `taxes`, `payment_terms`, `tags` | `einstellungen.kategorie_anlegen`, `…steuer_anlegen`, `…zahlungsbedingung_anlegen`, `…tag_loeschen` |
 | Abläufe | Belege & Freigaben | `/einstellungen/belege` | Sperren beim Bestätigen, Freigabegrenze Einkauf, Nummernkreise (nur lesen) | `settings.sales`, `settings.purchase`, `settings.freigaben` | `einstellungen.belegverhalten_setzen`, `einstellungen.freigaben_setzen` |
-| | Versand & Druck | `/einstellungen/versand` | Labelformat, Druckweg (PDF oder Druckbrücke), Agenten-Stand | `settings.dhl.print_format`, `settings.druckbruecke` | `einstellungen.versand_vorgaben_setzen`, `einstellungen.druckbruecke_setzen` |
+| | Versand & Druck | `/einstellungen/versand` | Standard-Labelformat, Druckweg (PDF oder Druckbrücke), Alt-Agenten | `settings.dhl.print_format`, `settings.druckbruecke` | `einstellungen.versand_vorgaben_setzen`, `einstellungen.druckbruecke_setzen` |
+| | Arbeitsplätze & Drucker | `/einstellungen/arbeitsplaetze` | Arbeitsplätze mit Art, Drucker (Typ, Maße, DHL-Format, Agent-Stand, Paket je Drucker), Druckwege je Platz und Druckart samt Ersatz | `work_centers`, `drucker`, `arbeitsplatz_druckwege` | `fertigung.arbeitsplatz_anlegen/_aendern`, `einstellungen.drucker_speichern/_schalten/_loeschen`, `einstellungen.druckweg_setzen` |
 | | Versandregeln | `/einstellungen/versandregeln` | Produkt/Versandart je Bedingung, von oben nach unten | `shipping_rules` | `versand.versandregel_*` |
 | | Kartonagen | `/einstellungen/kartonagen` | Verpackungen, Gewicht, Verbrauch | `packagings` | `versand.kartonage_*` |
 | | Finanzen | `/einstellungen/finanzen` | Stellschrauben der Cashflow-Prognose (14 Felder) | `settings.finanzen` (Merge) | `einstellungen.finanz_parameter_setzen` |
@@ -50,7 +51,8 @@ leitet weiter; der Knopf auf der Produktliste erscheint nur für Admins.
   `bindung 'frei'`), gespeichert per **Merge** — ein Formular überschreibt
   nie Schlüssel, die es nicht kennt. Der Wächter verbietet direkte
   `settings`-Schreiber in `src/app` (einzige Ausnahme: der Heartbeat der
-  Druck-Agenten, `api/druck/abholen`).
+  Alt-Agenten der Druckbrücke, `api/druck/abholen`; Agenten mit Drucker
+  melden sich an `drucker.zuletzt_gesehen`).
 - **Ein Bereich je Thema, eine Karte je Einstellung**: Titel ohne Klammer-
   Erklärung, Formular, Speichern, darunter ein Satz zur Wirkung („gilt
   sofort", „ab dem nächsten Label"). `notice` nur für Zustände und

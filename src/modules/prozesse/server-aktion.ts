@@ -6,6 +6,7 @@ import { registrierteAktion } from './registry/index.ts'
 import type { AktionsName } from './registry/index.ts'
 import type { AktionsErgebnis } from './registry/typen.ts'
 import { aktionAusfuehrenGeprueft } from './torwaechter.ts'
+import { arbeitsplatzIdDesGeraets } from '@/modules/druck/arbeitsplatz'
 
 /**
  * Wrapper-Kern für Server Actions: aus einer bestehenden Action wird ein
@@ -25,10 +26,13 @@ export async function serverAktion(
   aufruf: { recordId?: string; formData?: FormData; parameter?: unknown } = {},
 ): Promise<ActionResult> {
   const user = await requireUser()
+  // Der Arbeitsplatz des Geräts reist als Kontext mit — Druckaktionen
+  // drucken auf dessen Druckern (0087).
+  const arbeitsplatzId = (await arbeitsplatzIdDesGeraets()) ?? undefined
 
   let ergebnis: AktionsErgebnis
   try {
-    ergebnis = await aktionAusfuehrenGeprueft(name, aufruf, user)
+    ergebnis = await aktionAusfuehrenGeprueft(name, { ...aufruf, arbeitsplatzId }, user)
   } catch (err) {
     return actionFail(err)
   }

@@ -291,6 +291,10 @@ const RAHMEN_AKTIONEN = new Set([
   // kein Beleg, kein Bereich — mit eigenem Audit-Eintrag am Benutzer.
   'konto:backupCodesErneuern',
   'konto:geraetWiderrufen',
+  // Arbeitsplatz dieses PCs (0087): Geräteeinstellung wie „Gerät merken" —
+  // setzt nur ein Browser-Cookie, protokolliert am Benutzer; die Druck-
+  // FACHAKTIONEN lesen es und laufen weiter durch den Torwächter.
+  'arbeitsplatz-action:arbeitsplatzWaehlen',
 ])
 
 describe('Registry-Abdeckung (statisch)', () => {

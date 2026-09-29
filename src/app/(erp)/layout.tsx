@@ -18,6 +18,9 @@ import { pflichtGilt, sicherheitsEinstellung } from '@/modules/auth/zweifaktor'
 import { DIENST_LABELS, gestoerteDienste } from '@/modules/integrationen/wache'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
+import { ArbeitsplatzWaehler } from '@/components/arbeitsplatz-waehler'
+import { arbeitsplaetzeZurAuswahl, arbeitsplatzIdDesGeraets } from '@/modules/druck/arbeitsplatz'
+import { arbeitsplatzWaehlen } from './arbeitsplatz-action'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,6 +130,13 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   // Dienste-Wächter (0085): eine Störung schlägt jede Zählerei — sie steht
   // zuerst, mit Namen, damit niemand erst den Monitor öffnen muss.
   const stoerungen = await gestoerteDienste(sql)
+
+  // Arbeitsplatz dieses PCs (0087): erscheint, sobald Arbeitsplätze angelegt
+  // sind — ohne Wahl in Warnfarbe, denn dann druckt der Ersatzdrucker.
+  const [plaetze, arbeitsplatzId] = await Promise.all([
+    arbeitsplaetzeZurAuswahl(),
+    arbeitsplatzIdDesGeraets(),
+  ])
   const systemzustand =
     stoerungen.length > 0
       ? `Störung: ${stoerungen.map((d) => DIENST_LABELS[d]).join(', ')}`
@@ -360,6 +370,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             <span className="systemtext">{systemzustand}</span>
           </div>
           <div className="actions">
+            {plaetze.length > 0 && (
+              <ArbeitsplatzWaehler plaetze={plaetze} aktuell={arbeitsplatzId} action={arbeitsplatzWaehlen} />
+            )}
             <BefehlsOverlay
               aktionen={befehle.aktionen}
               seiten={befehle.seiten}

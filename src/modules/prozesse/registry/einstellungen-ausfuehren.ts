@@ -1111,3 +1111,94 @@ export async function werkszustand(
       'alle anderen Konten und die selbst gebauten Prozessversionen sind entfernt.',
   }
 }
+
+// --- Arbeitsplätze und Drucker (0087) ----------------------------------------
+
+export async function druckerSpeichern(p: {
+  id?: string
+  name: string
+  work_center_id?: string
+  druckername?: string
+  typ: 'label' | 'a4'
+  breite_mm?: number
+  hoehe_mm?: number
+  dhl_format?: string
+}): Promise<AktionsErgebnis> {
+  // Etiketten werden in der Größe des Druckers gerendert — ohne Maße ginge
+  // das nicht (die Datenbank prüft es ebenfalls, hier mit Klartext).
+  if (p.typ === 'label' && !(p.breite_mm && p.hoehe_mm)) {
+    throw new Error('Etikettendrucker brauchen Breite und Höhe des Etiketts in mm.')
+  }
+  const breite = p.typ === 'label' ? p.breite_mm! : null
+  const hoehe = p.typ === 'label' ? p.hoehe_mm! : null
+  const [doppelt] = await sql<{ id: string }[]>`
+    select id from drucker where lower(name) = lower(${p.name})
+      and id is distinct from ${p.id ?? null}::uuid`
+  if (doppelt) throw new Error(`Es gibt schon einen Drucker „${p.name}".`)
+
+  if (p.id) {
+    const r = await sql`
+      update drucker set name = ${p.name}, work_center_id = ${p.work_center_id ?? null},
+        druckername = ${p.druckername ?? null}, typ = ${p.typ},
+        breite_mm = ${breite}, hoehe_mm = ${hoehe}, dhl_format = ${p.dhl_format ?? null}
+      where id = ${p.id}`
+    if (r.count === 0) throw new Error('Drucker nicht gefunden.')
+    return { text: `Drucker „${p.name}" gespeichert.`, recordId: p.id }
+  }
+  const [neu] = await sql<{ id: string }[]>`
+    insert into drucker (name, work_center_id, druckername, typ, breite_mm, hoehe_mm, dhl_format)
+    values (${p.name}, ${p.work_center_id ?? null}, ${p.druckername ?? null}, ${p.typ},
+            ${breite}, ${hoehe}, ${p.dhl_format ?? null})
+    returning id`
+  return {
+    text: `Drucker „${p.name}" angelegt — jetzt die Druckwege setzen und das Paket für den PC laden.`,
+    recordId: neu.id,
+  }
+}
+
+export async function druckerSchalten(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [d] = await sql<{ name: string; aktiv: boolean }[]>`
+    update drucker set aktiv = not aktiv where id = ${ctx.recordId!} returning name, aktiv`
+  if (!d) throw new Error('Drucker nicht gefunden.')
+  return {
+    text: `„${d.name}" ${d.aktiv ? 'ist wieder aktiv' : 'ist abgeschaltet — seine Wege fallen auf den Ersatz zurück'}.`,
+    recordId: ctx.recordId,
+  }
+}
+
+export async function druckerLoeschen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  return tx(async (t) => {
+    // Offene Aufträge hätten ohne Drucker keinen Abholer mehr — und dürfen
+    // auch nicht an einen Alt-Agenten rutschen (drucker_id null).
+    const offen = await t`
+      update druckauftraege set status = 'fehler', fehler = 'Drucker gelöscht'
+      where drucker_id = ${ctx.recordId!} and status = 'offen'`
+    const [d] = await t<{ name: string }[]>`
+      delete from drucker where id = ${ctx.recordId!} returning name`
+    if (!d) throw new Error('Drucker nicht gefunden.')
+    return {
+      text:
+        `Drucker „${d.name}" gelöscht.` +
+        (offen.count > 0 ? ` ${offen.count} offene(r) Auftrag/Aufträge storniert.` : ''),
+    }
+  })
+}
+
+export async function druckwegSetzen(p: {
+  work_center_id?: string
+  druckart: string
+  drucker_id?: string
+}): Promise<AktionsErgebnis> {
+  const platz = p.work_center_id ?? null
+  if (!p.drucker_id) {
+    await sql`
+      delete from arbeitsplatz_druckwege
+      where work_center_id is not distinct from ${platz}::uuid and druckart = ${p.druckart}`
+    return { text: 'Druckweg entfernt.' }
+  }
+  await sql`
+    insert into arbeitsplatz_druckwege (work_center_id, druckart, drucker_id)
+    values (${platz}, ${p.druckart}, ${p.drucker_id})
+    on conflict (work_center_id, druckart) do update set drucker_id = excluded.drucker_id`
+  return { text: 'Druckweg gesetzt.' }
+}

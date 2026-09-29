@@ -7,7 +7,7 @@ import {
   queueFulfillmentForPicking,
   syncTracking,
 } from '@/modules/versand/service'
-import { druckbrueckeAktiv, labelDruckEinreihen } from '@/modules/versand/druckbruecke'
+import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
@@ -19,18 +19,18 @@ export async function labelErstellen(
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const pickingId = ctx.recordId!
+  // Der Labeldrucker des Platzes bestimmt das DHL-Format — schon beim Erzeugen.
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'versandlabel')
+  let result: Awaited<ReturnType<typeof createLabelForPicking>>
   try {
-    const result = await createLabelForPicking(pickingId, {
+    result = await createLabelForPicking(pickingId, {
       weightG: p.weight_g,
       product: p.dhl_product,
+      printFormat: ziel?.dhlFormat ?? undefined,
     })
     if (result.warnings.length > 0) {
       await sql`select log_event('stock_picking', ${pickingId}, 'note',
         ${`DHL-Hinweise zur Adresse: ${result.warnings.join(' | ')}`}, 'system')`
-    }
-    return {
-      text: `Label ${result.shipmentNumber} erstellt (${result.product}).`,
-      recordId: result.shipmentId,
     }
   } catch (err) {
     // Fehler dauerhaft am Beleg festhalten — nicht nur flüchtig in der UI.
@@ -38,6 +38,17 @@ export async function labelErstellen(
     await sql`select log_event('stock_picking', ${pickingId}, 'error',
       ${`DHL-Label fehlgeschlagen: ${message.slice(0, 300)}`}, 'system')`.catch(() => undefined)
     throw err
+  }
+  const druck = await drucken(
+    'versandlabel',
+    { art: 'label', shipmentId: result.shipmentId },
+    { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+    ziel,
+  )
+  return {
+    text: `Label ${result.shipmentNumber} erstellt (${result.product}).${druck.gedruckt ? ` ${druck.meldung}` : ''}`,
+    recordId: result.shipmentId,
+    ...(druck.gedruckt ? {} : { link: `/api/label/${result.shipmentId}` }),
   }
 }
 
@@ -80,7 +91,9 @@ export async function packtischAbschliessen(
   }
 
   // Label: ein vorhandenes wird wiederverwendet (Wiederholung nach
-  // Teilfehler), sonst frisch erstellt.
+  // Teilfehler), sonst frisch erstellt — im Format des Labeldruckers am
+  // Platz (0087).
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'versandlabel')
   const [vorhanden] = await sql<{ id: string; shipment_number: string }[]>`
     select id, shipment_number from shipments
     where picking_id = ${pickingId} and state <> 'cancelled'
@@ -95,6 +108,7 @@ export async function packtischAbschliessen(
     const result = await createLabelForPicking(pickingId, {
       weightG: p.weight_g,
       product: p.dhl_product,
+      printFormat: ziel?.dhlFormat ?? undefined,
     })
     shipmentId = result.shipmentId
     sendung = result.shipmentNumber
@@ -122,18 +136,20 @@ export async function packtischAbschliessen(
       .catch(() => undefined)
   }
 
-  // Druckbrücke: im Brücken-Modus wird das Label still am Tisch gedruckt;
-  // der Link bleibt trotzdem — als Zweitausdruck und Fallback.
-  let druckHinweis = ''
-  if (await druckbrueckeAktiv()) {
-    await labelDruckEinreihen(shipmentId)
-    druckHinweis = ' Label liegt an der Druckbrücke.'
-  }
+  // Druck: über die Brücke still am Labeldrucker des Tisches — dann KEIN
+  // Link, sonst öffnete der Packtisch zusätzlich einen Tab (Doppeldruck).
+  // Ohne Drucker bleibt das PDF im Browser.
+  const druck = await drucken(
+    'versandlabel',
+    { art: 'label', shipmentId },
+    { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+    ziel,
+  )
 
   return {
-    text: `Sendung ${sendung} abgeschlossen — Ware gebucht, Shop-Rückmeldung eingereiht.${druckHinweis}`,
+    text: `Sendung ${sendung} abgeschlossen — Ware gebucht, Shop-Rückmeldung eingereiht.${druck.gedruckt ? ` ${druck.meldung}` : ''}`,
     recordId: pickingId,
-    link: `/api/label/${shipmentId}`,
+    ...(druck.gedruckt ? {} : { link: `/api/label/${shipmentId}` }),
   }
 }
 
@@ -154,13 +170,16 @@ export async function trackingAktualisieren(): Promise<AktionsErgebnis> {
 /** Höchstzahl je Massendruck-Lauf — DHL-Aufrufe laufen nacheinander. */
 const MASSENDRUCK_LIMIT = 25
 
-export async function massendruck(p: {
-  einzel: boolean
-  sku: string
-  land: string
-  produkt: string
-  ausbuchen: boolean
-}): Promise<AktionsErgebnis> {
+export async function massendruck(
+  p: {
+    einzel: boolean
+    sku: string
+    land: string
+    produkt: string
+    ausbuchen: boolean
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
   const rows = await versandbereitMitVorschlag({
     nurEinzelposition: p.einzel,
     sku: p.sku,
@@ -173,11 +192,22 @@ export async function massendruck(p: {
   const stapel = offen.slice(0, MASSENDRUCK_LIMIT)
   const shipmentIds: string[] = []
   const fehler: string[] = []
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'versandlabel')
+  let meldung: string | null = null
 
   for (const r of stapel) {
     try {
-      const result = await createLabelForPicking(r.picking_id)
+      const result = await createLabelForPicking(r.picking_id, {
+        printFormat: ziel?.dhlFormat ?? undefined,
+      })
       shipmentIds.push(result.shipmentId)
+      const druck = await drucken(
+        'versandlabel',
+        { art: 'label', shipmentId: result.shipmentId },
+        { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+        ziel,
+      )
+      if (druck.gedruckt) meldung = druck.meldung
       if (p.ausbuchen) {
         await sql`select picking_validate(${r.picking_id}, ${sql.json({})}, false)`
         await consumePackagingForPicking(r.picking_id)
@@ -200,6 +230,8 @@ export async function massendruck(p: {
   ].filter(Boolean)
 
   if (shipmentIds.length === 0) throw new Error(teile.join(' — '))
+  // Über die Brücke gedruckt: kein Sammel-PDF obendrauf (Doppeldruck).
+  if (meldung) return { text: `${teile.join(' — ')}. ${meldung}` }
   return { text: teile.join(' — ') + '.', link: `/api/label/sammel?ids=${shipmentIds.join(',')}` }
 }
 

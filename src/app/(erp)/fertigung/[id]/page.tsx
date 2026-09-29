@@ -16,6 +16,7 @@ import {
   startMo,
   startOperation,
   updateMoDetails,
+  zettelDrucken,
 } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -165,8 +166,9 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         actions={
           <>
             <Badge state={mo.state} kind="mo" />
+            <ActionButton action={zettelDrucken.bind(null, id)}>Drucken</ActionButton>
             <Link className="btn" href={`/fertigung/${id}/druck`} target="_blank">
-              Drucken
+              Ansicht
             </Link>
             {mo.state === 'draft' && (
               <ActionButton className="primary" action={confirmMo.bind(null, id)}>Bestätigen</ActionButton>

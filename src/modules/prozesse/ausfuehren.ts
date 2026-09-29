@@ -84,6 +84,10 @@ export const AUSFUEHRUNG = {
   'einstellungen.telegram_test': einstellungen.telegramTest,
   'einstellungen.telegram_chats': einstellungen.telegramChats,
   'einstellungen.dienste_pruefen': einstellungen.dienstePruefen,
+  'einstellungen.drucker_speichern': einstellungen.druckerSpeichern,
+  'einstellungen.drucker_schalten': einstellungen.druckerSchalten,
+  'einstellungen.drucker_loeschen': einstellungen.druckerLoeschen,
+  'einstellungen.druckweg_setzen': einstellungen.druckwegSetzen,
 
   'fehler.ticket_melden': fehler.ticketMelden,
   'fehler.ticket_status': fehler.ticketStatus,

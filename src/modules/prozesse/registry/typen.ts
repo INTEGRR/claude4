@@ -71,6 +71,11 @@ export interface AktionsKontext {
   recordId?: string
   /** Benutzer-ID des Ausführenden — für Aktionen, die den Datensatz zuweisen. */
   userId?: string
+  /**
+   * Arbeitsplatz des Geräts, von dem aus ausgeführt wird (Cookie, 0087) —
+   * Druckaktionen drucken auf dessen Druckern. Fehlt er, gilt der Ersatz.
+   */
+  arbeitsplatzId?: string
 }
 
 /**
