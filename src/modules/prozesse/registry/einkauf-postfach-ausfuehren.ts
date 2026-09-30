@@ -11,11 +11,22 @@ import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 /** Ausführung Einkauf Stufe 2a (0093): Posteingang, erfasste Nachrichten, Wiedervorlagen. */
 
 export async function mailZuordnen(
-  p: { partner_id?: string; purchase_order_id?: string; zustaendig_id?: string; absender_merken: boolean },
+  p: { partner_id?: string; purchase_order_id?: string; einkaufsprojekt_id?: string; zustaendig_id?: string; absender_merken: boolean },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const threadId = ctx.recordId!
   let partnerId = p.partner_id ?? null
+  // Nur ein Einkaufsprojekt gewählt (0097): Lieferant und Bestellung des Threads bleiben.
+  const nurProjekt = Boolean(p.einkaufsprojekt_id && !p.partner_id && !p.purchase_order_id)
+  let projekt: { nummer: string } | undefined
+  if (p.einkaufsprojekt_id) {
+    ;[projekt] = await sql<{ nummer: string }[]>`select nummer from einkaufsprojekte where id = ${p.einkaufsprojekt_id}`
+    if (!projekt) throw new Error('Einkaufsprojekt nicht gefunden.')
+  }
+  if (nurProjekt) {
+    const [t] = await sql<{ partner_id: string | null }[]>`select partner_id from mail_threads where id = ${threadId}`
+    partnerId = t?.partner_id ?? null
+  }
   if (p.purchase_order_id) {
     const [po] = await sql<{ vendor_id: string; number: string }[]>`
       select vendor_id, number from purchase_orders where id = ${p.purchase_order_id}`
@@ -25,40 +36,55 @@ export async function mailZuordnen(
     }
     partnerId = po.vendor_id
   }
-  const [partner] = await sql<{ name: string; einkaeufer_id: string | null }[]>`
-    select name, einkaeufer_id from partners where id = ${partnerId}`
-  if (!partner) throw new Error('Lieferant nicht gefunden.')
+  const [partner] = partnerId
+    ? await sql<{ name: string; einkaeufer_id: string | null }[]>`
+        select name, einkaeufer_id from partners where id = ${partnerId}`
+    : []
+  if (partnerId && !partner) throw new Error('Lieferant nicht gefunden.')
+  if (!partner && !nurProjekt) throw new Error('Lieferant nicht gefunden.')
 
   const gemerkt = await tx(async (t) => {
     const [thread] = await t<{ id: string }[]>`
       update mail_threads set
         partner_id = ${partnerId},
-        purchase_order_id = ${p.purchase_order_id ?? null},
-        zustaendig_id = coalesce(${p.zustaendig_id ?? null}::uuid, zustaendig_id, ${partner.einkaeufer_id}::uuid),
+        purchase_order_id = case when ${nurProjekt} then purchase_order_id else ${p.purchase_order_id ?? null}::uuid end,
+        einkaufsprojekt_id = coalesce(${p.einkaufsprojekt_id ?? null}::uuid, einkaufsprojekt_id),
+        zustaendig_id = coalesce(${p.zustaendig_id ?? null}::uuid, zustaendig_id, ${partner?.einkaeufer_id ?? null}::uuid),
         zugeordnet_durch = 'mensch'
       where id = ${threadId}
       returning id`
     if (!thread) throw new Error('Thread nicht gefunden.')
-    await t`update partners set is_vendor = true where id = ${partnerId} and not is_vendor`
+    if (partnerId) await t`update partners set is_vendor = true where id = ${partnerId} and not is_vendor`
+    if (p.einkaufsprojekt_id && partnerId) {
+      // Antwort auf eine Anfrage: der Thread hängt ab jetzt an ihr.
+      await t`update lieferantenanfragen set thread_id = coalesce(thread_id, ${threadId})
+              where projekt_id = ${p.einkaufsprojekt_id} and partner_id = ${partnerId}`
+    }
 
     // Anhänge folgen dem Thread: an Lieferant und Bestellung hängen,
     // herrenlose Dokumente bekommen den Lieferanten.
     const doks = await t<{ dokument_id: string }[]>`
       select dokument_id from dokument_verweise where modell = 'mail_thread' and record_id = ${threadId}`
     for (const d of doks) {
-      await t`insert into dokument_verweise (dokument_id, modell, record_id, verknuepft_von)
-              values (${d.dokument_id}, 'partner', ${partnerId}, ${ctx.actor}) on conflict do nothing`
+      if (partnerId) {
+        await t`insert into dokument_verweise (dokument_id, modell, record_id, verknuepft_von)
+                values (${d.dokument_id}, 'partner', ${partnerId}, ${ctx.actor}) on conflict do nothing`
+      }
+      if (p.einkaufsprojekt_id) {
+        await t`insert into dokument_verweise (dokument_id, modell, record_id, verknuepft_von)
+                values (${d.dokument_id}, 'einkaufsprojekt', ${p.einkaufsprojekt_id}, ${ctx.actor}) on conflict do nothing`
+      }
       if (p.purchase_order_id) {
         await t`insert into dokument_verweise (dokument_id, modell, record_id, verknuepft_von)
                 values (${d.dokument_id}, 'purchase_order', ${p.purchase_order_id}, ${ctx.actor}) on conflict do nothing`
       }
     }
-    await t`update dokumente set partner_id = ${partnerId}
+    await t`update dokumente set partner_id = coalesce(partner_id, ${partnerId})
             where partner_id is null and id in (
               select dokument_id from dokument_verweise where modell = 'mail_thread' and record_id = ${threadId})`
 
     let kennung: string | null = null
-    if (p.absender_merken) {
+    if (p.absender_merken && partnerId) {
       const [erste] = await t<{ von: string | null }[]>`
         select coalesce(
           (select von from mail_nachrichten where thread_id = ${threadId} and richtung = 'eingang' and von like '%@%'
@@ -74,14 +100,15 @@ export async function mailZuordnen(
                 where id = ${partnerId} and not (${kennung} = any(mail_domains))`
       }
     }
-    await t`select log_event('mail_thread', ${threadId}, 'info', ${`Zugeordnet: ${partner.name}`}, ${ctx.actor})`
+    const ziel = [partner?.name, projekt?.nummer].filter(Boolean).join(' · ')
+    await t`select log_event('mail_thread', ${threadId}, 'info', ${`Zugeordnet: ${ziel}`}, ${ctx.actor})`
     return kennung
   })
 
   const umgezogen = await anhaengeUmziehen(threadId)
   return {
     text:
-      `Thread ${partner.name} zugeordnet.` +
+      `Thread ${[partner?.name, projekt?.nummer].filter(Boolean).join(' · ')} zugeordnet.` +
       (gemerkt ? ` ${gemerkt} wird künftig automatisch zugeordnet.` : '') +
       (umgezogen ? ` ${umgezogen} Datei(en) in den Lieferantenordner verschoben.` : ''),
     recordId: threadId,

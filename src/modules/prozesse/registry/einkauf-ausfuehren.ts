@@ -332,7 +332,7 @@ export async function wechselkursErfassen(p: {
 }): Promise<AktionsErgebnis> {
   await sql`
     insert into exchange_rates (currency, rate, valid_from, source)
-    values (${p.currency}, ${p.rate}, ${p.valid_from ?? null}::date, 'manuell')
+    values (${p.currency}, ${p.rate}, coalesce(${p.valid_from ?? null}::date, current_date), 'manuell')
     on conflict (currency, valid_from) do update
       set rate = excluded.rate, source = 'manuell'`
   return { text: `Kurs ${p.currency} = ${p.rate} erfasst.` }

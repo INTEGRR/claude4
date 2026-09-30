@@ -1290,6 +1290,48 @@ Fixture: `fixtures/einkauf-mail.ts` (Harness mit `GOOGLE_FAKE=1`,
 `KI_FAKE=1`). Paket: überall, wo der Bestellprozess aktiv ist. Details:
 [module/einkaufstool.md](module/einkaufstool.md) (Stufe 2b).
 
+## Einkaufsprojekt: Prozess `einkaufsprojekt` (Migration 0097, umgesetzt)
+
+Beleg `einkaufsprojekt` (`einkaufsprojekte`, Enum-Status).
+
+Schritte:
+
+1. Start → **Projekt mit Positionen anlegen** (`einkauf.projekt_anlegen`,
+   Zustand `bedarf`).
+2. **Anfragen freigeben und senden** (`einkauf.anfragen_freigeben`,
+   `angefragt`) — oder direkt weiter, wenn ein Angebot schon vorliegt.
+3. **Angebot wählen** (`einkauf.projekt_entscheiden`, `entschieden`).
+4. **Bestellen** (`einkauf.projekt_bestellen`, `bestellt`).
+5. **Abschließen** (`einkauf.projekt_abschliessen`, `abgeschlossen`) → Ende.
+
+Von jedem Schritt vor dem Abschluss führt **Abbrechen**
+(`einkauf.projekt_abbrechen`, `abgebrochen`); nach dem Bestellen erst,
+wenn die Bestellungen storniert sind.
+
+Den Abschluss setzt meist die Datenbank selbst: der Trigger ruft
+`einkaufsprojekt_pruefen`, sobald die Ware aller Projekt-Bestellungen
+eingegangen ist. Das ist derselbe Zustand, den auch die Schrittaktion
+setzt — kein zweites Token-Modell.
+
+Die Bestellung läuft danach ihren eigenen Prozess (Freigabe, Wareneingang,
+Rechnung); das Projekt verweist nur auf sie (`purchase_orders.einkaufsprojekt_id`).
+
+Prozessfrei sind:
+
+- Positionen pflegen;
+- Anfrage-Entwürfe vorbereiten (die Mails selbst sind Belege im Prozess
+  `mail_versand`);
+- Angebote erfassen, ändern und verwerfen;
+- Bestellung zuordnen;
+- Fracht- und Zollsätze;
+- EZB-Kurse (Job `ezb_kurse_abrufen`, Fähigkeit `finanzen:wechselkurse`).
+
+Nicht `ki` sind Sammelfreigabe, Entscheidung und Bestellung.
+
+Fixture: `fixtures/einkaufsprojekt.ts` (drei Läufe). Paket: überall, wo der
+Bestellprozess aktiv ist. Details:
+[module/einkaufstool.md](module/einkaufstool.md) (Stufe 3).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

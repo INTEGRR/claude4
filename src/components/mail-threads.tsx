@@ -22,7 +22,18 @@ export const KANAL_NAMEN: Record<string, string> = {
   sonstiges: 'Sonstiges',
 }
 
-export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partnerId?: string; purchaseOrderId?: string }) {
+export async function MailThreadsKarte({
+  partnerId,
+  purchaseOrderId,
+  einkaufsprojektId,
+  lieferanten = [],
+}: {
+  partnerId?: string
+  purchaseOrderId?: string
+  /** Threads eines Einkaufsprojekts (0097); „Neue Mail" geht dann an einen der `lieferanten`. */
+  einkaufsprojektId?: string
+  lieferanten?: { id: string; name: string }[]
+}) {
   const threads = await sql<
     {
       id: string
@@ -33,14 +44,22 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
       letzte_am: string | null
       anzahl: number
       bestellung: string | null
+      lieferant: string | null
     }[]
   >`
     select t.id, t.betreff, t.status::text as status, t.kanal::text as kanal, t.letzte_richtung::text as letzte_richtung,
-           t.letzte_am::text as letzte_am, t.anzahl, po.number as bestellung
+           t.letzte_am::text as letzte_am, t.anzahl, po.number as bestellung, pa.name as lieferant
     from mail_threads t
     left join purchase_orders po on po.id = t.purchase_order_id
+    left join partners pa on pa.id = t.partner_id
     where t.status <> 'ignoriert'
-      and ${purchaseOrderId ? sql`t.purchase_order_id = ${purchaseOrderId}` : sql`t.partner_id = ${partnerId ?? null}`}
+      and ${
+        einkaufsprojektId
+          ? sql`t.einkaufsprojekt_id = ${einkaufsprojektId}`
+          : purchaseOrderId
+            ? sql`t.purchase_order_id = ${purchaseOrderId}`
+            : sql`t.partner_id = ${partnerId ?? null}`
+      }
     order by t.letzte_am desc nulls last
     limit 30`
   const user = await currentUser()
@@ -57,7 +76,7 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
       }
     >
       {threads.length === 0 ? (
-        <Empty>Noch keine Mails zu diesem {purchaseOrderId ? 'Beleg' : 'Lieferanten'}.</Empty>
+        <Empty>Noch keine Mails zu diesem {einkaufsprojektId ? 'Projekt' : purchaseOrderId ? 'Beleg' : 'Lieferanten'}.</Empty>
       ) : (
         <ul className="dok-liste">
           {threads.map((t) => (
@@ -71,6 +90,7 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
                   {t.anzahl} Nachricht{t.anzahl === 1 ? '' : 'en'}
                   {t.kanal !== 'email' ? ` · ${KANAL_NAMEN[t.kanal]}` : ''}
                   {t.bestellung && !purchaseOrderId ? ` · ${t.bestellung}` : ''}
+                  {t.lieferant && !partnerId ? ` · ${t.lieferant}` : ''}
                 </div>
               </div>
               <Badge state={t.status} kind="mail_thread" />
@@ -78,17 +98,31 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
           ))}
         </ul>
       )}
-      {darf && (
+      {darf && (!einkaufsprojektId || lieferanten.length > 0) && (
         <ActionForm action={entwurfAnlegen} style={{ padding: '10px 12px' }}>
-          {purchaseOrderId ? (
+          {einkaufsprojektId ? (
+            <input type="hidden" name="einkaufsprojekt_id" value={einkaufsprojektId} />
+          ) : purchaseOrderId ? (
             <input type="hidden" name="purchase_order_id" value={purchaseOrderId} />
           ) : (
             <input type="hidden" name="partner_id" value={partnerId} />
           )}
           <div className="row">
+            {einkaufsprojektId && (
+              <label className="field">
+                <span>An</span>
+                <select name="partner_id" required>
+                  {lieferanten.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="field">
               <span>Neue Mail</span>
-              <select name="vorlage" defaultValue={purchaseOrderId ? 'liefertermin' : 'anfrage'}>
+              <select name="vorlage" defaultValue={purchaseOrderId ? 'liefertermin' : einkaufsprojektId ? '' : 'anfrage'}>
                 <option value="">— freier Text —</option>
                 {Object.entries(VORLAGEN_ANLAESSE).map(([k, label]) => (
                   <option key={k} value={k}>

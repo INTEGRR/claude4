@@ -50,6 +50,7 @@ export const EINKAUF_MAILVERSAND = {
         anhang_dokument_ids: z.array(uuid).max(30).default([]),
         antwort_erwartet_bis: datum.optional(),
         bestell_pdf: z.boolean().default(false),
+        einkaufsprojekt_id: uuid.optional().describe('Einkaufsprojekt, zu dem die Mail gehört (Thread hängt danach am Projekt)'),
       })
       .refine(
         (p) => p.thread_id || p.partner_id || p.purchase_order_id || p.an?.length,
@@ -66,6 +67,7 @@ export const EINKAUF_MAILVERSAND = {
       vorlage: leer(fd, 'vorlage') as never,
       sprache: leer(fd, 'sprache') as never,
       bestell_pdf: fd.get('bestell_pdf') === 'on' || fd.get('bestell_pdf') === 'true',
+      einkaufsprojekt_id: leer(fd, 'einkaufsprojekt_id'),
     }),
     revalidate: ['/einkauf/entwuerfe'],
   },

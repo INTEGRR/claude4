@@ -5,8 +5,8 @@ import { drive } from './drive.ts'
 
 /**
  * Ordnerbaum der geteilten Ablage „Einkauf" (0092): Lieferanten/<Name>/
- * <Bestellnummer>, Lieferanten/<Name>/Rechnungen, Artikel/<Name>, Eingang
- * (Mail-Anhänge ohne Zuordnung).
+ * <Bestellnummer>, Lieferanten/<Name>/Rechnungen, Artikel/<Name>,
+ * Projekte/<EP-Nummer Titel> (0097), Eingang (Mail-Anhänge ohne Zuordnung).
  * Jeder Ordner entsteht genau einmal — `drive_ordner` merkt ihn sich; fehlt
  * der Eintrag (z. B. nach „Betriebsdaten löschen"), wird erst nach einem
  * gleichnamigen Ordner gesucht statt einen zweiten anzulegen.
@@ -90,6 +90,13 @@ export async function zielOrdner(modell: DokumentModell, recordId: string): Prom
       if (t.purchase_order_id) return zielOrdner('purchase_order', t.purchase_order_id)
       if (t.partner_id) return lieferantenOrdner(t.partner_id)
       return bereichsOrdner('eingang')
+    }
+    case 'einkaufsprojekt': {
+      // Projekte/EP-00001 Titel — Zeichnungen, Angebote, Stücklisten des Projekts.
+      const [ep] = await sql<{ nummer: string; titel: string }[]>`
+        select nummer, titel from einkaufsprojekte where id = ${recordId}`
+      if (!ep) throw new Error('Einkaufsprojekt nicht gefunden')
+      return ordnerSichern(`einkaufsprojekt:${recordId}`, ordnerName(`${ep.nummer} ${ep.titel}`), await bereichsOrdner('projekte'))
     }
     default: {
       const _nie: never = modell

@@ -12,6 +12,7 @@ export const DOKUMENT_MODELLE = {
   vendor_bill: { tabelle: 'vendor_bills', bereich: 'einkauf', label: 'Lieferantenrechnung' },
   product_template: { tabelle: 'product_templates', bereich: 'produkte', label: 'Artikel' },
   mail_thread: { tabelle: 'mail_threads', bereich: 'einkauf', label: 'Mail-Thread' },
+  einkaufsprojekt: { tabelle: 'einkaufsprojekte', bereich: 'einkauf', label: 'Einkaufsprojekt' },
 } satisfies Record<string, { tabelle: string; bereich: Area; label: string }>
 
 export type DokumentModell = keyof typeof DOKUMENT_MODELLE

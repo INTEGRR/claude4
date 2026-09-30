@@ -104,6 +104,13 @@ export const JOB_KATALOG = {
     beschreibung: 'Übersetzt eine eingegangene (z. B. chinesische) Nachricht per KI ins Deutsche.',
     faehigkeit: 'ki:uebersetzen',
   },
+  ezb_kurse_abrufen: {
+    label: 'EZB-Kurse abrufen',
+    beschreibung:
+      'Holt werktags die Referenzkurse der EZB und speichert sie als EUR je Fremdeinheit (Quelle „ezb"); ' +
+      'von Hand erfasste Kurse bleiben stehen. Grundlage des Angebotsvergleichs in EUR.',
+    faehigkeit: 'finanzen:wechselkurse',
+  },
 } satisfies Record<string, JobEintrag>
 
 export type JobKind = keyof typeof JOB_KATALOG

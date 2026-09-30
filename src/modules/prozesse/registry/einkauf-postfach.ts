@@ -14,7 +14,7 @@ import type { RegistrierteAktion } from './typen.ts'
 const uuid = z.string().uuid()
 
 /** Woran eine Wiedervorlage hängen darf (Teilmenge der Dokument-Belege). */
-export const WIEDERVORLAGE_MODELLE = ['mail_thread', 'partner', 'purchase_order', 'vendor_bill'] as const
+export const WIEDERVORLAGE_MODELLE = ['mail_thread', 'partner', 'purchase_order', 'vendor_bill', 'einkaufsprojekt'] as const
 export type WiedervorlageModell = (typeof WIEDERVORLAGE_MODELLE)[number]
 
 const leerAlsUndefined = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
@@ -26,7 +26,7 @@ export const EINKAUF_POSTFACH = {
     prozessfrei: true,
     ki: true,
     beschreibung:
-      'Ordnet einen Mail-Thread einem Lieferanten und/oder einer Bestellung zu und setzt den ' +
+      'Ordnet einen Mail-Thread einem Lieferanten, einer Bestellung und/oder einem Einkaufsprojekt zu und setzt den ' +
       'zuständigen Einkäufer. Gewinnt immer gegen die automatische Regel. Die Anhänge des Threads ' +
       'werden mit Lieferant und Bestellung verknüpft und ziehen in deren Drive-Ordner um. Auf ' +
       'Wunsch merkt sich die Lieferantenakte den Absender (Domain, bei Freemailern die Adresse), ' +
@@ -37,17 +37,22 @@ export const EINKAUF_POSTFACH = {
       .object({
         partner_id: uuid.optional(),
         purchase_order_id: uuid.optional(),
+        einkaufsprojekt_id: uuid.optional(),
         zustaendig_id: uuid.optional(),
         absender_merken: z.boolean().default(false),
       })
-      .refine((p) => p.partner_id || p.purchase_order_id, 'Bitte Lieferant oder Bestellung wählen.'),
+      .refine(
+        (p) => p.partner_id || p.purchase_order_id || p.einkaufsprojekt_id,
+        'Bitte Lieferant, Bestellung oder Einkaufsprojekt wählen.',
+      ),
     zusammenfassung: (p) =>
-      ['Thread zuordnen', p.purchase_order_id && 'Bestellung', p.partner_id && 'Lieferant', p.absender_merken && 'Absender merken']
+      ['Thread zuordnen', p.purchase_order_id && 'Bestellung', p.einkaufsprojekt_id && 'Einkaufsprojekt', p.partner_id && 'Lieferant', p.absender_merken && 'Absender merken']
         .filter(Boolean)
         .join(' · '),
     formdata: (fd) => ({
       partner_id: leerAlsUndefined(fd, 'partner_id'),
       purchase_order_id: leerAlsUndefined(fd, 'purchase_order_id'),
+      einkaufsprojekt_id: leerAlsUndefined(fd, 'einkaufsprojekt_id'),
       zustaendig_id: leerAlsUndefined(fd, 'zustaendig_id'),
       absender_merken: fd.get('absender_merken') === 'on' || fd.get('absender_merken') === 'true',
     }),

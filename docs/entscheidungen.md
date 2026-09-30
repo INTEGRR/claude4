@@ -9,6 +9,51 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Einkaufsprojekt: Einstand statt Stückpreis, Sammelfreigabe, Abschluss per Trigger
+
+Stufe 3 des Einkaufstools (Migration 0097). Die Betreiber-Antworten dazu:
+mehrere Positionen je Projekt, Zielpreis je Position, Anfragen als Entwürfe
+mit Sammelfreigabe. Entschieden:
+
+- **Verglichen wird der Einstand je Stück in EUR**, nicht der Angebotspreis
+  (SQL `einstand_schaetzen`):
+  - Staffelpreis bei Projektmenge × letzter Kurs;
+  - Werkzeug/Muster nach **Warenwert** umgelegt (eine günstige Kleinposition
+    trägt nicht dieselbe Form-Umlage wie das Hauptteil);
+  - Fracht als max(Gewicht × Satz je kg, Mindestbetrag), nach Gewicht
+    verteilt, bei D-Klauseln 0;
+  - Zoll auf Ware + Fracht nach dem **längsten HS-Präfix**, bei DDP 0;
+  - die **EUSt nie** (sie ist erstattungsfähig).
+
+  Der Zielpreis ist derselbe Einstand und geht nie an den Lieferanten.
+- **Lücken werden sichtbar statt geschätzt**: ohne Kurs bleibt der Einstand
+  leer (`exchange_rate_at` liefert still 1 — für den Vergleich ungeeignet),
+  ohne Zollsatz „kein Zollsatz" statt 0 %. Frachtsätze starten mit groben
+  Schätzungen (als solche markiert). Zolltarife starten leer, weil ein
+  falscher Satz schlimmer ist als ein fehlender.
+- **Anfragen = Mail-Entwürfe** (Stufe 2b), vorbereitet je Lieferant in
+  dessen Sprache mit EP-Nummer im Betreff (Antworten finden ihr Projekt
+  per SQL-Regel). Die **Sammelfreigabe prüft alle und sendet alles oder
+  nichts**: eine halb versandte Anfragerunde wäre schwer zu überblicken.
+  Freigabe, Entscheidung und Bestellung sind nicht `ki`.
+- **Prozessschritte nur für Zustandswechsel.** Positionen, Angebote, Anfrage-
+  Entwürfe und Sätze sind prozessfreie Arbeit im Projekt. Der Abschluss
+  setzt die Datenbank per Trigger, sobald die Ware aller Projekt-
+  Bestellungen eingegangen ist. Der Belegstatus bleibt die einzige Wahrheit.
+- **Bestellen erzeugt einen Entwurf**, keine bestätigte Bestellung: Das
+  Freigabe-Limit und der Bestellprozess bleiben zuständig.
+  - Neue Teile bekommen erst hier ihren Artikel. Betriebsausstattung wird
+    Dienstleistung ohne Lager, im Einklang mit 0092.
+  - Werkzeug- und Musterkosten werden eigene Dienstleistungszeilen.
+  - Die Staffeln werden Lieferantenpreise.
+- **EZB-Kurse** kommen täglich als Job (ein EZB-Ausfall bricht den
+  Finanz-Tageslauf nicht) und überschreiben keine Handkurse.
+- **Nummer:** 0097, weil 0095/0096 an Navigation und Rollen vergeben waren.
+  Der Plan nannte 0095.
+
+Doku: [module/einkaufstool.md](module/einkaufstool.md) → Stufe 3,
+[prozesse.md](prozesse.md) → „Einkaufsprojekt".
+
 ## 2026-09-30 — Scans in beiden Tastaturbelegungen suchen
 
 Befund am Packtisch: „Keine Lieferung gefunden zu WH-OUT-00003". Der

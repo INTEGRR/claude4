@@ -28,9 +28,21 @@ export interface EntwurfEingabe {
   anhang_dokument_ids: string[]
   antwort_erwartet_bis?: string
   bestell_pdf: boolean
+  einkaufsprojekt_id?: string
 }
 
-export async function entwurfAnlegen(p: EntwurfEingabe, ctx: AktionsKontext, quelle: 'mensch' | 'agent' = 'mensch'): Promise<AktionsErgebnis> {
+/** Zusätze für aufrufende Fachfunktionen (Anfrage aus dem Einkaufsprojekt, 0097). */
+export interface EntwurfZusatz {
+  /** Den aus der Vorlage gefüllten Text je Sprache nachbearbeiten (z. B. Positionsblock einsetzen). */
+  textAnpassen?: (text: string, sprache: Sprache) => string
+}
+
+export async function entwurfAnlegen(
+  p: EntwurfEingabe,
+  ctx: AktionsKontext,
+  quelle: 'mensch' | 'agent' = 'mensch',
+  zusatz: EntwurfZusatz = {},
+): Promise<AktionsErgebnis> {
   let partnerId = p.partner_id ?? null
   let poId = p.purchase_order_id ?? null
   let betreff = p.betreff ?? ''
@@ -96,8 +108,9 @@ export async function entwurfAnlegen(p: EntwurfEingabe, ctx: AktionsKontext, que
       einkaeufer: ctx.actor,
       firma: firma?.name ?? undefined,
     })
-    if (!p.text_de) textDe = vorlageFuellen(de.text, werte('de'))
-    if (sprache !== 'de' && !p.text_ziel) textZiel = vorlageFuellen(ziel.text, werte(sprache))
+    const anpassen = zusatz.textAnpassen ?? ((t: string) => t)
+    if (!p.text_de) textDe = anpassen(vorlageFuellen(de.text, werte('de')), 'de')
+    if (sprache !== 'de' && !p.text_ziel) textZiel = anpassen(vorlageFuellen(ziel.text, werte(sprache)), sprache)
     if (!betreff) betreff = vorlageFuellen((sprache === 'de' ? de : ziel).betreff, werte(sprache))
   }
   // Antwort im Thread: Betreff „Re: …" des Gesprächs, damit Gmail und der Lieferant ihn zuordnen.
@@ -111,10 +124,11 @@ export async function entwurfAnlegen(p: EntwurfEingabe, ctx: AktionsKontext, que
 
   const [e] = await sql<{ id: string }[]>`
     insert into mail_entwuerfe (thread_id, partner_id, purchase_order_id, an, cc, betreff, text_de, text_ziel, sprache,
-                                vorlage, anhang_dokument_ids, quelle, antwort_erwartet_bis, erstellt_von, zustaendig_id)
+                                vorlage, anhang_dokument_ids, quelle, antwort_erwartet_bis, erstellt_von, zustaendig_id,
+                                einkaufsprojekt_id)
     values (${p.thread_id ?? null}, ${partnerId}, ${poId}, ${an}::text[], ${p.cc ?? []}::text[], ${betreff}, ${textDe}, ${textZiel},
             ${sprache}, ${p.vorlage ?? null}, ${anhaenge}::uuid[], ${quelle}, ${p.antwort_erwartet_bis ?? null},
-            ${ctx.actor}, ${ctx.userId ?? null})
+            ${ctx.actor}, ${ctx.userId ?? null}, ${p.einkaufsprojekt_id ?? null})
     returning id`
   await sql`select log_event('mail_entwurf', ${e.id}, 'info', ${`Entwurf angelegt${p.vorlage ? ` (Vorlage ${p.vorlage})` : ''}`}, ${ctx.actor})`
   return { text: 'Entwurf angelegt.', recordId: e.id, link: `/einkauf/entwuerfe/${e.id}` }
@@ -149,13 +163,61 @@ async function bestellPdfAblegen(poId: string, partnerId: string | null, ctx: Ak
   })
 }
 
-async function entwurfLesen(id: string) {
-  const [e] = await sql<
-    { id: string; status: string; sprache: Sprache; text_de: string; text_ziel: string | null; an: string[]; betreff: string; anhang_dokument_ids: string[] }[]
-  >`select id, status::text as status, sprache, text_de, text_ziel, an, betreff, anhang_dokument_ids
+export interface EntwurfZeile {
+  id: string
+  status: string
+  sprache: Sprache
+  text_de: string
+  text_ziel: string | null
+  an: string[]
+  betreff: string
+  anhang_dokument_ids: string[]
+}
+
+export async function entwurfLesen(id: string): Promise<EntwurfZeile> {
+  const [e] = await sql<EntwurfZeile[]>`
+    select id, status::text as status, sprache, text_de, text_ziel, an, betreff, anhang_dokument_ids
     from mail_entwuerfe where id = ${id}`
   if (!e) throw new Error('Entwurf nicht gefunden.')
   return e
+}
+
+/**
+ * Prüfungen vor der Freigabe — geteilt von der Einzelfreigabe und der
+ * Sammelfreigabe der Anfragen (0097): Postfach angebunden, Empfänger,
+ * Betreff, Text in der Versandsprache, keine offenen Platzhalter, Anhänge
+ * unter der Gmail-Grenze. Wirft mit einer Meldung für Menschen.
+ */
+export async function freigabePruefen(e: EntwurfZeile): Promise<void> {
+  if (e.status !== 'entwurf') throw new Error('Dieser Entwurf ist schon freigegeben oder erledigt.')
+  if (!postfachKonfiguriert()) {
+    throw new Error('Das Einkaufspostfach ist nicht angebunden — GOOGLE_DIENSTKONTO_JSON und EINKAUF_POSTFACH setzen.')
+  }
+  if (e.an.length === 0) throw new Error('Bitte mindestens einen Empfänger eintragen.')
+  if (!e.betreff.trim()) throw new Error('Bitte einen Betreff eintragen.')
+  const text = versandText(e)
+  if (!text) {
+    throw new Error(
+      e.sprache === 'de' ? 'Der Text ist leer.' : 'Der Text in der Sprache des Lieferanten ist leer — erst übersetzen oder schreiben.',
+    )
+  }
+  const offen = offenePlatzhalter(`${e.betreff}\n${text}`)
+  if (offen.length) throw new Error(`Noch offene Platzhalter: ${offen.map((o) => `[${o}]`).join(', ')} — bitte ausfüllen.`)
+  if (e.anhang_dokument_ids.length) {
+    const [{ summe }] = await sql<{ summe: number }[]>`
+      select coalesce(sum(groesse), 0)::float as summe from dokumente where id = any(${e.anhang_dokument_ids}::uuid[])`
+    if (summe > MAX_ANHANG_BYTES) {
+      throw new Error(`Die Anhänge sind zusammen ${(summe / 1024 / 1024).toFixed(1)} MB groß — höchstens 18 MB je Mail. Große Dateien per Drive-Link oder WeTransfer teilen.`)
+    }
+  }
+}
+
+/** Freigeben und das Senden einreihen — in der Transaktion des Aufrufers. */
+export async function freigabeEinreihen(t: typeof sql, e: EntwurfZeile, actor: string): Promise<void> {
+  await t`update mail_entwuerfe set status = 'freigegeben', freigegeben_von = ${actor}, freigegeben_am = now(), fehler = null
+          where id = ${e.id}`
+  await t`select enqueue_job('gmail_senden', ${t.json({ entwurf_id: e.id })}, ${`gmail-senden:${e.id}`})`
+  await t`select log_event('mail_entwurf', ${e.id}, 'info', ${`Freigegeben — wird an ${e.an.join(', ')} gesendet`}, ${actor})`
 }
 
 export async function mailEntwurfAnlegen(p: EntwurfEingabe, ctx: AktionsKontext): Promise<AktionsErgebnis> {
@@ -211,33 +273,8 @@ export async function mailUebersetzen(p: { richtung: 'nach_ziel' | 'nach_de' }, 
 
 export async function mailFreigeben(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   const e = await entwurfLesen(ctx.recordId!)
-  if (e.status !== 'entwurf') throw new Error('Dieser Entwurf ist schon freigegeben oder erledigt.')
-  if (!postfachKonfiguriert()) {
-    throw new Error('Das Einkaufspostfach ist nicht angebunden — GOOGLE_DIENSTKONTO_JSON und EINKAUF_POSTFACH setzen.')
-  }
-  if (e.an.length === 0) throw new Error('Bitte mindestens einen Empfänger eintragen.')
-  if (!e.betreff.trim()) throw new Error('Bitte einen Betreff eintragen.')
-  const text = versandText(e)
-  if (!text) {
-    throw new Error(
-      e.sprache === 'de' ? 'Der Text ist leer.' : 'Der Text in der Sprache des Lieferanten ist leer — erst übersetzen oder schreiben.',
-    )
-  }
-  const offen = offenePlatzhalter(`${e.betreff}\n${text}`)
-  if (offen.length) throw new Error(`Noch offene Platzhalter: ${offen.map((o) => `[${o}]`).join(', ')} — bitte ausfüllen.`)
-  if (e.anhang_dokument_ids.length) {
-    const [{ summe }] = await sql<{ summe: number }[]>`
-      select coalesce(sum(groesse), 0)::float as summe from dokumente where id = any(${e.anhang_dokument_ids}::uuid[])`
-    if (summe > MAX_ANHANG_BYTES) {
-      throw new Error(`Die Anhänge sind zusammen ${(summe / 1024 / 1024).toFixed(1)} MB groß — höchstens 18 MB je Mail. Große Dateien per Drive-Link oder WeTransfer teilen.`)
-    }
-  }
-  await tx(async (t) => {
-    await t`update mail_entwuerfe set status = 'freigegeben', freigegeben_von = ${ctx.actor}, freigegeben_am = now(), fehler = null
-            where id = ${e.id}`
-    await t`select enqueue_job('gmail_senden', ${t.json({ entwurf_id: e.id })}, ${`gmail-senden:${e.id}`})`
-    await t`select log_event('mail_entwurf', ${e.id}, 'info', ${`Freigegeben — wird an ${e.an.join(', ')} gesendet`}, ${ctx.actor})`
-  })
+  await freigabePruefen(e)
+  await tx(async (t) => freigabeEinreihen(t as unknown as typeof sql, e, ctx.actor))
   return { text: `Freigegeben — die Mail an ${e.an.join(', ')} geht innerhalb einer Minute hinaus.`, recordId: e.id }
 }
 

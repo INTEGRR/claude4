@@ -112,10 +112,13 @@ export async function GET(request: Request) {
       }
       case 'finanzen': {
         // Tageslauf: abgelaufene Verträge beenden, USt-Vorschlag für den
-        // Vormonat anlegen (idempotent, Logik in finanz_tageslauf/0060).
+        // Vormonat anlegen (idempotent, Logik in finanz_tageslauf/0060),
+        // EZB-Kurse holen.
         const [row] = await sql<{ finanz_tageslauf: Record<string, unknown> }[]>`
           select finanz_tageslauf('cron')`
-        return NextResponse.json({ task, ...row.finanz_tageslauf })
+        // EZB-Kurse (0097) als Job: ein Ausfall der EZB bricht den Tageslauf nicht.
+        await sql`select enqueue_job('ezb_kurse_abrufen', '{}'::jsonb, ${`ezb-kurse:${new Date().toISOString().slice(0, 10)}`})`
+        return NextResponse.json({ task, ...row.finanz_tageslauf, ezb: 'eingereiht' })
       }
       default:
         return NextResponse.json({ error: `Unbekannte Aufgabe: ${task}` }, { status: 400 })

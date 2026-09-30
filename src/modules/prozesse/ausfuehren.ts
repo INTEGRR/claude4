@@ -4,6 +4,7 @@ import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einkaufDokumente from './registry/einkauf-dokumente-ausfuehren.ts'
 import * as einkaufPostfach from './registry/einkauf-postfach-ausfuehren.ts'
 import * as einkaufMailversand from './registry/einkauf-mailversand-ausfuehren.ts'
+import * as einkaufProjekte from './registry/einkauf-projekte-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -47,6 +48,23 @@ export const AUSFUEHRUNG = {
   'einkauf.mail_freigeben': einkaufMailversand.mailFreigeben,
   'einkauf.mail_verwerfen': einkaufMailversand.mailVerwerfen,
   'einkauf.nachricht_uebersetzen': einkaufMailversand.nachrichtUebersetzen,
+  'einkauf.projekt_anlegen': einkaufProjekte.projektAnlegen,
+  'einkauf.projekt_aendern': einkaufProjekte.projektAendern,
+  'einkauf.projekt_position_setzen': einkaufProjekte.positionSetzen,
+  'einkauf.projekt_position_entfernen': einkaufProjekte.positionEntfernen,
+  'einkauf.anfragen_senden': einkaufProjekte.anfragenSenden,
+  'einkauf.anfragen_freigeben': einkaufProjekte.anfragenFreigeben,
+  'einkauf.angebot_erfassen': einkaufProjekte.angebotErfassen,
+  'einkauf.angebot_aendern': einkaufProjekte.angebotAendern,
+  'einkauf.angebot_verwerfen': einkaufProjekte.angebotVerwerfen,
+  'einkauf.projekt_entscheiden': einkaufProjekte.projektEntscheiden,
+  'einkauf.projekt_bestellen': einkaufProjekte.projektBestellen,
+  'einkauf.projekt_abschliessen': einkaufProjekte.projektAbschliessen,
+  'einkauf.projekt_abbrechen': einkaufProjekte.projektAbbrechen,
+  'einkauf.bestellung_projekt_zuordnen': einkaufProjekte.bestellungProjektZuordnen,
+  'einkauf.frachtsatz_setzen': einkaufProjekte.frachtsatzSetzen,
+  'einkauf.zolltarif_setzen': einkaufProjekte.zolltarifSetzen,
+  'einkauf.ezb_kurse_abrufen': einkaufProjekte.ezbKurseHolen,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,

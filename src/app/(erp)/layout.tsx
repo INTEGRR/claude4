@@ -49,6 +49,7 @@ async function badges() {
       posteingang: number
       wiedervorlagen: number
       entwuerfe: number
+      einkaufsprojekte: number
     }[]
   >`
     select
@@ -76,7 +77,8 @@ async function badges() {
         where status = 'offen' and letzte_richtung = 'eingang')::int as posteingang,
       (select count(*) from wiedervorlagen
         where erledigt_am is null and faellig_am <= current_date)::int as wiedervorlagen,
-      (select count(*) from mail_entwuerfe where status = 'entwurf')::int as entwuerfe`
+      (select count(*) from mail_entwuerfe where status = 'entwurf')::int as entwuerfe,
+      (select count(*) from einkaufsprojekte where status in ('bedarf', 'angefragt', 'entschieden'))::int as einkaufsprojekte`
   return row
 }
 
@@ -211,12 +213,14 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items: sees('einkauf') && prozessAktiv('einkauf')
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
+            { href: '/einkauf/projekte', label: 'Einkaufsprojekte', count: counts.einkaufsprojekte },
             { href: '/einkauf/posteingang', label: 'Posteingang', count: counts.posteingang },
             { href: '/einkauf/entwuerfe', label: 'Mail-Entwürfe', count: counts.entwuerfe },
             { href: '/einkauf/wiedervorlagen', label: 'Wiedervorlagen', count: counts.wiedervorlagen },
             { href: '/einkauf/lieferanten', label: 'Lieferanten' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },
             { href: '/einkauf/kurse', label: 'Wechselkurse' },
+            { href: '/einkauf/einstand', label: 'Einstand (Fracht & Zoll)' },
           ]
         : [],
     },

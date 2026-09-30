@@ -193,6 +193,20 @@ export const LABELS = {
     gesendet: 'Gesendet',
     verworfen: 'Verworfen',
   },
+  einkaufsprojekt: {
+    bedarf: 'Bedarf',
+    angefragt: 'Angefragt',
+    entschieden: 'Entschieden',
+    bestellt: 'Bestellt',
+    abgeschlossen: 'Abgeschlossen',
+    abgebrochen: 'Abgebrochen',
+  },
+  lieferantenanfrage: {
+    entwurf: 'Entwurf',
+    angefragt: 'Angefragt',
+    angebot: 'Angebot da',
+    abgesagt: 'Abgesagt',
+  },
 } as const
 
 /** Farbton für Status-Badges. */
@@ -210,6 +224,8 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'approved':
     case 'erledigt':
     case 'gesendet':
+    case 'abgeschlossen':
+    case 'angebot':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -221,11 +237,15 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'posted':
     case 'offen':
     case 'freigegeben':
+    case 'angefragt':
+    case 'entschieden':
+    case 'bestellt':
       return 'info'
     case 'cancel':
     case 'cancelled':
     case 'failure':
     case 'rejected':
+    case 'abgebrochen':
       return 'danger'
     case 'waiting':
     case 'started':
@@ -236,6 +256,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'created':
     case 'requested':
     case 'awaiting_device':
+    case 'bedarf':
       return 'warn'
     default:
       return 'neutral'

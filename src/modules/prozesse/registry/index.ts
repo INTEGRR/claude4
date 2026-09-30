@@ -4,6 +4,7 @@ import { EINKAUF } from './einkauf.ts'
 import { EINKAUF_DOKUMENTE } from './einkauf-dokumente.ts'
 import { EINKAUF_POSTFACH } from './einkauf-postfach.ts'
 import { EINKAUF_MAILVERSAND } from './einkauf-mailversand.ts'
+import { EINKAUF_PROJEKTE } from './einkauf-projekte.ts'
 import { EINSTELLUNGEN } from './einstellungen.ts'
 import { FEHLER } from './fehler.ts'
 import { FERTIGUNG } from './fertigung.ts'
@@ -33,6 +34,7 @@ export const REGISTRY = {
   ...EINKAUF_DOKUMENTE,
   ...EINKAUF_POSTFACH,
   ...EINKAUF_MAILVERSAND,
+  ...EINKAUF_PROJEKTE,
   ...EINSTELLUNGEN,
   ...FEHLER,
   ...FERTIGUNG,

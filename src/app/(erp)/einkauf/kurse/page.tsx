@@ -1,9 +1,10 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
-import { ActionForm } from '@/components/action-button'
+import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, isoDatum } from '@/modules/shared/format'
 import { setExchangeRate } from '../actions'
+import { ezbKurseHolen } from '../projekte/actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,8 @@ export default async function KursePage() {
     <>
       <PageHeader
         title="Wechselkurse"
-        subtitle="1 Einheit Fremdwährung = x Euro. Beim Bestätigen einer Bestellung wird der Kurs eingefroren."
+        subtitle="1 Einheit Fremdwährung = x Euro. Beim Bestätigen einer Bestellung wird der Kurs eingefroren. Die EZB-Kurse kommen täglich von selbst (0097); von Hand erfasste bleiben stehen."
+        actions={<ActionButton action={ezbKurseHolen}>EZB-Kurse holen</ActionButton>}
       />
 
       <div className="grid-3" style={{ marginBottom: 16 }}>

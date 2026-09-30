@@ -34,6 +34,7 @@ interface Entwurf {
   antwort_erwartet_bis: string | null
   freigegeben_von: string | null
   zustaendig_id: string | null
+  einkaufsprojekt_id: string | null
 }
 
 /** Der Text, der hinausgeht: Deutsch an deutsche Lieferanten, sonst die Zielsprache. */
@@ -52,7 +53,7 @@ export async function entwurfSenden(entwurfId: string): Promise<string> {
   const [e] = await sql<Entwurf[]>`
     select e.id, e.status::text as status, e.thread_id, t.gmail_thread_id, e.partner_id, e.purchase_order_id,
            e.an, e.cc, e.betreff, e.text_de, e.text_ziel, e.sprache, e.anhang_dokument_ids,
-           e.antwort_erwartet_bis::text as antwort_erwartet_bis, e.freigegeben_von, e.zustaendig_id
+           e.antwort_erwartet_bis::text as antwort_erwartet_bis, e.freigegeben_von, e.zustaendig_id, e.einkaufsprojekt_id
     from mail_entwuerfe e left join mail_threads t on t.id = e.thread_id
     where e.id = ${entwurfId}`
   if (!e) return 'Entwurf nicht mehr vorhanden'
@@ -112,9 +113,11 @@ export async function entwurfSenden(entwurfId: string): Promise<string> {
         vorhanden?.id ??
         (
           await t<{ id: string }[]>`
-            insert into mail_threads (gmail_thread_id, betreff, partner_id, purchase_order_id, zustaendig_id, kanal, zugeordnet_durch)
+            insert into mail_threads (gmail_thread_id, betreff, partner_id, purchase_order_id, einkaufsprojekt_id,
+                                      zustaendig_id, kanal, zugeordnet_durch)
             values (${gesendet.threadId}, ${betreffKern(e.betreff) || e.betreff}, ${e.partner_id}, ${e.purchase_order_id},
-                    ${e.zustaendig_id}, 'email', ${e.partner_id || e.purchase_order_id ? 'mensch' : null})
+                    ${e.einkaufsprojekt_id}, ${e.zustaendig_id}, 'email',
+                    ${e.partner_id || e.purchase_order_id || e.einkaufsprojekt_id ? 'mensch' : null})
             returning id`
         )[0].id
     }
@@ -134,7 +137,8 @@ export async function entwurfSenden(entwurfId: string): Promise<string> {
     }
     await t`
       update mail_threads set anzahl = anzahl + 1, letzte_richtung = 'ausgang', letzte_am = now(),
-             partner_id = coalesce(partner_id, ${e.partner_id}), purchase_order_id = coalesce(purchase_order_id, ${e.purchase_order_id})
+             partner_id = coalesce(partner_id, ${e.partner_id}), purchase_order_id = coalesce(purchase_order_id, ${e.purchase_order_id}),
+             einkaufsprojekt_id = coalesce(einkaufsprojekt_id, ${e.einkaufsprojekt_id})
       where id = ${threadId}`
     await t`
       update mail_entwuerfe set status = 'gesendet', gesendet_am = now(), gmail_message_id = ${gesendet.id},
@@ -146,6 +150,15 @@ export async function entwurfSenden(entwurfId: string): Promise<string> {
                       ${e.zustaendig_id}, ${e.freigegeben_von})`
     }
     await t`select log_event('mail_entwurf', ${e.id}, 'email', ${`Gesendet an ${e.an.join(', ')}`}, ${e.freigegeben_von})`
+    // Anfrage aus dem Einkaufsprojekt (0097): gilt ab jetzt als angefragt, der Thread hängt an ihr.
+    const [anfrage] = await t<{ projekt_id: string }[]>`
+      update lieferantenanfragen set status = 'angefragt', thread_id = ${threadId}, angefragt_am = now()
+      where entwurf_id = ${e.id} and status = 'entwurf'
+      returning projekt_id`
+    if (anfrage) {
+      await t`select log_event('einkaufsprojekt', ${anfrage.projekt_id}, 'email',
+                               ${`Anfrage an ${e.an.join(', ')} gesendet`}, ${e.freigegeben_von})`
+    }
     if (e.purchase_order_id) {
       await t`select log_event('purchase_order', ${e.purchase_order_id}, 'email',
                                ${`Mail an ${e.an.join(', ')} gesendet: ${e.betreff}`}, ${e.freigegeben_von})`

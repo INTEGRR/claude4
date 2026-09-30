@@ -5,6 +5,7 @@ import { BASIS } from './basis.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
 import { EINKAUF_FIXTURE, LIEFERANTENRECHNUNG_FIXTURE } from './einkauf.ts'
 import { EINKAUF_MAIL } from './einkauf-mail.ts'
+import { EINKAUFSPROJEKT_FIXTURE } from './einkaufsprojekt.ts'
 import { FERTIGUNG_FIXTURE } from './fertigung.ts'
 import { INVENTUR_FIXTURE } from './inventur.ts'
 import { REPARATUR } from './reparatur.ts'
@@ -29,6 +30,7 @@ export const FIXTURES = {
   artikel_anlegen: ARTIKEL_ANLEGEN,
   bug_ticket: BUG_TICKET,
   einkauf_wareneingang_rechnung: EINKAUF_FIXTURE,
+  einkaufsprojekt: EINKAUFSPROJEKT_FIXTURE,
   fertigung: FERTIGUNG_FIXTURE,
   inventur: INVENTUR_FIXTURE,
   lieferantenrechnung: LIEFERANTENRECHNUNG_FIXTURE,

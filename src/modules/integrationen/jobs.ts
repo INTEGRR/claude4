@@ -294,6 +294,12 @@ const handlers = {
     return nachrichtUebersetzen(String(payload.nachricht_id))
   },
 
+  /** EZB-Referenzkurse holen und als EUR je Fremdeinheit speichern (einkauf/ezb-abruf.ts, 0097). */
+  async ezb_kurse_abrufen() {
+    const { ezbKurseAbrufen } = await import('@/modules/einkauf/ezb-abruf')
+    return ezbKurseAbrufen()
+  },
+
   /** Mail-Anhang aus dem Einkaufspostfach in die Drive-Ablage (einkauf/anhang-ablage.ts). */
   async gmail_anhang_ablegen(payload) {
     const { anhangAblegen } = await import('@/modules/einkauf/anhang-ablage')

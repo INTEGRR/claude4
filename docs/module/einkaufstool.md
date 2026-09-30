@@ -19,7 +19,7 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
 | 1 | Google-Anbindung, Dokumente in Drive, Lieferantenakte, Dienstleistungen ohne Wareneingang (0092) | umgesetzt |
 | 2a | Einkaufspostfach lesen und zuordnen, Posteingang, Wiedervorlagen (0093) | umgesetzt |
 | 2b | Aus KRNL schreiben, Vorlagen je Sprache, Übersetzung, Bestell-PDF (0094) | umgesetzt |
-| 3 | Einkaufsprojekt: Anfragen, Angebote, Vergleich auf Einstand, Entscheidung | geplant |
+| 3 | Einkaufsprojekt: Anfragen, Angebote, Vergleich auf Einstand, Entscheidung, Bestellung, EZB-Kurse (0097) | umgesetzt |
 | 4 | Bemusterung (Golden Sample), Werkzeuge/Molds, Lieferantenverträge | geplant |
 | 5 | Eingangssendungen (Sammelfracht), Zoll, Pflichtdokumente, Cockpit, DATEV | geplant |
 | 6 | Agent — nur Entwürfe, bei jeder eingehenden Mail | geplant |
@@ -329,3 +329,147 @@ WeTransfer (Entscheidungslog 2026-09-30).
   Freigabe).
 - Fixture-Läufe „Preisanfrage auf Chinesisch …" und „Entwurf verwerfen"
   (`src/modules/prozesse/fixtures/einkauf-mail.ts`).
+
+## Stufe 3 — Einkaufsprojekt: Anfragen, Angebote, Vergleich (0097)
+
+Betreiber-Antworten 2026-09-30: ein Projekt hat **mehrere Positionen**, das
+Ziel ist ein **Zielpreis je Position**, Anfragen gehen als **Entwürfe je
+Lieferant mit Sammelfreigabe** hinaus.
+
+### Projekt und Prozess `einkaufsprojekt`
+
+- **Einkaufsprojekt** (`einkaufsprojekte`, Nummer `EP/00001`): Titel, Art
+  (Nachproduktion, Neuteil, Werkzeug/Form, Muster, Betriebsausstattung),
+  Verantwortlicher, Zieltermin, Beschreibung.
+- **Positionen** (`einkaufsprojekt_positionen`): Bezeichnung oder bestehender
+  Artikel, Menge, **Zielpreis je Stück in EUR** (Einstand, geht nie an den
+  Lieferanten), Gewicht (g), HS-Code, Spezifikation (geht in die Anfrage).
+- Prozess: Bedarf anlegen → **Anfragen freigeben** (`angefragt`) → **Angebot
+  wählen** (`entschieden`) → **Bestellen** (`bestellt`) → **abgeschlossen**;
+  von jedem offenen Schritt **Abbrechen**. Liegt schon ein Angebot vor
+  (bekannter Lieferant), geht es vom Bedarf direkt zur Entscheidung.
+- **Abgeschlossen von selbst** (SQL `einkaufsprojekt_pruefen`, Trigger auf
+  `purchase_order_lines.qty_received` und `purchase_orders.state`): sobald
+  das Projekt `bestellt` ist, mindestens eine nicht stornierte Bestellung hat
+  und jede davon bestätigt und ihre Lagerware vollständig eingegangen ist.
+  Reine Dienstleistung zählt ab Bestätigung. Von Hand geht es auch.
+- Alles andere ist Arbeit im Projekt und prozessfrei: Positionen pflegen,
+  Anfrage-Entwürfe anlegen, Angebote erfassen/ändern/verwerfen, Bestellung
+  zuordnen, Frachtsätze, Zolltarife, EZB-Kurse.
+
+### Anfragen (`lieferantenanfragen`)
+
+- **„Anfragen vorbereiten"** (`einkauf.anfragen_senden`): je gewähltem
+  Lieferanten ein Mail-Entwurf in dessen Sprache aus der Vorlage „Anfrage".
+  - Betreff mit EP-Nummer („询价 EP/00001 – …"); daran finden Antworten ihr
+    Projekt, auch in neuen Threads (`mail_thread_zuordnen` erkennt
+    `EP/nnnnn`).
+  - Der Positionsblock (Referenz, Positionen mit Menge und Einheit,
+    Spezifikation, Liefertermin) ersetzt die leeren Stichpunkte der Vorlage.
+    Wurde die Vorlage umgeschrieben, steht er nach der Anrede. Der
+    **Zielpreis steht nie darin**.
+  - Die gewählten Projektdateien hängen an. Die Frist wird „Antwort erwartet
+    bis" (Wiedervorlage beim Senden).
+  - Ein zweiter Lauf legt nichts doppelt an.
+- **„Anfragen freigeben"** (`einkauf.anfragen_freigeben`, Prozessschritt,
+  nicht `ki`): Sammelfreigabe, **alles oder nichts**. Jeder Entwurf wird wie
+  bei der Einzelfreigabe geprüft (Empfänger, Text in der Versandsprache,
+  offene Platzhalter, Anhanggröße); scheitert einer, geht keiner hinaus und
+  die Meldung nennt jeden Lieferanten mit Grund.
+- Beim Senden (`gmail_senden`) wird die Anfrage `angefragt`, Thread und
+  Anfrage hängen am Projekt. Mit dem ersten erfassten Angebot wird sie
+  `angebot`.
+
+### Angebote und Vergleich
+
+- **Angebot erfassen** (`einkauf.angebot_erfassen`, `ki`):
+  - Kopf: Lieferant, Währung, Incoterm (+ Ort), Anzahlung % bzw.
+    Zahlungstext, Lieferzeit, MOQ, gültig bis, Quelle (Datei oder
+    Nachricht).
+  - Einmalkosten: Werkzeug- und Musterkosten (Angebotswährung).
+  - Fracht: Modus oder ein fester Betrag je Stück.
+  - Preise je Position als **Staffeln**, eine je Zeile „Menge: Preis"
+    (`staffelnLesen`: „ab 1.000 = 0,72", „2000 pcs → 0.65 USD"; unlesbare
+    Zeilen werden abgewiesen, nicht verschluckt).
+  - Ein weiteres Angebot desselben Lieferanten wird Version 2.
+- **Einstand je Stück in EUR** (`einstand_schaetzen(angebot)`, SQL):
+  - **Ware** = Staffelpreis (größte Staffel ≤ Projektmenge, sonst die
+    kleinste) × Kurs.
+  - **Werkzeug + Muster** × Kurs, nach Warenwert auf die Positionen
+    umgelegt.
+  - **Fracht**: bei D-Klauseln (DAP, DPU, DDP) 0; sonst der feste Betrag
+    oder max(Gesamtgewicht × Satz, Mindestbetrag), nach Gewicht verteilt.
+  - **Zoll** = (Ware + Fracht) × Satz des längsten passenden HS-Präfixes;
+    bei DDP 0.
+  - Die **EUSt ist nie enthalten**.
+  - **Hinweise** statt stiller Annahmen: kein Kurs (der Wert bleibt leer
+    statt 1), kein Preis, unter Staffel/MOQ, kein Gewicht, kein Zollsatz,
+    abgelaufen.
+- Der **Vergleich** zeigt je Position und Angebot den Einstand (Aufschlüsselung
+  im Tooltip), die Summe mit Abweichung zum Ziel, die Konditionen und markiert
+  den **günstigsten vollständigen** Einstand. „Wählen" entscheidet (braucht
+  einen Preis für jede Position), „Verwerfen" nimmt ein Angebot heraus.
+- **Einstand** (`/einkauf/einstand`): Frachtsätze je Modus (Startwerte sind
+  Schätzungen) und Zollsätze je HS-Präfix. Ab Stufe 5 verfeinern Rechnungen
+  und Zollbescheide die Sätze.
+
+### Bestellen (`einkauf.projekt_bestellen`, nicht `ki`)
+
+Aus dem gewählten Angebot entsteht die Bestellung als **Entwurf**; bestätigt
+wird sie im eigenen Ablauf (Freigabe-Limit):
+
+- Neue Teile bekommen einen Artikel (Gewicht, HS-Code; Betriebsausstattung
+  als Dienstleistung ohne Lager).
+- Positionen zum Staffelpreis in Angebotswährung, Incoterm, Projekt-Verweis.
+- Werkzeug- und Musterkosten als Dienstleistungszeilen.
+- Zahlplan aus der Anzahlung: Anzahlung bei Bestellung, Rest bei Verschiffung;
+  100 % = Vorkasse.
+- **Lieferantenpreise** aus allen Staffeln (mit Gültigkeit und Lieferzeit) —
+  beim nächsten Mal schlägt KRNL sie selbst vor.
+
+Bestehende Bestellungen lassen sich einem Projekt zuordnen
+(`einkauf.bestellung_projekt_zuordnen`). Die Projektseite zeigt den
+Eingangsstand und die Preishistorie der Artikel aus früheren Bestellungen.
+
+### EZB-Kurse
+
+Job `ezb_kurse_abrufen` (täglich im Cron `finanzen`, Knopf „EZB-Kurse holen"
+auf der Kurse-Seite): Referenzkurse der EZB → gespeichert als EUR je
+Fremdeinheit (1/Kurs), Quelle `ezb`. Von Hand erfasste Kurse desselben Tages
+bleiben stehen. `EZB_FAKE=1` für Tests. „Kurs erfassen" ohne Datum gilt ab
+heute (vorher schlug es fehl).
+
+### Oberfläche
+
+- `/einkauf/projekte`: Liste mit Ansichten (laufend, abgeschlossen,
+  abgebrochen) und „Neues Projekt" mit erster Position.
+- `/einkauf/projekte/[id]`: Positionen, Anfragen (Lieferantenauswahl, Frist,
+  Dateien, Sammelfreigabe), Angebotsvergleich und Erfassung, Entscheidung,
+  Bestellungen, Preishistorie; dazu Mails (Neue Mail an einen angefragten
+  Lieferanten), Dateien (Drive-Ordner `Projekte/EP-… Titel`),
+  Wiedervorlagen, Prozess und Verlauf.
+- Threads lassen sich einem Projekt zuordnen (`einkauf.mail_zuordnen` mit
+  `einkaufsprojekt_id`).
+
+### Nachweis
+
+- `tests/einkaufsprojekt.test.ts`:
+  - Zahlen und Staffeln aus Text, Staffelwahl;
+  - Positionsblock je Sprache und in umgeschriebenen Vorlagen;
+  - Summe und bestes Angebot;
+  - EZB-XML und Kursumkehr.
+- `tests/prozesse/einkaufsprojekt.test.ts`:
+  - Einstand auf den Cent (CNY FOB mit Werkzeug und Mindestfracht gegen
+    USD DDP);
+  - fehlender Kurs;
+  - Anfrage-Texte in Chinesisch und Englisch;
+  - Sammelfreigabe alles oder nichts, Senden hängt Threads an;
+  - Antwort mit EP-Nummer in neuem Thread;
+  - Bestellung mit neuen Artikeln und Werkzeugzeile;
+  - Abbruch nur ohne offene Bestellung;
+  - Abschluss beim Wareneingang;
+  - EZB ohne Handkurse zu überschreiben.
+- Fixture-Läufe (`fixtures/einkaufsprojekt.ts`):
+  - Neuteil bis zum Abschluss beim Wareneingang;
+  - Betriebsausstattung direkt bestellt;
+  - Abbruch.
