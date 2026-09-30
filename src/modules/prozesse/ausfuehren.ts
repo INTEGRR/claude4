@@ -3,6 +3,7 @@ import type { AktionsName } from './registry/index.ts'
 import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einkaufDokumente from './registry/einkauf-dokumente-ausfuehren.ts'
 import * as einkaufPostfach from './registry/einkauf-postfach-ausfuehren.ts'
+import * as einkaufMailversand from './registry/einkauf-mailversand-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -40,6 +41,12 @@ export const AUSFUEHRUNG = {
   'einkauf.wiedervorlage_anlegen': einkaufPostfach.wiedervorlageAnlegen,
   'einkauf.wiedervorlage_erledigen': einkaufPostfach.wiedervorlageErledigen,
   'integrationen.postfach_abgleichen': einkaufPostfach.postfachAbgleichenAusfuehren,
+  'einkauf.mail_entwurf_anlegen': einkaufMailversand.mailEntwurfAnlegen,
+  'einkauf.mail_entwurf_aendern': einkaufMailversand.mailEntwurfAendern,
+  'einkauf.mail_uebersetzen': einkaufMailversand.mailUebersetzen,
+  'einkauf.mail_freigeben': einkaufMailversand.mailFreigeben,
+  'einkauf.mail_verwerfen': einkaufMailversand.mailVerwerfen,
+  'einkauf.nachricht_uebersetzen': einkaufMailversand.nachrichtUebersetzen,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,

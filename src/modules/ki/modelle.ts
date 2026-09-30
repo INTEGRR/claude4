@@ -62,6 +62,13 @@ export const KI_EBENEN = [
     standard: 'claude-haiku-4-5-20251001',
     env: ['DATENFRAGE_MODELL'],
   },
+  {
+    key: 'uebersetzung',
+    label: 'Übersetzung im Einkauf',
+    hinweis: 'Lieferanten-Mails ins Deutsche, Entwürfe nach Englisch/Chinesisch (0094)',
+    standard: 'claude-sonnet-5',
+    env: ['UEBERSETZUNG_MODELL'],
+  },
 ] as const
 
 export type KiEbene = (typeof KI_EBENEN)[number]['key']

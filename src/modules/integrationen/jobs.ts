@@ -282,6 +282,18 @@ const handlers = {
     return `${r.imported} Bestellung(en) übernommen — Übernahme abgeschlossen`
   },
 
+  /** Freigegebenen Mail-Entwurf über das Einkaufspostfach senden (einkauf/mail-senden.ts). */
+  async gmail_senden(payload) {
+    const { entwurfSenden } = await import('@/modules/einkauf/mail-senden')
+    return entwurfSenden(String(payload.entwurf_id))
+  },
+
+  /** Eingegangene Nachricht ins Deutsche übersetzen (einkauf/nachricht-uebersetzen.ts). */
+  async mail_uebersetzen(payload) {
+    const { nachrichtUebersetzen } = await import('@/modules/einkauf/nachricht-uebersetzen')
+    return nachrichtUebersetzen(String(payload.nachricht_id))
+  },
+
   /** Mail-Anhang aus dem Einkaufspostfach in die Drive-Ablage (einkauf/anhang-ablage.ts). */
   async gmail_anhang_ablegen(payload) {
     const { anhangAblegen } = await import('@/modules/einkauf/anhang-ablage')
@@ -411,6 +423,14 @@ async function originForJob(
     const [row] = await sql<{ thread_id: string }[]>`
       select n.thread_id from mail_anhaenge a join mail_nachrichten n on n.id = a.nachricht_id
       where a.id = ${String(payload.anhang_id)}`
+    if (row) return { model: 'mail_thread', id: row.thread_id }
+  }
+  if (kind === 'gmail_senden' && payload.entwurf_id) {
+    return { model: 'mail_entwurf', id: String(payload.entwurf_id) }
+  }
+  if (kind === 'mail_uebersetzen' && payload.nachricht_id) {
+    const [row] = await sql<{ thread_id: string }[]>`
+      select thread_id from mail_nachrichten where id = ${String(payload.nachricht_id)}`
     if (row) return { model: 'mail_thread', id: row.thread_id }
   }
   return null

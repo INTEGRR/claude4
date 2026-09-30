@@ -354,13 +354,17 @@ describe('Registry-Abdeckung (statisch)', () => {
  * Fachlogik der Registry-Aktion produkte.produkt_anlegen (wird NUR vom
  * Registry-Executor gerufen), sprechen-werkzeuge.ts protokolliert die
  * Sprachsession in ihren eigenen Tabellen (die Fachaktionen darin laufen
- * über aktionAusfuehrenGeprueft).
+ * über aktionAusfuehrenGeprueft), uebersetzen.ts schreibt das
+ * Verbrauchsprotokoll ki_verbrauch (Tokens je Aufruf, kein Fachdatum — das
+ * Ergebnis der Übersetzung speichert die aufrufende Registry-Aktion bzw.
+ * der Outbox-Job, 0094).
  */
 describe('KI-Modul: kein Schreib-SQL am Torwächter vorbei', () => {
   const KI_WURZEL = new URL('../src/modules/ki', import.meta.url).pathname
   const ERLAUBT: Record<string, RegExp[]> = {
     'produkt-anlegen.ts': [/^product_/],
     'sprechen-werkzeuge.ts': [/^sprachprotokoll/, /^sprach_vorgaenge$/],
+    'uebersetzen.ts': [/^ki_verbrauch$/],
   }
 
   test('insert/update/delete nur auf der geschlossenen Allowlist', () => {

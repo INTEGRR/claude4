@@ -186,6 +186,7 @@ describe('zitatTrennen', () => {
   test('Outlook deutsch und chinesischer Kopf', () => {
     assert.equal(zitatTrennen('Danke!\n\nVon: Wei\nGesendet: Montag\nBetreff: x\n\nalt').neu, 'Danke!')
     assert.equal(zitatTrennen('好的\n\n发件人: Tino\n发送时间: 2025年3月3日\n\n旧').neu, '好的')
+    assert.equal(zitatTrennen('样品已经到了吗？\n\n在 2026年9月30日，Tino 写道：\n> 请寄样品').neu, '样品已经到了吗？')
   })
 
   test('„Von:" im Fließtext ist kein Zitat; ohne Zitat bleibt alles neu', () => {

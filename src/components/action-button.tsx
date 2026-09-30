@@ -114,7 +114,9 @@ export function ActionForm({
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
-    const data = new FormData(form)
+    // Der geklickte Knopf reist mit (name/value) — so kann ein Formular
+    // „Speichern" und „Senden" anbieten (Mail-Entwurf, 0094).
+    const data = new FormData(form, (e.nativeEvent as SubmitEvent).submitter)
     setError(null)
     setInfo(null)
     startTransition(async () => {

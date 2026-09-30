@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import { money, qty } from '@/modules/shared/format'
+import { htmlSicher } from '@/modules/integrationen/mail'
 import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
 
@@ -166,6 +167,18 @@ export async function sperren(
 /** Stellt die Bestellung als E-Mail mit Positionsliste in die Outbox. */
 export async function emailSenden(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   const orderId = ctx.recordId!
+  // Seit 0094: mit angebundenem Einkaufspostfach entsteht ein Entwurf mit
+  // Bestell-PDF in der Sprache des Lieferanten — gegenlesen, freigeben,
+  // gesendet wird im Thread. Ohne Postfach bleibt der bisherige Weg (Resend).
+  const { postfachKonfiguriert, driveKonfiguriert } = await import('@/modules/google/auth')
+  if (postfachKonfiguriert() && driveKonfiguriert()) {
+    const { entwurfAnlegen } = await import('./einkauf-mailversand-ausfuehren.ts')
+    const r = await entwurfAnlegen(
+      { purchase_order_id: orderId, vorlage: 'bestellung', bestell_pdf: true, anhang_dokument_ids: [] },
+      ctx,
+    )
+    return { ...r, text: 'Entwurf mit Bestell-PDF angelegt — gegenlesen und freigeben.' }
+  }
   const [order] = await sql<
     { number: string; vendor: string; email: string | null }[]
   >`
@@ -185,7 +198,7 @@ export async function emailSenden(_p: object, ctx: AktionsKontext): Promise<Akti
   const rows = lines
     .map(
       (l) =>
-        `<tr><td>${l.name}</td><td align="right">${qty(l.qty)} ${l.uom}</td>` +
+        `<tr><td>${htmlSicher(l.name)}</td><td align="right">${qty(l.qty)} ${l.uom}</td>` +
         `<td align="right">${money(l.price_unit)}</td></tr>`,
     )
     .join('')
@@ -195,7 +208,7 @@ export async function emailSenden(_p: object, ctx: AktionsKontext): Promise<Akti
     `<table cellpadding="6" border="1" style="border-collapse:collapse">` +
     `<tr><th align="left">Position</th><th align="right">Menge</th><th align="right">Preis</th></tr>` +
     `${rows}</table>` +
-    `<p>Mit freundlichen Grüßen<br>${company?.name ?? ''}</p>`
+    `<p>Mit freundlichen Grüßen<br>${htmlSicher(company?.name ?? '')}</p>`
 
   await sql`select enqueue_job('send_po_email',
     ${sql.json({ purchase_order_id: orderId, html })}, ${`po-email:${orderId}:${Date.now()}`})`

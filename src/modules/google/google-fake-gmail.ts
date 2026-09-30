@@ -10,6 +10,8 @@ import { VerlaufAbgelaufen } from './gmail.ts'
  */
 
 interface FakePostfach {
+  /** Über `senden` verschickte Rohnachrichten — Tests prüfen Köpfe und Anhänge. */
+  gesendet: { id: string; threadId: string; raw: string }[]
   nachrichten: Map<string, GmailNachricht & { historyId: number }>
   anhaenge: Map<string, Buffer>
   historyId: number
@@ -19,7 +21,8 @@ interface FakePostfach {
 
 const postfach = (): FakePostfach => {
   const g = globalThis as unknown as { __krnlGmailFake?: FakePostfach }
-  g.__krnlGmailFake ??= { nachrichten: new Map(), anhaenge: new Map(), historyId: 1000, aeltesterCursor: 0 }
+  g.__krnlGmailFake ??= { gesendet: [], nachrichten: new Map(), anhaenge: new Map(), historyId: 1000, aeltesterCursor: 0 }
+  g.__krnlGmailFake.gesendet ??= []
   return g.__krnlGmailFake
 }
 
@@ -27,8 +30,23 @@ export function fakeGmailLeeren(): void {
   const p = postfach()
   p.nachrichten.clear()
   p.anhaenge.clear()
+  p.gesendet = []
   p.historyId = 1000
   p.aeltesterCursor = 0
+}
+
+/** Für Tests: was über die Attrappe verschickt wurde. */
+export function fakeGesendet(): { id: string; threadId: string; raw: string }[] {
+  return postfach().gesendet
+}
+
+/** Kopfzeilen einer Rohnachricht (entfaltet) — genug, damit der Abgleich sie wie echt sieht. */
+function rohKoepfe(raw: string): { name: string; value: string }[] {
+  const kopf = raw.split('\r\n\r\n')[0].replace(/\r\n[ \t]+/g, ' ')
+  return kopf.split('\r\n').map((z) => {
+    const i = z.indexOf(':')
+    return { name: z.slice(0, i), value: z.slice(i + 1).trim() }
+  })
 }
 
 /** Für den Rückfall-Test: alles vor dem aktuellen Stand gilt als abgelaufen. */
@@ -122,7 +140,9 @@ export const fakeGmail: GmailApi = {
   async verlauf(startHistoryId) {
     const p = postfach()
     const start = Number(startHistoryId)
-    if (start < p.aeltesterCursor) throw new VerlaufAbgelaufen('Verlauf abgelaufen')
+    // Ein Cursor aus der Zukunft (Attrappe nach Neustart wieder bei 1000) gilt
+    // wie bei Google als unbekannt — der Abgleich fällt auf die Liste zurück.
+    if (start < p.aeltesterCursor || start > p.historyId) throw new VerlaufAbgelaufen('Verlauf abgelaufen')
     const ids = [...p.nachrichten.values()].filter((n) => n.historyId > start).map((n) => n.id)
     return { ids, historyId: String(p.historyId) }
   },
@@ -136,6 +156,23 @@ export const fakeGmail: GmailApi = {
     if (!n) throw new Error(`Gmail (gmail.nachricht): 404 ${id}`)
     const { historyId: _h, ...rest } = n
     return rest
+  },
+
+  async senden(raw, threadId) {
+    const p = postfach()
+    const id = `fake-sent-${randomUUID()}`
+    const tid = threadId ?? `fake-thread-${randomUUID()}`
+    p.gesendet.push({ id, threadId: tid, raw })
+    p.historyId += 1
+    p.nachrichten.set(id, {
+      id,
+      threadId: tid,
+      labelIds: ['SENT'],
+      internalDate: String(Date.now()),
+      payload: { mimeType: 'text/plain', headers: rohKoepfe(raw), body: { data: '' } },
+      historyId: p.historyId,
+    })
+    return { id, threadId: tid }
   },
 
   async anhang(_messageId, attachmentId) {

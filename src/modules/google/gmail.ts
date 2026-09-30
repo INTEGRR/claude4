@@ -4,8 +4,9 @@ import { GMAIL_SCOPE, googleFake, zugriffstoken } from './auth.ts'
  * Gmail über REST (0093) — handelt im Namen des Einkaufspostfachs
  * (EINKAUF_POSTFACH, domänenweite Delegation nur mit gmail.modify). Nur das
  * Nötige für den Abgleich: Profil (Start-Cursor), Verlauf seit Cursor,
- * Nachricht vollständig, Anhang. Senden kommt mit Stufe 2b. Echte Anbindung
- * und Attrappe (google-fake-gmail.ts) teilen die Schnittstelle.
+ * Nachricht vollständig, Anhang — und seit Stufe 2b (0094) Senden im
+ * Thread. Echte Anbindung und Attrappe (google-fake-gmail.ts) teilen die
+ * Schnittstelle.
  */
 
 export interface GmailTeil {
@@ -34,9 +35,14 @@ export interface GmailApi {
   liste(q: string, pageToken?: string): Promise<{ ids: string[]; weiter?: string }>
   nachricht(id: string): Promise<GmailNachricht>
   anhang(messageId: string, attachmentId: string): Promise<Uint8Array>
+  /** Sendet eine fertige RFC-5322-Nachricht (mail-bauen.ts) — mit threadId im bestehenden Gespräch. */
+  senden(raw: string, threadId?: string | null): Promise<{ id: string; threadId: string }>
 }
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me'
+const UPLOAD = 'https://gmail.googleapis.com/upload/gmail/v1/users/me'
+/** Bis hierhin als JSON-`raw` (base64 bläht um ein Drittel auf), darüber als Upload (bis 35 MB). */
+const RAW_GRENZE = 3.5 * 1024 * 1024
 
 function postfach(): string {
   const p = process.env.EINKAUF_POSTFACH
@@ -44,11 +50,12 @@ function postfach(): string {
   return p
 }
 
-async function anfrage(pfad: string, art: string): Promise<Response> {
+async function anfrage(pfad: string, art: string, init: RequestInit = {}, basis = API): Promise<Response> {
   const token = await zugriffstoken(GMAIL_SCOPE, postfach())
-  const res = await fetch(`${API}${pfad}`, {
-    headers: { authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(30_000),
+  const res = await fetch(`${basis}${pfad}`, {
+    ...init,
+    headers: { authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
+    signal: AbortSignal.timeout(55_000),
   })
   if (res.status === 404 && art === 'gmail.verlauf') throw new VerlaufAbgelaufen('Verlauf abgelaufen')
   if (!res.ok) {
@@ -104,6 +111,35 @@ const echtesPostfach: GmailApi = {
     )
     const daten = (await res.json()) as { data: string }
     return base64urlBytes(daten.data)
+  },
+
+  async senden(raw, threadId) {
+    let res: Response
+    if (Buffer.byteLength(raw, 'utf8') <= RAW_GRENZE) {
+      const b64 = Buffer.from(raw, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+      res = await anfrage('/messages/send', 'gmail.senden', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ raw: b64, ...(threadId ? { threadId } : {}) }),
+      })
+    } else {
+      const g = `krnl-${crypto.randomUUID()}`
+      const body = Buffer.concat([
+        Buffer.from(`--${g}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(threadId ? { threadId } : {})}\r\n--${g}\r\ncontent-type: message/rfc822\r\n\r\n`),
+        Buffer.from(raw, 'utf8'),
+        Buffer.from(`\r\n--${g}--`),
+      ])
+      res = await anfrage(
+        '/messages/send?uploadType=multipart',
+        'gmail.senden',
+        { method: 'POST', headers: { 'content-type': `multipart/related; boundary=${g}` }, body },
+        UPLOAD,
+      )
+    }
+    const daten = (await res.json()) as { id: string; threadId: string }
+    const { logTransaction } = await import('../integrationen/transaktionen.ts')
+    await logTransaction({ system: 'google', kind: 'gmail.senden', ok: true, statusCode: res.status, reference: daten.id })
+    return daten
   },
 }
 

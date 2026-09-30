@@ -48,6 +48,7 @@ async function badges() {
       kuendigungen: number
       posteingang: number
       wiedervorlagen: number
+      entwuerfe: number
     }[]
   >`
     select
@@ -74,7 +75,8 @@ async function badges() {
       (select count(*) from mail_threads
         where status = 'offen' and letzte_richtung = 'eingang')::int as posteingang,
       (select count(*) from wiedervorlagen
-        where erledigt_am is null and faellig_am <= current_date)::int as wiedervorlagen`
+        where erledigt_am is null and faellig_am <= current_date)::int as wiedervorlagen,
+      (select count(*) from mail_entwuerfe where status = 'entwurf')::int as entwuerfe`
   return row
 }
 
@@ -208,6 +210,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
             { href: '/einkauf/posteingang', label: 'Posteingang', count: counts.posteingang },
+            { href: '/einkauf/entwuerfe', label: 'Mail-Entwürfe', count: counts.entwuerfe },
             { href: '/einkauf/wiedervorlagen', label: 'Wiedervorlagen', count: counts.wiedervorlagen },
             { href: '/einkauf/lieferanten', label: 'Lieferanten' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },

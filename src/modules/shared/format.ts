@@ -187,6 +187,12 @@ export const LABELS = {
     erledigt: 'Erledigt',
     ignoriert: 'Ignoriert',
   },
+  mail_entwurf: {
+    entwurf: 'Entwurf',
+    freigegeben: 'Wird gesendet',
+    gesendet: 'Gesendet',
+    verworfen: 'Verworfen',
+  },
 } as const
 
 /** Farbton für Status-Badges. */
@@ -203,6 +209,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'paid':
     case 'approved':
     case 'erledigt':
+    case 'gesendet':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -213,6 +220,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'received':
     case 'posted':
     case 'offen':
+    case 'freigegeben':
       return 'info'
     case 'cancel':
     case 'cancelled':

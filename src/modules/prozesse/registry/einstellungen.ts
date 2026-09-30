@@ -384,7 +384,7 @@ export const EINSTELLUNGEN = {
     prozessfrei: true,
     beschreibung:
       'Legt fest, welches Sprachmodell jede KI-Ebene nutzt (Auswertungen, Prozess-Entwurf, ' +
-      'Onboarding-Interview, schnelle Datenfrage) — eine Kosten-/Qualitätsentscheidung des ' +
+      'Onboarding-Interview, schnelle Datenfrage, Übersetzung im Einkauf) — eine Kosten-/Qualitätsentscheidung des ' +
       'Betreibers (settings.ki_modelle). Nur Modelle aus dem geprüften Katalog sind wählbar.',
     bindung: 'frei',
     schema: z.object({
@@ -392,14 +392,18 @@ export const EINSTELLUNGEN = {
       prozess: kiModellEnum,
       interview: kiModellEnum,
       datenfrage: kiModellEnum,
+      // Seit 0094; optional, damit ältere Aufrufe ohne diese Ebene gültig bleiben.
+      uebersetzung: kiModellEnum.optional(),
     }),
     zusammenfassung: (p) =>
-      `Auswertung ${p.auswertung} · Prozess ${p.prozess} · Interview ${p.interview} · Datenfrage ${p.datenfrage}`,
+      `Auswertung ${p.auswertung} · Prozess ${p.prozess} · Interview ${p.interview} · Datenfrage ${p.datenfrage}` +
+      (p.uebersetzung ? ` · Übersetzung ${p.uebersetzung}` : ''),
     formdata: (fd) => ({
       auswertung: String(fd.get('auswertung') ?? ''),
       prozess: String(fd.get('prozess') ?? ''),
       interview: String(fd.get('interview') ?? ''),
       datenfrage: String(fd.get('datenfrage') ?? ''),
+      uebersetzung: fd.has('uebersetzung') ? String(fd.get('uebersetzung') ?? '') : undefined,
     }),
     revalidate: ['/einstellungen/ki'],
   },

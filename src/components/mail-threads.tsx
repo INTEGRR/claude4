@@ -4,6 +4,10 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty } from '@/components/ui'
 import { date, dateTime } from '@/modules/shared/format'
 import { wiedervorlageAnlegen, wiedervorlageErledigen } from '@/app/(erp)/einkauf/posteingang/actions'
+import { entwurfAnlegen } from '@/app/(erp)/einkauf/entwuerfe/actions'
+import { currentUser } from '@/modules/auth'
+import { canWrite } from '@/modules/auth/permissions'
+import { VORLAGEN_ANLAESSE } from '@/modules/einkauf/mail-vorlagen'
 import type { WiedervorlageModell } from '@/modules/prozesse/registry/einkauf-postfach'
 
 /**
@@ -39,6 +43,8 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
       and ${purchaseOrderId ? sql`t.purchase_order_id = ${purchaseOrderId}` : sql`t.partner_id = ${partnerId ?? null}`}
     order by t.letzte_am desc nulls last
     limit 30`
+  const user = await currentUser()
+  const darf = Boolean(user && canWrite(user.role, 'einkauf', user.befugnisse))
 
   return (
     <Card
@@ -71,6 +77,39 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
             </li>
           ))}
         </ul>
+      )}
+      {darf && (
+        <ActionForm action={entwurfAnlegen} style={{ padding: '10px 12px' }}>
+          {purchaseOrderId ? (
+            <input type="hidden" name="purchase_order_id" value={purchaseOrderId} />
+          ) : (
+            <input type="hidden" name="partner_id" value={partnerId} />
+          )}
+          <div className="row">
+            <label className="field">
+              <span>Neue Mail</span>
+              <select name="vorlage" defaultValue={purchaseOrderId ? 'liefertermin' : 'anfrage'}>
+                <option value="">— freier Text —</option>
+                {Object.entries(VORLAGEN_ANLAESSE).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {purchaseOrderId && (
+              <label className="field shrink" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" name="bestell_pdf" />
+                <span>Bestell-PDF anhängen</span>
+              </label>
+            )}
+            <div className="field shrink">
+              <button className="small" type="submit">
+                Mail entwerfen
+              </button>
+            </div>
+          </div>
+        </ActionForm>
       )}
     </Card>
   )

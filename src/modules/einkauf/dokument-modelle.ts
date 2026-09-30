@@ -35,6 +35,7 @@ export const DOKUMENT_ARTEN = {
   vertrag: 'Vertrag',
   nda: 'NDA',
   foto: 'Foto',
+  bestellung: 'Bestellung (PDF)',
   sonstiges: 'Sonstiges',
 } as const
 

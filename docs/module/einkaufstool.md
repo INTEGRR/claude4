@@ -18,7 +18,7 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
 |---|---|---|
 | 1 | Google-Anbindung, Dokumente in Drive, Lieferantenakte, Dienstleistungen ohne Wareneingang (0092) | umgesetzt |
 | 2a | Einkaufspostfach lesen und zuordnen, Posteingang, Wiedervorlagen (0093) | umgesetzt |
-| 2b | Aus KRNL schreiben, Vorlagen je Sprache, Übersetzung | geplant |
+| 2b | Aus KRNL schreiben, Vorlagen je Sprache, Übersetzung, Bestell-PDF (0094) | umgesetzt |
 | 3 | Einkaufsprojekt: Anfragen, Angebote, Vergleich auf Einstand, Entscheidung | geplant |
 | 4 | Bemusterung (Golden Sample), Werkzeuge/Molds, Lieferantenverträge | geplant |
 | 5 | Eingangssendungen (Sammelfracht), Zoll, Pflichtdokumente, Cockpit, DATEV | geplant |
@@ -222,3 +222,110 @@ danach läuft es für diesen Lieferanten von selbst.
   „Absender merken" und Umzug aus dem Eingang, von der Regel nicht
   überschrieben; Alibaba-Erfassung; Wiedervorlagen; Rückfall bei
   abgelaufenem Verlauf; Zeitbudget.
+
+## Stufe 2b — aus KRNL schreiben, Vorlagen, Übersetzung (0094)
+
+### Entwurf als Beleg, Prozess `mail_versand`
+
+- Jede ausgehende Mail ist ein **Entwurf** (`mail_entwuerfe`): Empfänger,
+  Betreff, **deutscher Text zum Mitlesen** und der **Text in der Sprache des
+  Lieferanten** (de/en/zh aus der Lieferantenakte; ohne Angabe Deutsch für
+  deutsche, sonst Englisch), Anhänge aus der Ablage, „Antwort erwartet bis".
+- Prozess `mail_versand`: **Entwurf schreiben** (`einkauf.mail_entwurf_anlegen`)
+  → **Freigeben und senden** (`einkauf.mail_freigeben`) → Dienst
+  **gmail_senden** (Zustand `gesendet`) — oder **Verwerfen**. Bearbeiten
+  (`einkauf.mail_entwurf_aendern`) und Übersetzen (`einkauf.mail_uebersetzen`)
+  sind Arbeit am Entwurf, keine Schritte.
+- **Freigeben tut immer ein Mensch:** Die Aktion ist nicht für die KI
+  freigegeben; der Agent (Stufe 6) schreibt nur Entwürfe (`quelle 'agent'`).
+- Vor dem Senden prüft KRNL: Empfänger, Betreff, Text in der Versandsprache,
+  **offene Platzhalter** (`[bestellnummer]` …) und die Größe der Anhänge
+  (höchstens 18 MB — Gmail nimmt 25 MB inklusive Kodierung). Große Dateien
+  gehen als Drive-Link oder per WeTransfer.
+
+### Senden (`src/modules/einkauf/mail-senden.ts`, `mail-bauen.ts`)
+
+- MIME selbst gebaut (UTF-8 überall, RFC 2047/2231 für Betreff, Namen und
+  Dateinamen, reines ASCII auf der Leitung), gesendet über die Gmail-API
+  (`messages.send`, über 3,5 MB als Upload bis 35 MB).
+- **Im selben Gespräch:** threadId des Gmail-Threads plus `In-Reply-To`
+  (letzte Nachricht) und `References` (alle, gekürzt auf 20), Betreff
+  „Re: …" — so landet die Antwort auch bei QQ, 163 oder Outlook im Thread.
+- Danach steht die Mail als Nachricht im Thread (Deutsch daneben), der
+  Entwurf ist `gesendet`; der nächste Abgleich erkennt sie an der Gmail-ID.
+  Eine neue Mail ohne Thread eröffnet einen. Mit „Antwort erwartet bis"
+  entsteht eine Wiedervorlage am Thread.
+- Scheitert Google, steht der Fehler am Entwurf; der Job wiederholt mit
+  Backoff.
+
+### Vorlagen (`mail_vorlagen`)
+
+Fünf Anlässe × Deutsch/Englisch/Chinesisch: **Preis-/Angebotsanfrage**,
+**PI/Rechnung anfordern**, **Liefertermin & Tracking**, **Muster-Feedback**,
+**Bestellung senden**. Platzhalter `{{ansprechpartner}}` (Vorname aus der
+letzten Mail des Lieferanten, sonst „zusammen"/„Sir or Madam"/„尊敬的供应商"),
+`{{bestellnummer}}`, `{{liefertermin}}`, `{{einkaeufer}}`, `{{firma}}`,
+`{{lieferant}}`. Aus einer Vorlage entstehen beide Texte zugleich — für
+Vorlagen braucht es keine Übersetzung. Vorlagen sind Einrichtung und
+überstehen „Betriebsdaten löschen".
+
+### Übersetzung
+
+- **Eingang:** Der Abgleich erkennt die Sprache jeder Nachricht
+  (`spracheErkennen`); **chinesische** Mails vom Lieferanten übersetzt der
+  Job `mail_uebersetzen` automatisch ins Deutsche, die deutsche Fassung
+  steht im Thread unter dem Original. Andere auf Knopfdruck
+  (`einkauf.nachricht_uebersetzen`).
+- **Entwurf:** „Deutsch → Chinesisch" (und zurück) per KI — Zahlen, Maße,
+  Teilenummern und Incoterms bleiben unverändert (`src/modules/ki/uebersetzen.ts`).
+- KI-Ebene **Übersetzung** (Einstellungen → KI-Modelle, Standard Sonnet 5);
+  jeder Aufruf mit Tokens in `ki_verbrauch`. `KI_FAKE=1` markiert nur.
+
+### Bestellung per Mail mit PDF
+
+- „Per E-Mail senden" an der Bestellung legt mit angebundenem Postfach
+  einen **Entwurf mit Vorlage „Bestellung" in der Lieferantensprache** an und
+  hängt das **Bestell-PDF** an (`src/modules/einkauf/bestellung-pdf.ts`,
+  Englisch für ausländische, Deutsch für deutsche Lieferanten; abgelegt als
+  Dokument „Bestellung" im Bestellordner). Ohne Postfach bleibt der alte Weg.
+- Die Bestellung wird dabei **nicht** mehr auf `sent` gesetzt: Kein
+  Prozessschritt bildet `sent` ab, die Bestellung verlor danach ihren Platz
+  im Ablauf. Der Versand steht im Verlauf der Bestellung.
+
+### Oberfläche
+
+- **Thread:** Karte „Antworten" (Vorlage wählen → Entwurf) und die offenen
+  Entwürfe des Threads; je Nachricht die deutsche Fassung bzw. „Ins Deutsche
+  übersetzen".
+- **Lieferantenakte und Bestellung:** „Neue Mail" mit Vorlage (an der
+  Bestellung optional mit Bestell-PDF).
+- **Entwurf** `/einkauf/entwuerfe/[id]`: Deutsch und Zielsprache
+  nebeneinander, Übersetzen in beide Richtungen, Anhänge aus Thread,
+  Lieferant und Bestellung, „Antwort erwartet bis", Speichern/Senden in
+  einem Formular, Warnung bei offenen Platzhaltern; dazu worauf man
+  antwortet, Prozessdiagramm und Verlauf.
+- **Liste** `/einkauf/entwuerfe` (Offen, Gesendet, Verworfen, Alle);
+  Menüzähler = offene Entwürfe.
+
+### Zurückgestellt: Download-Links aus KRNL
+
+Befristete Links auf Dateien (`dokument_links`, `/d/[token]`) aus dem Plan
+kommen später: vercel.app ist aus China oft nicht erreichbar, Freigaben
+„für jeden mit Link" sind in geteilten Ablagen häufig per Richtlinie
+gesperrt, und das Durchreichen großer Dateien durch die Funktion stößt an
+Vercels Grenzen. Bis dahin: Anhang bis 18 MB, sonst Drive-Link oder
+WeTransfer (Entscheidungslog 2026-09-30).
+
+### Nachweis
+
+- `tests/mail-bauen.test.ts` — Hin- und Rückweg der MIME-Nachricht
+  (Chinesisch, HTML, Anhang mit Umlaut-Dateiname), Kopf-Kodierung,
+  Thread-Köpfe, Vorlagen-Platzhalter, Spracherkennung.
+- `tests/prozesse/einkauf-mailversand.test.ts` — Antwort im Thread mit
+  Vorlage in Lieferantensprache, offene Platzhalter halten auf, Übersetzen
+  mit Verbrauch, Senden mit In-Reply-To/References und Wiedervorlage, kein
+  Doppel beim Abgleich, automatische Übersetzung chinesischer Eingänge,
+  Bestellung mit PDF, Grenzen (Anhanggröße, Empfänger, Änderung nach
+  Freigabe).
+- Fixture-Läufe „Preisanfrage auf Chinesisch …" und „Entwurf verwerfen"
+  (`src/modules/prozesse/fixtures/einkauf-mail.ts`).

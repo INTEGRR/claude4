@@ -14,6 +14,9 @@ import { absenderKennung } from '@/modules/einkauf/mail-regeln'
 import { driveLink } from '@/modules/google/drive'
 import { dateTime } from '@/modules/shared/format'
 import { mailStatusSetzen, mailZuordnen, nachrichtErfassen } from '../actions'
+import { entwurfAnlegen, nachrichtUebersetzen } from '../../entwuerfe/actions'
+import { VORLAGEN_ANLAESSE } from '@/modules/einkauf/mail-vorlagen'
+import { uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +57,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
     where t.id = ${id}`
   if (!t) notFound()
 
-  const [nachrichten, anhaenge, lieferanten, bestellungen, nutzer] = await Promise.all([
+  const [nachrichten, anhaenge, lieferanten, bestellungen, nutzer, entwuerfe] = await Promise.all([
     sql<
       {
         id: string
@@ -67,13 +70,15 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         betreff: string | null
         datum: string
         text: string | null
+        text_de: string | null
+        sprache: string | null
         hat_html: boolean
         quelle: string
         erfasst_von: string | null
       }[]
     >`
       select id, richtung::text as richtung, kanal::text as kanal, von, von_name, an, cc, betreff,
-             datum::text as datum, text, html is not null as hat_html, quelle, erfasst_von
+             datum::text as datum, text, text_de, sprache, html is not null as hat_html, quelle, erfasst_von
       from mail_nachrichten where thread_id = ${id}
       order by datum, created_at`,
     sql<
@@ -102,8 +107,12 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       order by (po.vendor_id = ${t.partner_id}) desc nulls last, po.created_at desc
       limit 300`,
     sql<{ id: string; name: string }[]>`select id, name from users where active order by name`,
+    sql<{ id: string; betreff: string; status: string; erstellt_von: string | null }[]>`
+      select id, betreff, status::text as status, erstellt_von from mail_entwuerfe
+      where thread_id = ${id} and status in ('entwurf', 'freigegeben') order by created_at`,
   ])
 
+  const ki = uebersetzungMoeglich()
   const darf = canWrite(user.role, 'einkauf', user.befugnisse)
   const ersterEingang = nachrichten.find((n) => n.richtung === 'eingang' && n.von?.includes('@'))
   const kennungRoh = ersterEingang?.von ? absenderKennung(ersterEingang.von) : null
@@ -186,6 +195,19 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                 {n.betreff && n.betreff !== t.betreff && <div>Betreff: {n.betreff}</div>}
               </div>
               <div className="mail-text">{neu || <span className="muted">(kein Text)</span>}</div>
+              {n.text_de && (
+                <div className="mail-de">
+                  <div className="muted small">Deutsch (übersetzt)</div>
+                  <div className="mail-text">{zitatTrennen(n.text_de).neu}</div>
+                </div>
+              )}
+              {!n.text_de && darf && ki && n.sprache && n.sprache !== 'de' && neu && (
+                <div style={{ marginTop: 8 }}>
+                  <ActionButton className="small" action={nachrichtUebersetzen.bind(null, n.id, pfad)}>
+                    Ins Deutsche übersetzen
+                  </ActionButton>
+                </div>
+              )}
               {zitat && (
                 <details className="mail-zitat">
                   <summary className="small muted">Zitierten Verlauf anzeigen</summary>
@@ -216,6 +238,52 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           )
         })}
       </div>
+
+      {darf && (
+        <Card title="Antworten">
+          {entwuerfe.length > 0 && (
+            <ul className="dok-liste" style={{ marginBottom: 10 }}>
+              {entwuerfe.map((d) => (
+                <li key={d.id} className="dok-zeile">
+                  <Link href={`/einkauf/entwuerfe/${d.id}`} className="dok-name">
+                    {d.betreff || '(ohne Betreff)'}
+                  </Link>
+                  <span className="muted small">
+                    <Badge state={d.status} kind="mail_entwurf" /> {d.erstellt_von}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ActionForm action={entwurfAnlegen}>
+            <input type="hidden" name="thread_id" value={id} />
+            <div className="row">
+              <label className="field">
+                <span>Vorlage</span>
+                <select name="vorlage" defaultValue="">
+                  <option value="">— freier Text —</option>
+                  {Object.entries(VORLAGEN_ANLAESSE)
+                    .filter(([k]) => k !== 'anfrage' && k !== 'bestellung')
+                    .map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <div className="field shrink">
+                <button className="primary" type="submit">
+                  Antwort entwerfen
+                </button>
+              </div>
+            </div>
+            <p className="small muted" style={{ margin: '6px 0 0' }}>
+              Im Entwurf: Deutsch schreiben, per KI in die Sprache des Lieferanten übersetzen, Anhänge aus der
+              Ablage wählen, senden — im selben Thread.
+            </p>
+          </ActionForm>
+        </Card>
+      )}
 
       {darf && (
         <Card title="Zuordnung">

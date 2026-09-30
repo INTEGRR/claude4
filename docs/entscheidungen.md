@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Mails an Lieferanten: Entwurf als Beleg, Mensch gibt frei, PDF statt „sent"
+
+Stufe 2b des Einkaufstools (Migration 0094). Entschieden:
+
+- **Ausgehende Mail = Beleg `mail_entwurf` mit Prozess `mail_versand`**
+  (Entwurf → Freigabe → Dienst `gmail_senden` → gesendet, oder verworfen).
+  So sind Entwürfe von Menschen und später vom Agenten dasselbe Objekt, und
+  „wer hat was wann freigegeben" steht am Beleg. `einkauf.mail_freigeben`
+  ist bewusst nicht `ki` — der Agent schreibt, ein Mensch sendet.
+- **Zwei Texte je Entwurf** (Deutsch zum Mitlesen + Zielsprache): Das Team
+  liest jede Mail auf Deutsch mit, auch wenn Tino chinesisch schreibt.
+  Vorlagen liegen in allen drei Sprachen vor und brauchen keine KI.
+- **Übersetzung automatisch nur für chinesische Eingänge**, englische
+  liest das Team selbst (Kosten); jeder KI-Aufruf mit Tokens in
+  `ki_verbrauch`, eigene KI-Ebene „Übersetzung" (Standard Sonnet 5), und
+  `KI_FAKE=1` für Tests und Staging.
+- **Bestellung per Mail wird zum Entwurf mit Bestell-PDF** (Englisch für
+  ausländische Lieferanten — Hanzi bräuchten eine eingebettete Schrift),
+  PDF ohne JSX gebaut, damit die Prozesstests es rendern. Der alte
+  Resend-Weg bleibt, solange kein Postfach angebunden ist.
+- **Kein `sent` mehr beim Mailen der Bestellung:** Kein Schritt des
+  Bestellprozesses bildet `sent` ab; nach dem alten Mailversand fiel die
+  Bestellung auf die Startknoten zurück. Der Versand steht im Verlauf.
+- **Download-Links aus KRNL zurückgestellt** (Revision des Plans vom
+  selben Tag): China erreicht vercel.app oft nicht, „jeder mit Link" ist in
+  geteilten Ablagen oft gesperrt, große Dateien sprengen die Funktion.
+  Anhänge bis 18 MB, darüber Drive-Link oder WeTransfer; wieder aufnehmen
+  mit eigener Domain.
+- **Formulare mit mehreren Knöpfen:** `ActionForm` schickt den geklickten
+  Knopf mit (FormData mit submitter) — der Entwurf speichert und übersetzt
+  bzw. sendet in einem Zug, ohne dass Eingaben verloren gehen.
+- Umgesetzt und beschrieben: [module/einkaufstool.md](module/einkaufstool.md)
+  (Stufe 2b).
+
 ## 2026-09-30 — Einkaufspostfach: Cursor-Abgleich, Zuordnung per SQL-Regel, Freemail-Adressen
 
 Stufe 2a des Einkaufstools (Migration 0093). Entschieden:

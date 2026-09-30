@@ -2,6 +2,7 @@ import { sql, tx } from '@/db/client'
 import { type GmailApi, type GmailNachricht, VerlaufAbgelaufen, gmail } from '@/modules/google/gmail'
 import { betreffKern, kopfDatumLesen, mailZerlegen, weiterleitungZerlegen } from './mail-zerlegen.ts'
 import { domainVon } from './mail-regeln.ts'
+import { spracheErkennen } from './mail-vorlagen.ts'
 
 /**
  * Abgleich des Einkaufspostfachs (0093) — jede Minute über
@@ -224,6 +225,8 @@ export async function nachrichtUebernehmen(n: GmailNachricht, postfach: string):
     }
   }
 
+  const sprache = spracheErkennen(text)
+
   return tx(async (t) => {
     const [thread] = await t<{ id: string }[]>`
       insert into mail_threads (gmail_thread_id, betreff, kanal)
@@ -232,10 +235,10 @@ export async function nachrichtUebernehmen(n: GmailNachricht, postfach: string):
       returning id`
     const [nachricht] = await t<{ id: string }[]>`
       insert into mail_nachrichten (thread_id, gmail_message_id, rfc822_id, in_reply_to, richtung, kanal,
-                                    von, von_name, an, cc, betreff, datum, text, html, quelle, erfasst_von)
+                                    von, von_name, an, cc, betreff, datum, text, html, sprache, quelle, erfasst_von)
       values (${thread.id}, ${n.id}, ${m.rfc822Id}, ${m.inReplyTo}, ${richtung}, 'email',
               ${von}, ${vonName}, ${m.an}::text[], ${m.cc}::text[], ${betreff || null}, ${datum},
-              ${text || null}, ${m.html}, ${quelle}, ${erfasstVon})
+              ${text || null}, ${m.html}, ${sprache}, ${quelle}, ${erfasstVon})
       on conflict (gmail_message_id) do nothing
       returning id`
     if (!nachricht) return 'bekannt' as const
@@ -266,6 +269,12 @@ export async function nachrichtUebernehmen(n: GmailNachricht, postfach: string):
       await t`select enqueue_job('gmail_anhang_ablegen', ${t.json({ anhang_id: zeile.id })},
                                  ${`gmail-anhang:${zeile.id}`})`
       anhaenge++
+    }
+
+    // Chinesisches vom Lieferanten gleich ins Deutsche (Englisch liest das Team selbst).
+    if (richtung === 'eingang' && sprache === 'zh') {
+      await t`select enqueue_job('mail_uebersetzen', ${t.json({ nachricht_id: nachricht.id })},
+                                 ${`mail-uebersetzen:${nachricht.id}`})`
     }
 
     const [z] = await t<{ zugeordnet: boolean }[]>`select mail_thread_zuordnen(${thread.id}) as zugeordnet`

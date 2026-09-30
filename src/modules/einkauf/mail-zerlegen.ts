@@ -267,6 +267,7 @@ export function kopfDatumLesen(roh: string | null | undefined): Date | null {
 const ZITAT_BEGINN = [
   /^On .{4,200}wrote:\s*$/i,
   /^Am .{4,200}schrieb.{0,200}:\s*$/i,
+  /^在.{2,120}写道[:：]\s*$/,
   /^-{2,}\s*(?:original message|ursprüngliche nachricht|forwarded message|weitergeleitete nachricht|原始邮件|回复的原邮件)\s*-{0,}\s*$/i,
   /^_{10,}\s*$/,
   /^(?:from|von|发件人|寄件者)\s*[:：].+$/i,
@@ -275,8 +276,8 @@ const ZITAT_BEGINN = [
 /**
  * Antwort und Zitat trennen: Lieferanten zitieren bei jeder Antwort den
  * ganzen Verlauf. Die Ansicht zeigt das Neue und klappt das Zitat ein —
- * erkannt an „On … wrote:", „Am … schrieb", Outlook-Trennern, chinesischen
- * Köpfen („发件人:") oder einem Block aus „>"-Zeilen. Kein Zitat → alles neu.
+ * erkannt an „On … wrote:", „Am … schrieb", „在 … 写道：", Outlook-Trennern,
+ * chinesischen Köpfen („发件人:") oder einem Block aus „>"-Zeilen. Kein Zitat → alles neu.
  */
 export function zitatTrennen(text: string): { neu: string; zitat: string | null } {
   const zeilen = text.replace(/\r\n/g, '\n').split('\n')

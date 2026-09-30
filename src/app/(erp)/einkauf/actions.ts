@@ -48,7 +48,10 @@ export async function lockPo(orderId: string, locked: boolean): Promise<ActionRe
 }
 
 export async function sendPoEmail(orderId: string): Promise<ActionResult> {
-  return serverAktion('einkauf.email_senden', { recordId: orderId })
+  const ergebnis = await serverAktion('einkauf.email_senden', { recordId: orderId })
+  // Mit Einkaufspostfach entsteht ein Entwurf (0094) — gleich dorthin.
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
+  return ergebnis
 }
 
 // --- Rechnungen ------------------------------------------------------------

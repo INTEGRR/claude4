@@ -38,6 +38,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/fertigung/arbeitsplaetze', label: 'Arbeitsplätze', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/einkauf', label: 'Bestellungen', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/posteingang', label: 'Posteingang Einkauf (Lieferanten-Mails)', area: 'einkauf', prozess: ['einkauf'] },
+  { href: '/einkauf/entwuerfe', label: 'Mail-Entwürfe an Lieferanten', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/wiedervorlagen', label: 'Wiedervorlagen Einkauf', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/lieferanten', label: 'Lieferanten (Lieferantenakten)', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/rechnungen', label: 'Lieferantenrechnungen', area: 'einkauf', prozess: ['einkauf'] },

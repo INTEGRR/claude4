@@ -4,6 +4,7 @@ import { ARTIKEL_ANLEGEN } from './artikel-anlegen.ts'
 import { BASIS } from './basis.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
 import { EINKAUF_FIXTURE, LIEFERANTENRECHNUNG_FIXTURE } from './einkauf.ts'
+import { EINKAUF_MAIL } from './einkauf-mail.ts'
 import { FERTIGUNG_FIXTURE } from './fertigung.ts'
 import { INVENTUR_FIXTURE } from './inventur.ts'
 import { REPARATUR } from './reparatur.ts'
@@ -31,6 +32,7 @@ export const FIXTURES = {
   fertigung: FERTIGUNG_FIXTURE,
   inventur: INVENTUR_FIXTURE,
   lieferantenrechnung: LIEFERANTENRECHNUNG_FIXTURE,
+  mail_versand: EINKAUF_MAIL,
   reparatur: REPARATUR,
   reparatur_anfrage: REPARATUR_ANFRAGE,
   shopify_bestellung_versand: SHOPIFY_VERSAND,

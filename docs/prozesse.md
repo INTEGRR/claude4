@@ -1276,6 +1276,20 @@ Ablage der Anhänge der Outbox-Job `gmail_anhang_ablegen`
 (Fähigkeit `ablage:mailanhang_ablegen`). Details:
 [module/einkaufstool.md](module/einkaufstool.md) (Stufe 2a).
 
+## Mail an Lieferanten: Prozess `mail_versand` (Migration 0094, umgesetzt)
+
+Beleg `mail_entwurf` (`mail_entwuerfe`, Enum-Status). Schritte: Start →
+**Entwurf schreiben** (`einkauf.mail_entwurf_anlegen`, Zustand `entwurf`) →
+**Freigeben und senden** (`einkauf.mail_freigeben`, `freigegeben`) →
+Dienst **Über das Postfach senden** (`gmail_senden`, `gesendet`) → Ende;
+Nebenweg **Verwerfen** (`einkauf.mail_verwerfen`, `verworfen`). Der
+Dienstschritt hat einen eigenen Zustand, den der Job setzt — so wandert der
+Beleg nach dem Senden weiter, statt „wartet" stehen zu bleiben. Bearbeiten,
+Übersetzen und das Übersetzen eingegangener Nachrichten sind prozessfrei.
+Fixture: `fixtures/einkauf-mail.ts` (Harness mit `GOOGLE_FAKE=1`,
+`KI_FAKE=1`). Paket: überall, wo der Bestellprozess aktiv ist. Details:
+[module/einkaufstool.md](module/einkaufstool.md) (Stufe 2b).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

@@ -91,6 +91,19 @@ export const JOB_KATALOG = {
       'gleicher Inhalt beim selben Lieferanten wird verknüpft statt kopiert.',
     faehigkeit: 'ablage:mailanhang_ablegen',
   },
+  gmail_senden: {
+    label: 'Mail an Lieferanten senden',
+    beschreibung:
+      'Sendet einen freigegebenen Entwurf über das Einkaufspostfach im bestehenden Thread ' +
+      '(In-Reply-To/References), Anhänge aus der Ablage; legt die Nachricht im Thread ab und ' +
+      'bei „Antwort erwartet bis" die Wiedervorlage.',
+    faehigkeit: 'mail:lieferant_senden',
+  },
+  mail_uebersetzen: {
+    label: 'Lieferanten-Mail übersetzen',
+    beschreibung: 'Übersetzt eine eingegangene (z. B. chinesische) Nachricht per KI ins Deutsche.',
+    faehigkeit: 'ki:uebersetzen',
+  },
 } satisfies Record<string, JobEintrag>
 
 export type JobKind = keyof typeof JOB_KATALOG

@@ -35,7 +35,7 @@ export async function firmaSpeichern(
 }
 
 export async function kiModelleSetzen(
-  p: { auswertung: string; prozess: string; interview: string; datenfrage: string },
+  p: { auswertung: string; prozess: string; interview: string; datenfrage: string; uebersetzung?: string },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   await sql`

@@ -170,12 +170,19 @@ Interview und Prozess-Aufnahme cachen ihren Systemprompt genauso.
 **Modellwahl je Ebene ist Betreiber-Einstellung** (Einstellungen →
 KI-Modelle, Registry-Aktion `einstellungen.ki_modelle_setzen`,
 settings-Schlüssel `ki_modelle`): Auswertungen/SQL, Prozess-Aufnahme &
--Entwurf, Onboarding-Interview und die schnelle Datenfrage lassen sich
-getrennt auf Opus 5, Sonnet 5 oder Haiku 4.5 stellen — nur Katalog-
-Modelle aus `src/modules/ki/modelle.ts` sind wählbar (Tippfehler-Schutz).
-Auflösungsreihenfolge: Einstellung → Env-Notausgang (`ANTHROPIC_MODEL`,
-`AUFNAHME_MODELL`, `DATENFRAGE_MODELL`) → Standard der Ebene.
-Entscheidungslog 2026-08-25.
+-Entwurf, Onboarding-Interview, die schnelle Datenfrage und seit 0094 die
+Übersetzung im Einkauf lassen sich getrennt auf Opus 5, Sonnet 5 oder
+Haiku 4.5 stellen — nur Katalog-Modelle aus `src/modules/ki/modelle.ts`
+sind wählbar (Tippfehler-Schutz). Auflösungsreihenfolge: Einstellung →
+Env-Notausgang (`ANTHROPIC_MODEL`, `AUFNAHME_MODELL`, `DATENFRAGE_MODELL`,
+`UEBERSETZUNG_MODELL`) → Standard der Ebene. Entscheidungslog 2026-08-25.
+
+**Übersetzung und Verbrauch (0094):** `src/modules/ki/uebersetzen.ts`
+übersetzt Lieferanten-Mails ins Deutsche und Entwürfe nach Englisch/
+Chinesisch; jeder Aufruf schreibt Ebene, Modell, Zweck, Bezugsbeleg und
+Tokens in `ki_verbrauch`. `KI_FAKE=1` (Prozesstests, Staging, lokaler
+Browsertest) übersetzt nicht, sondern markiert nur (`[zh] …`) —
+deterministisch und ohne Schlüssel.
 
 **2. `diagramm` — zeigen.** Der Agent liefert eine schmale Beschreibung
   (`src/modules/ki/diagramm.ts`): Art (`saeulen`, `balken`, `anteile`), Titel,

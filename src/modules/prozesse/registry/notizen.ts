@@ -34,6 +34,7 @@ export const KOMMENTAR_MODELLE = {
   employee: { tabelle: 'employees', bereich: 'personal' },
   bug_report: { tabelle: 'bug_reports', bereich: 'fehler' },
   mail_thread: { tabelle: 'mail_threads', bereich: 'einkauf' },
+  mail_entwurf: { tabelle: 'mail_entwuerfe', bereich: 'einkauf' },
 } satisfies Record<string, { tabelle: string; bereich: Area }>
 
 /**
