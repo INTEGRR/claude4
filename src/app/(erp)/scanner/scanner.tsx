@@ -5,6 +5,7 @@ import { produceMo } from '../fertigung/actions'
 import { isActionError } from '@/modules/shared/action'
 import { Badge } from '@/components/ui'
 import type { ScannerDoc } from '@/app/api/scanner/lookup/route'
+import { scanGleich } from '@/modules/shared/scan'
 
 /**
  * Scanner-Arbeitsplatz: ein unsichtbares, dauerfokussiertes Eingabefeld
@@ -144,10 +145,8 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
 
   function scanProduct(code: string) {
     if (!doc) return
-    const norm = code.toLowerCase()
-    const line = doc.lines.find(
-      (l) => l.barcode?.toLowerCase() === norm || l.sku?.toLowerCase() === norm,
-    )
+    // Beide Tastaturbelegungen (US-Scanner an deutschem Windows) — shared/scan.ts.
+    const line = doc.lines.find((l) => scanGleich(code, l.barcode) || scanGleich(code, l.sku))
     if (!line) {
       say(
         <>
@@ -230,7 +229,7 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
       return
     }
     if (!doc) return
-    const isDocCode = code.toLowerCase() === doc.number.toLowerCase()
+    const isDocCode = scanGleich(code, doc.number)
     if (phase === 'work') {
       if (isDocCode) {
         if (!anyScanned) {

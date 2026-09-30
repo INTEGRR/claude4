@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
+import { scanVarianten } from '@/modules/shared/scan'
 import { vorschlaegeFuerPickings } from '@/modules/versand/regeln'
 
 /**
@@ -42,6 +43,24 @@ export interface PacktischDoc {
   lines: PacktischZeile[]
 }
 
+interface PacktischTreffer {
+  id: string
+  number: string
+  state: string
+  kind: string
+  auftrag: string | null
+  shopify: string | null
+  kunde: string | null
+  ship_name: string | null
+  ship_street: string | null
+  ship_house_number: string | null
+  ship_zip: string | null
+  ship_city: string | null
+  ship_country_code: string | null
+  kommissioniert_am: string | null
+  kommissioniert_von: string | null
+}
+
 export async function GET(request: Request) {
   const user = await currentUser()
   if (!user || !canWrite(user.rollen, 'versand', user.befugnisse)) {
@@ -56,25 +75,11 @@ export async function GET(request: Request) {
   // Primär die Picking-Nummer (der VERSAND-Barcode der Zettel); als
   // Tipp-Fallback die Auftragsnummer (S…) oder der Shopify-Name (#1234) —
   // dann die jüngste nicht stornierte Lieferung dieses Auftrags.
-  const [picking] = await sql<
-    {
-      id: string
-      number: string
-      state: string
-      kind: string
-      auftrag: string | null
-      shopify: string | null
-      kunde: string | null
-      ship_name: string | null
-      ship_street: string | null
-      ship_house_number: string | null
-      ship_zip: string | null
-      ship_city: string | null
-      ship_country_code: string | null
-      kommissioniert_am: string | null
-      kommissioniert_von: string | null
-    }[]
-  >`
+  // Erst wie getippt, dann in US-Belegung rückübersetzt: ein US-Scanner an
+  // deutschem Windows macht aus „WH/OUT/00003" ein „WH-OUT-00003" (shared/scan.ts).
+  let picking: PacktischTreffer | undefined
+  for (const kandidat of scanVarianten(code)) {
+    ;[picking] = await sql<PacktischTreffer[]>`
     select p.id, p.number, p.state, ot.kind,
            p.kommissioniert_am::text as kommissioniert_am, p.kommissioniert_von,
            so.number as auftrag, so.shopify_order_name as shopify,
@@ -85,12 +90,14 @@ export async function GET(request: Request) {
     join operation_types ot on ot.id = p.operation_type_id
     left join sales_orders so on so.id = p.origin_id and p.origin_model = 'sales_order'
     left join partners part on part.id = coalesce(so.partner_id, p.partner_id)
-    where p.number = ${code}
+    where p.number = ${kandidat}
        or (ot.kind = 'delivery' and p.state <> 'cancel' and so.id is not null
-           and (so.number = ${code} or so.shopify_order_name = ${code}
-                or so.shopify_order_name = ${'#' + code.replace(/^#/, '')}))
-    order by (p.number = ${code}) desc, p.created_at desc
+           and (so.number = ${kandidat} or so.shopify_order_name = ${kandidat}
+                or so.shopify_order_name = ${'#' + kandidat.replace(/^#/, '')}))
+    order by (p.number = ${kandidat}) desc, p.created_at desc
     limit 1`
+    if (picking) break
+  }
 
   if (!picking) {
     return NextResponse.json({ error: `Keine Lieferung gefunden zu "${code}"` }, { status: 404 })

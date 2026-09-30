@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { packtischFertig } from './actions'
 import { isActionError } from '@/modules/shared/action'
 import type { PacktischDoc } from '@/app/api/packtisch/lookup/route'
+import { scanGleich } from '@/modules/shared/scan'
 
 /**
  * Packtisch-Arbeitsplatz: die Scan-Maschine des Scanner-Arbeitsplatzes,
@@ -150,10 +151,8 @@ export function Packtisch() {
 
   function scanProduct(code: string) {
     if (!doc) return
-    const norm = code.toLowerCase()
-    const line = doc.lines.find(
-      (l) => l.barcode?.toLowerCase() === norm || l.sku?.toLowerCase() === norm,
-    )
+    // Beide Tastaturbelegungen (US-Scanner an deutschem Windows) — shared/scan.ts.
+    const line = doc.lines.find((l) => scanGleich(code, l.barcode) || scanGleich(code, l.sku))
     if (!line) {
       say(
         <>
@@ -235,7 +234,7 @@ export function Packtisch() {
       return
     }
     if (!doc) return
-    const isDocCode = code.toLowerCase() === doc.number.toLowerCase()
+    const isDocCode = scanGleich(code, doc.number)
     if (phase === 'work') {
       if (isDocCode) {
         if (!complete) {

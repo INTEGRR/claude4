@@ -145,6 +145,18 @@ Fokus nur zurück, wenn er ins Leere ging: sichtbare Eingabefelder
 (Nummer, Fertigmenge) und Knöpfe bleiben normal bedienbar (gleiches
 Muster am Packtisch, docs/module/versand.md).
 
+**Tastaturbelegung des Scanners:** Ein Handscanner tippt wie eine
+Tastatur. Steht er auf US-Belegung und Windows auf Deutsch, kommen andere
+Zeichen an als gedruckt: „WH/OUT/00003" wird „WH-OUT-00003", „KC-001"
+wird „KCß001", Y und Z tauschen, „#" wird „§". Deshalb sucht jeder
+Scan-Einstieg erst wie getippt und dann in der Rückübersetzung
+(`src/modules/shared/scan.ts`): Packtisch, Scanner-Arbeitsplatz, das
+Scanfeld im Kopf (`/api/scan`), Kommissionieren, das Gegenscannen der
+Artikel und der Stempel-Ausweis. Die eigentliche Abhilfe ist trotzdem,
+den Scanner per Konfigurations-Barcode aus seinem Handbuch auf deutsche
+Tastatur („Keyboard Country: Germany") zu stellen — dann stimmt auch jede
+andere Eingabe.
+
 Ablauf:
 
 1. **Beleg scannen** — Transfer (`WH/…`) oder Fertigungsauftrag (`MO/…`).

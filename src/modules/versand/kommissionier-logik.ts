@@ -1,3 +1,5 @@
+import { scanGleich } from '../shared/scan.ts'
+
 /**
  * Kommissionieren (0091), pur und app-frei — geteilt vom Sammel-Screen am
  * Handy (Führung, Scan-Zuordnung) und von lager.kommissionieren (harte
@@ -21,8 +23,6 @@ export function sammelReihenfolge<P extends SammelPosition>(positionen: P[]): P[
   return [...positionen].sort((a, b) => a.name.localeCompare(b.name, 'de') || a.variantId.localeCompare(b.variantId))
 }
 
-const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase()
-
 export type ScanErgebnis =
   | { art: 'treffer'; variantId: string }
   | { art: 'voll'; variantId: string }
@@ -30,9 +30,9 @@ export type ScanErgebnis =
 
 /** Wohin gehört ein gescannter Code? Zuerst eine noch offene Position. */
 export function scanTreffer(positionen: SammelPosition[], gesammelt: Gesammelt, code: string): ScanErgebnis {
-  const c = norm(code)
-  if (!c) return { art: 'fremd' }
-  const passend = positionen.filter((p) => norm(p.sku) === c || norm(p.barcode) === c)
+  if (!code.trim()) return { art: 'fremd' }
+  // Beide Tastaturbelegungen (US-Scanner an deutschem Windows) — shared/scan.ts.
+  const passend = positionen.filter((p) => scanGleich(code, p.sku) || scanGleich(code, p.barcode))
   if (passend.length === 0) return { art: 'fremd' }
   const offen = passend.find((p) => (gesammelt[p.variantId] ?? 0) < p.soll)
   return offen ? { art: 'treffer', variantId: offen.variantId } : { art: 'voll', variantId: passend[0].variantId }

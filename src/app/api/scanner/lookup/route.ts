@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
 import { canAccess, canWrite } from '@/modules/auth/permissions'
+import { scanVarianten } from '@/modules/shared/scan'
 
 /**
  * Löst einen am Scanner-Arbeitsplatz gescannten Belegcode auf und liefert
@@ -44,13 +45,18 @@ export async function GET(request: Request) {
   // admin und mitarbeiter dürfen beides.
   const darfPicking = canWrite(user.rollen, 'lager')
   const darfMo = canWrite(user.rollen, 'fertigung')
+  // Wie getippt oder in US-Belegung rückübersetzt (US-Scanner an deutschem
+  // Windows: „WH/IN/00012" kommt als „WH-IN-00012" an) — shared/scan.ts.
+  const kandidaten = scanVarianten(code)
 
   const [picking] = await sql<
     { id: string; number: string; state: string; kind: string; origin_label: string | null }[]
   >`
     select p.id, p.number, p.state, ot.kind, p.origin_label
     from stock_pickings p join operation_types ot on ot.id = p.operation_type_id
-    where p.number = ${code}`
+    where p.number = any(${kandidaten}::text[])
+    order by (p.number = ${code}) desc
+    limit 1`
 
   if (picking) {
     if (!darfPicking) {
@@ -104,7 +110,9 @@ export async function GET(request: Request) {
   >`
     select mo.id, mo.number, mo.state, variant_display_name(mo.variant_id) as product,
            mo.qty_to_produce, mo.qty_produced
-    from manufacturing_orders mo where mo.number = ${code}`
+    from manufacturing_orders mo where mo.number = any(${kandidaten}::text[])
+    order by (mo.number = ${code}) desc
+    limit 1`
 
   if (mo) {
     if (!darfMo) {

@@ -171,6 +171,9 @@ Der Arbeitsplatz für den echten Ablauf am Tisch (Menüpunkt „Packtisch",
 Schreibrechte im Versand nötig) — dieselbe Scan-Maschine wie der
 Scanner-Arbeitsplatz (Dauerfokus-Feld, Beeps, Leuchten), aber ohne
 Teilmengen: ein Paket ist erst dann ein Paket, wenn alles drin ist.
+Scans werden in beiden Tastaturbelegungen gesucht: ein US-Scanner an
+deutschem Windows liefert „WH-OUT-00003" statt „WH/OUT/00003"
+(`shared/scan.ts`, docs/module/rollen-auswertungen-scanner-ki.md).
 
 1. **VERSAND-Code scannen** (vom Fertigungs- oder Packzettel). Ohne
    Scanner gibt es ein sichtbares Eingabefeld für Liefer-, Auftrags-

@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Scans in beiden Tastaturbelegungen suchen
+
+Befund am Packtisch: „Keine Lieferung gefunden zu WH-OUT-00003". Der
+Barcode enthält „WH/OUT/00003". Der Handscanner steht auf US-Belegung,
+Windows auf Deutsch, also kommt jedes „/" als „-" an (außerdem „-" als
+„ß", Y/Z vertauscht, „#" als „§").
+
+Entschieden: Jeder Scan-Einstieg sucht erst wie getippt und dann in der
+Rückübersetzung US → DE (`src/modules/shared/scan.ts`, eine Tabelle für
+alle). Das gilt für Packtisch, Scanner-Arbeitsplatz, `/api/scan`,
+Kommissionieren, das Gegenscannen von Artikeln und den Stempel-Ausweis.
+Die genaue Schreibweise gewinnt immer; die Rückübersetzung ist nur der
+zweite Versuch, deshalb kann ein richtig eingestellter Scanner nichts
+Falsches treffen.
+
+Die Scanner auf deutsche Tastatur umzustellen bleibt die empfohlene
+Abhilfe, weil es auch freie Eingaben richtig macht. Die Software fängt
+den häufigen Fehler trotzdem ab, damit der Versand nicht steht. Doku:
+[module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)
+→ Scanner-Arbeitsplatz.
+
 ## 2026-09-30 — Mehrere Rollen je Benutzer, Anmeldung mit Benutzername
 
 Wer im Lager und in der Fertigung arbeitet, braucht beide Rollen. Viele

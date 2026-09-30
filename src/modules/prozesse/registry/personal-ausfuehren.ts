@@ -1,4 +1,5 @@
 import { sql } from '@/db/client'
+import { scanVarianten } from '@/modules/shared/scan'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Personal-Aktionen — Fachlogik unverändert aus personal/actions.ts. */
@@ -82,8 +83,10 @@ export async function stempelnBarcode(
   p: { barcode: string },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Wie gescannt oder in US-Belegung rückübersetzt (shared/scan.ts).
   const [employee] = await sql<{ id: string; name: string }[]>`
-    select id, name from employees where barcode = ${p.barcode} and active`
+    select id, name from employees where barcode = any(${scanVarianten(p.barcode)}::text[]) and active
+    order by (barcode = ${p.barcode}) desc limit 1`
   if (!employee) throw new Error(`Kein aktiver Mitarbeiter mit dem Ausweis „${p.barcode}"`)
   await sql`select * from time_clock_toggle(${employee.id}, ${ctx.actor})`
   return { text: `${employee.name} gestempelt.`, recordId: employee.id }
