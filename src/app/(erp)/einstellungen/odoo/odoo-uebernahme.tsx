@@ -19,7 +19,19 @@ interface Vorschau {
     bestand: number | null
     lieferanten: string[]
   }[]
-  stuecklisten: { skus: string[]; jeVariante: boolean; zeilen: { komponente: string; menge: number; uom: string }[] }[]
+  stuecklisten: {
+    skus: string[]
+    jeVariante: boolean
+    zeilen: { komponente: string; menge: number; uom: string; filter: string }[]
+  }[]
+  lagerbestaende: {
+    code: string | null
+    name: string
+    menge: number
+    krnlSku: string | null
+    preis: number | null
+    status: 'buchen' | 'vorhanden' | 'fehlt'
+  }[]
 }
 
 /**
@@ -47,7 +59,7 @@ export function OdooUebernahme({
     })
 
   const ausfuehren = () => {
-    if (!confirm('Stücklisten, Komponenten, Preise, Bestände und Routen jetzt aus Odoo übernehmen?')) return
+    if (!confirm('Stücklisten, Komponenten, Preise, Bestände und Routen jetzt aus Odoo übernehmen? Frühere Varianten-Stücklisten aus Odoo werden durch eine Stückliste je Artikel ersetzt.')) return
     startTransition(async () => {
       const r = await uebernehmen()
       if (r && 'error' in r) setMeldung({ ton: 'fehler', text: r.error })
@@ -67,8 +79,15 @@ export function OdooUebernahme({
           {pending && !vorschau ? 'Lese Odoo …' : 'Vorschau laden'}
         </button>
         {vorschau && (
-          <button type="button" className="primary" onClick={ausfuehren} disabled={pending || !u?.stuecklisten}>
-            {pending ? 'Übernehme …' : `${qty(u?.stuecklisten ?? 0)} Stückliste(n) übernehmen`}
+          <button
+            type="button"
+            className="primary"
+            onClick={ausfuehren}
+            disabled={pending || (!u?.stuecklisten && !u?.lagerBuchen)}
+          >
+            {pending
+              ? 'Übernehme …'
+              : `${qty(u?.stuecklisten ?? 0)} Stückliste(n) und ${qty((u?.bestand ?? 0) + (u?.lagerBuchen ?? 0))} Bestände übernehmen`}
           </button>
         )}
       </div>
@@ -84,7 +103,11 @@ export function OdooUebernahme({
             <Stat
               label="Stücklisten"
               value={qty(u.stuecklisten)}
-              hint={`${qty(u.vorlagenStuecklisten)} für ganze Artikel, der Rest je Variante`}
+              hint={
+                u.vorlagenStuecklisten === u.stuecklisten
+                  ? 'je Artikel eine, Zeilen mit Variantenfilter'
+                  : `${qty(u.vorlagenStuecklisten)} für ganze Artikel, ${qty(u.stuecklisten - u.vorlagenStuecklisten)} je Variante`
+              }
             />
             <Stat
               label="Fertigprodukte"
@@ -95,6 +118,11 @@ export function OdooUebernahme({
               label="Komponenten"
               value={`${qty(u.komponentenNeu)} neu`}
               hint={`${qty(u.komponentenVorhanden)} schon da · ${qty(u.komponentenOhneSku)} ohne SKU · ${qty(u.preise)} Preise · ${qty(u.bestand)} Bestände · ${qty(u.lieferantenpreise)} Lieferantenpreise`}
+            />
+            <Stat
+              label="Weitere Bestände"
+              value={`${qty(u.lagerBuchen)} buchen`}
+              hint={`Fertigprodukte und Zubehör per SKU · ${qty(u.lagerVorhanden)} haben in KRNL schon Bestand (bleibt) · ${qty(u.lagerFehlt)} ohne passenden Artikel`}
             />
           </div>
 
@@ -139,11 +167,18 @@ export function OdooUebernahme({
                 {vorschau.stuecklisten.map((s) => (
                   <tr key={s.skus.join('|')}>
                     <td className="mono small">
-                      {s.skus.join(', ')}
-                      <div className="muted">{s.jeVariante ? 'je Variante' : 'ganzer Artikel'}</div>
+                      {s.jeVariante ? s.skus.join(', ') : `${s.skus.length} Variante(n)`}
+                      <div className="muted">
+                        {s.jeVariante ? 'je Variante' : 'eine Stückliste für den ganzen Artikel, Zeilen mit Variantenfilter'}
+                      </div>
                     </td>
                     <td className="small">
-                      {s.zeilen.map((z) => `${qty(z.menge)} ${z.uom} ${z.komponente}`).join(' · ')}
+                      {s.zeilen.map((z, i) => (
+                        <div key={`${z.komponente}-${i}`}>
+                          {qty(z.menge)} {z.uom} <span className="mono">{z.komponente}</span>
+                          {z.filter && <span className="muted"> — nur {z.filter}</span>}
+                        </div>
+                      ))}
                     </td>
                   </tr>
                 ))}
@@ -178,6 +213,42 @@ export function OdooUebernahme({
               </tbody>
             </table>
           </TableWrap>
+
+          {vorschau.lagerbestaende.length > 0 && (
+            <>
+              <h3 className="mono-label" style={{ marginTop: 16 }}>Weitere Bestände (keine Komponenten)</h3>
+              <TableWrap>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Odoo</th>
+                      <th>Name</th>
+                      <th className="num">Bestand Odoo</th>
+                      <th>In KRNL</th>
+                      <th className="num">Preis setzen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vorschau.lagerbestaende.map((l) => (
+                      <tr key={`${l.code}-${l.name}`}>
+                        <td className="mono small">{l.code ?? <span className="badge warn">ohne SKU</span>}</td>
+                        <td className="small">{l.name}</td>
+                        <td className="num mono">{qty(l.menge)}</td>
+                        <td className="small">
+                          {l.status === 'buchen'
+                            ? `wird gebucht (${l.krnlSku ?? 'zugeordnet'})`
+                            : l.status === 'vorhanden'
+                              ? 'hat schon Bestand (bleibt)'
+                              : 'kein Artikel mit dieser SKU'}
+                        </td>
+                        <td className="num mono">{l.preis === null ? '—' : money(l.preis)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+            </>
+          )}
 
           {vorschau.fertigprodukte.some((f) => f.status === 'fehlt') && (
             <p className="small muted">

@@ -9,6 +9,50 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Odoo-Übernahme: eine Stückliste je Artikel mit Variantenfiltern, Bestände aller Artikel
+
+**Anlass:** Nach dem ersten Prod-Lauf hatte jede Variante eine eigene
+Stückliste (NATIVE 75: 30 Stück) — Vorgabe war eine Stückliste je
+Hauptprodukt mit „Auf Varianten anwenden" wie in Odoo. Und Bestände
+fehlten: übernommen wurden nur die der Stücklisten-Komponenten, nicht die
+von Zubehör (Deskmat 375 Stück) oder Fertigprodukten.
+
+**Entschieden:**
+- **Eine Stückliste je KRNL-Artikel**, Zeilen mit Variantenfilter. Die
+  Filter werden aus den aufgelösten Odoo-Listen je Variante und den
+  KRNL-Attributwerten **abgeleitet**, nicht per Attributname übersetzt:
+  Shopify teilt Produkte anders als Odoo (ein KRNL-Artikel je Farbe mit
+  Keycap Set × Mounting Plate × Switches, in Odoo eine Vorlage mit Farbe
+  × Material × …) und benennt Werte anders. Ist ein Filter zu weit, wird
+  die Zeile geteilt; eine Probe prüft je Variante das exakte Ergebnis.
+  Geht das nicht eindeutig oder fehlt einer aktiven Variante die
+  Odoo-Liste, bleibt es je Variante (hart statt still falsch).
+- **Filter-Semantik wie Odoo** (Migration 0098): je Attribut ODER, über
+  Attribute UND. Bisher reichte irgendein Filterwert — bei Filtern über
+  mehrere Attribute traf das zu viele Varianten. Für Filter mit einem
+  Attribut (alle bisherigen) ändert sich nichts.
+- **Formwechsel löst ab:** Ein erneuter Lauf deaktiviert eigene
+  (`herkunft = 'odoo'`) Stücklisten der alten Form, statt sie neben der
+  neuen stehen zu lassen (Varianten-Stücklisten gewännen in `resolve_bom`).
+  Deaktivieren statt löschen — Fertigungsaufträge verweisen darauf.
+- **Bestände aller Artikel** mit Odoo-Lagerbestand (intern, summiert), die
+  per SKU/Barcode/Verweis zu einer KRNL-Variante passen, nur wo KRNL 0
+  hat; Preis vorher, ebenfalls nur wo 0. Artikel ohne KRNL-Gegenstück
+  zeigt die Vorschau als „fehlt" — angelegt wird nichts.
+
+**Offen:** Shopify-Artikel mit anderer SKU als die Odoo-Komponente
+(GATERON-Switches SH00000115–117 gegen SW-GT-…, PCB Foam, ANSI-PCB)
+werden nicht zusammengeführt — dazu braucht es eine Betreiber-Entscheidung
+(gleicher Artikel? Packungsgröße → Kit?).
+
+Umgesetzt in `stuecklisten-plan.ts` (`vorlagenZeilen`, `lagerbestaende`),
+`stuecklisten-uebernahme.ts`, Migration 0098, Vorschau
+`einstellungen/odoo`; dokumentiert in
+[migration-odoo.md](migration-odoo.md) und
+[module/fertigung.md](module/fertigung.md); Tests
+`tests/odoo-stuecklisten.test.ts`, `tests/fertigung.test.ts`,
+`tests/prozesse/odoo-stuecklisten.test.ts`.
+
 ## 2026-09-30 — Shopify-Erstübernahme: Produkte zwingend vor Bestellungen
 
 Beim Neustart der Prod-Daten wurde „Kunden und Bestellungen" vor den

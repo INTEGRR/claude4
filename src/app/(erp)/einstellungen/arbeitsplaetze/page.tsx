@@ -295,6 +295,46 @@ export default async function ArbeitsplaetzePage() {
         </div>
       )}
 
+      {brueckeAktiv && drucker.some((d) => d.aktiv) && (
+        <Card title="Druckbrücke einrichten — ein Paket je Drucker">
+          <ol className="small" style={{ margin: '0 0 12px', paddingLeft: 18 }}>
+            <li>Paket des Druckers herunterladen (ZIP) — am besten direkt am PC, an dem der Drucker hängt.</li>
+            <li>
+              ZIP in einen eigenen Ordner entpacken und <span className="mono">druckbruecke-starten.cmd</span>{' '}
+              doppelklicken. Es muss nichts installiert werden (kein Node.js).
+            </li>
+            <li>
+              Einmal <span className="mono">autostart-einrichten.cmd</span> — dann startet die Brücke mit Windows. Unten
+              in der Druckerzeile steht danach „aktiv".
+            </li>
+          </ol>
+          <div className="druck-pakete">
+            {drucker
+              .filter((d) => d.aktiv)
+              .map((d) => (
+                <div key={d.id} className="druck-paket">
+                  <div>
+                    <strong>{d.name}</strong>
+                    {d.ort ? <span className="muted"> · {d.ort}</span> : null}
+                    <div className="small mono">
+                      {d.druckername ? (
+                        <>Windows: {d.druckername}</>
+                      ) : (
+                        <span className="wv-ueberfaellig">
+                          Name unter Windows fehlt — druckt auf den Standarddrucker des PCs. Unten am Drucker eintragen.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <a className="btn primary" href={`/api/druck/paket?drucker_id=${d.id}`}>
+                    Paket herunterladen
+                  </a>
+                </div>
+              ))}
+          </div>
+        </Card>
+      )}
+
       <Card title={`Arbeitsplätze (${plaetze.length})`} tight>
         {plaetze.length === 0 ? (
           <Empty>Noch keine Arbeitsplätze — unten Packtische, Montagetische usw. anlegen.</Empty>
@@ -358,7 +398,7 @@ export default async function ArbeitsplaetzePage() {
                   <th>Format</th>
                   <th>Agent</th>
                   <th className="num">Offen</th>
-                  <th />
+                  <th>Paket</th>
                   <th />
                 </tr>
               </thead>

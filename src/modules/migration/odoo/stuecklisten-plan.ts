@@ -7,8 +7,13 @@
  * Stücklisten an Vorlagen mit Attributen; Zeilen gelten per Filter nur für
  * bestimmte Varianten. Der Plan löst jede Odoo-Variante wie Odoo selbst
  * auf, ordnet Fertigprodukte und Komponenten per SKU (sonst Barcode) zu und
- * schreibt je KRNL-Vorlage eine Stückliste — oder, wenn die Varianten
- * verschiedene Listen brauchen, je Variante eine.
+ * schreibt je KRNL-Vorlage EINE Stückliste wie in Odoo: Zeilen, die nur
+ * manche Varianten brauchen, bekommen einen Variantenfilter („Auf Varianten
+ * anwenden") aus den KRNL-Attributwerten (seit 2026-09-30; Shopify teilt
+ * Produkte anders auf als Odoo, Namen weichen ab — deshalb abgeleitet aus
+ * den Varianten, nicht per Namen übersetzt). Nur wenn das nicht eindeutig
+ * geht oder nicht jede aktive Variante eine Odoo-Stückliste hat, entstehen
+ * Varianten-Stücklisten.
  *
  * Grundsätze:
  *   - Zugeordnete KRNL-Artikel werden nie umbenannt; Preis und Bestand nur,
@@ -16,6 +21,10 @@
  *   - Hart statt still: eine Stückliste mit ungelöster Einheit wird nicht
  *     geschrieben, sondern mit Grund gemeldet.
  *   - Von Hand angelegte KRNL-Stücklisten bleiben unangetastet.
+ *   - Bestände (seit 2026-09-30) nicht nur für Komponenten: jeder Artikel
+ *     mit Odoo-Lagerbestand, der per SKU/Barcode/Verweis zu einer
+ *     KRNL-Variante passt (Fertigprodukte wie der Switch-Tester, Zubehör wie
+ *     Deskmats), bekommt ihn — ebenfalls nur, wo KRNL 0 hat.
  */
 
 // --- Eingaben -----------------------------------------------------------------
@@ -88,6 +97,16 @@ export interface OdooLieferantenpreis {
   produktCode: string | null
 }
 
+/** Ein Odoo-Artikel mit Bestand an internen Lagerorten (alle, nicht nur Stücklisten-Teile). */
+export interface OdooLagerArtikel {
+  id: number
+  code: string | null
+  barcode: string | null
+  name: string
+  menge: number
+  standardPreis: number
+}
+
 export interface OdooDaten {
   varianten: OdooVariante[]
   vorlagen: OdooVorlage[]
@@ -98,6 +117,8 @@ export interface OdooDaten {
   lieferanten: OdooLieferantenpreis[]
   /** Bestand an internen Lagerorten je Odoo-Variante. */
   bestand: Record<number, number>
+  /** Alle Odoo-Artikel mit Lagerbestand > 0 (Fertigprodukte, Zubehör, Komponenten). */
+  lagerArtikel?: OdooLagerArtikel[]
 }
 
 export interface KrnlVariante {
@@ -125,6 +146,8 @@ export interface KrnlDaten {
   manuelleStuecklisten: { templateId: string; variantId: string | null }[]
   /** Frühere Übernahmen: Odoo-Varianten-ID → KRNL-Variante (auch ohne SKU wiedererkannt). */
   verweise?: Record<number, string>
+  /** Attributwerte der KRNL-Varianten (Anker der Variantenfilter). */
+  werte?: { variantId: string; attributId: string; ptavId: string; name: string }[]
 }
 
 // --- Ergebnis -------------------------------------------------------------------
@@ -134,6 +157,12 @@ export interface PlanZeile {
   komponente: number
   menge: number
   uomName: string
+  /** „Auf Varianten anwenden": KRNL-Attributwerte (leer = alle Varianten). */
+  filter?: string[]
+  /** Anzeige des Filters, z. B. „Mounting Plate: PC". */
+  filterText?: string
+  /** Reihenfolge wie in der Odoo-Stückliste (Position der ersten Zeile). */
+  folge?: number
 }
 
 export interface PlanKomponente {
@@ -172,9 +201,24 @@ export interface PlanFertigprodukt {
   grund?: string
 }
 
+/** Bestand eines Artikels, der keine Stücklisten-Komponente ist. */
+export interface PlanLagerbestand {
+  odooId: number
+  code: string | null
+  name: string
+  menge: number
+  krnlId: string | null
+  krnlSku: string | null
+  /** Einkaufspreis setzen, damit der Bestand bewertet ist (nur wo KRNL 0 hat). */
+  preis: number | null
+  /** buchen = KRNL hat 0; vorhanden = KRNL hat schon Bestand (bleibt); fehlt = keine passende Variante. */
+  status: 'buchen' | 'vorhanden' | 'fehlt'
+}
+
 export interface Plan {
   fertigprodukte: PlanFertigprodukt[]
   komponenten: PlanKomponente[]
+  lagerbestaende: PlanLagerbestand[]
   stuecklisten: PlanStueckliste[]
   routen: { templateId: string; fertigen: boolean; aufAuftrag: boolean; skus: string[] }[]
   blockiert: { was: string; grund: string }[]
@@ -268,8 +312,105 @@ function normCode(s: string | null | undefined): string | null {
   return t ? t.toLowerCase() : null
 }
 
+/**
+ * Eine Vorlagen-Stückliste mit Variantenfiltern aus den Listen je Variante
+ * ableiten. Je Zeile (Komponente, Menge, Einheit) die Menge S der Varianten,
+ * die sie brauchen; alle → ohne Filter, sonst ein Filter aus den
+ * Attributwerten von S (Odoo-Semantik: je Attribut einer der Werte, über
+ * Attribute alle). Trifft der Filter mehr Varianten als S, wird S nach dem
+ * Attribut mit den meisten Werten geteilt (mehrere gefilterte Zeilen), bis
+ * jeder Teil genau passt. Liefert null, wenn das nicht eindeutig geht (zwei
+ * Varianten mit gleichen Werten, aber verschiedenen Listen, oder Varianten
+ * ohne Attributwerte).
+ */
+export function vorlagenZeilen(
+  eintraege: { variantId: string; zeilen: PlanZeile[] }[],
+  werte: { variantId: string; attributId: string; ptavId: string; name: string }[],
+): PlanZeile[] | null {
+  const varianten = eintraege.map((e) => e.variantId)
+  if (varianten.length === 1) return eintraege[0].zeilen.map((z) => ({ ...z, filter: [], filterText: '' }))
+  const jeVariante = new Map<string, Map<string, string>>()
+  const namen = new Map<string, string>()
+  for (const w of werte) {
+    if (!varianten.includes(w.variantId)) continue
+    if (!jeVariante.has(w.variantId)) jeVariante.set(w.variantId, new Map())
+    jeVariante.get(w.variantId)!.set(w.attributId, w.ptavId)
+    namen.set(w.ptavId, w.name)
+  }
+  const attribute = [...new Set([...jeVariante.values()].flatMap((m) => [...m.keys()]))].sort()
+  if (attribute.length === 0) return null
+  const wert = (v: string, a: string) => jeVariante.get(v)?.get(a) ?? null
+  // Jede Variante braucht jeden Attributwert; gleiche Werte → gleiche Liste.
+  const schluessel = (z: PlanZeile) => `${z.komponente}:${z.menge}:${z.uomName}`
+  const tupelListe = new Map<string, string>()
+  for (const e of eintraege) {
+    if (attribute.some((a) => wert(e.variantId, a) === null)) return null
+    const tupel = attribute.map((a) => wert(e.variantId, a)).join('&')
+    const liste = e.zeilen.map(schluessel).sort().join('|')
+    if (tupelListe.has(tupel) && tupelListe.get(tupel) !== liste) return null
+    tupelListe.set(tupel, liste)
+  }
+  const alleWerte = new Map(attribute.map((a) => [a, new Set(varianten.map((v) => wert(v, a)!))]))
+  type Filter = Map<string, Set<string>>
+  const passt = (v: string, f: Filter) => [...f].every(([a, ws]) => ws.has(wert(v, a)!))
+  const kasten = (S: string[]): Filter => {
+    const f: Filter = new Map()
+    for (const a of attribute) {
+      const inS = new Set(S.map((v) => wert(v, a)!))
+      if (inS.size < alleWerte.get(a)!.size) f.set(a, inS)
+    }
+    return f
+  }
+  const abdecken = (S: string[]): Filter[] => {
+    const f = kasten(S)
+    if (varianten.filter((v) => passt(v, f)).length === S.length) return [f]
+    const [teilen] = attribute
+      .map((a) => [a, new Set(S.map((v) => wert(v, a))).size] as const)
+      .filter(([, n]) => n > 1)
+      .sort((x, y) => y[1] - x[1])
+    if (!teilen) return [f]
+    const teile = new Map<string, string[]>()
+    for (const v of S) teile.set(wert(v, teilen[0])!, [...(teile.get(wert(v, teilen[0])!) ?? []), v])
+    return [...teile.values()].flatMap(abdecken)
+  }
+
+  const zeilen = new Map<string, { zeile: PlanZeile; varianten: string[] }>()
+  for (const e of eintraege) {
+    for (const z of e.zeilen) {
+      const k = schluessel(z)
+      if (!zeilen.has(k)) zeilen.set(k, { zeile: z, varianten: [] })
+      zeilen.get(k)!.varianten.push(e.variantId)
+    }
+  }
+  const ergebnis: PlanZeile[] = []
+  for (const { zeile, varianten: S } of zeilen.values()) {
+    if (S.length === varianten.length) {
+      ergebnis.push({ ...zeile, filter: [], filterText: '' })
+      continue
+    }
+    for (const f of abdecken(S)) {
+      const ptavs = [...f.values()].flatMap((ws) => [...ws]).sort()
+      ergebnis.push({ ...zeile, filter: ptavs, filterText: ptavs.map((p) => namen.get(p) ?? p).join(', ') })
+    }
+  }
+  // Probe: jede Variante bekommt über die Filter genau ihre Liste.
+  for (const e of eintraege) {
+    const gilt = ergebnis.filter((z) => {
+      const f: Filter = new Map()
+      for (const p of z.filter ?? []) {
+        const a = attribute.find((x) => alleWerte.get(x)!.has(p))!
+        f.set(a, new Set([...(f.get(a) ?? []), p]))
+      }
+      return passt(e.variantId, f)
+    })
+    if (gilt.map(schluessel).sort().join('|') !== e.zeilen.map(schluessel).sort().join('|')) return null
+  }
+  // Reihenfolge wie in Odoo (gefilterte Zeilen stehen, wo sie in Odoo stehen).
+  return ergebnis.sort((a, b) => (a.folge ?? Infinity) - (b.folge ?? Infinity))
+}
+
 export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
-  const plan: Plan = { fertigprodukte: [], komponenten: [], stuecklisten: [], routen: [], blockiert: [] }
+  const plan: Plan = { fertigprodukte: [], komponenten: [], lagerbestaende: [], stuecklisten: [], routen: [], blockiert: [] }
 
   const uomOdoo = new Map(odoo.uoms.map((u) => [u.id, u]))
   const uomKrnl = new Map(krnl.uoms.map((u) => [u.name, u]))
@@ -285,7 +426,7 @@ export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
     if (b) nachBarcode.set(b, k)
   }
   const nachId = new Map(krnl.varianten.map((k) => [k.id, k]))
-  const krnlZu = (v: OdooVariante): KrnlVariante | null => {
+  const krnlZu = (v: { id: number; code: string | null; barcode: string | null }): KrnlVariante | null => {
     const verwiesen = krnl.verweise?.[v.id]
     if (verwiesen && nachId.has(verwiesen)) return nachId.get(verwiesen)!
     const code = normCode(v.code)
@@ -367,9 +508,10 @@ export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
       if (!prodUom || !bomUom) throw new Error('Einheit der Stückliste fehlt')
       const stueckMenge = odooUmrechnen(bom.menge, bomUom, prodUom)
       const summe = new Map<number, PlanZeile>()
-      for (const z of odoo.bomZeilen
+      const bomZeilen = odoo.bomZeilen
         .filter((z) => z.bomId === bom.id)
-        .sort((a, b) => a.sequenz - b.sequenz || a.id - b.id)) {
+        .sort((a, b) => a.sequenz - b.sequenz || a.id - b.id)
+      for (const [folge, z] of bomZeilen.entries()) {
         if (!zeileGilt(z.filterPtavIds, v.ptavIds, ptavAttribut)) continue
         const komp = komponente(z.variantId)
         if ('fehler' in komp) throw new Error(komp.fehler)
@@ -390,6 +532,7 @@ export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
           komponente: z.variantId,
           menge: Math.round(((bisher?.menge ?? 0) + menge) * 1e6) / 1e6,
           uomName: kompKrnlUom.name,
+          folge: bisher?.folge ?? folge,
         })
       }
       if (summe.size === 0) throw new Error('keine Zeile gilt für diese Variante')
@@ -416,13 +559,21 @@ export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
       typ: TYP[e.bom.typ],
       verbrauch: VERBRAUCH[e.bom.verbrauch] ?? 'warning',
     })
-    if (alleAbgedeckt && gleich) {
+    // Wie in Odoo: eine Stückliste je Artikel, Zeilen mit Variantenfilter —
+    // nur, wenn jede aktive Variante eine Odoo-Liste hat (sonst bekäme eine
+    // unbekannte Variante ungeprüft Zeilen) und Art/Verbrauch gleich sind.
+    const einheitlich = new Set(eintraege.map((e) => `${gemeinsam(e).typ}:${gemeinsam(e).verbrauch}`)).size === 1
+    const mitFiltern =
+      alleAbgedeckt && einheitlich && !gleich
+        ? vorlagenZeilen(eintraege.map((e) => ({ variantId: e.krnl.id, zeilen: e.zeilen })), krnl.werte ?? [])
+        : null
+    if (alleAbgedeckt && (gleich || mitFiltern)) {
       plan.stuecklisten.push({
         templateId,
         variantId: null,
         odooBomIds: [...new Set(eintraege.map((e) => e.bom.id))],
         ...gemeinsam(eintraege[0]),
-        zeilen: eintraege[0].zeilen,
+        zeilen: mitFiltern ?? eintraege[0].zeilen,
         skus: eintraege.map((e) => e.krnl.sku ?? e.krnl.id),
       })
     } else {
@@ -452,6 +603,27 @@ export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
   // Nur Komponenten, die in mindestens einer schreibbaren Stückliste stehen.
   const benutzt = new Set(plan.stuecklisten.flatMap((s) => s.zeilen.map((z) => z.komponente)))
   plan.komponenten = [...komponenten.values()].filter((k) => benutzt.has(k.odooId))
+
+  // Bestände aller übrigen Artikel mit Odoo-Lagerbestand — Komponenten haben
+  // ihren eigenen Weg oben; eine KRNL-Variante wird nur einmal gebucht.
+  const komponentenIds = new Set(plan.komponenten.map((k) => k.odooId))
+  const gebucht = new Set(plan.komponenten.filter((k) => k.bestand !== null && k.krnlId).map((k) => k.krnlId!))
+  for (const a of [...(odoo.lagerArtikel ?? [])].sort((x, y) => (x.code ?? x.name).localeCompare(y.code ?? y.name))) {
+    if (a.menge <= 0 || komponentenIds.has(a.id)) continue
+    const k = krnlZu(a)
+    const basis = { odooId: a.id, code: a.code, name: a.name, menge: a.menge, krnlId: k?.id ?? null, krnlSku: k?.sku ?? null }
+    if (!k) {
+      plan.lagerbestaende.push({ ...basis, preis: null, status: 'fehlt' })
+      continue
+    }
+    const buchen = k.bestand <= 0 && !gebucht.has(k.id)
+    gebucht.add(k.id)
+    plan.lagerbestaende.push({
+      ...basis,
+      preis: buchen && k.standardCost <= 0 && a.standardPreis > 0 ? Math.round(a.standardPreis * 100) / 100 : null,
+      status: buchen ? 'buchen' : 'vorhanden',
+    })
+  }
   return plan
 }
 
@@ -470,5 +642,8 @@ export function planUebersicht(plan: Plan) {
     bestand: plan.komponenten.filter((k) => k.bestand !== null).length,
     lieferantenpreise: plan.komponenten.reduce((s, k) => s + k.lieferanten.length, 0),
     routen: plan.routen.length,
+    lagerBuchen: plan.lagerbestaende.filter((l) => l.status === 'buchen').length,
+    lagerVorhanden: plan.lagerbestaende.filter((l) => l.status === 'vorhanden').length,
+    lagerFehlt: plan.lagerbestaende.filter((l) => l.status === 'fehlt').length,
   }
 }

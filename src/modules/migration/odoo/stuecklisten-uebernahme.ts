@@ -114,6 +114,34 @@ export async function odooStuecklistenDaten(): Promise<OdooDaten> {
     if (v !== null) bestand[v] = (bestand[v] ?? 0) + Number(q.quantity)
   }
 
+  // Bestände ALLER Artikel an internen Lagerorten (Fertigprodukte, Zubehör
+  // wie Deskmats) — nicht nur der Stücklisten-Komponenten (seit 2026-09-30).
+  const alleQuants = await alleLesen<{ product_id: M2o; quantity: number }>(
+    'stock.quant', [['location_id.usage', '=', 'internal']], ['product_id', 'quantity'])
+  const lagerMenge = new Map<number, number>()
+  for (const q of alleQuants) {
+    const v = id(q.product_id)
+    if (v !== null) lagerMenge.set(v, (lagerMenge.get(v) ?? 0) + Number(q.quantity))
+  }
+  const lagerIds = [...lagerMenge].filter(([, m]) => m > 0).map(([v]) => v)
+  const bekannt = new Map(varianten.map((v) => [v.id, v]))
+  const fehlend = lagerIds.filter((v) => !bekannt.has(v))
+  const nachgelesen = fehlend.length
+    ? await alleLesen<RohVariante>('product.product', [['id', 'in', fehlend], ['active', 'in', [true, false]]], VARIANTEN_FELDER)
+    : []
+  for (const v of nachgelesen) bekannt.set(v.id, v)
+  const lagerArtikel = lagerIds
+    .map((v) => bekannt.get(v))
+    .filter((v): v is RohVariante => Boolean(v))
+    .map((v) => ({
+      id: v.id,
+      code: v.default_code || null,
+      barcode: v.barcode || null,
+      name: v.display_name,
+      menge: lagerMenge.get(v.id) ?? 0,
+      standardPreis: Number(v.standard_price) || 0,
+    }))
+
   return {
     varianten: varianten.map((v) => ({
       id: v.id,
@@ -171,6 +199,7 @@ export async function odooStuecklistenDaten(): Promise<OdooDaten> {
       }
     }),
     bestand,
+    lagerArtikel,
   }
 }
 
@@ -191,6 +220,13 @@ export async function krnlStuecklistenDaten(ziel: typeof sql | TransactionSql = 
     select template_id, variant_id from boms where active and herkunft is null`
   const verweise = await ziel<{ odoo_id: number; krnl_id: string }[]>`
     select odoo_id, krnl_id from odoo_verweise where odoo_tabelle = 'product_product'`
+  const werte = await ziel<{ variant_id: string; attribut_id: string; ptav_id: string; name: string }[]>`
+    select pvav.variant_id, l.attribute_id as attribut_id, pvav.ptav_id, pa.name || ': ' || pav.name as name
+    from product_variant_attribute_values pvav
+    join product_template_attribute_values ptav on ptav.id = pvav.ptav_id
+    join product_template_attribute_lines l on l.id = ptav.line_id
+    join product_attributes pa on pa.id = l.attribute_id
+    join product_attribute_values pav on pav.id = ptav.value_id`
   return {
     varianten: varianten.map((v) => ({
       id: v.id,
@@ -205,6 +241,7 @@ export async function krnlStuecklistenDaten(ziel: typeof sql | TransactionSql = 
     uoms: uoms.map((u) => ({ name: u.name, kategorie: u.kategorie, ratio: Number(u.ratio) })),
     manuelleStuecklisten: manuell.map((m) => ({ templateId: m.template_id, variantId: m.variant_id })),
     verweise: Object.fromEntries(verweise.map((v) => [Number(v.odoo_id), v.krnl_id])),
+    werte: werte.map((w) => ({ variantId: w.variant_id, attributId: w.attribut_id, ptavId: w.ptav_id, name: w.name })),
   }
 }
 
@@ -219,6 +256,10 @@ export interface UebernahmeBericht {
   preise: number
   lieferantenpreise: number
   bestand: number
+  /** Bestände weiterer Artikel (keine Komponenten), nur wo KRNL 0 hat. */
+  bestandWeitere: number
+  /** Alte Stücklisten dieses Imports, die eine neue Form ablöst (deaktiviert). */
+  stuecklistenAbgeloest: number
   stuecklistenNeu: number
   stuecklistenUnveraendert: number
   routen: number
@@ -246,8 +287,8 @@ export async function stuecklistenUebernehmen(von: string): Promise<UebernahmeBe
     const plan = stuecklistenPlan(odoo, await krnlStuecklistenDaten(t))
     const lauf = `odoo-api ${new Date().toISOString().slice(0, 16)}`
     const bericht: UebernahmeBericht = {
-      komponentenNeu: 0, komponentenZugeordnet: 0, preise: 0, lieferantenpreise: 0, bestand: 0,
-      stuecklistenNeu: 0, stuecklistenUnveraendert: 0, routen: 0, blockiert: plan.blockiert.length,
+      komponentenNeu: 0, komponentenZugeordnet: 0, preise: 0, lieferantenpreise: 0, bestand: 0, bestandWeitere: 0,
+      stuecklistenAbgeloest: 0, stuecklistenNeu: 0, stuecklistenUnveraendert: 0, routen: 0, blockiert: plan.blockiert.length,
     }
     const uomId = new Map(
       (await t<{ id: string; name: string }[]>`select id, name from uoms`).map((u) => [u.name, u.id]),
@@ -328,21 +369,67 @@ export async function stuecklistenUebernehmen(von: string): Promise<UebernahmeBe
       bericht.bestand++
     }
 
+    // 3b. Bestände weiterer Artikel (Fertigprodukte, Zubehör) — Preis vor
+    //     Bestand, damit bewertet; nur, wo KRNL am Lagerort nichts hat.
+    for (const l of plan.lagerbestaende) {
+      if (l.status !== 'buchen' || !l.krnlId || !lager) continue
+      if (l.preis !== null) {
+        const r = await t`
+          update product_templates set standard_cost = ${l.preis}
+          where id = (select template_id from product_variants where id = ${l.krnlId}) and standard_cost <= 0`
+        bericht.preise += r.count
+      }
+      const [ist] = await t<{ menge: number }[]>`
+        select coalesce(sum(on_hand), 0)::float as menge from stock_quants
+        where variant_id = ${l.krnlId} and location_id = ${lager.id}`
+      if (Number(ist.menge) > 0) continue
+      const [zaehlung] = await t<{ id: string }[]>`
+        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty)
+        values (${lager.id}, ${l.krnlId}, ${l.menge}, 0) returning id`
+      await t`select inventory_apply(${zaehlung.id}, ${von})`
+      await merken(t, l.odooId, l.krnlId, 'zugeordnet', lauf)
+      bericht.bestandWeitere++
+    }
+
     // 4. Stücklisten: eigene aus früheren Läufen ersetzen, wenn sie sich
     //    geändert haben (deaktivieren statt löschen — Fertigungsaufträge
     //    verweisen darauf); von Hand angelegte bleiben (Plan blockiert sie).
+    // Frühere eigene Stücklisten einer Vorlage, die die neue Form nicht mehr
+    // hat (z. B. Varianten-Stücklisten, die jetzt EINE Stückliste mit
+    // Variantenfiltern ersetzt), werden deaktiviert — sonst gewännen sie in
+    // resolve_bom vor der Vorlagen-Stückliste.
+    const neueFormen = new Map<string, Set<string>>()
+    for (const s of plan.stuecklisten) {
+      neueFormen.set(s.templateId, new Set([...(neueFormen.get(s.templateId) ?? []), s.variantId ?? '']))
+    }
+    for (const [templateId, formen] of neueFormen) {
+      const r = await t`
+        update boms set active = false
+        where herkunft = 'odoo' and active and template_id = ${templateId}
+          and not (coalesce(variant_id::text, '') = any(${[...formen]}::text[]))`
+      bericht.stuecklistenAbgeloest += r.count
+    }
+
     for (const s of plan.stuecklisten) {
       const zeilen = s.zeilen.map((z) => ({
         variant: krnlVon.get(z.komponente)!,
         menge: z.menge,
         uom: uomId.get(z.uomName)!,
+        filter: [...(z.filter ?? [])].sort(),
       }))
-      const signatur = zeilen.map((z) => `${z.variant}:${Number(z.menge)}:${z.uom}`).sort().join('|')
+      const signatur = zeilen
+        .map((z) => `${z.variant}:${Number(z.menge)}:${z.uom}:${z.filter.join(',')}`)
+        .sort()
+        .join('|')
       const alte = await t<{ id: string; signatur: string }[]>`
-        select b.id,
-               coalesce(string_agg(l.component_variant_id || ':' || (l.qty::float)::text || ':' || l.uom_id,
-                                   '|' order by l.component_variant_id || ':' || (l.qty::float)::text || ':' || l.uom_id), '') as signatur
-        from boms b left join bom_lines l on l.bom_id = b.id
+        select b.id, coalesce(string_agg(z.teil, '|' order by z.teil), '') as signatur
+        from boms b
+        left join lateral (
+          select l.component_variant_id || ':' || (l.qty::float)::text || ':' || l.uom_id || ':' ||
+                 coalesce((select string_agg(f.ptav_id::text, ',' order by f.ptav_id::text)
+                           from bom_line_variant_filters f where f.bom_line_id = l.id), '') as teil
+          from bom_lines l where l.bom_id = b.id
+        ) z on true
         where b.herkunft = 'odoo' and b.active and b.template_id = ${s.templateId}
           and b.variant_id is not distinct from ${s.variantId}
         group by b.id`
@@ -362,8 +449,15 @@ export async function stuecklistenUebernehmen(von: string): Promise<UebernahmeBe
         returning id`
       let folge = 10
       for (const z of zeilen) {
-        await t`insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
-                values (${bom.id}, ${folge}, ${z.variant}, ${z.menge}, ${z.uom}, 'backflush')`
+        const [zeile] = await t<{ id: string }[]>`
+          insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
+          values (${bom.id}, ${folge}, ${z.variant}, ${z.menge}, ${z.uom}, 'backflush')
+          returning id`
+        // „Auf Varianten anwenden" wie in Odoo.
+        for (const ptav of z.filter) {
+          await t`insert into bom_line_variant_filters (bom_line_id, ptav_id) values (${zeile.id}, ${ptav})
+                  on conflict do nothing`
+        }
         folge += 10
       }
       bericht.stuecklistenNeu++

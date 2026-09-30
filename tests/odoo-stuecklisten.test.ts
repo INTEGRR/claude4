@@ -1,15 +1,19 @@
 /**
  * Odoo-Stücklisten in ein bestehendes KRNL (0090): Zuordnung per SKU,
- * Odoo-Filterlogik je Attribut, Vorlagen- vs. Varianten-Stückliste,
- * Einheiten, Preis/Bestand nur wo KRNL 0 hat, harte Blockaden.
+ * Odoo-Filterlogik je Attribut, eine Stückliste je Artikel mit
+ * abgeleiteten Variantenfiltern (sonst je Variante), Einheiten, Preis/
+ * Bestand nur wo KRNL 0 hat, Bestände aller Artikel, harte Blockaden.
  */
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   type KrnlDaten,
   type OdooDaten,
+  type PlanZeile,
   bomFuer,
+  planUebersicht,
   stuecklistenPlan,
+  vorlagenZeilen,
   zeileGilt,
 } from '../src/modules/migration/odoo/stuecklisten-plan.ts'
 
@@ -211,5 +215,193 @@ describe('Plan', () => {
     assert.match(grund['KB-B-DE'], /von Hand angelegte Stückliste/)
     assert.ok(!p.stuecklisten.some((s) => s.templateId === 't-tester' || s.templateId === 't-schwarz'))
     assert.ok(p.stuecklisten.some((s) => s.templateId === 't-weiss'), 'der Rest läuft')
+  })
+})
+
+
+// --- Eine Stückliste je Artikel mit Variantenfiltern (2026-09-30) -----------------
+
+/** KRNL-Attributwerte: Farbe (a-farbe) und Layout (a-layout) je Variante. */
+function wert(variantId: string, attributId: string, ptavId: string, name: string) {
+  return { variantId, attributId, ptavId, name }
+}
+const z = (komponente: number, menge = 1): PlanZeile => ({ komponente, menge, uomName: 'Stück' })
+const filterVon = (zeilen: PlanZeile[]) =>
+  zeilen.map((x) => `${x.komponente}${x.filter?.length ? ` [${x.filter.join('+')}]` : ''}`).sort()
+
+describe('Variantenfilter ableiten', () => {
+  // 2 × 2: Weiß/Schwarz × DE/US
+  const WERTE = [
+    wert('w-de', 'a-farbe', 'p-w', 'Farbe: Weiß'), wert('w-de', 'a-layout', 'p-de', 'Layout: DE'),
+    wert('w-us', 'a-farbe', 'p-w', 'Farbe: Weiß'), wert('w-us', 'a-layout', 'p-us', 'Layout: US'),
+    wert('b-de', 'a-farbe', 'p-b', 'Farbe: Schwarz'), wert('b-de', 'a-layout', 'p-de', 'Layout: DE'),
+    wert('b-us', 'a-farbe', 'p-b', 'Farbe: Schwarz'), wert('b-us', 'a-layout', 'p-us', 'Layout: US'),
+  ]
+
+  test('gemeinsame Zeilen ohne Filter, je Attribut gefilterte Zeilen mit einem Wert', () => {
+    const liste = (farbe: number, layout: number) => [z(farbe), z(layout), z(99, 70)]
+    const r = vorlagenZeilen(
+      [
+        { variantId: 'w-de', zeilen: liste(10, 13) },
+        { variantId: 'w-us', zeilen: liste(10, 14) },
+        { variantId: 'b-de', zeilen: liste(11, 13) },
+        { variantId: 'b-us', zeilen: liste(11, 14) },
+      ],
+      WERTE,
+    )
+    assert.ok(r)
+    assert.deepEqual(filterVon(r), ['10 [p-w]', '11 [p-b]', '13 [p-de]', '14 [p-us]', '99'])
+    assert.equal(r.find((x) => x.komponente === 13)?.filterText, 'Layout: DE')
+  })
+
+  test('Zeile nur für eine Kombination → Filter über beide Attribute (UND)', () => {
+    const r = vorlagenZeilen(
+      [
+        { variantId: 'w-de', zeilen: [z(1), z(50)] },
+        { variantId: 'w-us', zeilen: [z(1)] },
+        { variantId: 'b-de', zeilen: [z(1)] },
+        { variantId: 'b-us', zeilen: [z(1)] },
+      ],
+      WERTE,
+    )
+    assert.deepEqual(filterVon(r!), ['1', '50 [p-de+p-w]'])
+  })
+
+  test('über Kreuz (Weiß-DE und Schwarz-US) → zwei gefilterte Zeilen statt einer zu weiten', () => {
+    const r = vorlagenZeilen(
+      [
+        { variantId: 'w-de', zeilen: [z(1), z(60)] },
+        { variantId: 'w-us', zeilen: [z(1)] },
+        { variantId: 'b-de', zeilen: [z(1)] },
+        { variantId: 'b-us', zeilen: [z(1), z(60)] },
+      ],
+      WERTE,
+    )
+    assert.deepEqual(filterVon(r!), ['1', '60 [p-b+p-us]', '60 [p-de+p-w]'])
+  })
+
+  test('verschiedene Mengen je Variante → getrennte gefilterte Zeilen', () => {
+    const r = vorlagenZeilen(
+      [
+        { variantId: 'w-de', zeilen: [z(15, 70)] },
+        { variantId: 'w-us', zeilen: [z(15, 68)] },
+        { variantId: 'b-de', zeilen: [z(15, 70)] },
+        { variantId: 'b-us', zeilen: [z(15, 68)] },
+      ],
+      WERTE,
+    )
+    assert.deepEqual(
+      r!.map((x) => `${x.menge} ${x.filter?.join('+')}`).sort(),
+      ['68 p-us', '70 p-de'],
+    )
+  })
+
+  test('nicht eindeutig → null (dann Varianten-Stücklisten)', () => {
+    const zwei = [
+      { variantId: 'w-de', zeilen: [z(1)] },
+      { variantId: 'w-us', zeilen: [z(2)] },
+    ]
+    assert.equal(vorlagenZeilen(zwei, []), null, 'ohne Attributwerte')
+    const gleicheWerte = [wert('w-de', 'a-farbe', 'p-w', 'Farbe: Weiß'), wert('w-us', 'a-farbe', 'p-w', 'Farbe: Weiß')]
+    assert.equal(vorlagenZeilen(zwei, gleicheWerte), null, 'gleiche Werte, verschiedene Listen')
+    const luecke = [wert('w-de', 'a-layout', 'p-de', 'Layout: DE')]
+    assert.equal(vorlagenZeilen(zwei, luecke), null, 'eine Variante ohne Wert')
+  })
+})
+
+describe('Plan mit KRNL-Attributwerten', () => {
+  const werte = [
+    wert('k-w-de', 'a-layout', 'p-de', 'Layout: ISO-DE'),
+    wert('k-w-us', 'a-layout', 'p-us', 'Layout: ANSI'),
+    // Ein Attribut mit nur einem Wert filtert nie.
+    wert('k-w-de', 'a-farbe', 'p-weiss', 'Farbe: Weiß'),
+    wert('k-w-us', 'a-farbe', 'p-weiss', 'Farbe: Weiß'),
+  ]
+  const plan = stuecklistenPlan(ODOO, krnl({ werte }))
+
+  test('Weiß: EINE Stückliste für den Artikel, Keycaps je Layout gefiltert', () => {
+    const weiss = plan.stuecklisten.filter((s) => s.templateId === 't-weiss')
+    assert.equal(weiss.length, 1)
+    assert.equal(weiss[0].variantId, null)
+    assert.deepEqual(weiss[0].skus.sort(), ['KB-W-DE', 'KB-W-US'])
+    assert.deepEqual(filterVon(weiss[0].zeilen), ['10', '12', '13 [p-de]', '14 [p-us]', '15', '16'])
+    assert.equal(weiss[0].zeilen.find((x) => x.komponente === 14)?.filterText, 'Layout: ANSI')
+    assert.deepEqual(weiss[0].zeilen.map((x) => x.komponente), [10, 12, 13, 14, 15, 16], 'Reihenfolge wie in Odoo')
+    assert.equal(planUebersicht(plan).vorlagenStuecklisten, 3, 'Weiß, Schwarz, Switch-Tester')
+    assert.ok(plan.routen.some((r) => r.templateId === 't-weiss'))
+  })
+
+  test('eine aktive Variante ohne Odoo-Liste → weiter je Variante, ohne Routen', () => {
+    const p = stuecklistenPlan(
+      ODOO,
+      krnl({
+        werte,
+        varianten: [
+          ...krnl().varianten,
+          { id: 'k-w-uk', templateId: 't-weiss', sku: 'KB-W-UK', barcode: null, aktiv: true, standardCost: 0, uomName: 'Stück', bestand: 0 },
+        ],
+      }),
+    )
+    const weiss = p.stuecklisten.filter((s) => s.templateId === 't-weiss')
+    assert.equal(weiss.length, 2)
+    assert.ok(weiss.every((s) => s.variantId !== null))
+    assert.ok(!p.routen.some((r) => r.templateId === 't-weiss'))
+  })
+})
+
+describe('Bestände aller Artikel', () => {
+  const odoo: OdooDaten = {
+    ...ODOO,
+    lagerArtikel: [
+      // Komponente: läuft über den Komponenten-Weg, nicht doppelt
+      { id: 15, code: 'SW-1', barcode: null, name: 'Switch', menge: 5000, standardPreis: 0.25 },
+      // Fertigprodukt mit Stückliste
+      { id: 5, code: 'ST-1', barcode: null, name: 'Switch-Tester', menge: 12, standardPreis: 8 },
+      // Zubehör ohne Stückliste, in KRNL mit Preis
+      { id: 20, code: 'DM-PP-001', barcode: null, name: 'Deskmat', menge: 375, standardPreis: 6 },
+      // in KRNL schon mit Bestand
+      { id: 21, code: 'KABEL-1', barcode: null, name: 'Kabel', menge: 50, standardPreis: 3 },
+      // per Barcode zugeordnet
+      { id: 22, code: 'ALT-SKU', barcode: '4260000000017', name: 'Keycap-Puller', menge: 9, standardPreis: 0 },
+      // gibt es in KRNL nicht
+      { id: 23, code: 'NUR-ODOO', barcode: null, name: 'Muster', menge: 4, standardPreis: 1 },
+      { id: 24, code: 'LEER', barcode: null, name: 'Leer', menge: 0, standardPreis: 1 },
+    ],
+  }
+  const v = (id: string, sku: string, t = {}) => ({
+    id, templateId: `t-${id}`, sku, barcode: null, aktiv: true, standardCost: 0, uomName: 'Stück', bestand: 0, ...t,
+  })
+  const plan = stuecklistenPlan(
+    odoo,
+    krnl({
+      varianten: [
+        ...krnl().varianten,
+        v('k-dm', 'DM-PP-001', { standardCost: 5 }),
+        v('k-kabel', 'KABEL-1', { bestand: 7 }),
+        v('k-puller', 'PULLER', { barcode: '4260000000017' }),
+      ],
+    }),
+  )
+  const nach = Object.fromEntries(plan.lagerbestaende.map((l) => [l.code, l]))
+
+  test('Fertigprodukte und Zubehör bekommen ihren Bestand, Komponenten nicht doppelt', () => {
+    assert.equal(nach['SW-1'], undefined, 'Komponente')
+    assert.deepEqual(
+      { status: nach['ST-1'].status, menge: nach['ST-1'].menge, krnl: nach['ST-1'].krnlId, preis: nach['ST-1'].preis },
+      { status: 'buchen', menge: 12, krnl: 'k-st', preis: 8 },
+    )
+    assert.equal(nach['DM-PP-001'].status, 'buchen')
+    assert.equal(nach['DM-PP-001'].preis, null, 'gepflegter Preis bleibt')
+    assert.equal(nach['ALT-SKU'].krnlSku, 'PULLER', 'per Barcode')
+    assert.equal(nach['ALT-SKU'].preis, null, 'Odoo hat keinen Preis')
+  })
+
+  test('vorhandener KRNL-Bestand bleibt, fehlende Artikel werden gemeldet, 0 übersprungen', () => {
+    assert.equal(nach['KABEL-1'].status, 'vorhanden')
+    assert.equal(nach['NUR-ODOO'].status, 'fehlt')
+    assert.equal(nach['NUR-ODOO'].krnlId, null)
+    assert.equal(nach.LEER, undefined)
+    const u = planUebersicht(plan)
+    assert.deepEqual([u.lagerBuchen, u.lagerVorhanden, u.lagerFehlt], [3, 1, 1])
   })
 })

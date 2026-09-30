@@ -21,7 +21,7 @@ in 0090).
 - **„Auf Varianten anwenden"** (Kernfeature, Odoo-18-Semantik):
   - Pro Position können 0..n Attributwerte des Endprodukts hinterlegt werden (`bom_line_variant_filters` → `product_template_attribute_values`).
   - Leere Liste ⇒ Position gilt für **alle** Varianten.
-  - Nicht leer ⇒ Position gilt nur für Varianten, die **mindestens einen** der Werte tragen.
+  - Nicht leer ⇒ Position gilt nur für Varianten, die **je Attribut, das im Filter vorkommt, einen** der Werte dieses Attributs tragen (innerhalb eines Attributs ODER, über Attribute UND): `Farbe: Weiß, Layout: DE` gilt nur für Weiß-DE; `Layout: DE, Layout: US` gilt für beide Layouts. Seit 0098 genau wie Odoo — vorher reichte irgendein Wert, was bei Filtern über mehrere Attribute zu viel traf (Entscheidungslog 2026-09-30).
   - Beispiel: BoM „Tastatur" enthält Zeile „Gehäuse weiß" mit Filter `Farbe: Weiß` und Zeile „Gehäuse schwarz" mit Filter `Farbe: Schwarz`. Ein MO für die Variante „Tastatur – Weiß" übernimmt nur die weiße Gehäuse-Zeile.
 - UI: Positionstabelle mit einblendbarer Spalte „Auf Varianten anwenden" (Multi-Select der Attributwerte des Produkts); Vorschau-Funktion „BoM für Variante X anzeigen" (gefilterte Ansicht + Verfügbarkeits-Ampel je Komponente).
 - Eine Vorlage kann mehrere BoMs haben (aktiv/inaktiv, Variantenexklusiv); Auflösung bei MO-Anlage: exakte Varianten-BoM vor Vorlagen-BoM.

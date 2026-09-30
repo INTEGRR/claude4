@@ -173,7 +173,7 @@ export async function odooVorschau(): Promise<AktionsErgebnis> {
   return {
     text:
       `${uebersicht.stuecklisten} Stückliste(n) für ${uebersicht.fertigZugeordnet} zugeordnete Varianten, ` +
-      `${uebersicht.komponentenNeu} neue Komponente(n), ${uebersicht.blockiert} blockiert.`,
+      `${uebersicht.komponentenNeu} neue Komponente(n), ${uebersicht.lagerBuchen} weitere Bestände, ${uebersicht.blockiert} blockiert.`,
     daten: {
       uebersicht,
       fertigprodukte: plan.fertigprodukte,
@@ -195,7 +195,16 @@ export async function odooVorschau(): Promise<AktionsErgebnis> {
           komponente: komp.get(z.komponente)?.code ?? komp.get(z.komponente)?.name ?? String(z.komponente),
           menge: z.menge,
           uom: z.uomName,
+          filter: z.filterText ?? '',
         })),
+      })),
+      lagerbestaende: plan.lagerbestaende.map((l) => ({
+        code: l.code,
+        name: l.name,
+        menge: l.menge,
+        krnlSku: l.krnlSku,
+        preis: l.preis,
+        status: l.status,
       })),
     },
   }
@@ -209,9 +218,10 @@ export async function odooStuecklistenUebernehmen(
   const b = await stuecklistenUebernehmen(ctx.actor)
   return {
     text:
-      `${b.stuecklistenNeu} Stückliste(n) geschrieben, ${b.stuecklistenUnveraendert} unverändert; ` +
+      `${b.stuecklistenNeu} Stückliste(n) geschrieben, ${b.stuecklistenUnveraendert} unverändert` +
+      (b.stuecklistenAbgeloest ? `, ${b.stuecklistenAbgeloest} alte abgelöst` : '') + '; ' +
       `${b.komponentenNeu} Komponente(n) angelegt, ${b.komponentenZugeordnet} zugeordnet; ` +
-      `${b.preise} Preis(e), ${b.lieferantenpreise} Lieferantenpreis(e), ${b.bestand} Bestand/Bestände, ` +
+      `${b.preise} Preis(e), ${b.lieferantenpreise} Lieferantenpreis(e), ${b.bestand + b.bestandWeitere} Bestand/Bestände, ` +
       `${b.routen} Route(n)` + (b.blockiert ? `; ${b.blockiert} blockiert (siehe Vorschau).` : '.'),
     daten: { ...b },
   }

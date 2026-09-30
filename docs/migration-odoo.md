@@ -31,14 +31,34 @@ Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
      Varianten- vor Vorlagen-Stückliste; eine Zeile mit Filter gilt, wenn
      die Variante **je Attribut** einen der Filterwerte trägt. Mengen auf
      1 Stück normiert, Einheiten umgerechnet (auch kg → g).
-   - **Geschrieben** wird je KRNL-Vorlage eine Stückliste, wenn alle
-     aktiven Varianten dieselbe Liste brauchen — sonst je Variante eine
-     (keine Filter, die anders gelesen werden könnten).
+   - **Geschrieben** wird wie in Odoo **eine Stückliste je KRNL-Artikel**
+     (seit 2026-09-30): Zeilen, die alle Varianten brauchen, ohne Filter;
+     Zeilen, die nur manche brauchen, mit **Variantenfilter** („Auf
+     Varianten anwenden") aus den KRNL-Attributwerten. Die Filter werden
+     aus den aufgelösten Listen je Variante **abgeleitet**, nicht per Name
+     übersetzt — Shopify teilt Produkte anders auf als Odoo (NATIVE 75:
+     in Odoo eine Vorlage Farbe × Material × Switch × Keycaps, in KRNL ein
+     Artikel je Farbe mit Keycap Set × Mounting Plate × Switches; das
+     Farb-Gehäuse steht darum ungefiltert in der Stückliste des
+     Farb-Artikels). Trifft ein Filter mehr Varianten als nötig, wird die
+     Zeile nach dem Attribut mit den meisten Werten geteilt; eine Probe
+     prüft, dass jede Variante über die Filter genau ihre Liste bekommt.
+     **Je Variante** eine Stückliste nur noch, wenn das nicht eindeutig
+     geht (Varianten ohne Attributwerte, gleiche Werte mit verschiedenen
+     Listen) oder nicht jede aktive Variante eine Odoo-Stückliste hat.
    - **Komponenten**: per SKU/Barcode zugeordnet (bleiben wie sie sind)
      oder neu angelegt (nicht verkäuflich, einkaufbar, Einheit/Gewicht
      aus Odoo; ohne SKU markiert). Einkaufspreis (Standardpreis, sonst
      Lieferantenpreis) und Bestand **nur, wo KRNL 0 hat**; Lieferanten per
      Name/E-Mail zugeordnet oder angelegt, dazu ihre Preise.
+   - **Bestände aller Artikel** (seit 2026-09-30): jeder Odoo-Artikel mit
+     Bestand an internen Lagerorten (summiert über die Lagerorte), der per
+     SKU/Barcode/Verweis zu einer KRNL-Variante passt — auch Fertigprodukte
+     (Switch-Tester) und Zubehör ohne Stückliste (Deskmats) —, bekommt
+     seinen Bestand, **nur wo KRNL 0 hat**, Preis vorher (nur wo KRNL 0
+     hat). Die Vorschau zeigt sie als „Weitere Bestände" mit Status
+     buchen/vorhanden/fehlt; „fehlt" heißt: keine KRNL-Variante mit dieser
+     SKU (anlegen oder SKU angleichen, dann erneut übernehmen).
    - **Routen** Fertigen/Auf Auftrag wie in Odoo — nur, wenn jede aktive
      Variante der KRNL-Vorlage eine Stückliste bekommt (sonst liefe eine
      Shopify-Bestellung ins Leere). Ab dann erzeugt jede Shopify-Bestellung
@@ -54,7 +74,11 @@ Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
 3. **Wiederholbar**: ein zweiter Lauf erkennt alles (auch Komponenten ohne
    SKU über die Verweise), legt nichts doppelt an und ersetzt nur eigene
    Stücklisten, die sich in Odoo geändert haben (die alte wird
-   deaktiviert — Fertigungsaufträge verweisen darauf).
+   deaktiviert — Fertigungsaufträge verweisen darauf). Hat ein Artikel eine
+   neue **Form** (z. B. früher je Variante, jetzt eine Stückliste mit
+   Filtern), werden die eigenen Stücklisten der alten Form deaktiviert —
+   sonst gewänne eine Varianten-Stückliste in `resolve_bom` vor der neuen.
+   Die Signatur, an der „unverändert" erkannt wird, enthält die Filter.
 
 Nebenbei korrigiert (0090): `resolve_bom`/`resolve_kit` nahmen für eine
 Variante ohne eigene Stückliste die Varianten-Stückliste einer

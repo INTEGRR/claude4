@@ -9,7 +9,8 @@
  *     Varianten gelten; Routen Fertigen + Auf Auftrag.
  *   - Switch-Tester mit Stückliste für 2 Stück (wird auf 1 normiert).
  *   - Komponenten mit und ohne SKU, eine in Dutzend, eine in kg.
- *   - Ein Lieferant mit Preis, Bestände an internen Lagerorten.
+ *   - Ein Lieferant mit Preis, Bestände an internen Lagerorten — auch von
+ *     Artikeln ohne Stückliste (Deskmat) und vom Fertigprodukt Switch-Tester.
  *
  * Unterstützt search_read/read mit einfachen Domänen (=, in); unbekannte
  * Methoden gibt es nicht — odooLesen weist sie vorher ab.
@@ -43,6 +44,7 @@ const VARIANTE = (
 const T_KB: [number, string] = [100, 'NATIVE 75']
 const T_ST: [number, string] = [200, 'Switch-Tester']
 const T_TEIL: [number, string] = [300, 'Teile']
+const T_ZUB: [number, string] = [400, 'Deskmat']
 
 export const ODOO_FAKE_DATEN: Record<string, Datensatz[]> = {
   'uom.uom': [
@@ -86,6 +88,8 @@ export const ODOO_FAKE_DATEN: Record<string, Datensatz[]> = {
     VARIANTE(15, T_TEIL, 'FAKE-SW-1', 'Switch linear', [], { standard_price: 0.25 }),
     VARIANTE(16, T_TEIL, false, 'Schrauben M2', [], { uom_id: m2o(2, 'Dozens') }),
     VARIANTE(17, T_TEIL, 'FAKE-KLEBER', 'Kleber', [], { uom_id: m2o(4, 'g') }),
+    VARIANTE(20, T_ZUB, 'FAKE-DM-1', 'Deskmat', [], { standard_price: 6 }),
+    VARIANTE(21, T_ZUB, 'FAKE-DM-X', 'Deskmat Sonderedition'),
   ],
   'mrp.bom': [
     { id: 1000, product_tmpl_id: T_KB, product_id: false, product_qty: 1, product_uom_id: m2o(1, 'Units'), type: 'normal', sequence: 1, consumption: 'flexible' },
@@ -110,6 +114,10 @@ export const ODOO_FAKE_DATEN: Record<string, Datensatz[]> = {
     { id: 1, product_id: m2o(15, 'Switch linear'), quantity: 5000, location_id: m2o(8, 'WH/Stock'), location_usage: 'internal' },
     { id: 2, product_id: m2o(13, 'Keycaps ISO-DE'), quantity: 40, location_id: m2o(8, 'WH/Stock'), location_usage: 'internal' },
     { id: 3, product_id: m2o(15, 'Switch linear'), quantity: 999, location_id: m2o(5, 'Partners/Vendors'), location_usage: 'supplier' },
+    { id: 4, product_id: m2o(5, 'Switch-Tester'), quantity: 12, location_id: m2o(8, 'WH/Stock'), location_usage: 'internal' },
+    { id: 5, product_id: m2o(20, 'Deskmat'), quantity: 300, location_id: m2o(8, 'WH/Stock'), location_usage: 'internal' },
+    { id: 6, product_id: m2o(20, 'Deskmat'), quantity: 75, location_id: m2o(9, 'WH/Stock/Regal'), location_usage: 'internal' },
+    { id: 7, product_id: m2o(21, 'Deskmat Sonderedition'), quantity: 4, location_id: m2o(8, 'WH/Stock'), location_usage: 'internal' },
   ],
 }
 

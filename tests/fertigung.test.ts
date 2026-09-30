@@ -138,6 +138,55 @@ describe('Stückliste: Auf Varianten anwenden', () => {
       assert.ok(!comps.some((c) => c.variant_id === s.gehaeuseSchwarz))
     })
   })
+  test('Filter über zwei Attribute: je Attribut ODER, über Attribute UND (0098, wie Odoo)', async () => {
+    await withRollback(async (t) => {
+      const uom = await uomStueck(t)
+      const suffix = `F${++scenarioCounter}`
+      const [tpl] = await t<{ id: string }[]>`
+        insert into product_templates (name, uom_id) values (${`Tastatur ${suffix}`}, ${uom}) returning id`
+      const ptav: Record<string, string> = {}
+      for (const [attr, werte] of [['Farbe', ['Weiß', 'Schwarz']], ['Layout', ['DE', 'US']]] as const) {
+        const [a] = await t<{ id: string }[]>`
+          insert into product_attributes (name) values (${`${attr} ${suffix}`}) returning id`
+        const [l] = await t<{ id: string }[]>`
+          insert into product_template_attribute_lines (template_id, attribute_id) values (${tpl.id}, ${a.id}) returning id`
+        for (const w of werte) {
+          const [v] = await t<{ id: string }[]>`
+            insert into product_attribute_values (attribute_id, name) values (${a.id}, ${w}) returning id`
+          const [p] = await t<{ id: string }[]>`
+            insert into product_template_attribute_values (line_id, value_id) values (${l.id}, ${v.id}) returning id`
+          ptav[w] = p.id
+        }
+      }
+      await t`select generate_variants(${tpl.id})`
+      const varianten = await t<{ id: string; display_name: string }[]>`
+        select id, display_name from product_variants where template_id = ${tpl.id} and active`
+      const variante = (farbe: string, layout: string) =>
+        varianten.find((v) => v.display_name.includes(farbe) && v.display_name.includes(layout))!.id
+
+      const nurWeissDe = await makeProduct(t, `Sonderteil ${suffix}`)
+      const deOderUs = await makeProduct(t, `Keycaps ${suffix}`)
+      const [bom] = await t<{ id: string }[]>`
+        insert into boms (template_id, qty, uom_id) values (${tpl.id}, 1, ${uom}) returning id`
+      const [z1] = await t<{ id: string }[]>`
+        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+        values (${bom.id}, 10, ${nurWeissDe}, 1, ${uom}) returning id`
+      const [z2] = await t<{ id: string }[]>`
+        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+        values (${bom.id}, 20, ${deOderUs}, 1, ${uom}) returning id`
+      await t`insert into bom_line_variant_filters (bom_line_id, ptav_id)
+              values (${z1.id}, ${ptav['Weiß']}), (${z1.id}, ${ptav.DE}),
+                     (${z2.id}, ${ptav.DE}), (${z2.id}, ${ptav.US})`
+
+      const teile = async (v: string) =>
+        (await t<{ component_variant_id: string }[]>`
+          select component_variant_id from bom_components_for_variant(${bom.id}, ${v})`).map((c) => c.component_variant_id)
+      assert.deepEqual(await teile(variante('Weiß', 'DE')), [nurWeissDe, deOderUs])
+      assert.deepEqual(await teile(variante('Weiß', 'US')), [deOderUs], 'Weiß, aber nicht DE')
+      assert.deepEqual(await teile(variante('Schwarz', 'DE')), [deOderUs], 'DE, aber nicht Weiß — bis 0098 galt die Zeile hier')
+      assert.deepEqual(await teile(variante('Schwarz', 'US')), [deOderUs])
+    })
+  })
 })
 
 describe('Fertigungsauftrag', () => {

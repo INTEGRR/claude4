@@ -172,7 +172,8 @@ export default async function BomPage({
         <div className="notice info">
           Dieses Produkt hat Varianten. Positionen ohne Auswahl bei „Auf Varianten anwenden“ gelten für{' '}
           <strong>alle</strong> Varianten; mit Auswahl nur für die passenden — so kommt z. B. das weiße
-          Gehäuse nur in die weiße Tastatur.
+          Gehäuse nur in die weiße Tastatur. Wie in Odoo: je Attribut reicht einer der gewählten Werte, über
+          mehrere Attribute müssen alle passen („Plate: PC" und „Layout: ISO").
         </div>
       )}
 

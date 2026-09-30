@@ -275,7 +275,11 @@ Pakete je Drucker ersetzen.
 1. Einstellungen → Versand & Druck: den Druckweg auf **Druckbrücke**
    stellen (erzeugt das Agent-Token).
 2. Einstellungen → Arbeitsplätze & Drucker: Plätze, Drucker und Wege
-   anlegen; an der Druckerzeile **„Paket laden"**
+   anlegen; das Paket gibt es oben auf der Seite in der Karte
+   **„Druckbrücke einrichten — ein Paket je Drucker"** (drei Schritte,
+   ein Knopf „Paket herunterladen" je aktivem Drucker, Warnung, wenn der
+   Windows-Druckername fehlt) und an der Druckerzeile in der Spalte
+   „Paket"
    (`GET /api/druck/paket?drucker_id=…`, nur Administratoren — es enthält
    das Token). Darin: `druck-agent.ps1` (Windows-Agent, unverändert aus
    `scripts/`), `druckbruecke-starten.cmd` mit Adresse, Token,
