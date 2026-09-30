@@ -19,7 +19,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function POST(request: Request) {
   const user = await currentUser()
-  if (!user || !canWrite(user.role, 'einkauf', user.befugnisse)) {
+  if (!user || !canWrite(user.rollen, 'einkauf', user.befugnisse)) {
     return NextResponse.json({ error: 'Hochladen braucht Schreibrechte im Einkauf' }, { status: 401 })
   }
   const url = new URL(request.url)

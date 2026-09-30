@@ -15,7 +15,7 @@ export async function notizAnlegen(
   // Lese-Rollen) — deshalb die canAccess-Prüfung hier statt der
   // canWrite-Prüfung des Torwächters (der prüft den Bereich 'fehler',
   // den jede Rolle schreiben darf).
-  if (!canAccess(ctx.role, ziel.bereich)) {
+  if (!canAccess(ctx.rollen ?? ctx.role, ziel.bereich)) {
     throw new Error('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
 

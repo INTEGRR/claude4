@@ -28,7 +28,7 @@ export default async function AssistentPage({
   >`
     select name, beschreibung, bereich from prozesse
     where code = ${code} and aktiv and modell is null`
-  if (!prozess || !canAccess(user.role, prozess.bereich)) notFound()
+  if (!prozess || !canAccess(user.rollen, prozess.bereich)) notFound()
 
   const STATUS_TEXT: Record<string, string> = {
     laufend: 'läuft',
@@ -59,7 +59,7 @@ export default async function AssistentPage({
         title={prozess.name}
         subtitle={prozess.beschreibung ?? 'Assistent'}
         actions={
-          canWrite(user.role, prozess.bereich) ? (
+          canWrite(user.rollen, prozess.bereich) ? (
             <ActionButton className="primary" action={instanzStarten.bind(null, code)}>
               Assistent starten
             </ActionButton>

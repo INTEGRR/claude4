@@ -44,7 +44,7 @@ export interface PacktischDoc {
 
 export async function GET(request: Request) {
   const user = await currentUser()
-  if (!user || !canWrite(user.role, 'versand', user.befugnisse)) {
+  if (!user || !canWrite(user.rollen, 'versand', user.befugnisse)) {
     return NextResponse.json({ error: 'Der Packtisch braucht Schreibrechte im Versand' }, {
       status: 401,
     })

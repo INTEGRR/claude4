@@ -19,7 +19,7 @@ Ereignis-Monitor (`/integrationen`).
 | Gruppe | Bereich | Pfad | Was | Gespeichert in | Registry-Aktion(en) |
 |---|---|---|---|---|---|
 | Organisation | Firma | `/einstellungen` | Firmendaten = Absender auf Labels, Belegen, Mails; „Einrichtung erneut ansehen" | `settings.company` | `einstellungen.firma_speichern` |
-| | Benutzer | `/einstellungen/benutzer` | Konten, Rollen, Befugnisse, Passwort- und 2FA-Reset | `users` | `einstellungen.benutzer_*` |
+| | Benutzer | `/einstellungen/benutzer` | Konten (E-Mail oder Benutzername), Hauptrolle + Zusatzrollen, Befugnisse, Passwort- und 2FA-Reset | `users` | `einstellungen.benutzer_*` |
 | | Sicherheit | `/einstellungen/sicherheit` | Pflicht für den zweiten Faktor, Konten ohne 2FA, Regeln der Anmeldung (Info) | `settings.sicherheit` | `einstellungen.sicherheit_setzen` |
 | | Stammdaten | `/einstellungen/stammdaten` | Produktkategorien, Steuern, Zahlungsbedingungen, Tags (löschen mit Rückfrage) | `product_categories`, `taxes`, `payment_terms`, `tags` | `einstellungen.kategorie_anlegen`, `…steuer_anlegen`, `…zahlungsbedingung_anlegen`, `…tag_loeschen` |
 | Abläufe | Belege & Freigaben | `/einstellungen/belege` | Sperren beim Bestätigen, Freigabegrenze Einkauf, Nummernkreise (nur lesen) | `settings.sales`, `settings.purchase`, `settings.freigaben` | `einstellungen.belegverhalten_setzen`, `einstellungen.freigaben_setzen` |

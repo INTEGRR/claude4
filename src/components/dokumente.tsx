@@ -52,7 +52,7 @@ export async function DokumenteKarte({
     order by d.created_at desc`
   const bereit = driveKonfiguriert()
   const user = await currentUser()
-  const darf = Boolean(user && canWrite(user.role, 'einkauf', user.befugnisse))
+  const darf = Boolean(user && canWrite(user.rollen, 'einkauf', user.befugnisse))
 
   return (
     <Card title={`${titel} (${dokumente.length})`} tight>

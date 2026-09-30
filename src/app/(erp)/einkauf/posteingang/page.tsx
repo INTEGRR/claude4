@@ -102,7 +102,7 @@ export default async function PosteingangPage({
   ])
   const z = zahlen[0]
   const zaehler: Partial<Record<Ansicht, number>> = { offen: z.offen, uns: z.uns, ohne: z.ohne, meine: z.meine }
-  const darf = canWrite(user.role, 'einkauf', user.befugnisse)
+  const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
   const angebunden = postfachKonfiguriert()
 
   return (

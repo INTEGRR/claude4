@@ -81,9 +81,12 @@ export async function sitzungErstellen(
 
 export interface SitzungsNutzer {
   id: string
-  email: string
+  email: string | null
+  benutzername: string | null
   name: string
   role: string
+  /** Zusatzrollen (0096) — Rechte = Vereinigung mit der Hauptrolle. */
+  zusatz_rollen: string[]
   befugnisse: string[]
   totp_aktiv: boolean
 }
@@ -91,7 +94,8 @@ export interface SitzungsNutzer {
 /** Der Benutzer einer BESTÄTIGTEN, gültigen Sitzung — was currentUser() liefert. */
 export async function sitzungNutzer(db: Db, hash: string): Promise<SitzungsNutzer | null> {
   const [row] = await db<SitzungsNutzer[]>`
-    select u.id, u.email, u.name, u.role, u.befugnisse, u.totp_aktiviert_at is not null as totp_aktiv
+    select u.id, u.email, u.benutzername, u.name, u.role, u.zusatz_rollen::text[] as zusatz_rollen, u.befugnisse,
+           u.totp_aktiviert_at is not null as totp_aktiv
     from sessions s join users u on u.id = s.user_id
     where s.token = ${hash} and s.expires_at > now() and s.zweiter_faktor_ok and u.active`
   return row ?? null
@@ -99,6 +103,7 @@ export async function sitzungNutzer(db: Db, hash: string): Promise<SitzungsNutze
 
 export interface WartendeSitzung {
   user_id: string
+  /** Kennung des Kontos: E-Mail oder — ohne E-Mail — Benutzername (0096). */
   email: string
   name: string
   role: string
@@ -110,7 +115,7 @@ export interface WartendeSitzung {
 /** Die wartende Sitzung hinter einem Cookie — für die Code- und Einrichtungsseite. */
 export async function wartendeSitzung(db: Db, hash: string): Promise<WartendeSitzung | null> {
   const [row] = await db<(Omit<WartendeSitzung, 'entwurf'> & { entwurf: string | null })[]>`
-    select s.user_id, u.email, u.name, u.role,
+    select s.user_id, coalesce(u.email, u.benutzername) as email, u.name, u.role,
            u.totp_aktiviert_at is not null as totp_aktiv, s.entwurf
     from sessions s join users u on u.id = s.user_id
     where s.token = ${hash} and s.expires_at > now() and not s.zweiter_faktor_ok and u.active`

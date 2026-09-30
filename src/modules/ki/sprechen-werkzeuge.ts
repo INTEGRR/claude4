@@ -122,7 +122,7 @@ async function ausfuehren(
       // Sofort prüfen (Schema + Rechte), damit die Stimme Lücken direkt
       // meldet — gespeichert wird nur die Absicht, gebucht wird nichts.
       const { aktion: registriert } = registryPruefen(aktion, { parameter, recordId })
-      if (!aktionErlaubt(registriert, nutzer.role, nutzer.befugnisse)) {
+      if (!aktionErlaubt(registriert, nutzer.rollen ?? nutzer.role, nutzer.befugnisse)) {
         throw new AktionsFehler(
           `Dafür fehlt die Berechtigung („${registriert.label}") — der Vorgang wird nicht notiert.`,
         )
@@ -152,7 +152,7 @@ async function ausfuehren(
         .filter((a) => passt(a.name) || passt(a.label) || passt(a.beschreibung))
         .filter((a) => {
           const def = registrierteAktion(a.name)
-          return def ? aktionErlaubt(def, nutzer.role, nutzer.befugnisse) : false
+          return def ? aktionErlaubt(def, nutzer.rollen ?? nutzer.role, nutzer.befugnisse) : false
         })
         .map((a) => ({ name: a.name, label: a.label, beschreibung: a.beschreibung, felder: a.felder }))
         .slice(0, 5)

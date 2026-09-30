@@ -63,7 +63,7 @@ export default async function EinrichtungPage({
       select code, name, beschreibung from prozess_pakete order by code`,
     sql<{ value: Record<string, string> }[]>`select value from settings where key = 'company'`,
     sql<{ id: string; name: string; email: string; role: string }[]>`
-      select id, name, email, role from users where active order by created_at`,
+      select id, name, coalesce(email, benutzername) as email, role from users where active order by created_at`,
     sql<{ migrationen: number; module: number }[]>`
       select (select count(*)::int from schema_migrations) as migrationen,
              (select count(distinct bereich)::int from prozesse) as module`,

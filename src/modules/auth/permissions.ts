@@ -15,6 +15,33 @@
 
 export type Role = 'admin' | 'mitarbeiter' | 'lager' | 'fertigung'
 
+/**
+ * Ein Benutzer hat eine Hauptrolle und beliebig viele Zusatzrollen (0096 —
+ * wer im Lager UND in der Fertigung arbeitet, bekommt beide). Die
+ * Rechteprüfungen nehmen deshalb eine Rolle oder eine Rollenliste; es gilt
+ * die Vereinigung. Administrator ist nur als Hauptrolle vorgesehen.
+ */
+export type Rollen = Role | readonly Role[]
+
+export function rollenListe(rollen: Rollen): readonly Role[] {
+  return typeof rollen === 'string' ? [rollen] : rollen
+}
+
+export function hatRolle(rollen: Rollen, rolle: Role): boolean {
+  return rollenListe(rollen).includes(rolle)
+}
+
+/**
+ * Beschränkt ein Prozessschritt auf Rollen (prozess_schritte.rollen), reicht
+ * EINE der Rollen des Benutzers; Administratoren bestehen immer, keine
+ * Beschränkung heißt frei.
+ */
+export function schrittRollenErfuellt(rollen: Rollen, schrittRollen: readonly string[] | null | undefined): boolean {
+  if (hatRolle(rollen, 'admin')) return true
+  if (!schrittRollen || schrittRollen.length === 0) return true
+  return rollenListe(rollen).some((r) => schrittRollen.includes(r))
+}
+
 export type Area =
   | 'verkauf'
   | 'einkauf'
@@ -69,16 +96,16 @@ const BEFUGNIS_AREAS: Partial<Record<Area, Befugnis>> = {
   finanzen: 'finanzen:zugriff',
 }
 
-export function canAccess(role: Role, area: Area, befugnisse: readonly string[] = []): boolean {
+export function canAccess(rollen: Rollen, area: Area, befugnisse: readonly string[] = []): boolean {
   const noetig = BEFUGNIS_AREAS[area]
-  if (noetig) return role === 'admin' || befugnisse.includes(noetig)
-  return WRITE_AREAS[role].includes(area) || READ_AREAS[role].includes(area)
+  if (noetig) return hatRolle(rollen, 'admin') || befugnisse.includes(noetig)
+  return rollenListe(rollen).some((r) => WRITE_AREAS[r].includes(area) || READ_AREAS[r].includes(area))
 }
 
-export function canWrite(role: Role, area: Area, befugnisse: readonly string[] = []): boolean {
+export function canWrite(rollen: Rollen, area: Area, befugnisse: readonly string[] = []): boolean {
   const noetig = BEFUGNIS_AREAS[area]
-  if (noetig) return role === 'admin' || befugnisse.includes(noetig)
-  return WRITE_AREAS[role].includes(area)
+  if (noetig) return hatRolle(rollen, 'admin') || befugnisse.includes(noetig)
+  return rollenListe(rollen).some((r) => WRITE_AREAS[r].includes(area))
 }
 
 export const ROLE_LABELS: Record<Role, string> = {

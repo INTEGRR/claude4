@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
  */
 export default async function ZeiterfassungPage() {
   const user = await requireArea('zeiterfassung')
-  const sieht = (bereich: Parameters<typeof canAccess>[1]) => canAccess(user.role, bereich)
+  const sieht = (bereich: Parameters<typeof canAccess>[1]) => canAccess(user.rollen, bereich)
 
   const anwesend = await sql<
     {

@@ -48,7 +48,7 @@ export default async function AssistentLaufPage({
     from prozess_instanzen i
     join prozesse p on p.id = i.prozess_id
     where i.id = ${instanzId} and p.code = ${code} and p.modell is null`
-  if (!kopf || !canAccess(user.role, kopf.bereich)) notFound()
+  if (!kopf || !canAccess(user.rollen, kopf.bereich)) notFound()
 
   const schritte = await sql<FlowSchritt[]>`
     select s.code, s.name, s.art::text as art, s.optional,
@@ -67,10 +67,10 @@ export default async function AssistentLaufPage({
 
   const diagramm = await flowLayout(schritte, kanten, kopf.schritt_code)
   const laufend = kopf.status === 'laufend'
-  const darfSchreiben = canWrite(user.role, kopf.bereich)
+  const darfSchreiben = canWrite(user.rollen, kopf.bereich)
 
   const { angebote, passiv } = laufend
-    ? await naechsteAngebote(code, kopf.id, user.role)
+    ? await naechsteAngebote(code, kopf.id, user.rollen)
     : { angebote: [], passiv: [] }
 
   // Direkt abschließbar? (Kante vom aktuellen Schritt zu einem Ende)

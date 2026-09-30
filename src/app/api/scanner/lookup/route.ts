@@ -33,7 +33,7 @@ export interface ScannerDoc {
 
 export async function GET(request: Request) {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'scanner')) {
+  if (!user || !canAccess(user.rollen, 'scanner')) {
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
   }
 
@@ -42,8 +42,8 @@ export async function GET(request: Request) {
 
   // Lager-Rolle bucht Transfers, Fertigungs-Rolle Fertigungsaufträge;
   // admin und mitarbeiter dürfen beides.
-  const darfPicking = canWrite(user.role, 'lager')
-  const darfMo = canWrite(user.role, 'fertigung')
+  const darfPicking = canWrite(user.rollen, 'lager')
+  const darfMo = canWrite(user.rollen, 'fertigung')
 
   const [picking] = await sql<
     { id: string; number: string; state: string; kind: string; origin_label: string | null }[]

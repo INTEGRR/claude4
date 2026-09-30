@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { type Role, canWrite } from '../auth/permissions.ts'
+import { type Role, type Rollen, canWrite, hatRolle, schrittRollenErfuellt } from '../auth/permissions.ts'
 import { type AktionsErgebnis, type RegistrierteAktion, UUID_MUSTER } from './registry/typen.ts'
 import { REGISTRY, registrierteAktion } from './registry/index.ts'
 
@@ -73,11 +73,11 @@ export function aktionPruefen(
 /** Rechteprüfung als eigene, pure Funktion — je Rolle testbar. */
 export function aktionErlaubt(
   aktion: RegistrierteAktion,
-  role: Role,
+  rollen: Rollen,
   befugnisse: readonly string[] = [],
 ): boolean {
-  if (aktion.nurAdmin) return role === 'admin'
-  return canWrite(role, aktion.bereich, befugnisse)
+  if (aktion.nurAdmin) return hatRolle(rollen, 'admin')
+  return canWrite(rollen, aktion.bereich, befugnisse)
 }
 
 /**
@@ -91,9 +91,10 @@ export function aktionErlaubt(
 async function schrittRechtePruefen(
   aktionsName: string,
   label: string,
-  nutzer: { role: Role; befugnisse?: string[] },
+  nutzer: { role: Role; rollen?: readonly Role[]; befugnisse?: string[] },
 ): Promise<void> {
-  if (nutzer.role === 'admin') return
+  const rollen = nutzer.rollen ?? nutzer.role
+  if (hatRolle(rollen, 'admin')) return
   const { sql } = await import('@/db/client')
   const { BEFUGNISSE } = await import('../auth/permissions.ts')
 
@@ -118,7 +119,7 @@ async function schrittRechtePruefen(
 
   const besteht = mitAnforderung.some(
     (s) =>
-      (!s.rollen || s.rollen.length === 0 || s.rollen.includes(nutzer.role)) &&
+      schrittRollenErfuellt(rollen, s.rollen) &&
       (!s.befugnis || (nutzer.befugnisse ?? []).includes(s.befugnis)),
   )
   if (!besteht) {
@@ -142,11 +143,11 @@ async function schrittRechtePruefen(
 export async function aktionAusfuehrenGeprueft(
   name: string,
   aufruf: AktionsAufruf,
-  nutzer: { name: string; role: Role; id?: string; befugnisse?: string[] },
+  nutzer: { name: string; role: Role; rollen?: readonly Role[]; id?: string; befugnisse?: string[] },
 ): Promise<AktionsErgebnis> {
   const { aktion, werte, recordId } = aktionPruefen(name, aufruf)
 
-  if (!aktionErlaubt(aktion, nutzer.role, nutzer.befugnisse)) {
+  if (!aktionErlaubt(aktion, nutzer.rollen ?? nutzer.role, nutzer.befugnisse)) {
     throw new RechteFehler(
       aktion.nurAdmin
         ? `„${aktion.label}" ist Administratoren vorbehalten`
@@ -184,6 +185,7 @@ export async function aktionAusfuehrenGeprueft(
       (await fn(werte as never, {
         actor: nutzer.name,
         role: nutzer.role,
+        rollen: nutzer.rollen ? [...nutzer.rollen] : [nutzer.role],
         recordId,
         userId: nutzer.id,
         arbeitsplatzId:

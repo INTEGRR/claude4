@@ -108,7 +108,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const counts = await badges()
   // Geöffnete Navigationsgruppen des Benutzers (0095) — Standard: alles zu.
   const [navZustand] = await sql<{ nav_offen: string[] }[]>`select nav_offen from users where id = ${user.id}`
-  const sees = (area: Area) => canAccess(user.role, area, user.befugnisse)
+  const sees = (area: Area) => canAccess(user.rollen, area, user.befugnisse)
 
   const [company] = await sql<{ name: string }[]>`
     select value ->> 'name' as name from settings where key = 'company'`
@@ -159,7 +159,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   // Befehlsfeld überall (Strg/Cmd+K): derselbe Katalog wie auf der Übersicht,
   // plus das Lern-Gedächtnis dieses Benutzers fürs Ranking.
-  const befehle = befehlsKatalog(user.role, prozessAktiv, user.befugnisse, laufzeitProzesse)
+  const befehle = befehlsKatalog(user.rollen, prozessAktiv, user.befugnisse, laufzeitProzesse)
   const nutzung = await sql<{ schluessel: string; anzahl: number }[]>`
     select schluessel, anzahl from nutzungs_zaehler
     where user_id = ${user.id} order by anzahl desc limit 40`
@@ -370,7 +370,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             <div className="small muted" style={{ marginBottom: 8, lineHeight: 1.4 }}>
               {user.name}
               <br />
-              <span className="mono-label">{ROLE_LABELS[user.role]}</span>
+              <span className="mono-label">{user.rollen.map((r) => ROLE_LABELS[r]).join(' + ')}</span>
               <br />
               <Link className="small" href="/konto">Konto &amp; Sicherheit</Link>
             </div>

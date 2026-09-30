@@ -25,7 +25,7 @@ function ablageBereit() {
 /** Beleg existiert und der Nutzer darf dessen Bereich sehen. */
 export async function belegPruefen(modell: DokumentModell, recordId: string, ctx: AktionsKontext) {
   const ziel = DOKUMENT_MODELLE[modell]
-  if (!canAccess(ctx.role, ziel.bereich)) {
+  if (!canAccess(ctx.rollen ?? ctx.role, ziel.bereich)) {
     throw new Error(`Für ${ziel.label} fehlt Ihrer Rolle die Berechtigung.`)
   }
   const [da] = await sql`select 1 from ${sql(ziel.tabelle)} where id = ${recordId}`

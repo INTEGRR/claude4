@@ -34,7 +34,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const { id } = await params
   // Zahlungskonditionen sind Finanzsache: die Zahlplan-Karte sieht nur, wer
   // den Finanzbereich betreten darf (Admin oder Befugnis finanzen:zugriff).
-  const darfFinanzen = canAccess(user.role, 'finanzen', user.befugnisse)
+  const darfFinanzen = canAccess(user.rollen, 'finanzen', user.befugnisse)
 
   const [order] = await sql<
     {

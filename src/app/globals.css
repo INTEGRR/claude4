@@ -503,7 +503,7 @@ input[type='checkbox'], input[type='radio'] { width: auto; accent-color: var(--a
 input[type='date'], input[type='number'] { font-variant-numeric: tabular-nums; }
 
 label.field { display: block; margin-bottom: 12px; }
-label.field > span {
+label.field > span, .field > .feld-titel {
   display: block;
   font-family: var(--font-mono), monospace;
   font-size: 10px;

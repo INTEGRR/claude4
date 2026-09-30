@@ -11,7 +11,7 @@ import { sql } from '@/db/client'
  */
 export async function POST(request: Request) {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'ki')) {
+  if (!user || !canAccess(user.rollen, 'ki')) {
     return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 401 })
   }
 

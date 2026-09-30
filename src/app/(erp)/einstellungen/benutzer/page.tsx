@@ -9,6 +9,9 @@ import { createUser, resetPassword, resetZweiFaktor, setActive, setBefugnisse, s
 
 export const dynamic = 'force-dynamic'
 
+/** Als Zusatzrolle wählbar — Administrator nur als Hauptrolle (0096). */
+const ZUSATZ_ROLLEN: Role[] = ['mitarbeiter', 'lager', 'fertigung']
+
 export default async function BenutzerPage() {
   await requireArea('einstellungen')
   const admin = await requireAdmin()
@@ -16,15 +19,18 @@ export default async function BenutzerPage() {
   const users = await sql<
     {
       id: string
-      email: string
+      email: string | null
+      benutzername: string | null
       name: string
       role: Role
+      zusatz_rollen: Role[]
       befugnisse: string[]
       active: boolean
       created_at: string
       totp_aktiviert_at: string | null
     }[]
-  >`select id, email, name, role, befugnisse, active, created_at, totp_aktiviert_at
+  >`select id, email, benutzername, name, role, zusatz_rollen::text[] as zusatz_rollen, befugnisse, active,
+           created_at, totp_aktiviert_at
     from users order by created_at`
 
   const activeAdmins = users.filter((u) => u.role === 'admin' && u.active).length
@@ -39,8 +45,8 @@ export default async function BenutzerPage() {
             <thead>
               <tr>
                 <th>Name</th>
-                <th>E-Mail</th>
-                <th>Rolle</th>
+                <th>Anmeldung</th>
+                <th>Rollen</th>
                 <th>Befugnisse</th>
                 <th>Status</th>
                 <th>2FA</th>
@@ -57,7 +63,11 @@ export default async function BenutzerPage() {
                       {u.name}
                       {u.id === admin.id && <span className="muted small"> (Sie)</span>}
                     </td>
-                    <td className="mono small">{u.email}</td>
+                    <td className="mono small">
+                      {u.email ?? u.benutzername}
+                      {u.email && u.benutzername && <div className="muted">{u.benutzername}</div>}
+                      {!u.email && <div className="muted" style={{ fontFamily: 'inherit' }}>ohne E-Mail</div>}
+                    </td>
                     <td>
                       {lastAdmin ? (
                         // Gesperrter Zustand sichtbar machen, nicht nur im title-Attribut.
@@ -72,12 +82,30 @@ export default async function BenutzerPage() {
                         </>
                       ) : (
                         <ActionForm action={setRole.bind(null, u.id)}>
-                          <div className="row">
-                            <select name="role" defaultValue={u.role} className="small">
-                              {ALL_ROLES.map((r) => (
-                                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                              ))}
-                            </select>
+                          <input type="hidden" name="zusatz_gezeigt" value="1" />
+                          <div className="row" style={{ alignItems: 'flex-start' }}>
+                            <div>
+                              <select name="role" defaultValue={u.role} className="small" aria-label="Hauptrolle">
+                                {ALL_ROLES.map((r) => (
+                                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                                ))}
+                              </select>
+                              {u.role !== 'admin' && (
+                                <div style={{ marginTop: 4 }}>
+                                  {ZUSATZ_ROLLEN.filter((r) => r !== u.role).map((r) => (
+                                    <label key={r} className="small" style={{ display: 'block' }}>
+                                      <input
+                                        type="checkbox"
+                                        name="zusatz_rollen"
+                                        value={r}
+                                        defaultChecked={u.zusatz_rollen.includes(r)}
+                                      />{' '}
+                                      + {ROLE_LABELS[r]}
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                             <div className="shrink">
                               <button className="small" type="submit">Ändern</button>
                             </div>
@@ -192,25 +220,43 @@ export default async function BenutzerPage() {
               <input name="name" required />
             </label>
             <label className="field">
-              <span>E-Mail</span>
-              <input type="email" name="email" required />
+              <span>E-Mail (optional)</span>
+              <input type="email" name="email" />
+            </label>
+            <label className="field">
+              <span>Benutzername (ohne E-Mail)</span>
+              <input name="benutzername" className="mono" placeholder="z. B. max.m" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,39}" />
             </label>
             <label className="field">
               <span>Passwort</span>
               <input type="password" name="password" minLength={8} required />
             </label>
             <label className="field">
-              <span>Rolle</span>
+              <span>Hauptrolle</span>
               <select name="role" defaultValue="mitarbeiter">
                 {ALL_ROLES.map((r) => (
                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                 ))}
               </select>
             </label>
+            <div className="field">
+              <span className="feld-titel">Zusatzrollen</span>
+              <div>
+                {ZUSATZ_ROLLEN.map((r) => (
+                  <label key={r} className="small" style={{ display: 'block' }}>
+                    <input type="checkbox" name="zusatz_rollen" value={r} /> + {ROLE_LABELS[r]}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="shrink field">
               <button className="primary" type="submit">Anlegen</button>
             </div>
           </div>
+          <p className="small muted" style={{ margin: '8px 0 0' }}>
+            Wer keine E-Mail-Adresse hat, bekommt einen Benutzernamen und meldet sich damit an. Mehrere
+            Rollen: z. B. Hauptrolle Lager + Zusatzrolle Fertigung — die Rechte addieren sich.
+          </p>
         </ActionForm>
       </Card>
     </>

@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 export default async function BillPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireArea('einkauf')
   const { id } = await params
-  const darfFinanzen = canAccess(user.role, 'finanzen', user.befugnisse)
+  const darfFinanzen = canAccess(user.rollen, 'finanzen', user.befugnisse)
 
   const [bill] = await sql<
     {

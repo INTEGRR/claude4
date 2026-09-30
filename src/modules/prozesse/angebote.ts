@@ -1,5 +1,5 @@
 import { sql } from '@/db/client'
-import type { Role } from '../auth/permissions.ts'
+import { type Rollen, hatRolle, schrittRollenErfuellt } from '../auth/permissions.ts'
 import { registrierteAktion } from './registry/index.ts'
 import { formularFelder } from './schema-felder.ts'
 import { aktionErlaubt } from './torwaechter.ts'
@@ -200,7 +200,7 @@ export async function startAngebot(
 export async function naechsteAngebote(
   prozessCode: string,
   recordId: string,
-  rolle: Role,
+  rolle: Rollen,
   befugnisse: string[] = [],
 ): Promise<NaechsteSchritte> {
   // Ist-Werte des Belegs — die Schrittformulare zeigen sie als Vorbelegung.
@@ -282,8 +282,8 @@ export async function naechsteAngebote(
     const befugnis = befugnisJeSchritt.get(s.code) ?? null
     const erlaubt =
       aktionErlaubt(eintrag, rolle, befugnisse) &&
-      (rolle === 'admin' ||
-        ((!s.rollen || s.rollen.length === 0 || s.rollen.includes(rolle)) &&
+      (hatRolle(rolle, 'admin') ||
+        (schrittRollenErfuellt(rolle, s.rollen) &&
           (!befugnis || befugnisse.includes(befugnis))))
     angebote.push({
       code: s.code,

@@ -90,7 +90,7 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
   const gewaehlt = new Set(e.anhang_dokument_ids)
   const summe = kandidaten.filter((k) => gewaehlt.has(k.id)).reduce((a, k) => a + (k.groesse ?? 0), 0)
   const offen = offenePlatzhalter(`${e.betreff}\n${versandText(e)}`)
-  const darf = canWrite(user.role, 'einkauf', user.befugnisse)
+  const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
   const bearbeitbar = darf && e.status === 'entwurf'
   const zielName = SPRACHEN[e.sprache]
   const ki = uebersetzungMoeglich()
@@ -288,7 +288,7 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
         </Card>
       )}
 
-      <ProzessPanel prozessCode="mail_versand" recordId={id} rolle={user.role} befugnisse={user.befugnisse} nurDiagramm />
+      <ProzessPanel prozessCode="mail_versand" recordId={id} rolle={user.rollen} befugnisse={user.befugnisse} nurDiagramm />
       <RecordComments model="mail_entwurf" recordId={id} path={`/einkauf/entwuerfe/${id}`} />
     </>
   )

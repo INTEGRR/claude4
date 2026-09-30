@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function ScannerPage() {
   const user = await requireArea('scanner')
-  const canPickings = canWrite(user.role, 'lager')
-  const canMos = canWrite(user.role, 'fertigung')
+  const canPickings = canWrite(user.rollen, 'lager')
+  const canMos = canWrite(user.rollen, 'fertigung')
 
   return (
     <>

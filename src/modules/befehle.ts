@@ -1,4 +1,4 @@
-import type { Area, Role } from './auth/permissions'
+import type { Area, Rollen } from './auth/permissions'
 import { canAccess } from './auth/permissions'
 import { REGISTRY } from './prozesse/registry'
 import { aktionErlaubt } from './prozesse/torwaechter'
@@ -95,7 +95,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
 ]
 
 export function befehlsKatalog(
-  role: Role,
+  role: Rollen,
   prozessAktiv: (bereich: string) => boolean,
   befugnisse: readonly string[] = [],
   /**

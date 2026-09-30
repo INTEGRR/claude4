@@ -58,7 +58,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   if (!e) notFound()
 
   const users = await sql<{ id: string; label: string }[]>`
-    select id, name || ' · ' || email as label from users order by name`
+    select id, name || ' · ' || coalesce(email, benutzername) as label from users order by name`
 
   const [monat] = await sql<{ minutes: number; auftragszeit: number }[]>`
     select employee_minutes(${id}, date_trunc('month', current_date)::date, current_date) as minutes,

@@ -61,9 +61,14 @@ const GERAET_COOKIE = 'erp_geraet'
 export type { Area, Role } from './permissions'
 export interface User {
   id: string
-  email: string
+  /** Seit 0096 optional — Lager- und Fertigungsleute melden sich mit Benutzernamen an. */
+  email: string | null
+  benutzername: string | null
   name: string
+  /** Hauptrolle (Beschriftung, Startseite, Pflicht zum zweiten Faktor). */
   role: Role
+  /** Hauptrolle plus Zusatzrollen — DAS geht in die Rechteprüfungen (canAccess/canWrite). */
+  rollen: Role[]
   /** Personengebundene Zusatzrechte (z. B. einkauf:freigabe), siehe permissions.ts. */
   befugnisse: string[]
   /** Zweiter Faktor eingerichtet? Das Layout-Tor schickt Pflichtige ohne ihn zur Einrichtung. */
@@ -195,7 +200,9 @@ async function sperreMelden(kontoHash: string, konto: string): Promise<void> {
   )
 }
 
-export async function login(email: string, password: string): Promise<LoginErgebnis> {
+export async function login(kennung: string, password: string): Promise<LoginErgebnis> {
+  // Kennung = E-Mail oder Benutzername (0096).
+  const email = kennung.trim()
   // Drossel VOR der Prüfung: ein gesperrtes Konto bekommt keine Antwort
   // darauf, ob das Passwort gestimmt hätte (Entscheidungslog 2026-09-18).
   const konto = kennungHash(email)
@@ -208,16 +215,19 @@ export async function login(email: string, password: string): Promise<LoginErgeb
   const [row] = await sql<
     {
       id: string
-      email: string
+      email: string | null
+      benutzername: string | null
       name: string
       role: Role
+      zusatz_rollen: Role[]
       befugnisse: string[]
       password_hash: string
       totp_aktiv: boolean
     }[]
-  >`select id, email, name, role, befugnisse, password_hash,
+  >`select id, email, benutzername, name, role, zusatz_rollen::text[] as zusatz_rollen, befugnisse, password_hash,
            totp_aktiviert_at is not null as totp_aktiv
-    from users where lower(email) = lower(${email}) and active`
+    from users
+    where (lower(email) = lower(${email}) or lower(benutzername) = lower(${email})) and active`
   if (!row) {
     // Gleichbleibende Antwortzeit, damit unbekannte Konten nicht auffallen.
     await scrypt(password, randomBytes(16), 64)
@@ -235,8 +245,10 @@ export async function login(email: string, password: string): Promise<LoginErgeb
   const user: User = {
     id: row.id,
     email: row.email,
+    benutzername: row.benutzername,
     name: row.name,
     role: row.role,
+    rollen: rollenVon(row.role, row.zusatz_rollen),
     befugnisse: row.befugnisse,
     totpAktiv: row.totp_aktiv,
   }
@@ -289,11 +301,18 @@ export async function currentUser(): Promise<User | null> {
   return {
     id: row.id,
     email: row.email,
+    benutzername: row.benutzername,
     name: row.name,
     role: row.role as Role,
+    rollen: rollenVon(row.role as Role, row.zusatz_rollen as Role[]),
     befugnisse: row.befugnisse,
     totpAktiv: row.totp_aktiv,
   }
+}
+
+/** Hauptrolle zuerst, dann die Zusatzrollen ohne Doppel. */
+export function rollenVon(role: Role, zusatz: readonly Role[] | null | undefined): Role[] {
+  return [role, ...(zusatz ?? []).filter((r) => r !== role)]
 }
 
 /** Wie currentUser, leitet aber unangemeldete Besucher zum Login. */
@@ -317,14 +336,14 @@ export async function requireAdmin(): Promise<User> {
  */
 export async function requireArea(area: Area): Promise<User> {
   const user = await requireUser()
-  if (!canAccess(user.role, area, user.befugnisse)) redirect('/?verweigert=' + area)
+  if (!canAccess(user.rollen, area, user.befugnisse)) redirect('/?verweigert=' + area)
   return user
 }
 
 /** Für Server Actions: wirft, wenn die Rolle im Bereich nicht arbeiten darf. */
 export async function requireWrite(area: Area): Promise<User> {
   const user = await requireUser()
-  if (!canWrite(user.role, area, user.befugnisse)) {
+  if (!canWrite(user.rollen, area, user.befugnisse)) {
     throw new Error('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
   return user
@@ -436,7 +455,7 @@ export async function einrichtungKontext(): Promise<EinrichtungsKontext | null> 
   const user = await currentUser()
   if (!user) return null
   if (user.totpAktiv) return { art: 'fertig' }
-  return { art: 'einrichten', email: user.email, name: user.name, secret: await entwurfSicherstellen(sql, hash) }
+  return { art: 'einrichten', email: user.email ?? user.benutzername ?? user.name, name: user.name, secret: await entwurfSicherstellen(sql, hash) }
 }
 
 /**
@@ -453,7 +472,7 @@ export async function einrichtungAbschliessen(code: string): Promise<FaktorErgeb
   const wartend = await wartendeSitzung(sql, hash)
   const voll = wartend ? null : await currentUser()
   const userId = wartend?.user_id ?? voll?.id
-  const email = wartend?.email ?? voll?.email
+  const email = wartend?.email ?? voll?.email ?? voll?.benutzername
   const name = wartend?.name ?? voll?.name
   if (!userId || !email || !name) return 'keine_sitzung'
   if (wartend?.totp_aktiv || voll?.totpAktiv) return 'nicht_eingerichtet'

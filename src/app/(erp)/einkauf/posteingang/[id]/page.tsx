@@ -113,7 +113,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
   ])
 
   const ki = uebersetzungMoeglich()
-  const darf = canWrite(user.role, 'einkauf', user.befugnisse)
+  const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
   const ersterEingang = nachrichten.find((n) => n.richtung === 'eingang' && n.von?.includes('@'))
   const kennungRoh = ersterEingang?.von ? absenderKennung(ersterEingang.von) : null
   // Schon in einer Lieferantenakte hinterlegt → nichts mehr zu merken.

@@ -44,7 +44,7 @@ export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partner
     order by t.letzte_am desc nulls last
     limit 30`
   const user = await currentUser()
-  const darf = Boolean(user && canWrite(user.role, 'einkauf', user.befugnisse))
+  const darf = Boolean(user && canWrite(user.rollen, 'einkauf', user.befugnisse))
 
   return (
     <Card

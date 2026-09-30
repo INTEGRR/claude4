@@ -43,7 +43,7 @@ export default async function KontoPage({
     <>
       <PageHeader
         title="Konto & Sicherheit"
-        subtitle={`${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`}
+        subtitle={`${user.name} · ${user.email ?? user.benutzername} · ${user.rollen.map((r) => ROLE_LABELS[r]).join(' + ')}`}
       />
 
       {frisch && frisch.backup_codes.length > 0 && (

@@ -24,14 +24,14 @@ export function datenfrageKonfiguriert(): boolean {
 
 export async function datenfrageBeantworten(
   frage: string,
-  nutzer: { name: string; role: Role; befugnisse?: readonly string[] },
+  nutzer: { name: string; role: Role; rollen?: readonly Role[]; befugnisse?: readonly string[] },
 ): Promise<string> {
   if (!datenfrageKonfiguriert()) {
     return 'Datenfragen sind nicht konfiguriert (ANTHROPIC_API_KEY fehlt).'
   }
   // Finanzdaten nur, wenn der Fragende sie auch am Bildschirm sehen dürfte
   // (Admin oder Befugnis finanzen:zugriff) — Schema-Doku UND SQL-Sperre.
-  const finanzen = canAccess(nutzer.role, 'finanzen', nutzer.befugnisse ?? [])
+  const finanzen = canAccess(nutzer.rollen ?? nutzer.role, 'finanzen', nutzer.befugnisse ?? [])
 
   const client = new Anthropic()
   const modell = await kiModell(sql, 'datenfrage')

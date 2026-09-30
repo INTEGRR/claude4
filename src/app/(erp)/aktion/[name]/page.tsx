@@ -28,7 +28,7 @@ export default async function AktionsSeite({
 
   const eintrag = registrierteAktion(aktionsName)
   if (!eintrag || eintrag.bindung !== 'frei') notFound()
-  if (!aktionErlaubt(eintrag, user.role, user.befugnisse)) redirect('/?verweigert=' + eintrag.bereich)
+  if (!aktionErlaubt(eintrag, user.rollen, user.befugnisse)) redirect('/?verweigert=' + eintrag.bereich)
 
   const angebot = await aktionsAngebot(aktionsName)
   if (!angebot) notFound()

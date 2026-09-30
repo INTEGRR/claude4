@@ -344,7 +344,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
 
       {/* Welcher Prozess diesen Transfer führt, entscheidet der Beleg-Filter
           (Eingang = Wareneingang, Ausgang = Shop-Versand). */}
-      {prozessCode && <ProzessPanel prozessCode={prozessCode} recordId={id} rolle={user.role} befugnisse={user.befugnisse} />}
+      {prozessCode && <ProzessPanel prozessCode={prozessCode} recordId={id} rolle={user.rollen} befugnisse={user.befugnisse} />}
 
       <RecordComments model="stock_picking" recordId={id} path={`/lager/${id}`} />
     </>

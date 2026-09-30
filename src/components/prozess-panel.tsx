@@ -4,7 +4,7 @@ import { ProzessFlow } from '@/components/prozess-flow'
 import type { FlowKante, FlowSchritt } from '@/modules/prozesse/flow-daten'
 import { flowLayout } from '@/modules/prozesse/flow-layout'
 import { naechsteAngebote } from '@/modules/prozesse/angebote'
-import type { Role } from '@/modules/auth/permissions'
+import type { Rollen } from '@/modules/auth/permissions'
 import { ProzessAktionen } from '@/components/prozess-aktionen'
 
 /**
@@ -27,7 +27,7 @@ export async function ProzessPanel({
 }: {
   prozessCode: string
   recordId: string
-  rolle: Role
+  rolle: Rollen
   /** Personengebundene Zusatzrechte des Betrachters (users.befugnisse). */
   befugnisse?: string[]
   /**

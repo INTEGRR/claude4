@@ -30,7 +30,7 @@ export default async function Dashboard({
 }) {
   const user = await requireUser()
   const { verweigert } = await searchParams
-  const sees = (area: Area) => canAccess(user.role, area)
+  const sees = (area: Area) => canAccess(user.rollen, area)
 
   // Chamäleon: Signale und Seiten sind eine Projektion der aktiven Prozesse.
   const prozessBereiche = new Set(
@@ -125,7 +125,7 @@ export default async function Dashboard({
   ]
 
   // --- Befehlsfeld-Katalog: dieselbe Quelle wie das Strg+K-Overlay ---------
-  const { aktionen, seiten } = befehlsKatalog(user.role, prozessAktiv, user.befugnisse)
+  const { aktionen, seiten } = befehlsKatalog(user.rollen, prozessAktiv, user.befugnisse)
 
   // --- Lern-Gedächtnis: was DIESER Benutzer oft nutzt ----------------------
   const nutzung = await sql<{ art: string; schluessel: string; anzahl: number }[]>`

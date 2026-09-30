@@ -1,6 +1,6 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { ALL_ROLES, canAccess, canWrite } from '../src/modules/auth/permissions.ts'
+import { ALL_ROLES, canAccess, canWrite, hatRolle, schrittRollenErfuellt } from '../src/modules/auth/permissions.ts'
 import { closeDb, db } from './helpers.ts'
 
 after(closeDb)
@@ -52,5 +52,51 @@ describe('Rollen: Bereichsmatrix', () => {
     for (const role of ALL_ROLES) {
       assert.ok(enumValues.includes(role), `Enum-Wert ${role} fehlt`)
     }
+  })
+})
+
+describe('Mehrere Rollen je Benutzer (0096)', () => {
+  test('Lager + Fertigung: beide Bereiche, keine fremden, Produkte weiter nur lesend', () => {
+    const beide = ['lager', 'fertigung'] as const
+    assert.equal(canWrite(beide, 'lager'), true)
+    assert.equal(canWrite(beide, 'versand'), true)
+    assert.equal(canWrite(beide, 'fertigung'), true)
+    assert.equal(canAccess(beide, 'verkauf'), false)
+    assert.equal(canAccess(beide, 'produkte'), true)
+    assert.equal(canWrite(beide, 'produkte'), false)
+    // Eine einzelne Rolle bleibt gültig — alte Aufrufer ändern nichts.
+    assert.equal(canWrite('lager', 'fertigung'), false)
+  })
+
+  test('Finanzen bleiben Befugnis, nicht Rollensumme; Admin in der Liste besteht', () => {
+    assert.equal(canAccess(['mitarbeiter', 'lager'], 'finanzen'), false)
+    assert.equal(canAccess(['mitarbeiter', 'lager'], 'finanzen', ['finanzen:zugriff']), true)
+    assert.equal(canAccess(['admin'], 'finanzen'), true)
+  })
+
+  test('Schritt-Rollen: eine passende Rolle reicht, Admin immer, leer = frei', () => {
+    assert.equal(schrittRollenErfuellt(['lager', 'fertigung'], ['fertigung']), true)
+    assert.equal(schrittRollenErfuellt(['lager'], ['fertigung']), false)
+    assert.equal(schrittRollenErfuellt('admin', ['fertigung']), true)
+    assert.equal(schrittRollenErfuellt('lager', []), true)
+    assert.equal(schrittRollenErfuellt('lager', null), true)
+    assert.equal(hatRolle(['lager', 'fertigung'], 'fertigung'), true)
+  })
+
+  test('Zusatzrolle Administrator ist in der Datenbank ausgeschlossen, Kennung Pflicht', async () => {
+    const sql = db()
+    await assert.rejects(
+      sql`insert into users (email, name, password_hash, role, zusatz_rollen)
+          values ('x-rollen@example.com', 'X', 'h', 'lager', '{admin}')`,
+      /users_zusatz_rollen_ohne_admin/,
+    )
+    await assert.rejects(
+      sql`insert into users (name, password_hash, role) values ('Ohne Kennung', 'h', 'lager')`,
+      /users_kennung/,
+    )
+    await assert.rejects(
+      sql`insert into users (benutzername, name, password_hash, role) values ('Max M', 'X', 'h', 'lager')`,
+      /users_benutzername_format/,
+    )
   })
 })

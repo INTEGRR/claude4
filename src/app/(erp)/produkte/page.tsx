@@ -57,7 +57,7 @@ export default async function ProduktePage({
             <Link className="btn" href="/p/artikel_anlegen">Anlage-Assistent</Link>
             <Link className="btn" href="/produkte/attribute">Attribute</Link>
             {/* Kategorien, Steuern, Zahlungsbedingungen: Einstellungen → Stammdaten (nur Admin). */}
-            {canAccess(user.role, 'einstellungen', user.befugnisse) && (
+            {canAccess(user.rollen, 'einstellungen', user.befugnisse) && (
               <Link className="btn" href="/einstellungen/stammdaten">Kategorien &amp; Steuern</Link>
             )}
           </>

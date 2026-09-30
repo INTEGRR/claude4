@@ -16,7 +16,7 @@ import { AktionsFehler, aktionAusfuehrenGeprueft } from '@/modules/prozesse/torw
 
 async function eigenesProtokoll(protokollId: string) {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'ki')) return null
+  if (!user || !canAccess(user.rollen, 'ki')) return null
   const [p] = await sql<{ id: string }[]>`
     select id from sprachprotokolle where id = ${protokollId} and user_id = ${user.id}`
   return p ? user : null
@@ -24,7 +24,7 @@ async function eigenesProtokoll(protokollId: string) {
 
 export async function vorgangVerwerfen(vorgangId: string): Promise<ActionResult> {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'ki')) return actionError('Nicht berechtigt')
+  if (!user || !canAccess(user.rollen, 'ki')) return actionError('Nicht berechtigt')
   const geaendert = await sql`
     update sprach_vorgaenge v set status = 'verworfen'
     from sprachprotokolle p
@@ -37,7 +37,7 @@ export async function vorgangVerwerfen(vorgangId: string): Promise<ActionResult>
 
 export async function zaehlmengeAendern(vorgangId: string, formData: FormData): Promise<ActionResult> {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'ki')) return actionError('Nicht berechtigt')
+  if (!user || !canAccess(user.rollen, 'ki')) return actionError('Nicht berechtigt')
   const menge = Number(formData.get('counted_qty'))
   if (!Number.isFinite(menge) || menge < 0) {
     return actionError('Die gezählte Menge muss eine Zahl ≥ 0 sein.')

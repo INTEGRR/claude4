@@ -48,7 +48,7 @@ export default async function LoginPage({
           Die Anmeldung ist abgelaufen — bitte erneut anmelden.
         </div>
       ) : params.fehler ? (
-        <div className="notice danger">E-Mail-Adresse oder Passwort ist falsch.</div>
+        <div className="notice danger">Anmeldename oder Passwort ist falsch.</div>
       ) : null}
       {count === 0 && (
         <div className="notice warn">
@@ -59,8 +59,9 @@ export default async function LoginPage({
       )}
       <form action={signIn}>
         <label className="field">
-          <span>E-Mail</span>
-          <input type="email" name="email" required autoFocus autoComplete="username" />
+          <span>E-Mail oder Benutzername</span>
+          {/* Feldname bleibt „email" (Skripte, Passwortmanager); seit 0096 geht auch der Benutzername. */}
+          <input type="text" name="email" required autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} />
         </label>
         <label className="field">
           <span>Passwort</span>

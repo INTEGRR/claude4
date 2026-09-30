@@ -202,7 +202,7 @@ export default async function RepairPage({
       <ProzessPanel
         prozessCode="reparatur"
         recordId={id}
-        rolle={user.role}
+        rolle={user.rollen}
         befugnisse={user.befugnisse}
         sofortOffen={sofortOffen}
       />

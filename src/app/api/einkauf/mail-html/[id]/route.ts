@@ -12,7 +12,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'einkauf', user.befugnisse)) return new Response('Nicht gefunden', { status: 404 })
+  if (!user || !canAccess(user.rollen, 'einkauf', user.befugnisse)) return new Response('Nicht gefunden', { status: 404 })
   const { id } = await params
   if (!UUID.test(id)) return new Response('Nicht gefunden', { status: 404 })
   const [n] = await sql<{ html: string | null }[]>`select html from mail_nachrichten where id = ${id}`

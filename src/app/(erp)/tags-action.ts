@@ -25,7 +25,7 @@ export async function setTags(model: string, recordId: string, path: string, for
   const user = await requireUser()
   const target = MODELS[model]
   if (!target) return actionError(`Tags sind für "${model}" nicht vorgesehen`)
-  if (!canWrite(user.role, target.area)) {
+  if (!canWrite(user.rollen, target.area)) {
     return actionError('Dafür fehlt Ihrer Rolle die Berechtigung')
   }
 

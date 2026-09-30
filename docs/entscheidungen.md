@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Mehrere Rollen je Benutzer, Anmeldung mit Benutzername
+
+Wer im Lager und in der Fertigung arbeitet, braucht beide Rollen. Viele
+dieser Kolleginnen und Kollegen haben keine E-Mail-Adresse. Entschieden
+(Migration 0096):
+
+- **Hauptrolle plus Zusatzrollen** statt einer Rollentabelle:
+  `users.role` bleibt, dazu kommt `users.zusatz_rollen user_role[]`. Die
+  Rechte sind die Vereinigung. So bleiben alle Stellen, die nur die
+  Hauptrolle lesen (Anzeige, Zwei-Faktor-Pflicht `admins`, Paket-Download
+  nur für Admins), unverändert richtig. Die Rechteprüfungen (`canAccess`,
+  `canWrite`, Torwächter, Schrittrollen) nehmen die Rollenliste.
+- **Administrator nur als Hauptrolle** (Check-Constraint). Admin-Rechte
+  über eine Zusatzrolle würden die Regel „der letzte Administrator
+  bleibt" umgehen.
+- **E-Mail oder Benutzername** als Kennung (`email` wird nullable, Check
+  `users_kennung`, Benutzername klein und ohne `@` — Kollisionen mit
+  E-Mails sind ausgeschlossen). Das Login-Feld heißt weiter `email`
+  (Passwortmanager, Skripte), akzeptiert aber beides. Drossel und zweiter
+  Faktor hängen an der eingegebenen Kennung.
+
+Doku: [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)
+→ „Mehrere Rollen und Anmeldung ohne E-Mail".
+
 ## 2026-09-30 — Druckbrücke unter Windows ohne Node.js (PowerShell-Agent)
 
 Am Lager-PC scheiterte das Paket an „Node.js fehlt". Die Vorgabe des

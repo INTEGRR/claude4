@@ -856,6 +856,10 @@ export async function feldLoeschen(p: {
 
 /** Wirft, wenn nach der Änderung kein aktiver Administrator übrig bliebe. */
 async function guardLetzterAdmin(userId: string): Promise<void> {
+  // Nur wer selbst aktiver Administrator ist, kann „der letzte" sein.
+  const [ziel] = await sql<{ admin: boolean }[]>`
+    select role = 'admin' and active as admin from users where id = ${userId}`
+  if (!ziel?.admin) return
   const [row] = await sql<{ count: number }[]>`
     select count(*)::int as count from users
     where role = 'admin' and active and id <> ${userId}`
@@ -875,32 +879,46 @@ async function passwortHashen(password: string): Promise<string> {
 }
 
 export async function benutzerAnlegen(
-  p: { email: string; name: string; password: string; role: string },
+  p: { email?: string; benutzername?: string; name: string; password: string; role: string; zusatz_rollen: string[] },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  const kennung = p.email ?? p.benutzername!
+  // Beide Kennungen teilen sich einen Namensraum: niemand darf sich mit dem
+  // Benutzernamen eines anderen als E-Mail (oder umgekehrt) anmelden können.
+  const [belegt] = await sql<{ id: string }[]>`
+    select id from users
+    where lower(email) in (lower(${p.email ?? ''}), lower(${p.benutzername ?? ''}))
+       or lower(benutzername) in (lower(${p.email ?? ''}), lower(${p.benutzername ?? ''}))`
+  if (belegt) throw new Error(`${kennung} ist bereits vergeben`)
+  const zusatz = [...new Set(p.zusatz_rollen.filter((r) => r !== p.role))]
   const [row] = await sql<{ id: string }[]>`
-    insert into users (email, name, password_hash, role)
-    values (${p.email}, ${p.name}, ${await passwortHashen(p.password)}, ${p.role})
-    on conflict (email) do nothing
+    insert into users (email, benutzername, name, password_hash, role, zusatz_rollen)
+    values (${p.email ?? null}, ${p.benutzername ?? null}, ${p.name}, ${await passwortHashen(p.password)},
+            ${p.role}, ${zusatz}::user_role[])
     returning id`
-  if (!row) throw new Error('Diese E-Mail-Adresse ist bereits vergeben')
 
   await sql`select log_event('user', ${row.id}, 'state',
-    ${'Benutzer angelegt (' + p.role + ')'}, ${ctx.actor})`
-  return { text: `Benutzer ${p.email} angelegt.`, recordId: row.id }
+    ${'Benutzer angelegt (' + [p.role, ...zusatz].join(' + ') + ')'}, ${ctx.actor})`
+  return { text: `Benutzer ${kennung} angelegt.`, recordId: row.id }
 }
 
 export async function benutzerRolle(
-  p: { role: string },
+  p: { role: string; zusatz_rollen?: string[] },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const userId = ctx.recordId!
   if (p.role !== 'admin') await guardLetzterAdmin(userId)
 
-  await sql`update users set role = ${p.role} where id = ${userId}`
+  // Administrator hat ohnehin alles — Zusatzrollen wären Deko.
+  const zusatz = p.role === 'admin' ? [] : p.zusatz_rollen && [...new Set(p.zusatz_rollen.filter((r) => r !== p.role))]
+  await sql`update users set role = ${p.role},
+                   zusatz_rollen = coalesce(${zusatz ?? null}::user_role[], array_remove(zusatz_rollen, ${p.role}::user_role))
+            where id = ${userId}`
+  const [neu] = await sql<{ rollen: string[] }[]>`
+    select array_prepend(role::text, zusatz_rollen::text[]) as rollen from users where id = ${userId}`
   await sql`select log_event('user', ${userId}, 'state',
-    ${'Rolle geändert auf ' + p.role}, ${ctx.actor})`
-  return { recordId: userId }
+    ${'Rollen: ' + neu.rollen.join(' + ')}, ${ctx.actor})`
+  return { text: `Rollen gespeichert: ${neu.rollen.join(' + ')}.`, recordId: userId }
 }
 
 export async function benutzerAktiv(

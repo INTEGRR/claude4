@@ -17,7 +17,7 @@ export async function instanzStarten(code: string): Promise<ActionResult> {
   const [prozess] = await sql<{ bereich: Area }[]>`
     select bereich from prozesse where code = ${code} and aktiv and modell is null`
   if (!prozess) return actionFail(new Error('Unbekannter Assistent'))
-  if (!canWrite(user.role, prozess.bereich)) {
+  if (!canWrite(user.rollen, prozess.bereich)) {
     return actionFail(new Error('Ihrer Rolle fehlt die Berechtigung für diesen Assistenten'))
   }
   const [neu] = await sql<{ id: string }[]>`
@@ -37,7 +37,7 @@ export async function instanzAbschliessen(
     from prozess_instanzen i join prozesse p on p.id = i.prozess_id
     where i.id = ${instanzId} and i.status = 'laufend'`
   if (!instanz) return actionFail(new Error('Der Assistent läuft nicht mehr.'))
-  if (!canWrite(user.role, instanz.bereich)) {
+  if (!canWrite(user.rollen, instanz.bereich)) {
     return actionFail(new Error('Ihrer Rolle fehlt die Berechtigung'))
   }
 

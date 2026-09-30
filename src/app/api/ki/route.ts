@@ -13,7 +13,7 @@ export const maxDuration = 300
 
 export async function POST(request: Request) {
   const user = await currentUser()
-  if (!user || !canAccess(user.role, 'ki')) {
+  if (!user || !canAccess(user.rollen, 'ki')) {
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
   }
   if (!kiConfigured()) {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
           user.name,
           send,
           {
-            finanzen: canAccess(user.role, 'finanzen', user.befugnisse),
+            finanzen: canAccess(user.rollen, 'finanzen', user.befugnisse),
             admin: user.role === 'admin',
           },
           kontext,

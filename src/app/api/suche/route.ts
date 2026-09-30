@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
-import { canAccess } from '@/modules/auth/permissions'
+import { canAccess, schrittRollenErfuellt } from '@/modules/auth/permissions'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
 import { formularFelder } from '@/modules/prozesse/schema-felder'
@@ -58,7 +58,7 @@ async function belegAktionen(
       if (!`${s.name}`.toLowerCase().includes(rest)) continue
       const eintrag = registrierteAktion(s.aktion)
       if (!eintrag || !aktionErlaubt(eintrag, role, befugnisse)) continue
-      if (role !== 'admin' && s.rollen && s.rollen.length > 0 && !s.rollen.includes(role)) continue
+      if (!schrittRollenErfuellt(role, s.rollen)) continue
       const vorbelegt = s.params ?? {}
       const offeneFelder = formularFelder(eintrag).filter((f) => !(f.name in vorbelegt))
       ergebnis.push({
@@ -93,10 +93,10 @@ export async function GET(request: Request) {
 
   const treffer: SuchTreffer[] = []
   const sieht = (bereich: Parameters<typeof canAccess>[1]) =>
-    canAccess(user.role, bereich, user.befugnisse)
+    canAccess(user.rollen, bereich, user.befugnisse)
 
   // Beleg + Aktion zuerst — der spezifischste Treffer gehört nach oben.
-  treffer.push(...(await belegAktionen(q, user.role, user.befugnisse)))
+  treffer.push(...(await belegAktionen(q, user.rollen, user.befugnisse)))
 
   if (sieht('verkauf')) {
     for (const r of await sql<{ id: string; number: string; name: string | null; kunde: string }[]>`

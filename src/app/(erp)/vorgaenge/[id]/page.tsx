@@ -247,7 +247,7 @@ export default async function VorgangDetail({
         <ProzessPanel
           prozessCode={v.prozess_code}
           recordId={v.id}
-          rolle={user.role}
+          rolle={user.rollen}
           befugnisse={user.befugnisse}
           nurDiagramm
         />

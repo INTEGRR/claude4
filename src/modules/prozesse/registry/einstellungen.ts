@@ -801,20 +801,33 @@ export const EINSTELLUNGEN = {
     bereich: 'einstellungen',
     nurAdmin: true,
     prozessfrei: true,
-    beschreibung: 'Legt ein Benutzerkonto mit Rolle an (E-Mail eindeutig).',
+    beschreibung:
+      'Legt ein Benutzerkonto an: Anmeldung per E-Mail oder — für Lager und Fertigung ohne ' +
+      'E-Mail — per Benutzername (beides eindeutig), Hauptrolle und optionale Zusatzrollen.',
     bindung: 'frei',
-    schema: z.object({
-      email: z.string().email('Bitte eine gültige E-Mail-Adresse angeben'),
-      name: z.string().min(1, 'Bitte einen Namen angeben').max(100),
-      password: z.string().min(8, 'Das Passwort braucht mindestens 8 Zeichen'),
-      role: z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung']),
-    }),
-    zusammenfassung: (p) => `${p.email} (${p.role})`,
+    schema: z
+      .object({
+        email: z.string().trim().toLowerCase().email('Bitte eine gültige E-Mail-Adresse angeben').optional(),
+        benutzername: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .regex(/^[a-z0-9][a-z0-9._-]{1,39}$/, 'Benutzername: 2–40 Zeichen, a–z, 0–9, Punkt, Strich, Unterstrich')
+          .optional(),
+        name: z.string().min(1, 'Bitte einen Namen angeben').max(100),
+        password: z.string().min(8, 'Das Passwort braucht mindestens 8 Zeichen'),
+        role: z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung']),
+        zusatz_rollen: z.array(z.enum(['mitarbeiter', 'lager', 'fertigung'])).default([]),
+      })
+      .refine((p) => p.email || p.benutzername, 'Bitte E-Mail oder Benutzername angeben.'),
+    zusammenfassung: (p) => `${p.email ?? p.benutzername} (${[p.role, ...p.zusatz_rollen].join(' + ')})`,
     formdata: (fd) => ({
-      email: String(fd.get('email') ?? '').trim(),
+      email: String(fd.get('email') ?? '').trim() || undefined,
+      benutzername: String(fd.get('benutzername') ?? '').trim() || undefined,
       name: String(fd.get('name') ?? '').trim(),
       password: String(fd.get('password') ?? ''),
       role: String(fd.get('role') ?? ''),
+      zusatz_rollen: fd.getAll('zusatz_rollen').map(String),
     }),
     revalidate: ['/einstellungen/benutzer'],
   },
@@ -824,12 +837,18 @@ export const EINSTELLUNGEN = {
     bereich: 'einstellungen',
     nurAdmin: true,
     prozessfrei: true,
-    beschreibung: 'Ändert die Rolle eines Benutzers — der letzte aktive Administrator ist geschützt.',
+    beschreibung:
+      'Ändert Hauptrolle und Zusatzrollen eines Benutzers (Rechte = Vereinigung, z. B. Lager + ' +
+      'Fertigung) — der letzte aktive Administrator ist geschützt.',
     bindung: 'beleg',
     schema: z.object({
       role: z.enum(['admin', 'mitarbeiter', 'lager', 'fertigung']),
+      zusatz_rollen: z.array(z.enum(['mitarbeiter', 'lager', 'fertigung'])).optional(),
     }),
-    formdata: (fd) => ({ role: String(fd.get('role') ?? '') }),
+    formdata: (fd) => ({
+      role: String(fd.get('role') ?? ''),
+      zusatz_rollen: fd.has('zusatz_gezeigt') ? fd.getAll('zusatz_rollen').map(String) : undefined,
+    }),
     revalidate: ['/einstellungen/benutzer'],
   },
 

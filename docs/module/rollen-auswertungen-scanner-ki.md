@@ -21,9 +21,33 @@ Durchsetzung an drei Stellen:
 - **Sidebar/Dashboard**: zeigen nur erlaubte Bereiche (`canAccess`).
 
 Benutzerverwaltung unter **Einstellungen → Benutzer** (nur Admin): anlegen,
-Rolle ändern, deaktivieren (beendet laufende Sitzungen), Passwort
+Rollen ändern, deaktivieren (beendet laufende Sitzungen), Passwort
 zurücksetzen. Der letzte aktive Administrator lässt sich weder herabstufen
 noch deaktivieren.
+
+### Mehrere Rollen und Anmeldung ohne E-Mail (seit 0096)
+
+- **Hauptrolle + Zusatzrollen:** Wer im Lager und in der Fertigung
+  arbeitet, bekommt z. B. Hauptrolle `lager` und Zusatzrolle `fertigung`
+  (`users.role` + `users.zusatz_rollen`). Die Rechte sind die
+  **Vereinigung** aller Rollen: `canAccess`/`canWrite` nehmen eine Rolle
+  oder eine Liste (`Rollen`), `User.rollen` trägt die Liste, und der
+  Torwächter prüft Aktions- und Schrittrechte gegen alle Rollen
+  (`schrittRollenErfuellt`). Wählbar als Zusatz sind `mitarbeiter`,
+  `lager` und `fertigung`. `admin` gibt es nur als Hauptrolle (Constraint
+  `users_zusatz_rollen_ohne_admin`); wer Administrator wird, verliert
+  seine Zusatzrollen, und die Hauptrolle fällt aus den Zusatzrollen
+  heraus. Aktion `einstellungen.benutzer_rolle` (Hauptrolle, optional
+  `zusatz_rollen`; ohne das Feld bleiben die Zusatzrollen).
+- **Benutzername statt E-Mail:** Lager- und Fertigungsleute haben oft
+  keine E-Mail-Adresse. Ein Konto braucht E-Mail **oder** Benutzername
+  (`users_kennung`). Der Benutzername ist klein geschrieben, 2–40 Zeichen
+  aus a–z, 0–9 und `._-`. Kennungen sind über beide Felder eindeutig,
+  ohne Groß/Klein. Angemeldet wird mit
+  „E-Mail oder Benutzername" im selben Feld; Drossel und zweiter Faktor
+  gelten unverändert (die Authenticator-App zeigt dann den Benutzernamen).
+  Aktion `einstellungen.benutzer_anlegen` mit `email` und/oder
+  `benutzername`.
 
 ### Anmeldung und Login-Drossel
 

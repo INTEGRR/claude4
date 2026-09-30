@@ -67,7 +67,10 @@ export interface RegistrierteAktion<S extends z.ZodTypeAny = z.ZodTypeAny> {
 
 export interface AktionsKontext {
   actor: string
+  /** Hauptrolle. */
   role: Role
+  /** Hauptrolle plus Zusatzrollen (0096) — für Rechteprüfungen in Executors. */
+  rollen?: Role[]
   recordId?: string
   /** Benutzer-ID des Ausführenden — für Aktionen, die den Datensatz zuweisen. */
   userId?: string

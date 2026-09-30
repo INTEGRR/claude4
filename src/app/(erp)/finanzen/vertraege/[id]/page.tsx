@@ -81,7 +81,7 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
       <ProzessPanel
         prozessCode="vertrag_fixkosten"
         recordId={id}
-        rolle={user.role}
+        rolle={user.rollen}
         befugnisse={user.befugnisse}
       />
 
