@@ -226,6 +226,79 @@ describe('Odoo-Stücklisten übernehmen', () => {
     assert.match(d.blockiert.find((x) => x.was === 'FAKE-ST-1')?.grund ?? '', /von Hand/)
   })
 
+  test('Fertigbestand zurücknehmen: nur Odoo-Zählungen, Reservierung gelöst, Fertigung nachgezogen', async () => {
+    const [lager] = await h.sql<{ id: string }[]>`select id from stock_locations where full_path = 'WH/Stock'`
+    const zaehlen = async (variante: string, menge: number, note: string | null) => {
+      const [z] = await h.sql<{ id: string }[]>`
+        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+        values (${lager.id}, ${variante}, ${menge}, 0, ${note}) returning id`
+      await h.sql`select inventory_apply(${z.id}, 'test')`
+    }
+    // Wie der Lauf von 09:11: 5 Weiß-DE aus Odoo. Weiß-US dagegen von Hand gezählt — echt.
+    await zaehlen(v['FAKE-KB-W-DE'], 5, 'Odoo-Übernahme odoo-api 2026-09-30T09:11')
+    await zaehlen(v['FAKE-KB-W-US'], 3, null)
+
+    // Auftrag von vor den Stücklisten (ohne Route bestätigt): reserviert 2 vom Scheinbestand, kein Fertigungsauftrag.
+    const [kunde] = await h.sql<{ id: string }[]>`
+      insert into partners (name, is_customer) values ('Odoo-Testkunde', true) returning id`
+    const auftrag = async (sku: string, menge: number) => {
+      const [o] = await h.sql<{ id: string; number: string }[]>`
+        insert into sales_orders (number, partner_id) values (next_sequence('sale'), ${kunde.id}) returning id, number`
+      await h.sql`insert into sales_order_lines (order_id, variant_id, name, qty, uom_id, price_unit)
+                  values (${o.id}, ${v[sku]}, ${sku}, ${menge}, ${await stueck()}, 199)`
+      await h.sql`select confirm_sales_order(${o.id}, 'test')`
+      return o
+    }
+    await h.sql`update product_templates set route_mto = false where id = ${t.weiss}`
+    const alt = await auftrag('FAKE-KB-W-DE', 2)
+    await h.sql`update product_templates set route_mto = true where id = ${t.weiss}`
+    const neu = await auftrag('FAKE-KB-W-US', 1)
+    const reserviert = async (o: string) =>
+      (await h.sql<{ reserved: number; state: string }[]>`
+        select m.reserved_qty::float as reserved, m.state::text as state from stock_moves m
+        join stock_pickings p on p.id = m.picking_id where p.origin_model = 'sales_order' and p.origin_id = ${o}`)[0]
+    assert.deepEqual(await reserviert(alt.id), { reserved: 2, state: 'assigned' }, 'vom Scheinbestand reserviert')
+    const mos = async (o: string) =>
+      (await h.sql<{ qty: number; state: string; origin: string | null }[]>`
+        select qty_to_produce::float as qty, state::text as state, origin from manufacturing_orders
+        where sales_order_id = ${o} order by created_at`).map((x) => ({ ...x }))
+    assert.equal((await mos(alt.id)).length, 0)
+    assert.equal((await mos(neu.id)).length, 1, 'neue Aufträge bekommen ihn bei der Bestätigung')
+
+    const r = await aktionAusfuehrenGeprueft('integrationen.odoo_fertigbestand_zuruecknehmen', {}, ADMIN)
+    const b = r.daten as {
+      varianten: number; menge: number; reservierungenGeloest: number
+      uebersprungen: { sku: string }[]; fertigungsauftraege: { nummer: string; sku: string; menge: number }[]
+    }
+    assert.deepEqual([b.varianten, b.menge, b.reservierungenGeloest], [1, 5, 1])
+    assert.deepEqual(b.uebersprungen.map((u) => u.sku), ['FAKE-KB-W-US'], 'von Hand gezählter Bestand bleibt')
+    assert.deepEqual(b.fertigungsauftraege, [{ nummer: alt.number, sku: 'FAKE-KB-W-DE', menge: 2 }])
+
+    const bestand = async (sku: string) =>
+      (await h.sql<{ n: number }[]>`select on_hand_qty(${v[sku]}, null)::float as n`)[0].n
+    assert.equal(await bestand('FAKE-KB-W-DE'), 0)
+    assert.equal(await bestand('FAKE-KB-W-US'), 3)
+    assert.deepEqual(await reserviert(alt.id), { reserved: 0, state: 'confirmed' }, 'Lieferung wartet wieder')
+    assert.deepEqual(await mos(alt.id), [{ qty: 2, state: 'confirmed', origin: alt.number }])
+    assert.equal((await mos(neu.id)).length, 1, 'kein doppelter Fertigungsauftrag')
+    const [korrektur] = await h.sql<{ note: string; counted_qty: number }[]>`
+      select note, counted_qty::float as counted_qty from inventory_counts
+      where variant_id = ${v['FAKE-KB-W-DE']} order by created_at desc limit 1`
+    assert.deepEqual({ ...korrektur }, { note: 'Odoo-Fertigbestand zurückgenommen (in Odoo nicht ausgebucht)', counted_qty: 0 })
+
+    // Zweiter Klick: nichts mehr zu tun.
+    const nochmal = (await aktionAusfuehrenGeprueft('integrationen.odoo_fertigbestand_zuruecknehmen', {}, ADMIN))
+      .daten as { varianten: number; fertigungsauftraege: unknown[] }
+    assert.deepEqual([nochmal.varianten, nochmal.fertigungsauftraege.length], [0, 0])
+
+    // Die eigene Korrektur zählt nicht als echte Buchung: bucht ein späterer Lauf wieder, greift der Knopf erneut.
+    await zaehlen(v['FAKE-KB-W-DE'], 2, 'Odoo-Übernahme odoo-api 2026-09-30T12:00')
+    const wieder = (await aktionAusfuehrenGeprueft('integrationen.odoo_fertigbestand_zuruecknehmen', {}, ADMIN))
+      .daten as { varianten: number; menge: number }
+    assert.deepEqual([wieder.varianten, wieder.menge], [1, 2])
+    assert.equal(await bestand('FAKE-KB-W-DE'), 0)
+  })
+
   test('Odoo wird nur gelesen: schreibende Methoden sind gesperrt', async () => {
     const { odooLesen } = await import('../../src/modules/migration/odoo/api.ts')
     await assert.rejects(odooLesen('mrp.bom', 'write', [[1], { active: false }]), /gesperrt/)

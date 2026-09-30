@@ -152,5 +152,22 @@ export const INTEGRATIONEN = {
     revalidate: ['/einstellungen/odoo', '/fertigung/stuecklisten', '/produkte'],
   },
 
+  'integrationen.odoo_fertigbestand_zuruecknehmen': {
+    label: 'Odoo-Fertigbestand zurücknehmen, Fertigung nachziehen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Setzt den Bestand der Fertigprodukte (Artikel mit Odoo-Stückliste, keine Komponente) auf 0, ' +
+      'wenn er nur aus Inventurbuchungen stammt — der Odoo-Bestand war falsch, weil Lieferungen in Odoo ' +
+      'nicht ausgebucht wurden. Löst vorher Reservierungen wartender Lieferungen; bucht per Inventur ' +
+      '(bewertet, nachvollziehbar). Artikel mit echten Lagerbewegungen bleiben und werden gemeldet. ' +
+      'Danach bekommt jeder offene Verkaufsauftrag (Route Fertigen + Auf Auftrag) für die noch nicht ' +
+      'gefertigte Menge einen bestätigten Fertigungsauftrag.',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/odoo', '/lager', '/produkte', '/versand', '/fertigung', '/verkauf'],
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

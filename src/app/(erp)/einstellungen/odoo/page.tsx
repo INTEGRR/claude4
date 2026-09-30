@@ -1,6 +1,8 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card } from '@/components/ui'
+import { ActionButton } from '@/components/action-button'
+import { fertigbestandKandidaten, fertigungsLuecken } from '@/modules/migration/odoo/fertigbestand'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { odooKonfiguriert } from '@/modules/migration/odoo/api'
@@ -19,6 +21,11 @@ async function uebernehmen() {
   return serverAktion('integrationen.odoo_stuecklisten_uebernehmen', {})
 }
 
+async function fertigbestandZuruecknehmen() {
+  'use server'
+  return serverAktion('integrationen.odoo_fertigbestand_zuruecknehmen', {})
+}
+
 /**
  * Odoo-Übernahme (0090): nur Stücklisten, ihre Komponenten, Lieferanten und
  * Bestände — per API aus dem laufenden Odoo, zugeordnet per SKU an die
@@ -27,6 +34,14 @@ async function uebernehmen() {
 export default async function OdooPage() {
   await requireArea('einstellungen')
   const angebunden = odooKonfiguriert()
+  const [kandidaten, luecken] = await Promise.all([fertigbestandKandidaten(), fertigungsLuecken()])
+  const zuruecknehmen = kandidaten.filter((k) => k.echteBewegungen === 0)
+  const menge = zuruecknehmen.reduce((s, k) => s + k.menge, 0)
+  const reserviert = zuruecknehmen.reduce((s, k) => s + k.reserviert, 0)
+  const [ruecknahme] = await sql<{ message: string; actor: string | null; created_at: string }[]>`
+    select message, actor, created_at::text from audit_log
+    where model = 'odoo' and message like 'Odoo-Fertigbestand zurückgenommen%'
+    order by created_at desc limit 1`
   const [stand] = await sql<{ boms: number; angelegt: number; zugeordnet: number; zuletzt: string | null }[]>`
     select (select count(*)::int from boms where herkunft = 'odoo' and active) as boms,
            (select count(*)::int from odoo_verweise where herkunft = 'angelegt' and odoo_tabelle = 'product_product') as angelegt,
@@ -58,6 +73,44 @@ export default async function OdooPage() {
         )}
       </Card>
 
+      {(zuruecknehmen.length > 0 || luecken.length > 0) && (
+        <Card title="Fertigprodukt-Bestand aus Odoo zurücknehmen">
+          <p className="small" style={{ marginTop: 0 }}>
+            Odoo führt Tastaturen und Switch-Tester mit Bestand, weil die Lieferungen dort nicht ausgebucht wurden —
+            tatsächlich sind alle Fertigprodukte bei 0. Der Knopf setzt{' '}
+            <strong>
+              {qty(zuruecknehmen.length)} Variante(n) mit zusammen {qty(menge)} Stück
+            </strong>{' '}
+            per Inventur auf 0
+            {reserviert > 0 ? `, löst vorher ${qty(reserviert)} reservierte Stück (die Lieferungen warten dann wieder)` : ''}{' '}
+            und legt für{' '}
+            <strong>{qty(luecken.length)} offene Auftragsposition(en)</strong> ohne Fertigungsauftrag einen an
+            {luecken.length > 0 ? ` (${luecken.map((l) => `${l.nummer} ${qty(l.fehlt)}× ${l.sku ?? ''}`.trim()).join(', ')})` : ''}.
+          </p>
+          {kandidaten.length > zuruecknehmen.length && (
+            <p className="small muted">
+              Nicht angefasst ({qty(kandidaten.length - zuruecknehmen.length)}), weil ihr Bestand nicht nur aus der
+              Odoo-Übernahme stammt (Eingang, Fertigung, Lieferung oder eine von Hand gezählte Inventur):{' '}
+              {kandidaten
+                .filter((k) => k.echteBewegungen > 0)
+                .map((k) => k.sku ?? k.name)
+                .join(', ')}
+            </p>
+          )}
+          <p className="small muted">
+            Halbfabrikate, die selbst Komponente sind (3D-Druck des Switch-Testers), und Zubehör ohne Stückliste
+            bleiben. Alles in einer Buchung; erscheint im Lagerverlauf als Inventurkorrektur.
+          </p>
+          <ActionButton
+            action={fertigbestandZuruecknehmen}
+            className="danger"
+            confirm={`${zuruecknehmen.length} Fertigprodukt-Variante(n) (${menge} Stück) auf 0 setzen und ${luecken.length} Fertigungsauftrag/-aufträge nachziehen?`}
+          >
+            Fertigbestand zurücknehmen, Fertigung nachziehen
+          </ActionButton>
+        </Card>
+      )}
+
       <Card title="Stand">
         <p className="small" style={{ margin: 0 }}>
           {qty(stand.boms)} aktive Stückliste(n) aus Odoo · {qty(stand.angelegt)} Komponente(n) angelegt ·{' '}
@@ -65,6 +118,11 @@ export default async function OdooPage() {
           {stand.zuletzt ? ` · zuletzt ${dateTime(stand.zuletzt)}` : ''}. Ein weiterer Lauf ersetzt nur
           Stücklisten, die er selbst geschrieben hat und die sich in Odoo geändert haben.
         </p>
+        {ruecknahme && (
+          <p className="small" style={{ margin: '8px 0 0' }}>
+            Zuletzt: {ruecknahme.message} — {ruecknahme.actor ?? 'system'}, {dateTime(ruecknahme.created_at)}
+          </p>
+        )}
       </Card>
     </>
   )

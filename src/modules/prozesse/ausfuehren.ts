@@ -276,5 +276,6 @@ export const AUSFUEHRUNG = {
   'integrationen.shopify_preise_nachziehen': integrationen.shopifyPreiseNachziehen,
   'integrationen.odoo_vorschau': integrationen.odooVorschau,
   'integrationen.odoo_stuecklisten_uebernehmen': integrationen.odooStuecklistenUebernehmen,
+  'integrationen.odoo_fertigbestand_zuruecknehmen': integrationen.odooFertigbestandZuruecknehmen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

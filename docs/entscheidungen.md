@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Knopf: Odoo-Fertigbestand zurücknehmen, Fertigung nachziehen
+
+Löst den offenen Punkt aus „Fertigprodukte ohne Odoo-Bestand" (Betreiber:
+„ja", plus „Fertigungsaufträge bei Minusbestand durch Verkaufsaufträge
+müssen dann natürlich angelegt werden").
+
+**Entschieden:**
+- Registrierte Aktion `integrationen.odoo_fertigbestand_zuruecknehmen`
+  (nur Admin, Knopf unter Einstellungen → Odoo-Übernahme) statt SQL von
+  Hand in Prod: Reservierungen wartender Lieferungen lösen, dann per
+  Inventurzählung auf 0 (bewertet, im Lagerverlauf sichtbar).
+- **Nur Bestand aus Odoo-Übernahme-Zählungen** (Notiz `Odoo-Übernahme …`;
+  die Läufe von heute davor per Migration 0099 nachgetragen — erkannt an
+  Buchbestand 0, Variante aus `odoo_verweise`, seit 2026-09-29). Jede
+  andere Buchung, auch eine von Hand gezählte Inventur, schützt den
+  Bestand. Damit darf der Knopf dauerhaft auf der Seite bleiben.
+- **Fertigung nachziehen** in derselben Transaktion: je offener
+  Verkaufsmenge (Route Fertigen + Auf Auftrag, Stückliste vorhanden) ohne
+  Fertigungsauftrag ein bestätigter Fertigungsauftrag wie bei
+  `confirm_sales_order`. In Prod betrifft das S00106 und S00109; neue
+  Aufträge bekommen ihn ohnehin bei der Bestätigung (MTO fertigt
+  auftragsbezogen, auch bei Bestand).
+
+Umgesetzt in `src/modules/migration/odoo/fertigbestand.ts`, Registry
+`integrationen.ts`, Seite `einstellungen/odoo`, Migration 0099;
+dokumentiert in [migration-odoo.md](migration-odoo.md); Prozesstest
+`tests/prozesse/odoo-stuecklisten.test.ts`.
+
 ## 2026-09-30 — Fertigprodukte ohne Odoo-Bestand
 
 **Anlass:** Der Lauf von 09:11 buchte 117 Fertigprodukt-Varianten

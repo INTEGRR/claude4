@@ -226,3 +226,26 @@ export async function odooStuecklistenUebernehmen(
     daten: { ...b },
   }
 }
+
+/** Fertigprodukt-Bestand aus Odoo auf 0 (Odoo hatte Lieferungen nicht ausgebucht). */
+export async function odooFertigbestandZuruecknehmen(
+  _p: object,
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const { fertigbestandZuruecknehmen } = await import('../../migration/odoo/fertigbestand.ts')
+  const b = await fertigbestandZuruecknehmen(ctx.actor)
+  return {
+    text:
+      `${b.varianten} Fertigprodukt-Variante(n) auf 0 gesetzt (${b.menge} Stück)` +
+      (b.reservierungenGeloest ? `, ${b.reservierungenGeloest} Reservierung(en) gelöst` : '') +
+      (b.uebersprungen.length
+        ? `; ${b.uebersprungen.length} mit echten Lagerbewegungen übersprungen (bitte per Inventur prüfen): ` +
+          b.uebersprungen.slice(0, 5).map((u) => u.sku ?? u.name).join(', ')
+        : '') +
+      (b.fertigungsauftraege.length
+        ? `; ${b.fertigungsauftraege.length} Fertigungsauftrag/-aufträge nachgezogen (` +
+          b.fertigungsauftraege.map((f) => `${f.nummer} ${f.menge}× ${f.sku ?? ''}`.trim()).join(', ') + ')'
+        : '') + '.',
+    daten: { ...b },
+  }
+}

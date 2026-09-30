@@ -68,6 +68,27 @@ Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
    - Jede Bestandsbuchung der Übernahme ist eine Inventurzählung mit der
      Notiz `Odoo-Übernahme <Lauf>` — nachvollziehbar und gezielt
      korrigierbar.
+4. **Fertigbestand zurücknehmen, Fertigung nachziehen**
+   (`integrationen.odoo_fertigbestand_zuruecknehmen`, Karte auf derselben
+   Seite, erscheint nur, wenn es etwas zu tun gibt; `fertigbestand.ts`):
+   - Setzt Fertigprodukte (Vorlage mit aktiver Odoo-Stückliste, selbst
+     keine Komponente) per Inventurzählung auf 0 — **nur**, wenn ihr
+     Bestand ausschließlich aus Zählungen der Odoo-Übernahme stammt
+     (Notiz `Odoo-Übernahme …`; Läufe vor der Notiz per Migration 0099
+     nachgetragen). Andere Buchungen (Eingang, Fertigmeldung, Lieferung,
+     von Hand gezählte Inventur) → bleibt, wird gemeldet. Die eigene
+     Korrekturzählung (Notiz `Odoo-Fertigbestand zurückgenommen …`) zählt
+     dabei nicht als echte Buchung. Dadurch bleibt der Knopf dauerhaft
+     gefahrlos; das letzte Ergebnis steht unter „Stand".
+   - Löst vorher die Reservierungen wartender Lieferungen (die Inventur
+     selbst tut das beim Senken nicht) — die Lieferungen warten danach
+     wieder auf Ware.
+   - Legt danach für jede offene Verkaufsmenge mit Route Fertigen + Auf
+     Auftrag, die noch keinen Fertigungsauftrag hat (bestellt − geliefert
+     − schon in Fertigung), einen bestätigten Fertigungsauftrag an — wie
+     `confirm_sales_order`. Betrifft Aufträge, die vor den Stücklisten
+     bestätigt wurden; neue Aufträge bekommen ihn bei der Bestätigung.
+   - Eine Transaktion; ein zweiter Klick tut nichts mehr.
    - **Routen** Fertigen/Auf Auftrag wie in Odoo — nur, wenn jede aktive
      Variante der KRNL-Vorlage eine Stückliste bekommt (sonst liefe eine
      Shopify-Bestellung ins Leere). Ab dann erzeugt jede Shopify-Bestellung
