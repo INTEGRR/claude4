@@ -9,6 +9,7 @@ import { addAttribute, addVendorPrice, deleteVendorPrice, produktZuShopify, upda
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 import { RecordComments } from '@/components/record-comments'
+import { DokumenteKarte } from '@/components/dokumente'
 import { TagEditor } from '@/components/tag-editor'
 
 export const dynamic = 'force-dynamic'
@@ -545,6 +546,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </TableWrap>
         )}
       </Card>
+      <DokumenteKarte modell="product_template" recordId={id} />
       <RecordComments model="product_template" recordId={id} path={`/produkte/${id}`} />
     </>
   )

@@ -425,6 +425,7 @@ describe('KI: Schema-Doku wächst mit dem Schema (Wächter)', () => {
     'sprach_vorgaenge',
     'nutzungs_zaehler',         // Lern-Gedächtnis des Befehlsfelds, personenbezogen
     'shopify_webhook_events',   // Shopify-Rohpayloads, nur für den Import
+    'upload_sitzungen',         // Google-Upload-Adressen sind selbst Berechtigungen — per Sperrliste blockiert
   ])
 
   test('jede Tabelle ist dokumentiert oder bewusst versteckt', async () => {

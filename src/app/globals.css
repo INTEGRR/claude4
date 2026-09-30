@@ -913,6 +913,35 @@ label.field > span {
   .kommi-tippen { flex-basis: 100%; order: -1; }
 }
 
+/* --- Dokumente (Einkauf, 0092) --------------------------------------------- */
+.dok-upload { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.dok-upload.ueber { background: var(--info-soft); outline: 2px dashed var(--info); outline-offset: -4px; }
+.dok-laeufe { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dok-laeufe li { display: grid; grid-template-columns: minmax(0, 1fr) 160px; gap: 8px; align-items: center; }
+.dok-laeufe li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dok-balken { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; display: block; }
+.dok-balken > span { display: block; height: 100%; background: var(--info); transition: width 0.2s ease; }
+.dok-balken > span.fertig { background: var(--success); }
+.dok-liste { list-style: none; margin: 0; padding: 0; }
+.dok-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.dok-zeile:last-child { border-bottom: 0; }
+.dok-text { min-width: 0; }
+.dok-name { font-weight: 550; overflow-wrap: anywhere; }
+.dok-knoepfe { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.dok-knoepfe select { max-width: 160px; }
+@media (max-width: 560px) {
+  .dok-zeile { flex-direction: column; align-items: stretch; }
+  .dok-knoepfe { justify-content: flex-start; }
+  .dok-laeufe li { grid-template-columns: 1fr; }
+}
+
 /* --- KI-Analyse ------------------------------------------------------------ */
 .ki-chat {
   background: var(--surface);

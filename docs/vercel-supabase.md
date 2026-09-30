@@ -90,6 +90,18 @@ TELEGRAM_CHAT_ID     <Chat-ID, über Einstellungen → Benachrichtigungen ermitt
 Anmeldungen, Fehlversuche, fehlgeschlagene Jobs und Dienststörungen gehen
 damit als Push-Nachricht aufs Telefon ([module/integrationen.md](module/integrationen.md)).
 
+**Google Workspace für das Einkaufstool (optional):**
+
+```
+GOOGLE_DIENSTKONTO_JSON    <Schlüsseldatei des Dienstkontos, JSON oder Base64>
+GOOGLE_EINKAUF_ABLAGE_ID   <ID der geteilten Ablage „Einkauf">
+EINKAUF_POSTFACH           <einkauf@…, ab Stufe 2>
+```
+
+Das Dienstkonto in der geteilten Ablage als Inhaltsmanager eintragen; danach
+Einstellungen → Schnittstellen → „Ablage einrichten"
+([module/einkaufstool.md](module/einkaufstool.md)).
+
 Schützt `/api/cron/*` vor fremden Aufrufen. Vercel sendet ihn bei den eigenen
 Cron-Aufrufen automatisch als `Authorization: Bearer …` mit. Ist er auf Vercel
 nicht gesetzt, antwortet der Endpunkt seit 2026-09-18 mit 401 — dann läuft

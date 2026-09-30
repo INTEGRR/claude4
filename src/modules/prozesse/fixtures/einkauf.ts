@@ -68,6 +68,46 @@ export const EINKAUF_FIXTURE: ProzessFixture = {
       },
     },
     {
+      // Betriebsausstattung (0092): nur Dienstleistung — keine Lagerware,
+      // also kein Wareneingang. Die Weiche „Lagerware dabei?" führt direkt
+      // zur Rechnung; abgerechnet wird nach Bestellmenge.
+      name: 'Betriebsausstattung: nur Dienstleistung, ohne Wareneingang',
+      pfad: ['anlegen', 'position', 'bestaetigen', 'rechnung', 'abrechnung'],
+      eingaben: {
+        anlegen: (ctx) => ({ vendor_id: ctx.lieferantId }),
+        position: async (_ctx, sql) => {
+          const [stueck] = await sql<{ id: string }[]>`select id from uoms where name = 'Stück'`
+          const [tpl] = await sql<{ id: string }[]>`
+            insert into product_templates (name, uom_id, type)
+            values (${`Prozesstest Regal-Montage ${Date.now()}`}, ${stueck.id}, 'service') returning id`
+          await sql`select generate_variants(${tpl.id})`
+          const [v] = await sql<{ id: string }[]>`select id from product_variants where template_id = ${tpl.id}`
+          return { variant_id: v.id, qty: 1, price_unit: 450 }
+        },
+      },
+      ereignisse: {
+        abrechnung: async (ctx, sql) => {
+          const [bill] = await sql<{ id: string }[]>`
+            select id from vendor_bills
+            where purchase_order_id = ${ctx.einkauf_wareneingang_rechnung_beleg_id}`
+          assert.ok(bill, 'die Rechnung muss existieren')
+          await sql`update vendor_bills set bill_date = current_date where id = ${bill.id}`
+          const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+          const nutzer = { name: 'prozesstest', role: 'admin' as const }
+          await aktionAusfuehrenGeprueft('einkauf.rechnung_buchen', { recordId: bill.id }, nutzer)
+          await aktionAusfuehrenGeprueft('einkauf.rechnung_zahlen', { recordId: bill.id }, nutzer)
+        },
+      },
+      pruefen: async (sql, _ctx, poId) => {
+        const eingaenge = await sql`
+          select 1 from stock_pickings where origin_model = 'purchase_order' and origin_id = ${poId}`
+        assert.equal(eingaenge.length, 0, 'kein Wareneingang für Dienstleistungen')
+        const [bill] = await sql<{ state: string }[]>`
+          select state from vendor_bills where purchase_order_id = ${poId}`
+        assert.equal(bill.state, 'paid')
+      },
+    },
+    {
       // Der zweite START der Kette: nicht ein Mensch legt an, sondern der
       // Meldebestand — „Beschaffung ausführen" macht aus dem Vorschlag die
       // Bestellung (record_id = die Meldebestand-Regel).

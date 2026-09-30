@@ -201,6 +201,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items: sees('einkauf') && prozessAktiv('einkauf')
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
+            { href: '/einkauf/lieferanten', label: 'Lieferanten' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },
             { href: '/einkauf/kurse', label: 'Wechselkurse' },
           ]

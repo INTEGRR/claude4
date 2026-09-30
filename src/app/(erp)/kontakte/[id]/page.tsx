@@ -87,7 +87,11 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             )}
             {partner.is_customer && 'Kunde'}
             {partner.is_customer && partner.is_vendor && ' · '}
-            {partner.is_vendor && 'Lieferant'}
+            {partner.is_vendor && (
+              <>
+                Lieferant (<Link href={`/einkauf/lieferanten/${id}`}>Lieferantenakte</Link>)
+              </>
+            )}
             {partner.is_company ? ' · Firma' : ''}
             {partner.ref && (
               <> · Ref. <span className="mono">{partner.ref}</span></>

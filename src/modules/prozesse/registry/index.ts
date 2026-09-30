@@ -1,6 +1,7 @@
 import type { RegistrierteAktion } from './typen.ts'
 import { AUSWERTUNGEN } from './auswertungen.ts'
 import { EINKAUF } from './einkauf.ts'
+import { EINKAUF_DOKUMENTE } from './einkauf-dokumente.ts'
 import { EINSTELLUNGEN } from './einstellungen.ts'
 import { FEHLER } from './fehler.ts'
 import { FERTIGUNG } from './fertigung.ts'
@@ -27,6 +28,7 @@ import { VORGANG } from './vorgang.ts'
 export const REGISTRY = {
   ...AUSWERTUNGEN,
   ...EINKAUF,
+  ...EINKAUF_DOKUMENTE,
   ...EINSTELLUNGEN,
   ...FEHLER,
   ...FERTIGUNG,

@@ -17,7 +17,7 @@ export interface Variable {
 }
 
 export interface Anbindung {
-  schluessel: 'shopify' | 'dhl' | 'mail' | 'ki' | 'sprache' | 'telegram' | 'odoo' | 'system'
+  schluessel: 'shopify' | 'dhl' | 'mail' | 'ki' | 'sprache' | 'telegram' | 'odoo' | 'google' | 'system'
   titel: string
   /** Umgebungsvariable, die die Anbindung durch eine Attrappe ersetzt (Tests, Staging). */
   fake?: string
@@ -90,6 +90,16 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
       { name: 'ODOO_DB', pflicht: true, zweck: 'Name der Odoo-Datenbank' },
       { name: 'ODOO_USER', pflicht: true, zweck: 'Login (E-Mail) des Odoo-Benutzers' },
       { name: 'ODOO_API_KEY', pflicht: true, zweck: 'API-Schlüssel: Odoo → Einstellungen → Benutzer → Kontosicherheit' },
+    ],
+  },
+  {
+    schluessel: 'google',
+    titel: 'Google Workspace (Einkauf)',
+    fake: 'GOOGLE_FAKE',
+    variablen: [
+      { name: 'GOOGLE_DIENSTKONTO_JSON', pflicht: true, zweck: 'Schlüsseldatei des Dienstkontos (JSON oder Base64) — Google Cloud → IAM → Dienstkonten' },
+      { name: 'GOOGLE_EINKAUF_ABLAGE_ID', pflicht: true, zweck: 'ID der geteilten Ablage „Einkauf" (Dienstkonto als Inhaltsmanager eintragen)' },
+      { name: 'EINKAUF_POSTFACH', pflicht: false, zweck: 'Einkaufspostfach (z. B. einkauf@…) — ab Stufe 2, domänenweite Delegation nur gmail.modify' },
     ],
   },
   {

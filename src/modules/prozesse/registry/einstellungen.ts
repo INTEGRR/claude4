@@ -99,6 +99,9 @@ export const EINSTELLUNGEN = {
       country: z.string().length(3).default('DEU'),
       email: z.string().max(120).default(''),
       phone: z.string().max(40).default(''),
+      // Einkauf/Zoll (0092): EORI-Nummer und USt-IdNr. für Spediteur und Zoll.
+      eori: z.string().trim().max(17).regex(/^([A-Z]{2}[A-Z0-9]{1,15})?$/, 'EORI: Länderkürzel + bis zu 15 Zeichen, z. B. DE123456789012345').optional(),
+      ust_id: z.string().trim().max(20).optional(),
     }),
     zusammenfassung: (p) => `Firma ${p.name}`,
     formdata: (fd) => ({
@@ -110,6 +113,9 @@ export const EINSTELLUNGEN = {
       country: String(fd.get('country') ?? 'DEU'),
       email: String(fd.get('email') ?? ''),
       phone: String(fd.get('phone') ?? ''),
+      // Nur mitsenden, wenn das Formular die Felder hat (die Einrichtung hat sie nicht).
+      eori: fd.has('eori') ? String(fd.get('eori') ?? '').trim().toUpperCase() : undefined,
+      ust_id: fd.has('ust_id') ? String(fd.get('ust_id') ?? '').trim().toUpperCase() : undefined,
     }),
     revalidate: ['/einstellungen', '/'],
   },

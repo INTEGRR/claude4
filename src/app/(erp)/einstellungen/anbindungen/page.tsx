@@ -26,6 +26,11 @@ async function shopifyModusSpeichern(formData: FormData) {
   return serverAktion('einstellungen.shopify_modus_setzen', { formData })
 }
 
+async function einkaufsablageEinrichten() {
+  'use server'
+  return serverAktion('einkauf.ablage_einrichten', {})
+}
+
 async function webhooksRegistrieren(formData: FormData) {
   'use server'
   return serverAktion('integrationen.webhooks_registrieren', { formData })
@@ -268,6 +273,22 @@ export default async function SchnittstellenPage() {
           <Link href="/einstellungen/odoo">Odoo-Übernahme</Link>.
         </p>
         <Variablen stand={stand.odoo} />
+      </Card>
+
+      <Card title="Google Workspace (Einkauf)">
+        <Stand stand={stand.google} wache={wache.google} />
+        <p className="small muted" style={{ margin: '0 0 10px' }}>
+          Dateien des Einkaufs liegen in der geteilten Ablage „Einkauf" (Ordner je Lieferant, Bestellung
+          und Artikel) — KRNL hält nur den Index. Das Dienstkonto braucht dort die Rolle
+          Inhaltsmanager; für das Einkaufspostfach (Stufe 2) zusätzlich die domänenweite Delegation
+          mit nur <code className="mono">gmail.modify</code>.
+        </p>
+        <ActionForm action={einkaufsablageEinrichten}>
+          <button className="small" type="submit" disabled={!stand.google.vollstaendig && !stand.google.fake}>
+            Ablage einrichten (Hauptordner anlegen)
+          </button>
+        </ActionForm>
+        <Variablen stand={stand.google} />
       </Card>
 
       <Card title="Betrieb (Zeitsteuerung und Schlüssel)">

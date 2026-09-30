@@ -38,6 +38,20 @@ export function money(value: number | string | null | undefined, currency = 'EUR
 }
 
 /**
+ * Stückpreis im Einkauf (0092): bis 6 Nachkommastellen, mindestens 2 —
+ * Kleinteile kosten 0,0034 USD, ein Gehäuse 20,00 €.
+ */
+export function stueckpreis(value: number | string | null | undefined, currency = 'EUR'): string {
+  if (value === null || value === undefined) return '—'
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(Number(value))
+}
+
+/**
  * Prozent mit deutschem Komma. Fehlte bisher — deshalb stand `12.3 %` (aus
  * toFixed(), englischer Punkt) neben `12,5 %` (aus qty()) im selben System.
  * Erwartet den ANTEIL (0.123), nicht den Prozentwert.

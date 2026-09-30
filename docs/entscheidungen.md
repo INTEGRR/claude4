@@ -9,6 +9,53 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Einkaufstool: ein Ablauf vom Bedarf bis zur Lieferung, Dateien in Google Drive
+
+Tino und Patrick kaufen bei 20–60 Lieferanten, überwiegend in China
+(Platinen, Sensoren, Keycaps, CNC-/Laser-/Moldteile, Packaging, Foam; dazu
+Betriebsausstattung). Hunderte Mails, Termine abwarten, Preise, Tracking,
+Zeichnungen teilen, fehlenden Rechnungen hinterherlaufen.
+
+**Entschieden (Betreiber-Interview):**
+
+- **Ein durchgängiger Ablauf:** Einkaufsprojekt (Bedarf → Anfragen →
+  Angebote → Muster → Entscheidung → Bestellung) plus **Lieferantenakte**,
+  verknüpft. Ein Projekt ist abgeschlossen, wenn alles geliefert ist;
+  Rechnung und Zahlung laufen an der Bestellung weiter.
+- **Postfach:** neues eigenes Google-Workspace-Postfach, KRNL liest und sendet
+  per Gmail-API im selben Thread. Alt-Threads leitet Tino weiter (kein Zugriff
+  auf persönliche Postfächer); Alibaba-Chats von Hand. Sprache je Lieferant
+  (de/en/zh), Anzeige immer auch deutsch.
+- **Dateien in Google Drive** (geteilte Ablage „Einkauf", Ordner je Lieferant,
+  Bestellung, Artikel, später Projekt), KRNL hält nur Index und Verweise. Für
+  China ist der Mail-Anhang der Standard (Drive und vercel.app sind dort oft
+  gesperrt, eine eigene Domain gibt es nicht).
+- **Google-Zugriff minimal:** Drive ohne domänenweite Delegation (Dienstkonto
+  als Inhaltsmanager der Ablage), Gmail mit Delegation nur `gmail.modify` und
+  nur für das Einkaufspostfach. Eigene JWT-Anmeldung per `node:crypto`,
+  keine googleapis-Abhängigkeit.
+- **Upload über KRNL in 4-MiB-Stücken** statt direkt aus dem Browser zu
+  Google: ohne Zugangsdaten ließ sich die CORS-Frage der Drive-Sitzungen nicht
+  vorab klären; der Stückweg funktioniert sicher unter der Vercel-Grenze von
+  4,5 MB. Die Sitzungsadresse bleibt serverseitig; übernommen wird eine Datei
+  erst nach Prüfung bei Google (Registry-Aktion, nie der ID aus dem Browser
+  geglaubt). Direkter Upload bleibt eine spätere Beschleunigung.
+- **Mehrere Einkäufer**, zuständig je Vorgang; jeder entscheidet seine Käufe
+  (Freigabe-Limit bleibt optional). Wiedervorlagen im Cockpit und täglich im
+  bestehenden Telegram-Chat. EZB-Kurse automatisch. Einstand mit lernenden
+  Schätzwerten. Rechnungen per Beleg-Mail an DATEV.
+- **Agent zuletzt, nur Entwürfe**, sofort bei jeder eingehenden Mail; er
+  sendet und bucht nie selbst.
+- **Stufe 1 (0092):** Dokumente, Lieferantenakte, EORI. Dazu zwei
+  Korrekturen, die das Tool braucht:
+  - **Dienstleistungen** erzeugen keine Lagerbewegung mehr. Eine reine
+    Dienstleistungs-Bestellung hing bisher ewig im Teilprozess
+    Wareneingang; jetzt führt die Weiche „Lagerware dabei?" direkt zur
+    Rechnung. Dienstleistungen rechnen nach Bestellmenge ab.
+  - **Einkaufspreise mit 6 Nachkommastellen.**
+
+Plan und Stand je Stufe: [module/einkaufstool.md](module/einkaufstool.md).
+
 ## 2026-09-29 — Kommissionieren: „ohne Scan bestätigen" als Einstellung für den Start
 
 Ergänzt den Eintrag „Kommissionieren: Packzettel auf Papier und

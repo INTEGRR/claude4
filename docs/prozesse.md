@@ -1248,6 +1248,20 @@ beweist die Kette Bestellung → Fertigung → Packtisch-Scan → picking done +
 Label + shopify_fulfillment_id + voll geliefert. Arbeitsplatz-Seite und
 Druckbrücke: docs/module/versand.md (folgt mit den nächsten Paketen).
 
+## Einkauf: Weiche „Lagerware dabei?" (Migration 0092, umgesetzt)
+
+Der Bestellprozess `einkauf_wareneingang_rechnung` hat nach „Bestätigen"
+die XOR-Weiche `lagerware`. Mit Lagerware (`hat_lagerware` aus
+`prozess_beleg_daten`, abgeleitet aus den Positionen) geht es wie bisher in
+den Teilprozess Wareneingang. Ohne Lagerware stehen „Rechnung erstellen"
+und die Abrechnung sofort nebeneinander — beide Kanten bedingt, damit der
+Lagerweg sie nicht vorzeitig anbietet. Anlass: `confirm_purchase_order`
+legt für Dienstleistungen keinen Eingang mehr an; ohne Weiche hätte der
+Teilprozess Wareneingang ohne Kindbeleg ewig gewartet. Fixture-Lauf
+„Betriebsausstattung: nur Dienstleistung, ohne Wareneingang" beweist den
+Weg bis zur bezahlten Rechnung. Das Einkaufstool insgesamt:
+[module/einkaufstool.md](module/einkaufstool.md).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

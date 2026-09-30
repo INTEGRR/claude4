@@ -6,7 +6,8 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { date, isoDatum, money, qty } from '@/modules/shared/format'
+import { DokumenteKarte } from '@/components/dokumente'
+import { date, isoDatum, money, qty, stueckpreis } from '@/modules/shared/format'
 import {
   addPoLine,
   approvePo,
@@ -387,7 +388,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                           </span>
                         </span>
                       </td>
-                      <td className="num">{money(l.price_unit, order.currency)}</td>
+                      <td className="num">{stueckpreis(l.price_unit, order.currency)}</td>
                       <td className="num">{Number(l.discount) > 0 ? `${qty(l.discount)} %` : '—'}</td>
                       <td className="num">{money(l.subtotal, order.currency)}</td>
                       {editable && (
@@ -436,7 +437,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 </label>
                 <label className="field">
                   <span>Preis (optional)</span>
-                  <input type="number" name="price_unit" step="0.01" placeholder="aus Preisliste" />
+                  <input type="number" name="price_unit" step="any" min={0} placeholder="aus Preisliste" />
                 </label>
                 <label className="field">
                   <span>Rabatt % (optional)</span>
@@ -605,6 +606,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         )}
       </div>
 
+      <DokumenteKarte modell="purchase_order" recordId={id} />
       <RecordComments model="purchase_order" recordId={id} path={`/einkauf/${id}`} />
     </>
   )

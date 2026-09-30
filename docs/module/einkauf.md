@@ -6,6 +6,9 @@ Referenzverhalten: [docs/odoo-referenz/einkauf.md](../odoo-referenz/einkauf.md)
 
 Komponenten bei Lieferanten bestellen: Angebotsanfrage → Bestellung → Wareneingang → Lieferantenrechnung. Mit E-Mail-Versand, Stornieren und Sperren.
 
+Das **Einkaufstool** (Dokumente in Google Drive, Lieferantenakte, Postfach,
+Projekte, Sendungen/Zoll) beschreibt [einkaufstool.md](einkaufstool.md).
+
 ## Lieferanten & Preise
 
 - Lieferant = `partners`-Eintrag mit `is_vendor` (Name, E-Mail für Bestellversand, Adresse, USt-ID, Zahlungsziel).
@@ -36,7 +39,8 @@ Variante, Beschreibung, **Menge + Einkaufs-Maßeinheit**, Einzelpreis, Steuersat
 
 ## Lieferantenrechnungen
 
-- **Abrechnungsrichtlinie** (`bill_policy` je Produkt, Default `received`): `ordered` = Rechnung ab Bestätigung über bestellte Mengen; `received` = erst nach Wareneingang über erhaltene Mengen (Versuch vorher ⇒ Fehlermeldung).
+- **Abrechnungsrichtlinie** (`bill_policy` je Produkt, Default `received`): `ordered` = Rechnung ab Bestätigung über bestellte Mengen; `received` = erst nach Wareneingang über erhaltene Mengen (Versuch vorher ⇒ Fehlermeldung). Dienstleistungen stehen immer auf `ordered` (Trigger, 0092).
+- **Dienstleistungen** (0092) erzeugen beim Bestätigen keine Lagerbewegung; eine reine Dienstleistungs-Bestellung hat keinen Wareneingang, die Weiche „Lagerware dabei?" führt direkt zur Rechnung. Einkaufspreise haben 6 Nachkommastellen.
 - Button **Rechnung erstellen** auf der Bestellung ⇒ Entwurfsrechnung mit vorbefüllten Positionen (Richtlinie beachtet, bereits abgerechnete Mengen abgezogen) → Rechnungsdatum + Lieferantenreferenz erfassen → **Buchen** (`posted`, aktualisiert `qty_billed` + `billing_status`) → **Zahlung erfassen** (`paid`, Datum).
 - **Stornieren**: Entwurf ⇒ `cancel`. Gebuchte Rechnung ⇒ **Gutschrift** (`is_credit_note`, `reversed_bill_id`), die `qty_billed` wieder reduziert.
 - `billing_status` auf der Bestellung: `nothing` / `waiting` / `fully_billed` gemäß Odoo-Tabelle (siehe Referenz).

@@ -1,6 +1,7 @@
 import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
 import * as einkauf from './registry/einkauf-ausfuehren.ts'
+import * as einkaufDokumente from './registry/einkauf-dokumente-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -25,6 +26,13 @@ import * as vorgang from './registry/vorgang-ausfuehren.ts'
  */
 export const AUSFUEHRUNG = {
 
+  'einkauf.ablage_einrichten': einkaufDokumente.ablageEinrichtenAusfuehren,
+  'einkauf.upload_vorbereiten': einkaufDokumente.uploadVorbereiten,
+  'einkauf.dokument_registrieren': einkaufDokumente.dokumentRegistrieren,
+  'einkauf.dokument_verknuepfen': einkaufDokumente.dokumentVerknuepfen,
+  'einkauf.dokument_loesen': einkaufDokumente.dokumentLoesen,
+  'einkauf.dokument_aendern': einkaufDokumente.dokumentAendern,
+  'einkauf.lieferantendaten_setzen': einkaufDokumente.lieferantendatenSetzen,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,

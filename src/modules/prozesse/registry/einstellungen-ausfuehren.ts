@@ -23,10 +23,14 @@ export async function firmaSpeichern(
     country: string
     email: string
     phone: string
+    eori?: string
+    ust_id?: string
   },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
-  await sql`update settings set value = ${sql.json(p)} where key = 'company'`
+  // Zusammenführen statt ersetzen: Formulare ohne EORI/USt-IdNr. (die
+  // Einrichtung) lassen die gepflegten Werte stehen.
+  await sql`update settings set value = coalesce(value, '{}'::jsonb) || ${sql.json(JSON.parse(JSON.stringify(p)))} where key = 'company'`
   return { text: `Firmendaten von „${p.name}" gespeichert.` }
 }
 

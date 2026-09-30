@@ -8,7 +8,7 @@ export const SCHEMA_DOKU = `
 Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 
 ### Stammdaten
-- **partners**: Kunden & Lieferanten. Spalten: name, is_company, is_customer, is_vendor, email, phone, street, house_number, zip, city, country_code, vat, active.
+- **partners**: Kunden & Lieferanten. Spalten: name, is_company, is_customer, is_vendor, email, phone, street, house_number, zip, city, country_code, vat, active. Einkauf (Lieferantenakte): sprache ('de'|'en'|'zh'), mail_domains text[] (ordnen eingehende Mails zu), einkaeufer_id → users (zuständig), standard_incoterm, standard_waehrung.
 - **uoms**: Maßeinheiten (name, category, factor). Umrechnung: uom_convert(qty, von_uom_id, nach_uom_id).
 - **product_templates**: Produkte. name, uom_id, list_price (VK), standard_cost (Einstand), weight_g, can_be_sold, can_be_purchased, type ('goods'|'service'), route_manufacture, route_mto, route_buy, active.
 - **product_variants**: Varianten je Template (template_id). sku, barcode, display_name, price_extra, active. Anzeigename: variant_display_name(variant_id).
@@ -57,6 +57,10 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **purchase_order_lines**: order_id, variant_id, qty, qty_received, qty_billed, uom_id, price_unit.
 - **vendor_bills**: Lieferantenrechnungen (number 'BILL/…', vendor_id, purchase_order_id, state 'draft'|'posted'|'paid'|'cancel', total).
 - **vendor_bill_lines**: Positionen.
+- **dokumente**: Einkaufsdateien in Google Drive (drive_file_id, name, mime, groesse, md5, art 'zeichnung'|'gerber'|'step'|'ai'|'bom'|'angebot'|'pi'|'ci'|'packing_list'|'rechnung'|'bl_awb'|'zollbescheid'|'vertrag'|'nda'|'foto'|'sonstiges', revision, quelle 'upload'|'mail'|'drive'|'weitergeleitet'|'manuell', partner_id = Lieferant, notiz, text_auszug, datev_uebergeben_am). Die Datei liegt in der geteilten Ablage „Einkauf", KRNL hält den Index.
+- **dokument_verweise**: welche Datei an welchem Beleg hängt (dokument_id, modell 'partner'|'purchase_order'|'vendor_bill'|'product_template', record_id) — n:m. „Welche Zeichnungen hat Bestellung X?": join dokument_verweise v on v.modell='purchase_order' and v.record_id = <id>.
+- **drive_ordner**: Ordner-Cache der Ablage (schluessel wie 'partner:<uuid>', folder_id, name).
+- Bestellungen nur mit Dienstleistungen (product_templates.type = 'service') haben KEINEN Wareneingang; Dienstleistungen rechnen nach Bestellmenge ab (bill_policy 'ordered').
 
 ### Personal
 - **employees**: Mitarbeiter (number 'MA0001', name, barcode = Ausweis, job_title, department, employment_type 'full_time'|'part_time'|'mini_job'|'temp'|'apprentice', hourly_cost = Personalkostensatz je Stunde, weekly_hours, vacation_days, hire_date, exit_date, active, user_id → users).

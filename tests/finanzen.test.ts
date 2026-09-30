@@ -202,7 +202,10 @@ describe('Finanzen: Zahlungsregister', () => {
         from vertraege v where v.id = ${v.id}`
       const zum = new Date(k.zum)
       const frist = new Date(k.frist)
-      assert.ok(frist >= new Date(), 'Der nächste Kandidat hat eine noch offene Frist')
+      // Tagesgenau vergleichen: die Frist ist ein Datum (00:00) und gilt den
+      // ganzen Tag — am Fristtag selbst ist sie noch offen.
+      const heute = new Date(new Date().toISOString().slice(0, 10))
+      assert.ok(frist >= heute, 'Der nächste Kandidat hat eine noch offene Frist')
       assert.equal(
         (zum.getTime() - new Date('2024-01-01').getTime()) % 1 >= 0 && zum.getMonth(),
         11,

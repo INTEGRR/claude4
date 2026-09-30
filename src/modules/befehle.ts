@@ -37,6 +37,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/fertigung/stuecklisten', label: 'Stücklisten', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/fertigung/arbeitsplaetze', label: 'Arbeitsplätze', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/einkauf', label: 'Bestellungen', area: 'einkauf', prozess: ['einkauf'] },
+  { href: '/einkauf/lieferanten', label: 'Lieferanten (Lieferantenakten)', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/rechnungen', label: 'Lieferantenrechnungen', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/einkauf/kurse', label: 'Wechselkurse', area: 'einkauf', prozess: ['einkauf'] },
   { href: '/lager', label: 'Transfers', area: 'lager' },

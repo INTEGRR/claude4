@@ -17,6 +17,8 @@ interface Firma {
   country: string
   email: string
   phone: string
+  eori: string
+  ust_id: string
 }
 
 async function firmaSpeichern(formData: FormData) {
@@ -54,6 +56,16 @@ export default async function FirmaPage() {
             <label className="field">
               <span>Telefon</span>
               <input name="phone" defaultValue={firma.phone ?? ''} />
+            </label>
+          </div>
+          <div className="row">
+            <label className="field">
+              <span>EORI-Nummer (Zoll)</span>
+              <input name="eori" className="mono" defaultValue={firma.eori ?? ''} placeholder="DE…" />
+            </label>
+            <label className="field">
+              <span>USt-IdNr.</span>
+              <input name="ust_id" className="mono" defaultValue={firma.ust_id ?? ''} placeholder="DE…" />
             </label>
           </div>
           <div className="row">

@@ -5,6 +5,7 @@ import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { aktiveDruckerVorhanden, stilleDrucker } from '@/modules/druck/abholen'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
+import { DRIVE_SCOPE, driveKonfiguriert, googleFake, zugriffstoken } from '@/modules/google/auth'
 import { mailConfigured } from './mail'
 import { shopifyConfigured, shopifyGraphQL } from './shopify'
 import { TELEGRAM_API, TELEGRAM_ZEITLIMIT_MS, telegramConfigured } from './telegram'
@@ -105,6 +106,22 @@ export function standardSonden(): Sonde[] {
           signal: AbortSignal.timeout(TELEGRAM_ZEITLIMIT_MS),
         })
         if (!res.ok) throw new Error(`antwortet ${res.status} — Token prüfen`)
+      },
+    },
+    {
+      // Google (Einkaufsablage, 0092): Anmeldung als Dienstkonto + die
+      // geteilte Ablage muss für das Konto sichtbar sein.
+      dienst: 'google',
+      konfiguriert: driveKonfiguriert(),
+      pruefen: async () => {
+        if (googleFake()) return
+        const token = await zugriffstoken(DRIVE_SCOPE)
+        await httpOk(
+          `https://www.googleapis.com/drive/v3/drives/${encodeURIComponent(process.env.GOOGLE_EINKAUF_ABLAGE_ID ?? '')}?fields=id`,
+          { headers: { authorization: `Bearer ${token}` } },
+        ).catch((err: Error) => {
+          throw new Error(`Ablage nicht erreichbar (${err.message}) — Dienstkonto als Inhaltsmanager eintragen`)
+        })
       },
     },
   ]
