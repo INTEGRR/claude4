@@ -169,5 +169,27 @@ export const INTEGRATIONEN = {
     revalidate: ['/einstellungen/odoo', '/lager', '/produkte', '/versand', '/fertigung', '/verkauf'],
   },
 
+  'integrationen.odoo_artikel_zusammenfuehren': {
+    label: 'Doppelten Artikel zusammenführen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Führt eine von der Odoo-Übernahme angelegte Komponente in den Shop-Artikel zusammen, der dasselbe ' +
+      'Einzelteil ist: Bestand (per Inventur), Stücklistenzeilen, offene Bewegungen, Lieferantenpreise, ' +
+      'Meldebestand und Odoo-Zuordnung wandern mit, die SKU wird SKU bzw. Barcode des Shop-Artikels, die ' +
+      'Odoo-Kopie wird archiviert. Nur ohne Belege und ohne fremde Lagerbuchungen.',
+    bindung: 'frei',
+    schema: z.object({
+      aufloesen_id: z.string().uuid(),
+      behalten_id: z.string({ required_error: 'Bitte einen Shop-Artikel wählen' }).uuid('Bitte einen Shop-Artikel wählen'),
+    }),
+    formdata: (fd) => ({
+      aufloesen_id: String(fd.get('aufloesen_id') ?? ''),
+      behalten_id: String(fd.get('behalten_id') ?? ''),
+    }),
+    revalidate: ['/einstellungen/odoo', '/lager', '/produkte', '/fertigung'],
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

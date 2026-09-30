@@ -277,5 +277,6 @@ export const AUSFUEHRUNG = {
   'integrationen.odoo_vorschau': integrationen.odooVorschau,
   'integrationen.odoo_stuecklisten_uebernehmen': integrationen.odooStuecklistenUebernehmen,
   'integrationen.odoo_fertigbestand_zuruecknehmen': integrationen.odooFertigbestandZuruecknehmen,
+  'integrationen.odoo_artikel_zusammenfuehren': integrationen.odooArtikelZusammenfuehren,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

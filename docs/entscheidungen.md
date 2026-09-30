@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Doppelte Artikel zusammenführen (Shop-Artikel ↔ Odoo-Komponente)
+
+**Anlass:** GATERON-Switches, PCB Foam u. a. gibt es zweimal — als
+Shop-Artikel (SH00000115…, Bestand 0) und als von der Odoo-Übernahme
+angelegte Komponente (SW-GT-…, mit Bestand, in den Stücklisten).
+Betreiber: „Einzelteile" — es ist jeweils dasselbe Teil, keine Packung.
+
+**Entschieden:**
+- Zusammenführen **in den Shop-Artikel**, die Odoo-Kopie wird
+  archiviert: Er trägt die Shopify-Kopplung und die Verkaufshistorie; die
+  Odoo-Kopie hat nur Übernahme-Daten. Bestand (per Inventur, bewertet),
+  aktive Stücklistenzeilen, offene Bewegungen, Lieferantenpreise,
+  Meldebestand und `odoo_verweise` wandern mit; die Odoo-SKU wird SKU
+  oder Barcode des Shop-Artikels.
+- **Der Mensch bestätigt jedes Paar** (Knopf je Zeile). Vorausgewählt nur
+  eindeutige Namenstreffer; unsichere Paare (Cherry Silent Red gegen
+  GATERON Silent Red, PCB Foam gegen Middle/Bottom Foam) nicht.
+- Registrierte Aktion statt SQL von Hand; hart statt still bei Belegen,
+  fremden Lagerbuchungen, Stückliste am Ziel oder anderer Einheit.
+- Bekannte Grenze: Einkaufspreis ist je Vorlage — mehrere Switch-Typen in
+  einer Shop-Vorlage teilen sich einen Preis (der erste gesetzte gilt).
+
+Umgesetzt in `src/modules/migration/odoo/doppelte.ts` und
+`doppelte-vorschlag.ts`, Registry `integrationen.ts`, Seite
+`einstellungen/odoo`; dokumentiert in [migration-odoo.md](migration-odoo.md);
+Tests `tests/odoo-doppelte.test.ts`, `tests/prozesse/odoo-stuecklisten.test.ts`.
+
 ## 2026-09-30 — Stücklisten-Liste zeigt nur aktive
 
 **Anlass:** Nach der Umstellung auf eine Stückliste je Artikel sind in

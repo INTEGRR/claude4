@@ -299,6 +299,85 @@ describe('Odoo-Stücklisten übernehmen', () => {
     assert.equal(await bestand('FAKE-KB-W-DE'), 0)
   })
 
+  test('Doppelte Artikel: Odoo-Komponente in den gleichen Shop-Artikel zusammenführen', async () => {
+    const [lager] = await h.sql<{ id: string }[]>`select id from stock_locations where full_path = 'WH/Stock'`
+    const [pl] = await h.sql<{ id: string }[]>`select id from product_variants where sku = 'FAKE-PL-1'`
+    // Kommapreis wie bei den echten Switches (0,15 €) — ganzzahlige Preise verdeckten einen Typfehler.
+    await h.sql`update product_templates set standard_cost = 0.15
+                where id = (select template_id from product_variants where id = ${pl.id})`
+    // Odoo-Bestand der Platine (steht in den Stücklisten Weiß und Schwarz); die zwei
+    // Fertigungsaufträge von oben reservieren davon 3.
+    const [z] = await h.sql<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+      values (${lager.id}, ${pl.id}, 30, 0, 'Odoo-Übernahme odoo-api 2026-09-30T09:11') returning id`
+    await h.sql`select inventory_apply(${z.id}, 'test')`
+    const moRes = async (variante: string) =>
+      (await h.sql<{ n: number }[]>`
+        select coalesce(sum(reserved_qty), 0)::float as n from stock_moves
+        where variant_id = ${variante} and production_id is not null and state not in ('done', 'cancel')`)[0].n
+    assert.equal(await moRes(pl.id), 3)
+
+    // Derselbe Teil als Shop-Artikel: ohne SKU, ohne Preis, mit Shopify-Kopplung.
+    const [tpl] = await h.sql<{ id: string }[]>`
+      insert into product_templates (name, uom_id, can_be_sold) values ('Platine', ${await stueck()}, true) returning id`
+    await h.sql`select generate_variants(${tpl.id})`
+    const [shop] = await h.sql<{ id: string }[]>`
+      update product_variants set shopify_variant_id = 'gid://shopify/ProductVariant/4711'
+      where template_id = ${tpl.id} returning id`
+
+    const { zusammenfuehrenKandidaten } = await import('../../src/modules/migration/odoo/doppelte.ts')
+    const k = await zusammenfuehrenKandidaten()
+    assert.equal(k.links.find((l) => l.id === pl.id)?.vorschlag, shop.id, 'eindeutiger Namenstreffer')
+
+    // Nur, was die Übernahme selbst angelegt hat, lässt sich auflösen.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'integrationen.odoo_artikel_zusammenfuehren',
+        { parameter: { aufloesen_id: v['FAKE-SW-1'], behalten_id: shop.id } },
+        ADMIN,
+      ),
+      /angelegt hat/,
+    )
+
+    // Aus dem Formular der Seite (FormData): ohne Auswahl eine klare Meldung.
+    const leer = new FormData()
+    leer.set('aufloesen_id', pl.id)
+    leer.set('behalten_id', '')
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('integrationen.odoo_artikel_zusammenfuehren', { formData: leer }, ADMIN),
+      /Shop-Artikel wählen/,
+    )
+
+    const formular = new FormData()
+    formular.set('aufloesen_id', pl.id)
+    formular.set('behalten_id', shop.id)
+    const r = await aktionAusfuehrenGeprueft('integrationen.odoo_artikel_zusammenfuehren', { formData: formular }, ADMIN)
+    const b = r.daten as Record<string, unknown>
+    assert.deepEqual(
+      [b.bestand, b.stuecklistenzeilen, b.offeneBewegungen, b.preisUebernommen, b.sku],
+      [30, 2, 2, true, 'sku'],
+    )
+
+    const [nachher] = await h.sql<{ sku: string; bestand: number; preis: number; alt_aktiv: boolean; alt_sku: string | null }[]>`
+      select pv.sku, on_hand_qty(pv.id, null)::float as bestand, pt.standard_cost::float as preis,
+             (select active from product_variants where id = ${pl.id}) as alt_aktiv,
+             (select sku from product_variants where id = ${pl.id}) as alt_sku
+      from product_variants pv join product_templates pt on pt.id = pv.template_id where pv.id = ${shop.id}`
+    assert.deepEqual({ ...nachher }, { sku: 'FAKE-PL-1', bestand: 30, preis: 0.15, alt_aktiv: false, alt_sku: null })
+    assert.equal(await moRes(shop.id), 3, 'Fertigungsaufträge reservieren jetzt den Shop-Artikel')
+    const teile = await h.sql<{ id: string }[]>`
+      select c.component_variant_id as id from bom_components_for_variant(resolve_bom(${v['FAKE-KB-W-DE']}), ${v['FAKE-KB-W-DE']}) c`
+    assert.ok(teile.some((x) => x.id === shop.id), 'Stückliste zeigt auf den Shop-Artikel')
+    const [verweis] = await h.sql<{ krnl_id: string; herkunft: string }[]>`
+      select krnl_id, herkunft from odoo_verweise where odoo_tabelle = 'product_product' and odoo_id = 12`
+    assert.deepEqual({ ...verweis }, { krnl_id: shop.id, herkunft: 'zugeordnet' })
+
+    // Der nächste Lauf erkennt die Platine als Shop-Artikel und ändert nichts.
+    const lauf = (await aktionAusfuehrenGeprueft('integrationen.odoo_stuecklisten_uebernehmen', {}, ADMIN))
+      .daten as Record<string, number>
+    assert.deepEqual([lauf.komponentenNeu, lauf.stuecklistenNeu, lauf.bestand], [0, 0, 0])
+  })
+
   test('Odoo wird nur gelesen: schreibende Methoden sind gesperrt', async () => {
     const { odooLesen } = await import('../../src/modules/migration/odoo/api.ts')
     await assert.rejects(odooLesen('mrp.bom', 'write', [[1], { active: false }]), /gesperrt/)

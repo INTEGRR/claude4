@@ -1,8 +1,9 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
-import { Card } from '@/components/ui'
-import { ActionButton } from '@/components/action-button'
+import { Card, TableWrap } from '@/components/ui'
+import { ActionButton, ActionForm } from '@/components/action-button'
 import { fertigbestandKandidaten, fertigungsLuecken } from '@/modules/migration/odoo/fertigbestand'
+import { zusammenfuehrenKandidaten } from '@/modules/migration/odoo/doppelte'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { odooKonfiguriert } from '@/modules/migration/odoo/api'
@@ -26,6 +27,11 @@ async function fertigbestandZuruecknehmen() {
   return serverAktion('integrationen.odoo_fertigbestand_zuruecknehmen', {})
 }
 
+async function zusammenfuehren(formData: FormData) {
+  'use server'
+  return serverAktion('integrationen.odoo_artikel_zusammenfuehren', { formData })
+}
+
 /**
  * Odoo-Übernahme (0090): nur Stücklisten, ihre Komponenten, Lieferanten und
  * Bestände — per API aus dem laufenden Odoo, zugeordnet per SKU an die
@@ -34,14 +40,19 @@ async function fertigbestandZuruecknehmen() {
 export default async function OdooPage() {
   await requireArea('einstellungen')
   const angebunden = odooKonfiguriert()
-  const [kandidaten, luecken] = await Promise.all([fertigbestandKandidaten(), fertigungsLuecken()])
+  const [kandidaten, luecken, doppelte] = await Promise.all([
+    fertigbestandKandidaten(),
+    fertigungsLuecken(),
+    zusammenfuehrenKandidaten(),
+  ])
   const zuruecknehmen = kandidaten.filter((k) => k.echteBewegungen === 0)
   const menge = zuruecknehmen.reduce((s, k) => s + k.menge, 0)
   const reserviert = zuruecknehmen.reduce((s, k) => s + k.reserviert, 0)
-  const [ruecknahme] = await sql<{ message: string; actor: string | null; created_at: string }[]>`
+  const zuletzt = await sql<{ message: string; actor: string | null; created_at: string }[]>`
     select message, actor, created_at::text from audit_log
-    where model = 'odoo' and message like 'Odoo-Fertigbestand zurückgenommen%'
-    order by created_at desc limit 1`
+    where model = 'odoo'
+      and (message like 'Odoo-Fertigbestand zurückgenommen%' or message like 'Artikel zusammengeführt%')
+    order by created_at desc limit 5`
   const [stand] = await sql<{ boms: number; angelegt: number; zugeordnet: number; zuletzt: string | null }[]>`
     select (select count(*)::int from boms where herkunft = 'odoo' and active) as boms,
            (select count(*)::int from odoo_verweise where herkunft = 'angelegt' and odoo_tabelle = 'product_product') as angelegt,
@@ -111,6 +122,68 @@ export default async function OdooPage() {
         </Card>
       )}
 
+      {doppelte.links.length > 0 && doppelte.rechts.length > 0 && (
+        <Card title="Doppelte Artikel zusammenführen" tight>
+          <p className="small" style={{ margin: 0, padding: '10px 12px' }}>
+            Die Übernahme hat Komponenten neu angelegt, die es als Shop-Artikel mit anderer SKU schon gibt (z. B.
+            GATERON G PRO 2.0 YELLOW = SW-GT-LY-001). Je Zeile den gleichen Shop-Artikel wählen und zusammenführen:
+            Bestand, Stücklistenzeilen, offene Fertigungsbewegungen und Lieferantenpreise wandern in den Shop-Artikel,
+            die Odoo-SKU wird seine SKU bzw. sein Barcode (Lager-Etiketten bleiben scanbar), die Odoo-Kopie wird
+            archiviert. Vorausgewählt ist nur ein eindeutiger Namenstreffer — bitte jedes Paar prüfen.
+          </p>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Aus Odoo angelegt</th>
+                  <th className="num">Bestand</th>
+                  <th>Gleicher Shop-Artikel</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doppelte.links.map((l) => (
+                  <tr key={l.id}>
+                    <td className="small">
+                      {l.sku && <span className="mono">{l.sku}</span>} {l.name.replace(/^\[[^\]]*\]\s*/, '')}
+                      {l.inStuecklisten > 0 && <div className="muted">in {qty(l.inStuecklisten)} Stückliste(n)</div>}
+                    </td>
+                    <td className="num mono">{qty(l.bestand)}</td>
+                    <td>
+                      <ActionForm action={zusammenfuehren}>
+                        <input type="hidden" name="aufloesen_id" value={l.id} />
+                        <div className="row">
+                          <label className="field">
+                            <select
+                              name="behalten_id"
+                              defaultValue={l.vorschlag ?? ''}
+                              required
+                              aria-label={`Gleicher Shop-Artikel für ${l.sku ?? l.name}`}
+                            >
+                              <option value="">— kein Shop-Artikel —</option>
+                              {doppelte.rechts.map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.name}
+                                  {r.sku ? ` · ${r.sku}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <div className="shrink field">
+                            <button type="submit" className="small">
+                              Zusammenführen
+                            </button>
+                          </div>
+                        </div>
+                      </ActionForm>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
+
       <Card title="Stand">
         <p className="small" style={{ margin: 0 }}>
           {qty(stand.boms)} aktive Stückliste(n) aus Odoo · {qty(stand.angelegt)} Komponente(n) angelegt ·{' '}
@@ -118,10 +191,14 @@ export default async function OdooPage() {
           {stand.zuletzt ? ` · zuletzt ${dateTime(stand.zuletzt)}` : ''}. Ein weiterer Lauf ersetzt nur
           Stücklisten, die er selbst geschrieben hat und die sich in Odoo geändert haben.
         </p>
-        {ruecknahme && (
-          <p className="small" style={{ margin: '8px 0 0' }}>
-            Zuletzt: {ruecknahme.message} — {ruecknahme.actor ?? 'system'}, {dateTime(ruecknahme.created_at)}
-          </p>
+        {zuletzt.length > 0 && (
+          <ul className="small" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+            {zuletzt.map((z) => (
+              <li key={z.created_at + z.message}>
+                {z.message} — {z.actor ?? 'system'}, {dateTime(z.created_at)}
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
     </>

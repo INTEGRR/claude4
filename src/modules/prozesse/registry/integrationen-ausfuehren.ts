@@ -249,3 +249,21 @@ export async function odooFertigbestandZuruecknehmen(
     daten: { ...b },
   }
 }
+
+/** Aus Odoo angelegte Komponente in den gleichen Shop-Artikel zusammenführen. */
+export async function odooArtikelZusammenfuehren(
+  p: { aufloesen_id: string; behalten_id: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const { artikelZusammenfuehren } = await import('../../migration/odoo/doppelte.ts')
+  const b = await artikelZusammenfuehren(p.aufloesen_id, p.behalten_id, ctx.actor)
+  return {
+    recordId: p.behalten_id,
+    text:
+      `${b.von} → ${b.nach}: ${b.bestand} Stück Bestand, ${b.stuecklistenzeilen} Stücklistenzeile(n), ` +
+      `${b.offeneBewegungen} offene Bewegung(en), ${b.lieferantenpreise} Lieferantenpreis(e) übernommen` +
+      (b.preisUebernommen ? ', Einkaufspreis gesetzt' : '') +
+      (b.sku === 'sku' ? `, SKU ${b.von} übernommen` : b.sku === 'barcode' ? `, ${b.von} als Barcode` : '') + '.',
+    daten: { ...b },
+  }
+}

@@ -89,6 +89,31 @@ Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
      `confirm_sales_order`. Betrifft Aufträge, die vor den Stücklisten
      bestätigt wurden; neue Aufträge bekommen ihn bei der Bestätigung.
    - Eine Transaktion; ein zweiter Klick tut nichts mehr.
+5. **Doppelte Artikel zusammenführen**
+   (`integrationen.odoo_artikel_zusammenfuehren`, Karte „Doppelte Artikel
+   zusammenführen"; `doppelte.ts`, Vorschlag rein rechnend in
+   `doppelte-vorschlag.ts`): Die Übernahme legt Komponenten, die sie per
+   SKU nicht findet, neu an — manche gibt es schon als Shop-Artikel mit
+   anderer SKU (GATERON G PRO 2.0 YELLOW `SH00000115` = Odoo
+   `SW-GT-LY-001`). Je aus Odoo angelegter Komponente wählt der Betreiber
+   den gleichen Shop-Artikel; vorausgewählt ist nur ein eindeutiger
+   Namenstreffer (Jaccard über unterscheidende Wörter > 0,5, ohne
+   Gleichstand) — Cherry gegen Gateron oder Foams ohne unterscheidendes
+   Wort bleiben leer.
+   - Zusammengeführt wird **in den Shop-Artikel** (Shopify-Kopplung,
+     Verkaufshistorie): Bestand je Lagerort per Inventur (Preis vorher,
+     nur wo 0 — Achtung: der Einkaufspreis gilt je Vorlage, bei mehreren
+     Switch-Typen in einer Shop-Vorlage setzt der erste den Preis), aktive
+     Stücklistenzeilen, offene Bewegungen (Komponenten laufender
+     Fertigungsaufträge; neu reserviert), Lieferantenpreise, Meldebestand,
+     `odoo_verweise` — der nächste Lauf erkennt das Teil als Shop-Artikel.
+   - Die Odoo-SKU wird SKU des Shop-Artikels (wenn er keine hat) oder sein
+     Barcode — Odoo-Etiketten im Lager bleiben scanbar. Die Odoo-Kopie
+     wird archiviert, nicht gelöscht.
+   - Hart statt still: nur von der Übernahme angelegte Artikel ohne Belege
+     (Verkauf, Einkauf, Fertigung, Reparatur, Chargen) und ohne
+     Lagerbuchungen außerhalb der Übernahme; Ziel ist ein Shop-Artikel ohne
+     eigene Stückliste in derselben Einheit.
    - **Routen** Fertigen/Auf Auftrag wie in Odoo — nur, wenn jede aktive
      Variante der KRNL-Vorlage eine Stückliste bekommt (sonst liefe eine
      Shopify-Bestellung ins Leere). Ab dann erzeugt jede Shopify-Bestellung
