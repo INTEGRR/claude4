@@ -9,6 +9,20 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Stücklisten-Liste zeigt nur aktive
+
+**Anlass:** Nach der Umstellung auf eine Stückliste je Artikel sind in
+Prod 9 Stücklisten aktiv; die 190 abgelösten Varianten-Stücklisten sind
+deaktiviert — die Liste zeigte sie trotzdem („massiv viele Stücklisten").
+
+**Entschieden:** `/fertigung/stuecklisten` zeigt standardmäßig nur aktive,
+die inaktiven über „Auch N inaktive zeigen". Gelöscht wird nichts:
+abgelöste Stücklisten bleiben als Historie (Fertigungsaufträge verweisen
+auf ihre Stückliste), wie im Eintrag zur Odoo-Übernahme festgelegt.
+
+Umgesetzt in `src/app/(erp)/fertigung/stuecklisten/page.tsx`; dokumentiert
+in [module/fertigung.md](module/fertigung.md).
+
 ## 2026-09-30 — Knopf: Odoo-Fertigbestand zurücknehmen, Fertigung nachziehen
 
 Löst den offenen Punkt aus „Fertigprodukte ohne Odoo-Bestand" (Betreiber:

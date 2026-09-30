@@ -8,8 +8,16 @@ import { createBom } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BomListPage() {
+/**
+ * Stücklisten: standardmäßig nur aktive — abgelöste (z. B. die früheren
+ * Varianten-Stücklisten der Odoo-Übernahme) bleiben als Historie für
+ * Fertigungsaufträge erhalten, stehen aber nicht mehr in der Liste
+ * (Entscheidungslog 2026-09-30, „Stücklisten-Liste nur aktive").
+ */
+export default async function BomListPage({ searchParams }: { searchParams: Promise<{ inaktiv?: string }> }) {
   await requireArea('fertigung')
+  const alle = (await searchParams).inaktiv === '1'
+  const [{ inaktiv }] = await sql<{ inaktiv: number }[]>`select count(*)::int as inaktiv from boms where not active`
   const boms = await sql<
     {
       id: string
@@ -32,7 +40,8 @@ export default async function BomListPage() {
     from boms b
     join product_templates pt on pt.id = b.template_id
     join uoms u on u.id = b.uom_id
-    order by pt.name`
+    where b.active or ${alle}
+    order by b.active desc, pt.name, b.created_at desc`
 
   const templates = await sql<{ id: string; name: string }[]>`
     select id, name from product_templates where active and type = 'goods' order by name limit 300`
@@ -68,6 +77,14 @@ export default async function BomListPage() {
       </Card>
 
       <Card tight>
+        {inaktiv > 0 && (
+          <div className="actions" style={{ padding: '10px 12px' }}>
+            <Link href={alle ? '/fertigung/stuecklisten' : '/fertigung/stuecklisten?inaktiv=1'} className="btn small">
+              <span className={alle ? 'led on' : 'led off'} />
+              {alle ? 'Nur aktive zeigen' : `Auch ${qty(inaktiv)} inaktive (abgelöste) zeigen`}
+            </Link>
+          </div>
+        )}
         {boms.length === 0 ? (
           <Empty>Noch keine Stücklisten.</Empty>
         ) : (
