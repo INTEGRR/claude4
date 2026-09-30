@@ -118,7 +118,8 @@ des `db`-Dienstes.
 | Aufgabe | Frequenz | Aufruf |
 |---|---|---|
 | Shopify-Webhooks verarbeiten | minütlich (nur Variante B) | `/api/cron?task=webhooks` |
-| Outbox abarbeiten (Fulfillment, E-Mail) | minütlich | `/api/cron?task=jobs` |
+| Outbox abarbeiten (Fulfillment, E-Mail, Mail-Anhänge) | minütlich | `/api/cron?task=jobs` |
+| Einkaufspostfach abgleichen (Gmail, nur wenn angebunden) | minütlich | `/api/cron?task=mail` |
 | Bestellabgleich mit Shopify | Variante A: minütlich · B: alle 15 Min | `/api/cron?task=reconcile` |
 | DHL-Sendungsverfolgung | stündlich | `/api/cron?task=tracking` |
 | Dienste-Wächter (Störungen → Telegram) | alle 5 Min | `/api/cron?task=wache` |

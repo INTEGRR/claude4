@@ -46,7 +46,7 @@ export default async function LieferantenPage({ searchParams }: { searchParams: 
     <>
       <PageHeader title="Lieferanten" subtitle="Lieferantenakten — Einkaufsdaten, Bestellungen, Dateien und Preise je Lieferant" />
       <Card tight>
-        <form method="get" className="row" style={{ padding: '10px 12px 0', alignItems: 'flex-end' }}>
+        <form method="get" className="row" style={{ padding: '10px 12px 0' }}>
           <label className="field">
             <span>Suche (Name oder Maildomain)</span>
             <input name="q" defaultValue={q} placeholder="z. B. gateron oder example.cn" />

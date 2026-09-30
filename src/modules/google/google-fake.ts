@@ -108,4 +108,10 @@ export const fakeDrive: DriveApi = {
     if (!d) throw new Error(`Google Drive (drive.datei_inhalt): 404 File not found: ${fileId}`)
     return new Uint8Array(d.bytes)
   },
+
+  async dateiVerschieben(fileId, zielId) {
+    const d = ablage().dateien.get(fileId)
+    if (!d) throw new Error(`Google Drive (drive.datei_verschieben): 404 File not found: ${fileId}`)
+    d.parents = [zielId]
+  },
 }

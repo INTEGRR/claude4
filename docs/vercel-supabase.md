@@ -95,12 +95,17 @@ damit als Push-Nachricht aufs Telefon ([module/integrationen.md](module/integrat
 ```
 GOOGLE_DIENSTKONTO_JSON    <Schlüsseldatei des Dienstkontos, JSON oder Base64>
 GOOGLE_EINKAUF_ABLAGE_ID   <ID der geteilten Ablage „Einkauf">
-EINKAUF_POSTFACH           <einkauf@…, ab Stufe 2>
+EINKAUF_POSTFACH           <einkauf@… — das Postfach, das KRNL liest>
 ```
 
 Das Dienstkonto in der geteilten Ablage als Inhaltsmanager eintragen; danach
 Einstellungen → Schnittstellen → „Ablage einrichten"
-([module/einkaufstool.md](module/einkaufstool.md)).
+([module/einkaufstool.md](module/einkaufstool.md)). Für das Postfach in der
+Google-Admin-Konsole (Sicherheit → API-Steuerung → Domainweite Delegierung)
+der Client-ID des Dienstkontos nur den Scope
+`https://www.googleapis.com/auth/gmail.modify` geben. Der Cron
+`/api/cron?task=mail` (vercel.json) liest dann jede Minute; der erste Lauf
+holt die letzten 30 Tage.
 
 Schützt `/api/cron/*` vor fremden Aufrufen. Vercel sendet ihn bei den eigenen
 Cron-Aufrufen automatisch als `Authorization: Bearer …` mit. Ist er auf Vercel

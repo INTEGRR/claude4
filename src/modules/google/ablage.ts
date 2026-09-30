@@ -5,7 +5,8 @@ import { drive } from './drive.ts'
 
 /**
  * Ordnerbaum der geteilten Ablage „Einkauf" (0092): Lieferanten/<Name>/
- * <Bestellnummer>, Lieferanten/<Name>/Rechnungen, Artikel/<Name>, Eingang.
+ * <Bestellnummer>, Lieferanten/<Name>/Rechnungen, Artikel/<Name>, Eingang
+ * (Mail-Anhänge ohne Zuordnung).
  * Jeder Ordner entsteht genau einmal — `drive_ordner` merkt ihn sich; fehlt
  * der Eintrag (z. B. nach „Betriebsdaten löschen"), wird erst nach einem
  * gleichnamigen Ordner gesucht statt einen zweiten anzulegen.
@@ -78,6 +79,17 @@ export async function zielOrdner(modell: DokumentModell, recordId: string): Prom
       const [t] = await sql<{ name: string }[]>`select name from product_templates where id = ${recordId}`
       if (!t) throw new Error('Artikel nicht gefunden')
       return ordnerSichern(`product_template:${recordId}`, ordnerName(t.name), await bereichsOrdner('artikel'))
+    }
+    case 'mail_thread': {
+      // Anhänge und Screenshots eines Threads: in den Ordner seiner Bestellung
+      // bzw. seines Lieferanten — solange er niemandem zugeordnet ist, in den
+      // Eingang (beim Zuordnen zieht die Datei um).
+      const [t] = await sql<{ partner_id: string | null; purchase_order_id: string | null }[]>`
+        select partner_id, purchase_order_id from mail_threads where id = ${recordId}`
+      if (!t) throw new Error('Mail-Thread nicht gefunden')
+      if (t.purchase_order_id) return zielOrdner('purchase_order', t.purchase_order_id)
+      if (t.partner_id) return lieferantenOrdner(t.partner_id)
+      return bereichsOrdner('eingang')
     }
     default: {
       const _nie: never = modell

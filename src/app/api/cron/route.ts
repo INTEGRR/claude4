@@ -14,6 +14,8 @@ import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
 import { pruneLoginVersuche, pruneSessions, pruneGeraete } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { dhlConfigured } from '@/modules/versand/dhl'
+import { postfachKonfiguriert } from '@/modules/google/auth'
+import { postfachAbgleichen } from '@/modules/einkauf/postfach-abgleich'
 
 export const maxDuration = 60
 
@@ -22,6 +24,7 @@ export const maxDuration = 60
  *
  *   /api/cron?task=webhooks      jede Minute   - Shopify-Events verarbeiten
  *   /api/cron?task=jobs          jede Minute   - Outbox abarbeiten, Telegram senden
+ *   /api/cron?task=mail          jede Minute   - Einkaufspostfach abgleichen (Gmail)
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
@@ -57,6 +60,11 @@ export async function GET(request: Request) {
         const gemeldet = await fehlgeschlageneJobsMelden(sql)
         const benachrichtigungen = await benachrichtigungenVersenden()
         return NextResponse.json({ task, ...jobs, jobs_gemeldet: gemeldet, benachrichtigungen })
+      }
+
+      case 'mail': {
+        if (!postfachKonfiguriert()) return NextResponse.json({ skipped: 'Einkaufspostfach nicht konfiguriert' })
+        return NextResponse.json({ task, ...(await postfachAbgleichen()) })
       }
 
       case 'reconcile': {

@@ -33,6 +33,8 @@ export interface DriveApi {
   dateiLesen(fileId: string): Promise<DriveDatei>
   dateiHochladen(p: { name: string; mime: string; bytes: Uint8Array; elternId: string }): Promise<DriveDatei>
   dateiInhalt(fileId: string): Promise<Uint8Array>
+  /** Hängt die Datei in einen anderen Ordner um (alle bisherigen Eltern werden gelöst). */
+  dateiVerschieben(fileId: string, zielId: string): Promise<void>
 }
 
 export const ORDNER_MIME = 'application/vnd.google-apps.folder'
@@ -159,6 +161,14 @@ const echteAblage: DriveApi = {
   },
 
   async dateiHochladen({ name, mime, bytes, elternId }) {
+    // Multipart trägt bei Google nur bis 5 MB — größere Mail-Anhänge (bis
+    // 25 MB) gehen als fortsetzbarer Upload in einem einzigen Stück.
+    if (bytes.byteLength > 5 * 1024 * 1024) {
+      const uri = await this.uploadSitzungAnlegen({ name, mime, groesse: bytes.byteLength, elternId })
+      const r = await this.uploadStueck(uri, bytes, 0, bytes.byteLength)
+      if (!r.fertig || !r.datei) throw new Error(`Google Drive (Upload): unvollständig bei ${r.weiterAb ?? 0} Bytes`)
+      return r.datei
+    }
     const grenze = `krnl-${crypto.randomUUID()}`
     const kopf = Buffer.from(
       `--${grenze}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({
@@ -186,6 +196,22 @@ const echteAblage: DriveApi = {
       referenz: fileId,
     })
     return new Uint8Array(await res.arrayBuffer())
+  },
+
+  async dateiVerschieben(fileId, zielId) {
+    const datei = await this.dateiLesen(fileId)
+    const alt = (datei.parents ?? []).filter((e) => e !== zielId)
+    if (alt.length === 0 && datei.parents?.includes(zielId)) return
+    const q = new URLSearchParams({ supportsAllDrives: 'true', addParents: zielId, fields: 'id' })
+    if (alt.length) q.set('removeParents', alt.join(','))
+    await anfrage(`${API}/files/${encodeURIComponent(fileId)}?${q}`, {
+      method: 'PATCH',
+      art: 'drive.datei_verschieben',
+      referenz: fileId,
+      headers: { 'content-type': 'application/json; charset=UTF-8' },
+      body: '{}',
+    })
+    await protokoll('drive.datei_verschieben', true, 200, undefined, fileId)
   },
 }
 

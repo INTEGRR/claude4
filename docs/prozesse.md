@@ -1262,6 +1262,20 @@ Teilprozess Wareneingang ohne Kindbeleg ewig gewartet. Fixture-Lauf
 Weg bis zur bezahlten Rechnung. Das Einkaufstool insgesamt:
 [module/einkaufstool.md](module/einkaufstool.md).
 
+## Einkaufspostfach: Threads als Beleg ohne Prozess (Migration 0093, umgesetzt)
+
+`mail_thread` steht in `prozess_modelle` (Tabelle `mail_threads`,
+Statusspalte `status` offen/erledigt/ignoriert, Route
+`/einkauf/posteingang/:id`), damit Kommentare, Dokumente, Wiedervorlagen und
+beleggebundene Aktionen (`einkauf.mail_zuordnen`,
+`einkauf.mail_status_setzen`) den Existenz-Check des Torwächters nutzen. Einen
+Prozess hat der Thread bewusst nicht: er ist Kommunikation **am** Beleg
+(Lieferant, Bestellung), kein eigener Ablauf — alle Postfach-Aktionen sind
+`prozessfrei`. Der Abgleich selbst ist ein Cron-Dienst (kein Knopf), die
+Ablage der Anhänge der Outbox-Job `gmail_anhang_ablegen`
+(Fähigkeit `ablage:mailanhang_ablegen`). Details:
+[module/einkaufstool.md](module/einkaufstool.md) (Stufe 2a).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

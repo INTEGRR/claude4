@@ -9,6 +9,8 @@ import { einstellung } from '@/modules/einstellungen/lesen'
 import { ANBINDUNGEN, type AnbindungsStand, anbindungsStand } from '@/modules/einstellungen/umgebung'
 import { type DienstStatus, dienstStatusLesen } from '@/modules/integrationen/wache'
 import { dateTime } from '@/modules/shared/format'
+import { POSTFACH_SCHLUESSEL, type PostfachStand } from '@/modules/einkauf/postfach-abgleich'
+import { postfachKonfiguriert } from '@/modules/google/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +31,11 @@ async function shopifyModusSpeichern(formData: FormData) {
 async function einkaufsablageEinrichten() {
   'use server'
   return serverAktion('einkauf.ablage_einrichten', {})
+}
+
+async function einkaufspostfachAbgleichen() {
+  'use server'
+  return serverAktion('integrationen.postfach_abgleichen', {})
 }
 
 async function webhooksRegistrieren(formData: FormData) {
@@ -103,6 +110,7 @@ function Variablen({ stand }: { stand: AnbindungsStand }) {
 export default async function SchnittstellenPage() {
   await requireArea('einstellungen')
   const shopify = await einstellung<{ modus: string }>('shopify')
+  const postfach = await einstellung<PostfachStand>(POSTFACH_SCHLUESSEL)
   const modus = shopify.modus === 'schreiben' ? 'schreiben' : 'lesen'
   const wache = Object.fromEntries((await dienstStatusLesen(sql)).map((d) => [d.dienst, d])) as Record<
     string,
@@ -280,14 +288,23 @@ export default async function SchnittstellenPage() {
         <p className="small muted" style={{ margin: '0 0 10px' }}>
           Dateien des Einkaufs liegen in der geteilten Ablage „Einkauf" (Ordner je Lieferant, Bestellung
           und Artikel) — KRNL hält nur den Index. Das Dienstkonto braucht dort die Rolle
-          Inhaltsmanager; für das Einkaufspostfach (Stufe 2) zusätzlich die domänenweite Delegation
-          mit nur <code className="mono">gmail.modify</code>.
+          Inhaltsmanager; für das Einkaufspostfach zusätzlich die domänenweite Delegation mit nur{' '}
+          <code className="mono">gmail.modify</code>. KRNL liest das Postfach jede Minute
+          (<Link href="/einkauf/posteingang">Posteingang</Link>)
+          {postfach.letzter_lauf ? `, zuletzt ${dateTime(postfach.letzter_lauf)}` : ''}.
         </p>
-        <ActionForm action={einkaufsablageEinrichten}>
-          <button className="small" type="submit" disabled={!stand.google.vollstaendig && !stand.google.fake}>
-            Ablage einrichten (Hauptordner anlegen)
-          </button>
-        </ActionForm>
+        <div className="actions">
+          <ActionForm action={einkaufsablageEinrichten}>
+            <button className="small" type="submit" disabled={!stand.google.vollstaendig && !stand.google.fake}>
+              Ablage einrichten (Hauptordner anlegen)
+            </button>
+          </ActionForm>
+          <ActionForm action={einkaufspostfachAbgleichen}>
+            <button className="small" type="submit" disabled={!postfachKonfiguriert()}>
+              Postfach jetzt abgleichen
+            </button>
+          </ActionForm>
+        </div>
         <Variablen stand={stand.google} />
       </Card>
 

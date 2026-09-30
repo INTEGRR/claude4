@@ -1,0 +1,156 @@
+import Link from 'next/link'
+import { sql } from '@/db/client'
+import { ActionButton, ActionForm } from '@/components/action-button'
+import { Badge, Card, Empty } from '@/components/ui'
+import { date, dateTime } from '@/modules/shared/format'
+import { wiedervorlageAnlegen, wiedervorlageErledigen } from '@/app/(erp)/einkauf/posteingang/actions'
+import type { WiedervorlageModell } from '@/modules/prozesse/registry/einkauf-postfach'
+
+/**
+ * Bausteine des Einkaufspostfachs (0093) für Lieferantenakte, Bestellung und
+ * Thread: die Mail-Threads eines Belegs und seine Wiedervorlagen.
+ */
+
+export const KANAL_NAMEN: Record<string, string> = {
+  email: 'Mail',
+  alibaba: 'Alibaba',
+  telefon: 'Telefon',
+  sonstiges: 'Sonstiges',
+}
+
+export async function MailThreadsKarte({ partnerId, purchaseOrderId }: { partnerId?: string; purchaseOrderId?: string }) {
+  const threads = await sql<
+    {
+      id: string
+      betreff: string | null
+      status: string
+      kanal: string
+      letzte_richtung: string | null
+      letzte_am: string | null
+      anzahl: number
+      bestellung: string | null
+    }[]
+  >`
+    select t.id, t.betreff, t.status::text as status, t.kanal::text as kanal, t.letzte_richtung::text as letzte_richtung,
+           t.letzte_am::text as letzte_am, t.anzahl, po.number as bestellung
+    from mail_threads t
+    left join purchase_orders po on po.id = t.purchase_order_id
+    where t.status <> 'ignoriert'
+      and ${purchaseOrderId ? sql`t.purchase_order_id = ${purchaseOrderId}` : sql`t.partner_id = ${partnerId ?? null}`}
+    order by t.letzte_am desc nulls last
+    limit 30`
+
+  return (
+    <Card
+      title={`Mails & Nachrichten (${threads.length})`}
+      tight
+      actions={
+        <Link className="btn small" href="/einkauf/posteingang">
+          Posteingang
+        </Link>
+      }
+    >
+      {threads.length === 0 ? (
+        <Empty>Noch keine Mails zu diesem {purchaseOrderId ? 'Beleg' : 'Lieferanten'}.</Empty>
+      ) : (
+        <ul className="dok-liste">
+          {threads.map((t) => (
+            <li key={t.id} className="dok-zeile">
+              <div className="dok-text">
+                <Link href={`/einkauf/posteingang/${t.id}`} className="dok-name">
+                  {t.betreff || '(ohne Betreff)'}
+                </Link>
+                <div className="muted small">
+                  {t.letzte_richtung === 'ausgang' ? '→ wartet auf Lieferant' : '← wartet auf uns'} · {dateTime(t.letzte_am)} ·{' '}
+                  {t.anzahl} Nachricht{t.anzahl === 1 ? '' : 'en'}
+                  {t.kanal !== 'email' ? ` · ${KANAL_NAMEN[t.kanal]}` : ''}
+                  {t.bestellung && !purchaseOrderId ? ` · ${t.bestellung}` : ''}
+                </div>
+              </div>
+              <Badge state={t.status} kind="mail_thread" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+/** In 7 Tagen, als JJJJ-MM-TT — Vorgabe für neue Wiedervorlagen. */
+function inTagen(n: number): string {
+  return new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10)
+}
+
+export async function WiedervorlagenKarte({
+  modell,
+  recordId,
+  pfad,
+}: {
+  modell: WiedervorlageModell
+  recordId: string
+  pfad: string
+}) {
+  const [liste, nutzer] = await Promise.all([
+    sql<{ id: string; faellig_am: string; grund: string; zustaendig: string | null; ueberfaellig: boolean }[]>`
+      select w.id, w.faellig_am::text as faellig_am, w.grund, u.name as zustaendig,
+             w.faellig_am < current_date as ueberfaellig
+      from wiedervorlagen w left join users u on u.id = w.zustaendig_id
+      where w.modell = ${modell} and w.record_id = ${recordId} and w.erledigt_am is null
+      order by w.faellig_am`,
+    sql<{ id: string; name: string }[]>`select id, name from users where active order by name`,
+  ])
+
+  return (
+    <Card title={`Wiedervorlagen (${liste.length})`} tight>
+      {liste.length > 0 && (
+        <ul className="dok-liste">
+          {liste.map((w) => (
+            <li key={w.id} className="dok-zeile">
+              <div className="dok-text">
+                <span className={w.ueberfaellig ? 'dok-name wv-ueberfaellig' : 'dok-name'}>{w.grund}</span>
+                <div className="muted small">
+                  fällig {date(w.faellig_am)}
+                  {w.ueberfaellig ? ' · überfällig' : ''}
+                  {w.zustaendig ? ` · ${w.zustaendig}` : ''}
+                </div>
+              </div>
+              <ActionButton className="small" action={wiedervorlageErledigen.bind(null, w.id, pfad)}>
+                Erledigt
+              </ActionButton>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ActionForm action={wiedervorlageAnlegen.bind(null, pfad)} style={{ padding: '10px 12px' }}>
+        <input type="hidden" name="modell" value={modell} />
+        <input type="hidden" name="record_id" value={recordId} />
+        <div className="row">
+          <label className="field" style={{ flex: 2 }}>
+            <span>Grund</span>
+            <input name="grund" required maxLength={300} placeholder="z. B. Antwort zum Preis erwartet" />
+          </label>
+          <label className="field shrink">
+            <span>Fällig am</span>
+            <input name="faellig_am" type="date" required defaultValue={inTagen(7)} />
+          </label>
+          <label className="field shrink">
+            <span>Zuständig</span>
+            <select name="zustaendig_id" defaultValue="">
+              <option value="">ich</option>
+              {nutzer.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="field shrink">
+            <button className="small" type="submit">
+              Vormerken
+            </button>
+          </div>
+        </div>
+      </ActionForm>
+    </Card>
+  )
+}

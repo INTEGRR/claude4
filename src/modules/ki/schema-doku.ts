@@ -8,7 +8,7 @@ export const SCHEMA_DOKU = `
 Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 
 ### Stammdaten
-- **partners**: Kunden & Lieferanten. Spalten: name, is_company, is_customer, is_vendor, email, phone, street, house_number, zip, city, country_code, vat, active. Einkauf (Lieferantenakte): sprache ('de'|'en'|'zh'), mail_domains text[] (ordnen eingehende Mails zu), einkaeufer_id → users (zuständig), standard_incoterm, standard_waehrung.
+- **partners**: Kunden & Lieferanten. Spalten: name, is_company, is_customer, is_vendor, email, phone, street, house_number, zip, city, country_code, vat, active. Einkauf (Lieferantenakte): sprache ('de'|'en'|'zh'), mail_domains text[] (Domains, bei Freemailern volle Adressen — ordnen eingehende Mails zu), einkaeufer_id → users (zuständig), standard_incoterm, standard_waehrung.
 - **uoms**: Maßeinheiten (name, category, factor). Umrechnung: uom_convert(qty, von_uom_id, nach_uom_id).
 - **product_templates**: Produkte. name, uom_id, list_price (VK), standard_cost (Einstand), weight_g, can_be_sold, can_be_purchased, type ('goods'|'service'), route_manufacture, route_mto, route_buy, active.
 - **product_variants**: Varianten je Template (template_id). sku, barcode, display_name, price_extra, active. Anzeigename: variant_display_name(variant_id).
@@ -58,8 +58,12 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 - **vendor_bills**: Lieferantenrechnungen (number 'BILL/…', vendor_id, purchase_order_id, state 'draft'|'posted'|'paid'|'cancel', total).
 - **vendor_bill_lines**: Positionen.
 - **dokumente**: Einkaufsdateien in Google Drive (drive_file_id, name, mime, groesse, md5, art 'zeichnung'|'gerber'|'step'|'ai'|'bom'|'angebot'|'pi'|'ci'|'packing_list'|'rechnung'|'bl_awb'|'zollbescheid'|'vertrag'|'nda'|'foto'|'sonstiges', revision, quelle 'upload'|'mail'|'drive'|'weitergeleitet'|'manuell', partner_id = Lieferant, notiz, text_auszug, datev_uebergeben_am). Die Datei liegt in der geteilten Ablage „Einkauf", KRNL hält den Index.
-- **dokument_verweise**: welche Datei an welchem Beleg hängt (dokument_id, modell 'partner'|'purchase_order'|'vendor_bill'|'product_template', record_id) — n:m. „Welche Zeichnungen hat Bestellung X?": join dokument_verweise v on v.modell='purchase_order' and v.record_id = <id>.
+- **dokument_verweise**: welche Datei an welchem Beleg hängt (dokument_id, modell 'partner'|'purchase_order'|'vendor_bill'|'product_template'|'mail_thread', record_id) — n:m. „Welche Zeichnungen hat Bestellung X?": join dokument_verweise v on v.modell='purchase_order' and v.record_id = <id>.
 - **drive_ordner**: Ordner-Cache der Ablage (schluessel wie 'partner:<uuid>', folder_id, name).
+- **mail_threads**: Gesprächsfäden des Einkaufs aus dem Einkaufspostfach und von Hand erfasste Kanäle (gmail_thread_id, betreff, partner_id = Lieferant, purchase_order_id, zustaendig_id → users, status 'offen'|'erledigt'|'ignoriert', kanal 'email'|'alibaba'|'telefon'|'sonstiges', letzte_richtung 'eingang'|'ausgang', letzte_am, anzahl, zugeordnet_durch 'regel'|'mensch'|'agent'). „Wartet auf uns" = status 'offen' and letzte_richtung 'eingang'; „wartet auf Lieferant" = letzte_richtung 'ausgang'.
+- **mail_nachrichten**: einzelne Mails/Nachrichten eines Threads (thread_id, gmail_message_id, rfc822_id, in_reply_to, richtung, kanal, von, von_name, an[], cc[], betreff, datum, text, html, text_de = deutsche Fassung, sprache, quelle 'gmail'|'weitergeleitet'|'manuell', erfasst_von, suche = tsvector 'simple' über Betreff+Text). Volltext: where suche @@ plainto_tsquery('simple', 'tracking').
+- **mail_anhaenge**: Anhänge der Nachrichten (nachricht_id, dateiname, mime, groesse, gmail_attachment_id, dokument_id → dokumente sobald abgelegt, fehler).
+- **wiedervorlagen**: manuelle Wiedervorlagen des Einkaufs (modell 'mail_thread'|'partner'|'purchase_order'|'vendor_bill', record_id, faellig_am, grund, zustaendig_id, erstellt_von, erledigt_am, erledigt_von). Offene: erledigt_am is null.
 - Bestellungen nur mit Dienstleistungen (product_templates.type = 'service') haben KEINEN Wareneingang; Dienstleistungen rechnen nach Bestellmenge ab (bill_policy 'ordered').
 
 ### Personal

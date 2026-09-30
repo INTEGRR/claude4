@@ -46,6 +46,8 @@ async function badges() {
       offene_bugs: number
       faellige_zahlungen: number
       kuendigungen: number
+      posteingang: number
+      wiedervorlagen: number
     }[]
   >`
     select
@@ -68,7 +70,11 @@ async function badges() {
         where status in ('offen', 'in_arbeit'))::int as offene_bugs,
       (select count(*) from finanz_faellig(current_date + 7))::int as faellige_zahlungen,
       (select count(*) from vertraege v
-        where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen`
+        where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
+      (select count(*) from mail_threads
+        where status = 'offen' and letzte_richtung = 'eingang')::int as posteingang,
+      (select count(*) from wiedervorlagen
+        where erledigt_am is null and faellig_am <= current_date)::int as wiedervorlagen`
   return row
 }
 
@@ -201,6 +207,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items: sees('einkauf') && prozessAktiv('einkauf')
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
+            { href: '/einkauf/posteingang', label: 'Posteingang', count: counts.posteingang },
+            { href: '/einkauf/wiedervorlagen', label: 'Wiedervorlagen', count: counts.wiedervorlagen },
             { href: '/einkauf/lieferanten', label: 'Lieferanten' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },
             { href: '/einkauf/kurse', label: 'Wechselkurse' },

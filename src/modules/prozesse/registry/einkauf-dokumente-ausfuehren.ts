@@ -23,7 +23,7 @@ function ablageBereit() {
 }
 
 /** Beleg existiert und der Nutzer darf dessen Bereich sehen. */
-async function belegPruefen(modell: DokumentModell, recordId: string, ctx: AktionsKontext) {
+export async function belegPruefen(modell: DokumentModell, recordId: string, ctx: AktionsKontext) {
   const ziel = DOKUMENT_MODELLE[modell]
   if (!canAccess(ctx.role, ziel.bereich)) {
     throw new Error(`Für ${ziel.label} fehlt Ihrer Rolle die Berechtigung.`)
@@ -124,7 +124,7 @@ export async function dokumentRegistrieren(
 }
 
 /** Lieferant eines Belegs — damit die Lieferantenakte alle seine Dateien zeigt. */
-async function partnerZumBeleg(modell: DokumentModell, recordId: string): Promise<string | null> {
+export async function partnerZumBeleg(modell: DokumentModell, recordId: string): Promise<string | null> {
   if (modell === 'partner') return recordId
   if (modell === 'purchase_order') {
     const [r] = await sql<{ vendor_id: string }[]>`select vendor_id from purchase_orders where id = ${recordId}`
@@ -133,6 +133,10 @@ async function partnerZumBeleg(modell: DokumentModell, recordId: string): Promis
   if (modell === 'vendor_bill') {
     const [r] = await sql<{ vendor_id: string }[]>`select vendor_id from vendor_bills where id = ${recordId}`
     return r?.vendor_id ?? null
+  }
+  if (modell === 'mail_thread') {
+    const [r] = await sql<{ partner_id: string | null }[]>`select partner_id from mail_threads where id = ${recordId}`
+    return r?.partner_id ?? null
   }
   return null
 }

@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Einkaufspostfach: Cursor-Abgleich, Zuordnung per SQL-Regel, Freemail-Adressen
+
+Stufe 2a des Einkaufstools (Migration 0093). Entschieden:
+
+- **Abgleich per Gmail-Verlauf** (`historyId` als Cursor in `settings`) jede
+  Minute über den Cron, nicht per Push (Pub/Sub): ein Dienst weniger, und
+  der Cursor macht den Lauf wiederholbar. Kennt Google den Cursor nicht
+  mehr, werden die letzten 7 Tage neu gelesen — die eindeutige
+  Gmail-Nachrichten-ID verhindert Doppel. Zeitbudget 40 s, dann bleibt der
+  Cursor stehen; auch der Job-Runner bekommt ein Budget.
+- **Weiterleitung zerlegen im Abgleich, kein eigener Job:** Das Zerlegen des
+  Weiterleitungskopfs ist reine Textarbeit ohne Fremdaufruf — ein Outbox-Job
+  (im Plan `gmail_weiterleitung_zerlegen`) brächte nur Verzögerung. Anhänge
+  dagegen laufen als Job `gmail_anhang_ablegen` (Download + Drive, Retry).
+- **Zuordnung als SQL-Regel** (`mail_thread_zuordnen`), die eine menschliche
+  Zuordnung nie überschreibt; der Agent (Stufe 6) bekommt dieselbe
+  Rangfolge (`zugeordnet_durch`). **Freemailer** (qq.com, 163.com, gmail.com
+  …) sind bei chinesischen Lieferanten verbreitet — ihre Domain sagt nichts,
+  deshalb trägt die Lieferantenakte dort die volle Adresse; eine
+  Freemail-Domain allein wird abgewiesen.
+- **Anhänge ohne Doppel:** gleicher Inhalt (md5) beim selben Lieferanten
+  wird verknüpft statt erneut abgelegt; ohne Zuordnung landet die Datei in
+  „Eingang" und zieht beim Zuordnen um. Kleine Bilder (< 20 KB) gelten als
+  Signatur und werden nicht abgelegt.
+- **Threads sind prozessfrei** (Kommunikation am Beleg, kein Ablauf wie
+  Notizen und Dokumente); ihr Status (offen/erledigt/ignoriert) ist dennoch
+  die Statusspalte in `prozess_modelle`. Eine Antwort des Lieferanten holt
+  einen erledigten Thread zurück.
+- **HTML nur auf Klick** in einem iframe ohne Skripte mit CSP ohne
+  Fremdbilder; die Route liefert text/plain, damit direkt aufgerufen nichts
+  rendert. Gelesen wird standardmäßig der Text, Zitate eingeklappt.
+- Umgesetzt und beschrieben: [module/einkaufstool.md](module/einkaufstool.md)
+  (Stufe 2a).
+
 ## 2026-09-30 — Einkaufstool: ein Ablauf vom Bedarf bis zur Lieferung, Dateien in Google Drive
 
 Tino und Patrick kaufen bei 20–60 Lieferanten, überwiegend in China

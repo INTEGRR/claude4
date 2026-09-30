@@ -17,7 +17,7 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Google-Anbindung, Dokumente in Drive, Lieferantenakte, Dienstleistungen ohne Wareneingang (0092) | umgesetzt |
-| 2a | Einkaufspostfach lesen und zuordnen, Posteingang, Wiedervorlagen | geplant |
+| 2a | Einkaufspostfach lesen und zuordnen, Posteingang, Wiedervorlagen (0093) | umgesetzt |
 | 2b | Aus KRNL schreiben, Vorlagen je Sprache, Übersetzung | geplant |
 | 3 | Einkaufsprojekt: Anfragen, Angebote, Vergleich auf Einstand, Entscheidung | geplant |
 | 4 | Bemusterung (Golden Sample), Werkzeuge/Molds, Lieferantenverträge | geplant |
@@ -33,8 +33,8 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
 - **Drive ohne Delegation:** Das Dienstkonto ist **Inhaltsmanager der
   geteilten Ablage „Einkauf"** und legt dort selbst an (`drive.ts`, überall
   `supportsAllDrives`).
-- **Gmail** (ab Stufe 2) mit domänenweiter Delegation, nur Scope
-  `gmail.modify`, nur für das Einkaufspostfach.
+- **Gmail** (ab Stufe 2a, `gmail.ts`) mit domänenweiter Delegation, nur
+  Scope `gmail.modify`, nur für das Einkaufspostfach.
 - **Env:** `GOOGLE_DIENSTKONTO_JSON` (Schlüsseldatei, JSON oder Base64),
   `GOOGLE_EINKAUF_ABLAGE_ID` (ID der geteilten Ablage), `EINKAUF_POSTFACH`.
   `GOOGLE_FAKE=1` ersetzt Google durch eine Attrappe im Speicher
@@ -79,11 +79,12 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
   Dateien; Suche nach Name oder Maildomain.
 - **Akte je Lieferant:** Einkaufsdaten, eigene Dateien, Dateien an Bestellungen
   und Rechnungen, Bestellungen, offene Rechnungen, Lieferantenpreise, Verlauf.
-  Mails und Projekte folgen mit den Stufen 2 und 3.
+  Seit Stufe 2a auch Mail-Threads und Wiedervorlagen; Projekte folgen mit
+  Stufe 3.
 - **Einkaufsdaten** (`einkauf.lieferantendaten_setzen`): Sprache (de/en/zh),
-  **Maildomains** (je Domain genau ein Lieferant — sie ordnen ab Stufe 2
-  eingehende Mails zu), zuständiger Einkäufer, Standard-Incoterm und
-  -Währung.
+  **Maildomains** (je Domain genau ein Lieferant — sie ordnen ab Stufe 2a
+  eingehende Mails zu; bei Freemailern die volle Adresse, siehe unten),
+  zuständiger Einkäufer, Standard-Incoterm und -Währung.
 - Firmendaten tragen jetzt **EORI** und USt-IdNr. (für Spediteur und Zoll).
 
 ### Bestellungen: Dienstleistungen und Preise
@@ -108,3 +109,116 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
   ohne Wareneingang.
 - Fixture-Lauf „Betriebsausstattung: nur Dienstleistung, ohne Wareneingang"
   (`src/modules/prozesse/fixtures/einkauf.ts`).
+
+## Stufe 2a — Einkaufspostfach lesen und zuordnen (0093)
+
+### Abgleich (`src/modules/einkauf/postfach-abgleich.ts`)
+
+- **Cron** `/api/cron?task=mail` jede Minute (`vercel.json`); von Hand über
+  „Jetzt abgleichen" im Posteingang und unter Einstellungen → Schnittstellen
+  (`integrationen.postfach_abgleichen`, nur Admin).
+- **Cursor:** Gmails `historyId` in `settings['einkauf_postfach']`. Der
+  erste Lauf holt die letzten 30 Tage; kennt Google den Cursor nicht mehr
+  (nach etwa einer Woche Stillstand), liest KRNL die letzten 7 Tage neu.
+  Doppelt übernommen wird nie — die Gmail-Nachrichten-ID ist eindeutig.
+- **Zeitbudget** 40 s: Reicht es nicht, bleibt der Cursor stehen und der
+  nächste Lauf überspringt das schon Übernommene. Auch der Job-Runner hat
+  jetzt ein Budget (`JOB_BUDGET_MS`): nicht begonnene Jobs gehen zurück in
+  die Warteschlange, statt mitten im Handler abgeschossen zu werden.
+- **Richtung:** Label SENT oder Absender = Postfach → Ausgang. Direkt in
+  Gmail geschriebene Mails erscheinen damit ebenfalls im Thread.
+- **Weitergeleitete Alt-Threads:** Schreibt ein Kollege der eigenen Domain an
+  das Postfach und der Text trägt einen Weiterleitungskopf (Gmail, Outlook,
+  Apple Mail; deutsch/englisch), zählen der **ursprüngliche** Absender, sein
+  Datum und sein Betreff (`quelle 'weitergeleitet'`, `erfasst_von` =
+  Weiterleitender). So kommen ausgewählte Threads aus Tinos Postfach herein,
+  ohne dass KRNL darauf zugreift.
+- Entwürfe, Spam, Papierkorb und Chats werden übersprungen.
+
+### Zerlegen (`src/modules/einkauf/mail-zerlegen.ts`, pur)
+
+- multipart-Baum der Gmail-API, Zeichensatz aus dem Content-Type — auch
+  **GBK/GB2312** chinesischer Lieferanten; RFC-2047-Köpfe; nur HTML → Text als
+  Rückfall.
+- `zitatTrennen`: Lieferanten zitieren bei jeder Antwort den ganzen Verlauf.
+  Die Thread-Ansicht zeigt das Neue und klappt das Zitat ein („On … wrote:",
+  „Am … schrieb", Outlook-Trenner, „发件人:", „>"-Blöcke).
+
+### Zuordnung (SQL `mail_thread_zuordnen`)
+
+1. **Bestellnummer im Betreff** (`P00042`) → Bestellung und ihr Lieferant.
+2. Sonst der **Gesprächspartner** → Lieferant über `partners.mail_domains`:
+   Absender der ersten eingehenden Nachricht, bei einem von uns begonnenen
+   Thread der erste Empfänger. Domains passen auch auf Subdomains.
+3. **Freemailer** (qq.com, 163.com, 126.com, foxmail.com, gmail.com …) sagen
+   über den Lieferanten nichts — für sie trägt die Lieferantenakte die
+   **volle Adresse** ein; die Domain allein wird abgewiesen
+   (`einkauf/mail-regeln.ts`). Die volle Adresse gewinnt vor der Domain.
+4. Folgemails erben die Zuordnung des Threads. Der zuständige Einkäufer
+   kommt aus `partners.einkaeufer_id`.
+5. Die Regel überschreibt **nie** eine menschliche Zuordnung
+   (`zugeordnet_durch 'mensch'`) — und ab Stufe 6 keine des Agenten.
+
+Was die Regel nicht erkennt, bleibt im Posteingang unter „Nicht zugeordnet".
+`einkauf.mail_zuordnen` ordnet von Hand zu (Lieferant, Bestellung,
+Zuständig) und merkt sich auf Wunsch den Absender in der Lieferantenakte —
+danach läuft es für diesen Lieferanten von selbst.
+
+### Anhänge
+
+- Je Anhang ein Outbox-Job `gmail_anhang_ablegen`
+  (`einkauf/anhang-ablage.ts`): in den Drive-Ordner der Bestellung bzw. des
+  Lieferanten, ohne Zuordnung nach **Eingang**; verknüpft mit Thread,
+  Lieferant und Bestellung.
+- **Keine Doppel:** Schickt ein Lieferant dieselbe Zeichnung mit jeder
+  Antwort erneut, wird der gleiche Inhalt (md5) beim selben Lieferanten nur
+  verknüpft, nicht noch einmal abgelegt.
+- Kleine Bilder (< 20 KB) gelten als Signatur-Logo und werden nicht abgelegt.
+- Beim Zuordnen von Hand ziehen die Dateien aus dem Eingang in den Ordner
+  des Lieferanten bzw. der Bestellung um (best effort).
+- Gmail vergibt Anhang-IDs bei jedem Abruf neu; ist die gespeicherte
+  verfallen, holt der Job die Nachricht frisch.
+- Drive-Uploads über 5 MB laufen als fortsetzbarer Upload (Multipart trägt
+  bei Google nur 5 MB).
+
+### Oberfläche
+
+- **Posteingang** `/einkauf/posteingang`: Ansichten Offen, Wartet auf uns,
+  Wartet auf Lieferant, Nicht zugeordnet, Meine, Erledigt, Alle; Suche über
+  Betreff, Lieferant, Absender und Volltext (`suche`, tsvector 'simple').
+  Menüzähler: offene Threads, deren letzte Nachricht vom Lieferanten kommt.
+- **Thread** `/einkauf/posteingang/[id]`: Nachrichten in zeitlicher Folge
+  (ältere eingeklappt, Zitate eingeklappt), Anhänge mit Link in die Ablage,
+  **Originaldarstellung** erst auf Klick in einem iframe ohne Skripte, mit
+  CSP ohne Fremdbilder (Tracking-Pixel laden nicht); Zuordnung, Status
+  (erledigt/ignoriert/wieder offen), Gespräch von Hand erfassen,
+  Wiedervorlagen, Dokumente, Verlauf.
+- **Status:** Eine neue Nachricht des Lieferanten holt einen erledigten
+  Thread zurück in den Posteingang; ignorierte bleiben still.
+- **Alibaba-Chats und Telefonate** (`einkauf.nachricht_erfassen`): Text
+  einfügen, Kanal und Richtung wählen — als neuer Thread am Lieferanten oder
+  als Nachricht in einem bestehenden. Screenshots als Dokument am Thread.
+- **Wiedervorlagen** (`einkauf.wiedervorlage_anlegen`/`_erledigen`) an
+  Thread, Lieferant, Bestellung oder Rechnung; Liste
+  `/einkauf/wiedervorlagen` (Meine/Alle, Überfälliges oben), Menüzähler =
+  heute fällig oder überfällig. Regelbasierte Wiedervorlagen (fehlende PI,
+  ETA überfällig) kommen mit dem Cockpit in Stufe 5.
+- Lieferantenakte und Bestellung zeigen ihre Mail-Threads und
+  Wiedervorlagen, die Rechnung ihre Wiedervorlagen.
+- **Ohne echtes Gmail** (`GOOGLE_FAKE=1`, lokal/Staging): `POST
+  /api/google-fake/mail` (nur Admin) liefert eine Mail ins Attrappen-Postfach
+  ein — Grundlage des Browsertests und von Vorführungen.
+
+### Nachweis
+
+- `tests/mail-zerlegen.test.ts` — multipart, GBK, HTML-Rückfall,
+  Adresslisten, RFC 2047, Betreffkern, Datumsformate, Weiterleitungsköpfe
+  (Gmail en/de, Outlook, Apple Mail), Zitat-Trennung, Freemail-Regeln.
+- `tests/prozesse/einkauf-postfach.test.ts` — Erstabgleich und zweiter Lauf
+  ohne Doppel; Zuordnung per Subdomain, Freemail-Adresse, Bestellnummer und
+  Empfänger; Anhänge in Bestell-/Lieferantenordner, gleicher Inhalt nur
+  verknüpft; Gesendet = Ausgang; Wiederöffnen bei Antwort; Entwürfe
+  übersprungen; weitergeleiteter Alt-Thread; menschliche Zuordnung mit
+  „Absender merken" und Umzug aus dem Eingang, von der Regel nicht
+  überschrieben; Alibaba-Erfassung; Wiedervorlagen; Rückfall bei
+  abgelaufenem Verlauf; Zeitbudget.

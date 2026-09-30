@@ -7,6 +7,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { DokumenteKarte } from '@/components/dokumente'
+import { MailThreadsKarte, WiedervorlagenKarte } from '@/components/mail-threads'
 import { date, isoDatum, money, qty, stueckpreis } from '@/modules/shared/format'
 import {
   addPoLine,
@@ -606,6 +607,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         )}
       </div>
 
+      <MailThreadsKarte purchaseOrderId={id} />
+      <WiedervorlagenKarte modell="purchase_order" recordId={id} pfad={`/einkauf/${id}`} />
       <DokumenteKarte modell="purchase_order" recordId={id} />
       <RecordComments model="purchase_order" recordId={id} path={`/einkauf/${id}`} />
     </>

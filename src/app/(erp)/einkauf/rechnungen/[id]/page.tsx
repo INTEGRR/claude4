@@ -7,6 +7,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { DokumenteKarte } from '@/components/dokumente'
+import { WiedervorlagenKarte } from '@/components/mail-threads'
 import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { cancelBill, payBill, postBill, setBillChecked, setBillDate } from '../../actions'
 import { rechnungTeilzahlung, zahlungStornieren } from '../../../finanzen/actions'
@@ -325,6 +326,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
         </Card>
       )}
 
+      <WiedervorlagenKarte modell="vendor_bill" recordId={id} pfad={`/einkauf/rechnungen/${id}`} />
       <DokumenteKarte modell="vendor_bill" recordId={id} />
       <RecordComments model="vendor_bill" recordId={id} path={`/einkauf/rechnungen/${id}`} />
     </>

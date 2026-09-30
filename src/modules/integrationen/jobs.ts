@@ -282,6 +282,12 @@ const handlers = {
     return `${r.imported} Bestellung(en) übernommen — Übernahme abgeschlossen`
   },
 
+  /** Mail-Anhang aus dem Einkaufspostfach in die Drive-Ablage (einkauf/anhang-ablage.ts). */
+  async gmail_anhang_ablegen(payload) {
+    const { anhangAblegen } = await import('@/modules/einkauf/anhang-ablage')
+    return anhangAblegen(String(payload.anhang_id))
+  },
+
   /**
    * Retourenlabel an den Kunden. Hängt das Label an einer Reparatur, nennt
    * die Mail die RMA-Nummer — der Zettel im Paket ist am Wareneingang die
@@ -401,11 +407,26 @@ async function originForJob(
   if (kind === 'send_repair_request_email' && payload.vorgang_id) {
     return { model: 'vorgang', id: String(payload.vorgang_id) }
   }
+  if (kind === 'gmail_anhang_ablegen' && payload.anhang_id) {
+    const [row] = await sql<{ thread_id: string }[]>`
+      select n.thread_id from mail_anhaenge a join mail_nachrichten n on n.id = a.nachricht_id
+      where a.id = ${String(payload.anhang_id)}`
+    if (row) return { model: 'mail_thread', id: row.thread_id }
+  }
   return null
 }
 
 /** Arbeitet fällige Jobs ab. Wird vom Cron-Endpunkt aufgerufen. */
-export async function runDueJobs(limit = 20): Promise<RunResult> {
+/**
+ * Zeitbudget je Lauf (0093): Vercel beendet die Funktion nach 60 s. Jobs,
+ * die nach Ablauf des Budgets noch nicht begonnen haben, gehen zurück in die
+ * Warteschlange statt mitten im Handler abgeschossen zu werden (Drive-
+ * Ablagen und Mail-Anhänge dauern länger als ein Shopify-Aufruf).
+ */
+export const JOB_BUDGET_MS = 40_000
+
+export async function runDueJobs(limit = 20, budgetMs = JOB_BUDGET_MS): Promise<RunResult> {
+  const beginn = Date.now()
   // Hängengebliebene Läufe (Prozessabbruch mitten im Handler) zurückholen.
   await sql`select reap_stuck_jobs()`
 
@@ -428,7 +449,14 @@ export async function runDueJobs(limit = 20): Promise<RunResult> {
   let failed = 0
   let uebersprungen = 0
 
-  for (const job of jobs) {
+  for (const [i, job] of jobs.entries()) {
+    if (Date.now() - beginn > budgetMs) {
+      const rest = jobs.slice(i).map((j) => j.id)
+      await sql`update integration_jobs
+                set status = 'pending', attempts = greatest(attempts - 1, 0), started_at = null
+                where id = any(${rest}::uuid[]) and status = 'running'`
+      break
+    }
     const handler = handlerFuer(job.kind)
     if (!handler) {
       await sql`update integration_jobs

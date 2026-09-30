@@ -4,6 +4,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { DokumenteKarte, groesseText } from '@/components/dokumente'
+import { MailThreadsKarte, WiedervorlagenKarte } from '@/components/mail-threads'
 import { RecordComments } from '@/components/record-comments'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { DOKUMENT_ARTEN } from '@/modules/einkauf/dokument-modelle'
@@ -19,7 +20,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * Lieferantenakte (Einkauf, 0092): alles zu einem Lieferanten auf einer
  * Seite — Einkaufsdaten (Sprache, Maildomains, Einkäufer, Standards),
  * Dateien (eigene und die seiner Bestellungen/Rechnungen), Bestellungen,
- * offene Rechnungen, Lieferantenpreise, Verlauf. Mails folgen mit Stufe 2.
+ * offene Rechnungen, Lieferantenpreise, Verlauf; seit Stufe 2a (0093) auch
+ * die Mail-Threads und Wiedervorlagen.
  */
 export default async function LieferantenaktePage({ params }: { params: Promise<{ id: string }> }) {
   await requireArea('einkauf')
@@ -128,12 +130,12 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
               </select>
             </label>
             <label className="field" style={{ flex: 2 }}>
-              <span>Maildomains (Komma-getrennt)</span>
+              <span>Maildomains / Adressen (Komma-getrennt)</span>
               <input
                 name="mail_domains"
                 className="mono"
                 defaultValue={p.mail_domains.join(', ')}
-                placeholder="example.cn, example-pcb.com"
+                placeholder="example-pcb.com, sales88@qq.com"
               />
             </label>
             <label className="field">
@@ -177,12 +179,15 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
           </div>
         </ActionForm>
         <p className="small muted" style={{ margin: '8px 0 0' }}>
-          Über die Maildomains ordnet KRNL eingehende Mails dem Lieferanten zu; Vorlagen und Entwürfe
-          entstehen in seiner Sprache.
+          Über die Maildomains ordnet KRNL eingehende Mails dem Lieferanten zu — bei Freemailern
+          (qq.com, 163.com, gmail.com …) die volle Adresse eintragen. Vorlagen und Entwürfe entstehen in
+          seiner Sprache.
           {!p.is_vendor && ' Mit dem Speichern wird der Kontakt zum Lieferanten.'}
         </p>
       </Card>
 
+      <MailThreadsKarte partnerId={id} />
+      <WiedervorlagenKarte modell="partner" recordId={id} pfad={`/einkauf/lieferanten/${id}`} />
       <DokumenteKarte modell="partner" recordId={id} titel="Dateien des Lieferanten" />
 
       {fremdeDateien.length > 0 && (

@@ -4,6 +4,7 @@ import {
   DOKUMENT_MODELL_NAMEN,
   MAX_DATEI_BYTES,
 } from '../../einkauf/dokument-modelle.ts'
+import { mailKennungFehler } from '../../einkauf/mail-regeln.ts'
 import type { RegistrierteAktion } from './typen.ts'
 
 /**
@@ -131,14 +132,23 @@ export const EINKAUF_DOKUMENTE = {
     prozessfrei: true,
     ki: true,
     beschreibung:
-      'Pflegt die Lieferantenakte: Kommunikationssprache (de/en/zh), Maildomains für die ' +
-      'automatische Zuordnung eingehender Mails, zuständiger Einkäufer, Standard-Incoterm ' +
+      'Pflegt die Lieferantenakte: Kommunikationssprache (de/en/zh), Maildomains bzw. bei ' +
+      'Freemailern (qq.com, 163.com …) volle Adressen für die automatische Zuordnung ' +
+      'eingehender Mails, zuständiger Einkäufer, Standard-Incoterm ' +
       'und -Währung. Macht den Kontakt zugleich zum Lieferanten.',
     bindung: 'beleg',
     modell: 'partner',
     schema: z.object({
       sprache: z.enum(['de', 'en', 'zh']).optional(),
-      mail_domains: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, 'Ungültige Maildomain')).max(20).default([]),
+      mail_domains: z
+        .array(
+          z.string().trim().toLowerCase().superRefine((e, c) => {
+            const fehler = mailKennungFehler(e)
+            if (fehler) c.addIssue({ code: 'custom', message: fehler })
+          }),
+        )
+        .max(20)
+        .default([]),
       einkaeufer_id: uuid.optional(),
       standard_incoterm: z.string().max(3).optional(),
       standard_waehrung: z.string().length(3).optional(),

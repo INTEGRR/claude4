@@ -83,6 +83,14 @@ export const JOB_KATALOG = {
       'eine Reparatur angefragt hat.',
     faehigkeit: 'mail:anfrage_bestaetigung',
   },
+  gmail_anhang_ablegen: {
+    label: 'Mail-Anhang ablegen',
+    beschreibung:
+      'Legt einen Anhang aus dem Einkaufspostfach in der Drive-Ablage ab (Ordner von Bestellung ' +
+      'bzw. Lieferant, sonst Eingang) und verknüpft ihn mit Thread, Lieferant und Bestellung; ' +
+      'gleicher Inhalt beim selben Lieferanten wird verknüpft statt kopiert.',
+    faehigkeit: 'ablage:mailanhang_ablegen',
+  },
 } satisfies Record<string, JobEintrag>
 
 export type JobKind = keyof typeof JOB_KATALOG

@@ -182,6 +182,11 @@ export const LABELS = {
     failure: 'Problem',
     cancelled: 'Storniert',
   },
+  mail_thread: {
+    offen: 'Offen',
+    erledigt: 'Erledigt',
+    ignoriert: 'Ignoriert',
+  },
 } as const
 
 /** Farbton für Status-Badges. */
@@ -197,6 +202,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'fully_billed':
     case 'paid':
     case 'approved':
+    case 'erledigt':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -206,6 +212,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'under_repair':
     case 'received':
     case 'posted':
+    case 'offen':
       return 'info'
     case 'cancel':
     case 'cancelled':

@@ -2,6 +2,7 @@ import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
 import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einkaufDokumente from './registry/einkauf-dokumente-ausfuehren.ts'
+import * as einkaufPostfach from './registry/einkauf-postfach-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -33,6 +34,12 @@ export const AUSFUEHRUNG = {
   'einkauf.dokument_loesen': einkaufDokumente.dokumentLoesen,
   'einkauf.dokument_aendern': einkaufDokumente.dokumentAendern,
   'einkauf.lieferantendaten_setzen': einkaufDokumente.lieferantendatenSetzen,
+  'einkauf.mail_zuordnen': einkaufPostfach.mailZuordnen,
+  'einkauf.mail_status_setzen': einkaufPostfach.mailStatusSetzen,
+  'einkauf.nachricht_erfassen': einkaufPostfach.nachrichtErfassen,
+  'einkauf.wiedervorlage_anlegen': einkaufPostfach.wiedervorlageAnlegen,
+  'einkauf.wiedervorlage_erledigen': einkaufPostfach.wiedervorlageErledigen,
+  'integrationen.postfach_abgleichen': einkaufPostfach.postfachAbgleichenAusfuehren,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,
