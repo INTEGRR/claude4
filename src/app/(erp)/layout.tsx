@@ -106,6 +106,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   if (einrichtung?.offen) redirect('/einrichtung')
 
   const counts = await badges()
+  // Geöffnete Navigationsgruppen des Benutzers (0095) — Standard: alles zu.
+  const [navZustand] = await sql<{ nav_offen: string[] }[]>`select nav_offen from users where id = ${user.id}`
   const sees = (area: Area) => canAccess(user.role, area, user.befugnisse)
 
   const [company] = await sql<{ name: string }[]>`
@@ -358,7 +360,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             <Wortmarke groesse={17} />
           </div>
           <div className="brand-sub">{firma}</div>
-          <SidebarNav groups={groups} />
+          <SidebarNav groups={groups} offen={navZustand?.nav_offen ?? []} />
 
           <div className="spacer" />
           {/* Kein <form action={…}>: dessen Server-Fallback-Attribute lösten

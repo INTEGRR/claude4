@@ -9,6 +9,18 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Navigation eingeklappt, Zustand je Benutzer
+
+Auf Wunsch des Betreibers sind die Gruppen der linken Navigation (Verkauf,
+Einkauf, Lager …) standardmäßig eingeklappt, und die Gruppe der aktuellen
+Seite klappt nicht mehr von selbst auf — ihr Kopf wird nur markiert. Welche
+Gruppen jemand öffnet, merkt sich KRNL am Benutzer (`users.nav_offen`,
+Migration 0095) statt in `localStorage`: derselbe Zustand an jedem Gerät,
+und Server und Client rendern von Anfang an gleich (kein Aufklappen nach
+dem Laden). Gespeichert wird über die Rahmenaktion `navigationMerken`
+(Oberfläche der eigenen Sitzung, kein Beleg — daher auf der Liste
+RAHMEN_AKTIONEN statt in der Registry, wie „Backup-Codes erneuern").
+
 ## 2026-09-30 — Mails an Lieferanten: Entwurf als Beleg, Mensch gibt frei, PDF statt „sent"
 
 Stufe 2b des Einkaufstools (Migration 0094). Entschieden:

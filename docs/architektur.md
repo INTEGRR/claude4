@@ -118,7 +118,9 @@ begründet im [Entscheidungslog](entscheidungen.md):
   über die Aktions-Registry und den **Torwächter** (`aktionAusfuehrenGeprueft`
   — zod-Validierung, Rollen/Befugnisse, Audit) als einzigen Schreibweg;
   Prozesse sind Daten in der DB, Masken werden aus Schritten generiert, die
-  Navigation ist eine Projektion der aktiven Prozesse (Chamäleon).
+  Navigation ist eine Projektion der aktiven Prozesse (Chamäleon). Ihre
+  Gruppen sind standardmäßig eingeklappt; welche jemand öffnet, steht am
+  Benutzer (`users.nav_offen`, 0095) statt im Browser.
 - **Los-/Seriennummern, Arbeitsplätze/Arbeitsgänge, Kits/Phantom-Baugruppen,
   Befugnisse** — die früher hier als „später" gelisteten Punkte sind gebaut.
 - **Finanzmodul** (Zahlungen, Verträge, Darlehen/Steuern, 13-Wochen-Prognose)

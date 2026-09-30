@@ -295,6 +295,9 @@ const RAHMEN_AKTIONEN = new Set([
   // setzt nur ein Browser-Cookie, protokolliert am Benutzer; die Druck-
   // FACHAKTIONEN lesen es und laufen weiter durch den Torwächter.
   'arbeitsplatz-action:arbeitsplatzWaehlen',
+  // Navigation je Benutzer (0095): welche Menügruppen offen sind — Oberfläche
+  // der eigenen Sitzung, kein Beleg, kein Bereich.
+  'nav-action:navigationMerken',
 ])
 
 describe('Registry-Abdeckung (statisch)', () => {

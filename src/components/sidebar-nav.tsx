@@ -1,13 +1,16 @@
 'use client'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState, useTransition } from 'react'
 import { usePathname } from 'next/navigation'
+import { navigationMerken } from '@/app/(erp)/nav-action'
 
 /**
  * Gruppierte, aufklappbare Navigation (Claude-Code-Stil). Die Gruppen kommen
- * bereits rollengefiltert aus dem Server-Layout; hier lebt nur der
- * Auf-/Zuklapp-Zustand (localStorage, Standard: offen). Die Gruppe der
- * aktiven Route ist immer geöffnet.
+ * bereits rollengefiltert aus dem Server-Layout. Standard: alles
+ * eingeklappt; welche Gruppen jemand öffnet, merkt sich KRNL am Benutzer
+ * (users.nav_offen, 0095) — derselbe Zustand an jedem Gerät, und Server
+ * und Client rendern von Anfang an gleich. Die Gruppe der aktuellen Seite
+ * klappt NICHT von selbst auf; ist sie zu, trägt ihr Kopf die Markierung.
  */
 
 export interface NavItem {
@@ -22,8 +25,6 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-const STORAGE_PREFIX = 'erp.nav.'
-
 function NavEntry({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link className="nav" href={item.href} aria-current={active ? 'page' : undefined}>
@@ -33,56 +34,26 @@ function NavEntry({ item, active }: { item: NavItem; active: boolean }) {
   )
 }
 
-export function SidebarNav({ groups }: { groups: NavGroup[] }) {
+export function SidebarNav({ groups, offen: gespeichert }: { groups: NavGroup[]; offen: string[] }) {
   const pathname = usePathname()
-  const [closed, setClosed] = useState<Record<string, boolean>>({})
-
-  // Zustand erst nach dem Mount laden — Server und Client rendern initial
-  // identisch (alles offen), danach klappt der gespeicherte Zustand zu.
-  useEffect(() => {
-    const fromStorage: Record<string, boolean> = {}
-    for (const g of groups) {
-      if (g.label && localStorage.getItem(STORAGE_PREFIX + g.label) === 'zu') {
-        fromStorage[g.label] = true
-      }
-    }
-    setClosed(fromStorage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [offen, setOffen] = useState<string[]>(gespeichert)
+  const [, startTransition] = useTransition()
 
   // Genau ein Eintrag ist aktiv: der mit dem längsten passenden Pfad. Sonst
   // leuchtete auf /personal/schichtplan auch „Mitarbeiter" (/personal) mit.
   const passt = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
-
-  // Beim Ankommen auf einer Seite öffnet sich deren Gruppe — wer über Scanner
-  // oder Suche springt, soll sich verorten können. Danach ist sie normal
-  // zuklappbar: eine dauerhaft erzwungene Gruppe wäre ein Knopf, der klickbar
-  // aussieht und nichts tut (und genau so im Durchklick-Test aufgefallen ist).
-  useEffect(() => {
-    const aktive = groups.find((g) => g.label && g.items.some((i) => passt(i.href)))?.label
-    if (!aktive) return
-    setClosed((c) => {
-      if (!c[aktive]) return c
-      localStorage.setItem(STORAGE_PREFIX + aktive, 'auf')
-      const next = { ...c }
-      delete next[aktive]
-      return next
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
   const aktiv = groups
     .flatMap((g) => g.items.map((i) => i.href))
     .filter(passt)
     .sort((a, b) => b.length - a.length)[0]
-
   const isActive = (href: string) => href === aktiv
 
   const toggle = (label: string) => {
-    setClosed((c) => {
-      const next = { ...c, [label]: !c[label] }
-      localStorage.setItem(STORAGE_PREFIX + label, next[label] ? 'zu' : 'auf')
-      return next
+    const next = offen.includes(label) ? offen.filter((g) => g !== label) : [...offen, label]
+    setOffen(next)
+    startTransition(() => {
+      void navigationMerken(next)
     })
   }
 
@@ -94,12 +65,13 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
             <NavEntry key={item.href} item={item} active={isActive(item.href)} />
           ))
         }
-        const isClosed = closed[g.label] === true
+        const isClosed = !offen.includes(g.label)
+        const enthaeltAktiv = g.items.some((item) => isActive(item.href))
         return (
           <div key={g.label ?? i} className="nav-group">
             <button
               type="button"
-              className="nav-group-head"
+              className={`nav-group-head${isClosed && enthaeltAktiv ? ' aktiv' : ''}`}
               onClick={() => toggle(g.label!)}
               aria-expanded={!isClosed}
             >

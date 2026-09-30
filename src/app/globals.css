@@ -241,6 +241,8 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius-sm);
 }
 .sidebar .nav-group-head:hover { color: var(--text); background: var(--surface-2); }
+/* Eingeklappte Gruppe mit der aktuellen Seite darin (0095): Kopf markiert statt aufgeklappt. */
+.sidebar .nav-group-head.aktiv { color: var(--text); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--accent); }
 .sidebar .chevron {
   display: inline-block;
   transition: transform 0.12s ease;
