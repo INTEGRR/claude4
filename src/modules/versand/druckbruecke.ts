@@ -4,7 +4,8 @@ import { sql } from '@/db/client'
 /**
  * Druckbrücke: die App erreicht den Labeldrucker am Packtisch nie direkt
  * (Vercel ↛ LAN) — deshalb eine Warteschlange (druckauftraege, 0077) und
- * ein kleiner Agent auf dem Packtisch-PC (scripts/druck-agent.ts), der
+ * ein kleiner Agent auf dem Packtisch-PC (scripts/druck-agent.ps1, unter
+ * Linux/macOS scripts/druck-agent.ts), der
  * offene Aufträge per HTTPS abholt, still druckt und quittiert.
  * Authentifiziert wird der Agent über ein gemeinsames Token — kein
  * Benutzer-Login auf dem Gerät.

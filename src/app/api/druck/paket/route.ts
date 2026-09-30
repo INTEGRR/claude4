@@ -15,9 +15,9 @@ import { zipErstellen } from '@/modules/shared/zip'
  * drucker_id das Alt-Paket je PC (?name=…&ziel=…&drucker=…). Nur für Administratoren, weil das Paket das
  * Agent-Token enthält; ohne aktive Druckbrücke gibt es nichts zu laden.
  *
- * Der Agent kommt unverändert aus scripts/druck-agent.ts (eine Quelle) —
- * next.config.ts nimmt die Datei per outputFileTracingIncludes in die
- * Funktion auf.
+ * Die Agenten kommen unverändert aus scripts/druck-agent.ps1 (Windows,
+ * ohne Node) und scripts/druck-agent.ts (Linux/macOS) — next.config.ts
+ * nimmt beide per outputFileTracingIncludes in die Funktion auf.
  */
 export async function GET(request: Request) {
   const nutzer = await currentUser()
@@ -50,6 +50,7 @@ export async function GET(request: Request) {
     windowsDrucker = d.druckername ?? ''
   }
   const agentQuelle = await readFile(path.join(process.cwd(), 'scripts', 'druck-agent.ts'), 'utf8')
+  const agentPsQuelle = await readFile(path.join(process.cwd(), 'scripts', 'druck-agent.ps1'), 'utf8')
   const erstellt = new Date()
   const zip = zipErstellen(
     druckbrueckePaket({
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
       ziel: zielWert(anfrage.searchParams.get('ziel')),
       drucker: windowsDrucker,
       agentQuelle,
+      agentPsQuelle,
       erstellt,
     }),
     erstellt,

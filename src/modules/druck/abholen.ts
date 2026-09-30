@@ -34,8 +34,13 @@ export interface AbgeholterAuftrag {
   hoehe_mm: string | null
 }
 
-/** Offene Aufträge für einen Agenten sperren und liefern (älteste zuerst). */
-export async function auftraegeAbholen(wer: Abholer): Promise<AbgeholterAuftrag[]> {
+/**
+ * Offene Aufträge für einen Agenten sperren und liefern (älteste zuerst).
+ * `limit` (1–3): der PowerShell-Agent holt je Abruf genau einen — Windows
+ * PowerShell liest große JSON-Antworten sonst nicht.
+ */
+export async function auftraegeAbholen(wer: Abholer, limit = JE_ABRUF): Promise<AbgeholterAuftrag[]> {
+  const menge = Math.min(Math.max(Math.trunc(limit) || JE_ABRUF, 1), JE_ABRUF)
   const druckerId = 'druckerId' in wer ? wer.druckerId : null
   const ziele = 'ziele' in wer ? wer.ziele : null
   const gesperrt = await sql<{ id: string }[]>`
@@ -49,7 +54,7 @@ export async function auftraegeAbholen(wer: Abholer): Promise<AbgeholterAuftrag[
                else drucker_id is null
                     and (${ziele}::text[] is null or ziel = any(${ziele}::text[])) end)
       order by created_at
-      limit ${JE_ABRUF}
+      limit ${menge}
       for update skip locked)
     update druckauftraege d set abgeholt_am = now()
     from frei where d.id = frei.id

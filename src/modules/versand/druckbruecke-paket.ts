@@ -1,10 +1,14 @@
 import type { ZipDatei } from '../shared/zip.ts'
 
 /**
- * Das Druckbrücken-Paket für EINEN Drucker (0087): der Agent
- * (scripts/druck-agent.ts, unverändert) plus Startskript mit Adresse,
- * Token, Drucker-ID und Windows-Druckername bereits eingetragen, ein
- * Skript für den Autostart und eine Anleitung. Download an der
+ * Das Druckbrücken-Paket für EINEN Drucker (0087): die Agenten plus
+ * Startskript mit Adresse, Token, Drucker-ID und Windows-Druckername
+ * bereits eingetragen, ein Skript für den Autostart und eine Anleitung.
+ * Windows läuft seit 2026-09-30 OHNE Node.js: der Agent ist ein
+ * PowerShell-Skript (scripts/druck-agent.ps1, auf jedem Windows 10/11
+ * lauffähig), das SumatraPDF bei Bedarf portabel nachlädt — auf dem
+ * Lagerrechner wird nichts installiert. Linux/macOS nutzen weiter den
+ * Node-Agenten (scripts/druck-agent.ts). Download an der
  * Druckerzeile unter Einstellungen → Arbeitsplätze (nur Administratoren,
  * das Paket enthält das Agent-Token). Ohne Drucker-ID entsteht das
  * Alt-Paket je PC mit Zielen (vor 0087).
@@ -32,7 +36,10 @@ export interface PaketAngaben {
   ziel: DruckZiel
   /** Druckername wie in Windows; leer = Standarddrucker. */
   drucker: string
+  /** Node-Agent (Linux/macOS), unverändert aus scripts/druck-agent.ts. */
   agentQuelle: string
+  /** PowerShell-Agent (Windows), unverändert aus scripts/druck-agent.ps1. */
+  agentPsQuelle: string
   erstellt: Date
 }
 
@@ -92,12 +99,10 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     `set "DRUCK_DRUCKER_ID=${druckerId}"`,
     `set "DRUCK_ZIELE=${ziele}"`,
     `set "DRUCKER=${drucker}"`,
-    'rem SumatraPDF an den ueblichen Installationsorten finden.',
-    'set "PATH=%PATH%;%LOCALAPPDATA%\\SumatraPDF;%ProgramFiles%\\SumatraPDF;%ProgramFiles(x86)%\\SumatraPDF"',
-    'where node >nul 2>nul || (echo Node.js fehlt: bitte die LTS-Version von https://nodejs.org installieren. & pause & exit /b 1)',
-    'where SumatraPDF >nul 2>nul || (echo SumatraPDF fehlt: bitte von https://www.sumatrapdfreader.org installieren. & pause & exit /b 1)',
+    'rem Ohne Node.js: der Agent ist ein PowerShell-Skript (Windows 10/11 hat es).',
+    'rem SumatraPDF wird gefunden oder beim ersten Start portabel in diesen Ordner geladen.',
     ':start',
-    'node --experimental-strip-types --disable-warning=ExperimentalWarning druck-agent.ts',
+    'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0druck-agent.ps1"',
     'echo Druckbruecke beendet - Neustart in 10 Sekunden ...',
     'timeout /t 10 /nobreak >nul',
     'goto start',
@@ -137,11 +142,11 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     : (DRUCK_ZIELE.find((z) => z.wert === a.ziel)?.label ?? 'Alles')
   const kontrolle = druckerId
     ? [
-        '5. Kontrolle in KRNL: Einstellungen → Arbeitsplätze → Drucker.',
+        'Kontrolle in KRNL: Einstellungen → Arbeitsplätze → Drucker.',
         `   Bei „${name}" steht unter „zuletzt gesehen" gerade eben.`,
       ]
     : [
-        '5. Kontrolle in KRNL: Einstellungen → Versand & Druck → Druck-Agenten.',
+        'Kontrolle in KRNL: Einstellungen → Versand & Druck → Druck-Agenten.',
         `   Dort erscheint „${name}" mit dem Zustand „aktiv".`,
       ]
   const liesmich = `\uFEFF${crlf([
@@ -151,17 +156,18 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     `Dieser PC druckt: ${zielText}`,
     `Drucker: ${drucker || 'Windows-Standarddrucker'}`,
     '',
-    'Einrichtung (einmalig, Windows):',
+    'Einrichtung (einmalig, Windows) — es muss NICHTS installiert werden:',
     '',
-    '1. Node.js installieren: https://nodejs.org → „LTS" herunterladen und',
-    '   mit den Standardeinstellungen installieren.',
-    '2. SumatraPDF installieren: https://www.sumatrapdfreader.org → Installer.',
-    '   (Druckt die PDFs still, ohne Dialog.)',
-    '3. Dieses ZIP entpacken, z. B. nach C:\\KRNL-Druckbruecke.',
-    '4. „druckbruecke-starten.cmd" doppelklicken. Im Fenster steht',
-    '   „Druckbrücke aktiv" — das Fenster offen lassen (minimieren geht).',
+    '1. Dieses ZIP entpacken, z. B. nach C:\\KRNL-Druckbruecke',
+    '   (Rechtsklick → „Alle extrahieren").',
+    '2. „druckbruecke-starten.cmd" doppelklicken. Beim ersten Start lädt die',
+    '   Brücke SumatraPDF (druckt die PDFs still) als portable Version in',
+    '   diesen Ordner — ist es schon installiert, nimmt sie das installierte.',
+    '3. Im Fenster steht „Druckbruecke aktiv" — das Fenster offen lassen',
+    '   (minimieren geht). Fragt Windows beim Start nach, „Trotzdem',
+    '   ausführen" wählen.',
     ...kontrolle,
-    '6. Damit die Brücke nach einem Neustart von selbst läuft:',
+    '4. Damit die Brücke nach einem Neustart von selbst läuft:',
     '   „autostart-einrichten.cmd" einmal doppelklicken.',
     '',
     'Druckername ändern: druckbruecke-starten.cmd mit dem Editor öffnen und',
@@ -174,7 +180,7 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     'Zwei Drucker an einem PC: je Drucker ein eigenes Paket in einen eigenen',
     'Ordner entpacken und beide starten.',
     '',
-    'Linux/macOS: druckbruecke-starten.sh (druckt über lp).',
+    'Linux/macOS: druckbruecke-starten.sh (braucht Node.js ≥ 22, druckt über lp).',
   ])}`
 
   return [
@@ -182,6 +188,9 @@ export function druckbrueckePaket(a: PaketAngaben): ZipDatei[] {
     { name: 'autostart-einrichten.cmd', inhalt: autostart },
     { name: 'druckbruecke-starten.sh', inhalt: shell },
     { name: 'LIESMICH.txt', inhalt: liesmich },
+    // PowerShell 5.1 liest .ps1 ohne BOM in der ANSI-Codepage — das Skript
+    // ist reines ASCII, mit CRLF wie die .cmd.
+    { name: 'druck-agent.ps1', inhalt: crlf(a.agentPsQuelle.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')) },
     { name: 'druck-agent.ts', inhalt: a.agentQuelle },
     // Ohne diese Angabe rät Node den Modultyp und warnt bei jedem Start.
     { name: 'package.json', inhalt: '{ "type": "module", "private": true }\n' },

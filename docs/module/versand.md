@@ -274,27 +274,44 @@ Pakete je Drucker ersetzen.
 2. Einstellungen → Arbeitsplätze & Drucker: Plätze, Drucker und Wege
    anlegen; an der Druckerzeile **„Paket laden"**
    (`GET /api/druck/paket?drucker_id=…`, nur Administratoren — es enthält
-   das Token). Darin: `druck-agent.ts` (unverändert aus `scripts/`),
-   `druckbruecke-starten.cmd` mit Adresse, Token, Drucker-ID und
-   Windows-Druckername bereits eingetragen (startet nach einem Absturz
-   neu), `autostart-einrichten.cmd` (Verknüpfung mit dem Druckernamen —
-   zwei Drucker an einem PC stören sich nicht), `druckbruecke-starten.sh`
-   für Linux/macOS und `LIESMICH.txt`.
-3. Auf dem PC: Node.js (LTS) und SumatraPDF installieren, ZIP je Drucker
-   in einen eigenen Ordner entpacken, `druckbruecke-starten.cmd`
-   doppelklicken, einmal `autostart-einrichten.cmd`. Bei „Agent" steht
-   an der Druckerzeile dann „aktiv".
+   das Token). Darin: `druck-agent.ps1` (Windows-Agent, unverändert aus
+   `scripts/`), `druckbruecke-starten.cmd` mit Adresse, Token,
+   Drucker-ID und Windows-Druckername bereits eingetragen (startet nach
+   einem Absturz neu), `autostart-einrichten.cmd` (Verknüpfung mit dem
+   Druckernamen — zwei Drucker an einem PC stören sich nicht),
+   `LIESMICH.txt` sowie `druck-agent.ts` + `druckbruecke-starten.sh` für
+   Linux/macOS.
+3. Auf dem PC **wird nichts installiert**: ZIP je Drucker in einen
+   eigenen Ordner entpacken, `druckbruecke-starten.cmd` doppelklicken,
+   einmal `autostart-einrichten.cmd`. Bei „Agent" steht an der
+   Druckerzeile dann „aktiv".
 4. Windows druckt über **SumatraPDF** — Etiketten mit
-   `-print-settings fit` (auf das Etikett eingepasst), A4 mit `shrink`;
-   Linux/macOS über `lp` (Etiketten mit `-o fit-to-page`). Ein eigenes
-   Kommando geht über `DRUCK_KOMMANDO` mit den Platzhaltern `{datei}`,
-   `{drucker}` und `{skalierung}`.
+   `-print-settings fit` (auf das Etikett eingepasst), A4 mit `shrink`.
+   Der Agent sucht ein vorhandenes SumatraPDF (`DRUCK_SUMATRA`, Ordner
+   des Pakets, `%LOCALAPPDATA%`, `Programme`); fehlt es, lädt er beim
+   ersten Start einmalig die **portable** Version 3.5.2 (64 Bit) in den
+   Paketordner — SHA-256 fest im Skript hinterlegt, bei Abweichung bricht
+   er ab. Linux/macOS drucken über `lp` (Etiketten mit
+   `-o fit-to-page`); ein eigenes Kommando geht dort über
+   `DRUCK_KOMMANDO` mit den Platzhaltern `{datei}`, `{drucker}` und
+   `{skalierung}`.
 
-Von Hand geht es weiterhin: `scripts/druck-agent.ts` mit Node ≥ 22.6
-(`node --experimental-strip-types druck-agent.ts`) und den Variablen
-`KRNL_URL`, `DRUCK_AGENT_TOKEN`, `DRUCK_DRUCKER_ID`, optional `DRUCKER`.
-Ohne `DRUCK_DRUCKER_ID` läuft der Agent im Alt-Betrieb (`DRUCK_ZIELE`,
-`DRUCK_AGENT_NAME`).
+**Zwei Agenten, ein Protokoll** (Entscheidungslog 2026-09-30):
+
+- **Windows:** `scripts/druck-agent.ps1` läuft mit dem eingebauten
+  Windows PowerShell 5.1 (`powershell -NoProfile -ExecutionPolicy Bypass
+  -File`), ohne Node.js. Das Skript ist reines ASCII (PowerShell 5.1 liest
+  Skripte ohne BOM als ANSI) und im Paket mit CRLF. Es holt **je Abruf
+  genau einen Auftrag** (`&limit=1`, Server erlaubt 1–3), weil
+  `ConvertFrom-Json` in 5.1 an großen Antworten scheitert; gelesen wird
+  mit `JavaScriptSerializer` ohne Längengrenze. Störungen (Token
+  ungültig, Drucker unbekannt, Netz weg) meldet es einmal verständlich
+  und versucht weiter.
+- **Linux/macOS:** `scripts/druck-agent.ts` mit Node ≥ 22.6
+  (`node --experimental-strip-types druck-agent.ts`).
+- Beide nehmen dieselben Variablen: `KRNL_URL`, `DRUCK_AGENT_TOKEN`,
+  `DRUCK_DRUCKER_ID`, optional `DRUCKER`. Ohne `DRUCK_DRUCKER_ID` laufen
+  sie im Alt-Betrieb (`DRUCK_ZIELE`, `DRUCK_AGENT_NAME`).
 
 **Abholen mit Sperre:** Der Agent fragt alle 3 Sekunden
 (`DRUCK_INTERVALL_MS`) `GET /api/druck/abholen?drucker=<id>` (Bearer-Token;

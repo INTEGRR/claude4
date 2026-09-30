@@ -11,7 +11,8 @@ import { agentBerechtigt, zieleAusAnfrage } from '@/modules/versand/druckbruecke
 
 /**
  * Abholstelle der Druckbrücke: der Agent am Arbeitsplatz-PC
- * (scripts/druck-agent.ts) fragt hier im Takt nach offenen Druckaufträgen
+ * (scripts/druck-agent.ps1 unter Windows, scripts/druck-agent.ts unter
+ * Linux/macOS) fragt hier im Takt nach offenen Druckaufträgen
  * und bekommt die PDFs gleich mitgeliefert (base64) — Pull-Modell, weil
  * die App die LAN-Drucker nie erreichen kann.
  *
@@ -29,6 +30,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const druckerParam = url.searchParams.get('drucker')
+  // Windows-Agent (PowerShell) holt je Abruf einen Auftrag: ?limit=1.
+  const limit = Number(url.searchParams.get('limit') ?? '') || undefined
   let jobs: Awaited<ReturnType<typeof auftraegeAbholen>>
 
   if (druckerParam) {
@@ -40,7 +43,7 @@ export async function GET(request: Request) {
         { status: 404 },
       )
     }
-    jobs = drucker.aktiv ? await auftraegeAbholen({ druckerId: drucker.id }) : []
+    jobs = drucker.aktiv ? await auftraegeAbholen({ druckerId: drucker.id }, limit) : []
   } else {
     const ziele = zieleAusAnfrage(url.searchParams.get('ziele'))
     const agent = (url.searchParams.get('name') ?? '').trim() || (ziele?.join('+') ?? 'agent')
@@ -53,7 +56,7 @@ export async function GET(request: Request) {
         settings.value || jsonb_build_object(
           'agenten', coalesce(settings.value -> 'agenten', '{}'::jsonb)),
         array['agenten', ${agent}::text], to_jsonb(now()))`
-    jobs = await auftraegeAbholen({ ziele })
+    jobs = await auftraegeAbholen({ ziele }, limit)
   }
 
   const druckbar: {

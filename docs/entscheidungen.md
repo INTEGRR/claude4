@@ -9,6 +9,38 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Druckbrücke unter Windows ohne Node.js (PowerShell-Agent)
+
+Am Lager-PC scheiterte das Paket an „Node.js fehlt". Die Vorgabe des
+Betreibers: Auf den Arbeitsplatz-PCs wird nichts installiert. Deshalb
+läuft die Druckbrücke unter Windows jetzt mit einem eigenen Agenten
+`scripts/druck-agent.ps1` auf dem eingebauten Windows PowerShell 5.1. Die
+Variablen und das Protokoll (Abholen, Quittieren) sind dieselben wie beim
+Node-Agenten. `druck-agent.ts` bleibt für Linux/macOS.
+
+- **SumatraPDF** wird nicht mehr vorausgesetzt. Fehlt es, lädt der Agent
+  beim ersten Start einmalig die portable Version 3.5.2 (64 Bit) in den
+  Paketordner. Die SHA-256-Prüfsumme ist fest im Skript hinterlegt; weicht
+  der Download ab, bricht der Agent ab. Es wird nichts installiert. Die
+  Version ist bewusst gepinnt, ein Update ist eine Skriptänderung.
+- **Je Abruf ein Auftrag** (`/api/druck/abholen?…&limit=1`, der Server
+  erlaubt 1–3, Standard bleibt 3): `ConvertFrom-Json` in PowerShell 5.1
+  scheitert an großen JSON-Antworten. Gelesen wird deshalb mit
+  `JavaScriptSerializer` ohne Längengrenze, und die Antworten bleiben
+  klein. Die Fließband-Wirkung bleibt, weil der Agent sofort nachfragt,
+  solange Aufträge kommen.
+- **Das Skript ist reines ASCII** und steht im Paket mit CRLF.
+  PowerShell 5.1 liest Dateien ohne BOM als ANSI. Ein Test erzwingt ASCII,
+  `limit=1` und die hinterlegte Prüfsumme (`tests/druckbruecke-paket.test.ts`).
+- `druckbruecke-starten.cmd` startet den Agenten mit
+  `powershell -NoProfile -ExecutionPolicy Bypass -File` und so ohne
+  Richtlinienänderung am PC. Nach einem Absturz startet es ihn nach
+  10 Sekunden neu.
+
+Bestehende Pakete mit Node laufen weiter. Wer kein Node hat, lädt das
+Paket neu. Doku: [module/versand.md](module/versand.md) → „Einrichtung der
+Agenten".
+
 ## 2026-09-30 — Navigation eingeklappt, Zustand je Benutzer
 
 Auf Wunsch des Betreibers sind die Gruppen der linken Navigation (Verkauf,

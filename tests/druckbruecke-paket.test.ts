@@ -1,8 +1,10 @@
 /**
  * Druckbrücken-Paket (Download unter Einstellungen → Versand & Druck): das
  * ZIP ist lesbar, die Skripte tragen Adresse, Token, Name und Ziel, Freitext
- * kann nicht aus den Skripten ausbrechen, und der Agent startet mit genau
- * den Node-Flags, die das Startskript benutzt.
+ * kann nicht aus den Skripten ausbrechen. Unter Windows startet der
+ * PowerShell-Agent ohne Node (CRLF, nur ASCII — Windows PowerShell 5.1 liest
+ * Skripte ohne BOM als ANSI); der Node-Agent für Linux/macOS startet mit genau
+ * den Flags, die das Shell-Skript benutzt.
  */
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
@@ -41,6 +43,7 @@ const ANGABEN = {
   ziel: 'labeldrucker' as const,
   drucker: 'Zebra GK420d',
   agentQuelle: '// Agent\nconsole.log("x")\n',
+  agentPsQuelle: '# Agent\nWrite-Host "x"\n',
   erstellt: new Date('2026-09-29T10:00:00Z'),
 }
 
@@ -62,7 +65,7 @@ describe('Druckbrücken-Paket', () => {
     const dateien = new Map(druckbrueckePaket(ANGABEN).map((d) => [d.name, String(d.inhalt)]))
     assert.deepEqual([...dateien.keys()], [
       'druckbruecke-starten.cmd', 'autostart-einrichten.cmd', 'druckbruecke-starten.sh',
-      'LIESMICH.txt', 'druck-agent.ts', 'package.json',
+      'LIESMICH.txt', 'druck-agent.ps1', 'druck-agent.ts', 'package.json',
     ])
     assert.equal(JSON.parse(dateien.get('package.json')!).type, 'module')
     const cmd = dateien.get('druckbruecke-starten.cmd')!
@@ -72,7 +75,7 @@ describe('Druckbrücken-Paket', () => {
       'set "DRUCK_AGENT_NAME=packtisch"',
       'set "DRUCK_ZIELE=labeldrucker"',
       'set "DRUCKER=Zebra GK420d"',
-      'node --experimental-strip-types --disable-warning=ExperimentalWarning druck-agent.ts',
+      'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0druck-agent.ps1"',
     ]) {
       assert.ok(cmd.includes(`${zeile}\r\n`), `fehlt: ${zeile}`)
     }
@@ -80,7 +83,9 @@ describe('Druckbrücken-Paket', () => {
     const nurAscii = (text: string) => [...text].every((zeichen) => zeichen.charCodeAt(0) < 128)
     assert.ok(nurAscii(cmd), 'die Konsole liest OEM — keine Umlaute im Skript')
     assert.ok(nurAscii(dateien.get('autostart-einrichten.cmd')!))
-    assert.equal(dateien.get('druck-agent.ts'), ANGABEN.agentQuelle, 'der Agent kommt unverändert')
+    assert.ok(!/^(node|where node)/m.test(cmd), 'Windows braucht kein Node.js')
+    assert.equal(dateien.get('druck-agent.ps1'), '# Agent\r\nWrite-Host "x"\r\n', 'PowerShell-Agent mit CRLF')
+    assert.equal(dateien.get('druck-agent.ts'), ANGABEN.agentQuelle, 'der Node-Agent kommt unverändert')
     assert.ok(dateien.get('LIESMICH.txt')!.startsWith('﻿'), 'UTF-8 mit BOM für den Windows-Editor')
   })
 
@@ -117,7 +122,20 @@ describe('Druckbrücken-Paket', () => {
     assert.equal(oeffentlicheAdresse({}, kopf({}), 'http://localhost:3000'), 'http://localhost:3000')
   })
 
-  test('der echte Agent startet mit den Flags des Startskripts (und verlangt Adresse und Token)', async () => {
+  test('der echte PowerShell-Agent: nur ASCII, holt je Abruf einen Auftrag, Sumatra mit fester Prüfsumme', async () => {
+    const quelle = await readFile(new URL('../scripts/druck-agent.ps1', import.meta.url), 'utf8')
+    assert.ok(quelle.length > 1000)
+    assert.ok([...quelle].every((zeichen) => zeichen.charCodeAt(0) < 128), 'PowerShell 5.1 liest Skripte ohne BOM als ANSI')
+    assert.match(quelle, /'limit=1'/)
+    assert.match(quelle, /\$SumatraSha256 = '[0-9A-F]{64}'/)
+    assert.match(quelle, /\/api\/druck\/quittieren/)
+    const paket = druckbrueckePaket({ ...ANGABEN, agentPsQuelle: quelle })
+    const ps1 = String(paket.find((d) => d.name === 'druck-agent.ps1')!.inhalt)
+    assert.equal(ps1.replace(/\r\n/g, '\n'), quelle.replace(/\r\n/g, '\n'))
+    assert.ok(!/[^\r]\n/.test(ps1), 'nur CRLF')
+  })
+
+  test('der echte Node-Agent startet mit den Flags des Startskripts (und verlangt Adresse und Token)', async () => {
     const quelle = await readFile(new URL('../scripts/druck-agent.ts', import.meta.url), 'utf8')
     assert.ok(quelle.length > 1000)
     const lauf = promisify(execFile)(

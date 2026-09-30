@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
   // Das Druckbrücken-Paket liefert den Agenten unverändert aus dem Repo aus
   // (eine Quelle) — die Datei muss dafür in die Funktion der Route.
   outputFileTracingIncludes: {
-    '/api/druck/paket': ['./scripts/druck-agent.ts'],
+    '/api/druck/paket': ['./scripts/druck-agent.ts', './scripts/druck-agent.ps1'],
   },
   experimental: {
     // Alle Änderungen laufen über Server Actions; das Limit ist großzügig
