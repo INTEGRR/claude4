@@ -53,12 +53,21 @@ Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
      Name/E-Mail zugeordnet oder angelegt, dazu ihre Preise.
    - **Bestände aller Artikel** (seit 2026-09-30): jeder Odoo-Artikel mit
      Bestand an internen Lagerorten (summiert über die Lagerorte), der per
-     SKU/Barcode/Verweis zu einer KRNL-Variante passt — auch Fertigprodukte
-     (Switch-Tester) und Zubehör ohne Stückliste (Deskmats) —, bekommt
-     seinen Bestand, **nur wo KRNL 0 hat**, Preis vorher (nur wo KRNL 0
-     hat). Die Vorschau zeigt sie als „Weitere Bestände" mit Status
-     buchen/vorhanden/fehlt; „fehlt" heißt: keine KRNL-Variante mit dieser
-     SKU (anlegen oder SKU angleichen, dann erneut übernehmen).
+     SKU/Barcode/Verweis zu einer KRNL-Variante passt — Zubehör ohne
+     Stückliste wie Deskmats —, bekommt seinen Bestand, **nur wo KRNL 0
+     hat**, Preis vorher (nur wo KRNL 0 hat). Die Vorschau zeigt sie als
+     „Weitere Bestände" mit Status buchen/vorhanden/fehlt; „fehlt" heißt:
+     keine KRNL-Variante mit dieser SKU (anlegen oder SKU angleichen, dann
+     erneut übernehmen).
+   - **Fertigprodukte nie** (Odoo-Vorlage mit Stückliste — Tastaturen,
+     Switch-Tester): ihr Odoo-Bestand stimmt nicht, weil Lieferungen in
+     Odoo nicht ausgebucht wurden; tatsächlich sind sie bei 0. Die Vorschau
+     nennt nur ihre Zahl („Fertigprodukte ausgelassen"). Halbfabrikate, die
+     selbst Komponente sind (3D-Druck des Switch-Testers), laufen als
+     Komponente und behalten ihren Bestand.
+   - Jede Bestandsbuchung der Übernahme ist eine Inventurzählung mit der
+     Notiz `Odoo-Übernahme <Lauf>` — nachvollziehbar und gezielt
+     korrigierbar.
    - **Routen** Fertigen/Auf Auftrag wie in Odoo — nur, wenn jede aktive
      Variante der KRNL-Vorlage eine Stückliste bekommt (sonst liefe eine
      Shopify-Bestellung ins Leere). Ab dann erzeugt jede Shopify-Bestellung

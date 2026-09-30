@@ -30,7 +30,7 @@ interface Vorschau {
     menge: number
     krnlSku: string | null
     preis: number | null
-    status: 'buchen' | 'vorhanden' | 'fehlt'
+    status: 'buchen' | 'vorhanden' | 'fehlt' | 'fertigprodukt'
   }[]
 }
 
@@ -122,7 +122,7 @@ export function OdooUebernahme({
             <Stat
               label="Weitere Bestände"
               value={`${qty(u.lagerBuchen)} buchen`}
-              hint={`Fertigprodukte und Zubehör per SKU · ${qty(u.lagerVorhanden)} haben in KRNL schon Bestand (bleibt) · ${qty(u.lagerFehlt)} ohne passenden Artikel`}
+              hint={`Zubehör per SKU · ${qty(u.lagerVorhanden)} haben in KRNL schon Bestand (bleibt) · ${qty(u.lagerFehlt)} ohne passenden Artikel · ${qty(u.lagerFertigprodukte ?? 0)} Fertigprodukte ausgelassen`}
             />
           </div>
 
@@ -214,9 +214,16 @@ export function OdooUebernahme({
             </table>
           </TableWrap>
 
-          {vorschau.lagerbestaende.length > 0 && (
+          {(u.lagerFertigprodukte ?? 0) > 0 && (
+            <p className="small muted" style={{ marginTop: 16 }}>
+              {qty(u.lagerFertigprodukte)} Fertigprodukt(e) mit Odoo-Bestand werden ausgelassen: Ihr Bestand in Odoo
+              stimmt nicht (Lieferungen dort nicht ausgebucht) — in KRNL bleiben sie bei 0.
+            </p>
+          )}
+
+          {vorschau.lagerbestaende.some((l) => l.status !== 'fertigprodukt') && (
             <>
-              <h3 className="mono-label" style={{ marginTop: 16 }}>Weitere Bestände (keine Komponenten)</h3>
+              <h3 className="mono-label" style={{ marginTop: 16 }}>Weitere Bestände (keine Komponenten, keine Fertigprodukte)</h3>
               <TableWrap>
                 <table>
                   <thead>
@@ -229,7 +236,7 @@ export function OdooUebernahme({
                     </tr>
                   </thead>
                   <tbody>
-                    {vorschau.lagerbestaende.map((l) => (
+                    {vorschau.lagerbestaende.filter((l) => l.status !== 'fertigprodukt').map((l) => (
                       <tr key={`${l.code}-${l.name}`}>
                         <td className="mono small">{l.code ?? <span className="badge warn">ohne SKU</span>}</td>
                         <td className="small">{l.name}</td>

@@ -363,8 +363,8 @@ export async function stuecklistenUebernehmen(von: string): Promise<UebernahmeBe
         where variant_id = ${variant} and location_id = ${lager.id}`
       if (Number(ist.menge) > 0) continue
       const [zaehlung] = await t<{ id: string }[]>`
-        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty)
-        values (${lager.id}, ${variant}, ${k.bestand}, 0) returning id`
+        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+        values (${lager.id}, ${variant}, ${k.bestand}, 0, ${`Odoo-Übernahme ${lauf}`}) returning id`
       await t`select inventory_apply(${zaehlung.id}, ${von})`
       bericht.bestand++
     }
@@ -384,8 +384,8 @@ export async function stuecklistenUebernehmen(von: string): Promise<UebernahmeBe
         where variant_id = ${l.krnlId} and location_id = ${lager.id}`
       if (Number(ist.menge) > 0) continue
       const [zaehlung] = await t<{ id: string }[]>`
-        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty)
-        values (${lager.id}, ${l.krnlId}, ${l.menge}, 0) returning id`
+        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+        values (${lager.id}, ${l.krnlId}, ${l.menge}, 0, ${`Odoo-Übernahme ${lauf}`}) returning id`
       await t`select inventory_apply(${zaehlung.id}, ${von})`
       await merken(t, l.odooId, l.krnlId, 'zugeordnet', lauf)
       bericht.bestandWeitere++

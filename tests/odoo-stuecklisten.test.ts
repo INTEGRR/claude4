@@ -355,7 +355,7 @@ describe('Bestände aller Artikel', () => {
     lagerArtikel: [
       // Komponente: läuft über den Komponenten-Weg, nicht doppelt
       { id: 15, code: 'SW-1', barcode: null, name: 'Switch', menge: 5000, standardPreis: 0.25 },
-      // Fertigprodukt mit Stückliste
+      // Fertigprodukt mit Stückliste: Odoo-Bestand falsch (Lieferungen nicht ausgebucht)
       { id: 5, code: 'ST-1', barcode: null, name: 'Switch-Tester', menge: 12, standardPreis: 8 },
       // Zubehör ohne Stückliste, in KRNL mit Preis
       { id: 20, code: 'DM-PP-001', barcode: null, name: 'Deskmat', menge: 375, standardPreis: 6 },
@@ -384,11 +384,12 @@ describe('Bestände aller Artikel', () => {
   )
   const nach = Object.fromEntries(plan.lagerbestaende.map((l) => [l.code, l]))
 
-  test('Fertigprodukte und Zubehör bekommen ihren Bestand, Komponenten nicht doppelt', () => {
+  test('Zubehör bekommt seinen Bestand, Komponenten nicht doppelt, Fertigprodukte nie', () => {
     assert.equal(nach['SW-1'], undefined, 'Komponente')
     assert.deepEqual(
-      { status: nach['ST-1'].status, menge: nach['ST-1'].menge, krnl: nach['ST-1'].krnlId, preis: nach['ST-1'].preis },
-      { status: 'buchen', menge: 12, krnl: 'k-st', preis: 8 },
+      { status: nach['ST-1'].status, preis: nach['ST-1'].preis },
+      { status: 'fertigprodukt', preis: null },
+      'Odoo-Vorlage mit Stückliste: Bestand bleibt 0 (in Odoo nicht ausgebucht)',
     )
     assert.equal(nach['DM-PP-001'].status, 'buchen')
     assert.equal(nach['DM-PP-001'].preis, null, 'gepflegter Preis bleibt')
@@ -402,6 +403,6 @@ describe('Bestände aller Artikel', () => {
     assert.equal(nach['NUR-ODOO'].krnlId, null)
     assert.equal(nach.LEER, undefined)
     const u = planUebersicht(plan)
-    assert.deepEqual([u.lagerBuchen, u.lagerVorhanden, u.lagerFehlt], [3, 1, 1])
+    assert.deepEqual([u.lagerBuchen, u.lagerVorhanden, u.lagerFehlt, u.lagerFertigprodukte], [2, 1, 1, 1])
   })
 })

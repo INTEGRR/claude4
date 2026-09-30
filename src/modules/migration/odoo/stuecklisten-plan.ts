@@ -23,8 +23,11 @@
  *   - Von Hand angelegte KRNL-Stücklisten bleiben unangetastet.
  *   - Bestände (seit 2026-09-30) nicht nur für Komponenten: jeder Artikel
  *     mit Odoo-Lagerbestand, der per SKU/Barcode/Verweis zu einer
- *     KRNL-Variante passt (Fertigprodukte wie der Switch-Tester, Zubehör wie
- *     Deskmats), bekommt ihn — ebenfalls nur, wo KRNL 0 hat.
+ *     KRNL-Variante passt (Zubehör wie Deskmats), bekommt ihn — ebenfalls
+ *     nur, wo KRNL 0 hat. AUSSER Fertigprodukten (Odoo-Vorlage mit
+ *     Stückliste): deren Odoo-Bestand stimmt nicht, weil Lieferungen in
+ *     Odoo nicht ausgebucht wurden — sie bleiben 0 (Entscheidungslog
+ *     2026-09-30, „Fertigprodukte ohne Odoo-Bestand").
  */
 
 // --- Eingaben -----------------------------------------------------------------
@@ -211,8 +214,12 @@ export interface PlanLagerbestand {
   krnlSku: string | null
   /** Einkaufspreis setzen, damit der Bestand bewertet ist (nur wo KRNL 0 hat). */
   preis: number | null
-  /** buchen = KRNL hat 0; vorhanden = KRNL hat schon Bestand (bleibt); fehlt = keine passende Variante. */
-  status: 'buchen' | 'vorhanden' | 'fehlt'
+  /**
+   * buchen = KRNL hat 0; vorhanden = KRNL hat schon Bestand (bleibt); fehlt =
+   * keine passende Variante; fertigprodukt = hat in Odoo eine Stückliste, der
+   * Odoo-Bestand gilt nicht (Lieferungen dort nicht ausgebucht) — nie gebucht.
+   */
+  status: 'buchen' | 'vorhanden' | 'fehlt' | 'fertigprodukt'
 }
 
 export interface Plan {
@@ -612,6 +619,11 @@ export function stuecklistenPlan(odoo: OdooDaten, krnl: KrnlDaten): Plan {
     if (a.menge <= 0 || komponentenIds.has(a.id)) continue
     const k = krnlZu(a)
     const basis = { odooId: a.id, code: a.code, name: a.name, menge: a.menge, krnlId: k?.id ?? null, krnlSku: k?.sku ?? null }
+    const odooVariante = variante.get(a.id)
+    if (odooVariante && vorlagenMitBom.has(odooVariante.tmplId)) {
+      plan.lagerbestaende.push({ ...basis, preis: null, status: 'fertigprodukt' })
+      continue
+    }
     if (!k) {
       plan.lagerbestaende.push({ ...basis, preis: null, status: 'fehlt' })
       continue
@@ -645,5 +657,6 @@ export function planUebersicht(plan: Plan) {
     lagerBuchen: plan.lagerbestaende.filter((l) => l.status === 'buchen').length,
     lagerVorhanden: plan.lagerbestaende.filter((l) => l.status === 'vorhanden').length,
     lagerFehlt: plan.lagerbestaende.filter((l) => l.status === 'fehlt').length,
+    lagerFertigprodukte: plan.lagerbestaende.filter((l) => l.status === 'fertigprodukt').length,
   }
 }

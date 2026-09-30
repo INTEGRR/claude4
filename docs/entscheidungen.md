@@ -9,6 +9,36 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Fertigprodukte ohne Odoo-Bestand
+
+**Anlass:** Der Lauf von 09:11 buchte 117 Fertigprodukt-Varianten
+(Tastaturen) mit 738 Stück plus den Switch-Tester (206). Laut Betreiber
+sind alle Fertigprodukte tatsächlich bei 0 — Odoo führt sie mit Bestand,
+weil die Lieferungen dort nicht ausgebucht wurden.
+
+**Entschieden:**
+- Die Übernahme bucht für **Fertigprodukte** (Odoo-Vorlage mit Stückliste)
+  **nie** Bestand; die Vorschau nennt nur ihre Zahl. Revidiert damit den
+  Teil „auch Fertigprodukte" des Eintrags „eine Stückliste je Artikel …,
+  Bestände aller Artikel" von heute. Zubehör ohne Stückliste (Deskmats,
+  Accent Kits, Keycaps) bekommt seinen Bestand weiter — der Betreiber hat
+  ihn als richtig bestätigt (Deskmat 375).
+- Halbfabrikate, die selbst Komponente einer Stückliste sind (3D-Druck
+  des Switch-Testers), laufen als Komponente und behalten ihren Bestand
+  (in Odoo durch Fertigungsaufträge verbraucht, nicht durch Lieferungen).
+- Übernahme-Buchungen tragen die Notiz `Odoo-Übernahme <Lauf>` an der
+  Inventurzählung — so lässt sich jede gezielt finden und zurücknehmen.
+
+**Offen:** Der schon gebuchte Fertigprodukt-Bestand in Prod (738 + 206
+Stück, zwei Lieferungen haben davon 2 Stück reserviert) ist noch nicht
+zurückgenommen — Weg (Knopf mit Reservierungslösung oder Inventur von
+Hand) entscheidet der Betreiber.
+
+Umgesetzt in `stuecklisten-plan.ts` (Status `fertigprodukt`),
+`stuecklisten-uebernahme.ts` (Notiz), Vorschau `einstellungen/odoo`;
+dokumentiert in [migration-odoo.md](migration-odoo.md); Tests
+`tests/odoo-stuecklisten.test.ts`, `tests/prozesse/odoo-stuecklisten.test.ts`.
+
 ## 2026-09-30 — Odoo-Übernahme: eine Stückliste je Artikel mit Variantenfiltern, Bestände aller Artikel
 
 **Anlass:** Nach dem ersten Prod-Lauf hatte jede Variante eine eigene

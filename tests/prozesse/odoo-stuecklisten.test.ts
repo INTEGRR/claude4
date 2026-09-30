@@ -4,7 +4,7 @@
  * vorher in KRNL (wie aus Shopify), die Übernahme hängt EINE Stückliste je
  * Artikel mit Variantenfiltern an (und löst frühere Varianten-Stücklisten
  * ab), legt fehlende Komponenten an, setzt Preis und Bestand nur wo 0 —
- * auch für Zubehör und Fertigprodukte —, schaltet die Routen, und ein
+ * auch für Zubehör, nie für Fertigprodukte —, schaltet die Routen, und ein
  * zweiter Lauf ändert nichts.
  */
 import './spur.ts'
@@ -104,7 +104,7 @@ describe('Odoo-Stücklisten übernehmen', () => {
     assert.match(weiss.zeilen.find((z) => z.komponente === 'FAKE-KC-US')?.filter ?? '', /FAKE-KB-W-US/, 'ANSI-Keycaps nur für die ANSI-Variante')
     assert.equal(weiss.zeilen.find((z) => z.komponente === 'FAKE-PL-1')?.filter, '', 'Platine für alle')
     const lager = Object.fromEntries(d.lagerbestaende.map((l) => [l.code, `${l.status} ${l.menge}`]))
-    assert.deepEqual(lager, { 'FAKE-DM-1': 'buchen 375', 'FAKE-DM-X': 'fehlt 4', 'FAKE-ST-1': 'buchen 12' })
+    assert.deepEqual(lager, { 'FAKE-DM-1': 'buchen 375', 'FAKE-DM-X': 'fehlt 4', 'FAKE-ST-1': 'fertigprodukt 12' })
     assert.equal((await h.sql<{ n: number }[]>`select count(*)::int as n from boms`)[0].n, vorher)
   })
 
@@ -115,7 +115,7 @@ describe('Odoo-Stücklisten übernehmen', () => {
     assert.equal(b.stuecklistenAbgeloest, 2, 'die alten Varianten-Stücklisten von Weiß')
     assert.equal(b.komponentenNeu, 6)
     assert.equal(b.komponentenZugeordnet, 2)
-    assert.equal(b.bestandWeitere, 2, 'Deskmat und Switch-Tester')
+    assert.equal(b.bestandWeitere, 1, 'Deskmat — der Switch-Tester ist Fertigprodukt')
 
     // Beide Weiß-Varianten lösen dieselbe Vorlagen-Stückliste auf; die Filter
     // entscheiden je Variante (wie „Auf Varianten anwenden" in Odoo).
@@ -157,9 +157,13 @@ describe('Odoo-Stücklisten übernehmen', () => {
         from product_variants pv join product_templates pt on pt.id = pv.template_id where pv.id = ${id}`)[0]
     assert.deepEqual(await artikel(v['FAKE-KC-DE']), { name: 'Keycaps ISO-DE (Shop)', standard_cost: 15, bestand: 3 })
     assert.deepEqual(await artikel(v['FAKE-SW-1']), { name: 'Switch linear (Shop)', standard_cost: 0.25, bestand: 5000 })
-    // Auch Artikel ohne Stückliste: Deskmat (zwei Odoo-Lagerorte summiert) und das Fertigprodukt.
+    // Auch Artikel ohne Stückliste: Deskmat (zwei Odoo-Lagerorte summiert). Das
+    // Fertigprodukt nicht — sein Odoo-Bestand stimmt nicht (nicht ausgebucht).
     assert.deepEqual(await artikel(v['FAKE-DM-1']), { name: 'Deskmat (Shop)', standard_cost: 6, bestand: 375 })
-    assert.equal((await artikel(v['FAKE-ST-1'])).bestand, 12)
+    assert.equal((await artikel(v['FAKE-ST-1'])).bestand, 0)
+    const [notiz] = await h.sql<{ note: string }[]>`
+      select note from inventory_counts where variant_id = ${v['FAKE-DM-1']}`
+    assert.match(notiz.note, /^Odoo-Übernahme odoo-api /, 'Übernahme-Buchungen sind markiert')
 
     // Neue Komponente mit Preis und Lieferant; der Bestand der Switches ist bewertet.
     const [gh] = await h.sql<{ standard_cost: number; can_be_sold: boolean }[]>`
