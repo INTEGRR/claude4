@@ -90,6 +90,21 @@ async function starteProduktUebernahme() {
   return actionInfo('Produktübernahme läuft — Ergebnis auf dieser Karte und in der Outbox.')
 }
 
+/**
+ * Sind die Shopify-Produkte da? Bestellungen brauchen sie: ohne Artikel
+ * landet jede Position in der Klärliste, und bereits versandte Bestellungen
+ * würden als Historie OHNE Positionen übernommen (ein zweiter Lauf füllt
+ * sie nicht nach). Bereit = mindestens eine verknüpfte Variante und keine
+ * Produktübernahme mehr in der Outbox.
+ */
+async function produkteBereit(): Promise<boolean> {
+  const [r] = await sql<{ bereit: boolean }[]>`
+    select exists (select 1 from product_variants where shopify_variant_id is not null)
+       and not exists (select 1 from integration_jobs
+                       where kind = 'shopify_product_import' and status in ('pending', 'running')) as bereit`
+  return Boolean(r?.bereit)
+}
+
 /** Erstübernahme anstoßen: Kunden und/oder Bestellungen ab Zeitraum. */
 async function starteUebernahme(formData: FormData) {
   'use server'
@@ -97,6 +112,13 @@ async function starteUebernahme(formData: FormData) {
   const was = String(formData.get('was') ?? 'beides')
   const tage = Number(formData.get('tage') ?? 365)
   const seit = new Date(Date.now() - tage * 24 * 60 * 60 * 1000).toISOString()
+
+  if ((was === 'bestellungen' || was === 'beides') && !(await produkteBereit())) {
+    return actionError(
+      'Erst Schritt 1: Produkte aus Shopify übernehmen und warten, bis sie abgeschlossen ist — sonst landen alle ' +
+        'Bestellpositionen in der Klärliste und versandte Bestellungen ohne Positionen.',
+    )
+  }
 
   try {
     if (was === 'kunden' || was === 'beides') {
@@ -300,6 +322,8 @@ export default async function IntegrationenPage() {
   >`
     select variant_id, sku, erp_menge, shop_menge, shop_seen_at
     from shopify_inventory_drift order by sku limit 50`
+
+  const bereitFuerBestellungen = await produkteBereit()
 
   // Stand der Erstübernahme (Kunden/Bestellungen) für die Karte.
   const uebernahme = Object.fromEntries(
@@ -525,9 +549,12 @@ export default async function IntegrationenPage() {
             übersprungen; die Übernahme darf mehrfach laufen. Im ERP gepflegte Kontaktdaten werden
             nicht überschrieben, nur Lücken gefüllt.
           </p>
-          <div style={{ marginBottom: 10 }}>
+          <div className="small" style={{ marginBottom: 6 }}>
+            <strong>Schritt 1 — Produkte.</strong> Immer zuerst: Bestellungen finden ihre Artikel über die Produkte.
+          </div>
+          <div style={{ marginBottom: 14 }}>
             <ActionButton action={starteProduktUebernahme}>
-              Produkte aus Shopify verknüpfen/übernehmen
+              1 · Produkte aus Shopify verknüpfen/übernehmen
             </ActionButton>
             {uebernahme.backfill_products && (
               <span className="small" style={{ marginLeft: 12 }}>
@@ -543,6 +570,13 @@ export default async function IntegrationenPage() {
                 {uebernahme.backfill_products.fertig ? ' — abgeschlossen' : ' — läuft'}
               </span>
             )}
+          </div>
+          <div className="small" style={{ marginBottom: 6 }}>
+            <strong>Schritt 2 — Kunden und Bestellungen.</strong>{' '}
+            {bereitFuerBestellungen
+              ? 'Produkte sind da — die Positionen finden ihre Artikel.'
+              : 'Erst möglich, wenn Schritt 1 abgeschlossen ist (für „Nur Kunden" schon jetzt).'}{' '}
+            Stücklisten aus Odoo kommen am besten dazwischen (Einstellungen → Odoo-Übernahme).
           </div>
           <ActionForm action={starteUebernahme}>
             <div className="row">
@@ -564,7 +598,7 @@ export default async function IntegrationenPage() {
                 </select>
               </label>
               <div className="shrink field">
-                <button className="primary" type="submit">Übernahme starten</button>
+                <button className="primary" type="submit">2 · Übernahme starten</button>
               </div>
             </div>
           </ActionForm>

@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-09-30 — Shopify-Erstübernahme: Produkte zwingend vor Bestellungen
+
+Beim Neustart der Prod-Daten wurde „Kunden und Bestellungen" vor den
+Produkten gestartet. Die Folge: Alle Positionen landeten in der Klärliste,
+und versandte Bestellungen wären als Historie ohne Positionen übernommen
+worden (ein zweiter Lauf heilt nur Entwürfe). Die Reihenfolge war
+dokumentiert, aber nicht erzwungen.
+
+Entschieden:
+
+- Die Bestellübernahme verweigert den Start, solange keine Variante mit
+  Shopify verknüpft ist oder eine Produktübernahme noch in der Outbox
+  steht. Die Prüfung sitzt in der Server Action, nicht nur in der
+  Oberfläche.
+- Die Karte nummeriert die Schritte (1 · Produkte, 2 · Kunden und
+  Bestellungen) und nennt die Odoo-Stücklisten als Zwischenschritt.
+
+Doku: [module/integrationen.md](module/integrationen.md) →
+„Reihenfolge der Erstübernahme".
+
 ## 2026-09-30 — Einkaufsprojekt: Einstand statt Stückpreis, Sammelfreigabe, Abschluss per Trigger
 
 Stufe 3 des Einkaufstools (Migration 0097). Die Betreiber-Antworten dazu:

@@ -54,6 +54,15 @@ Shopify-Kunden mit mindestens einer Bestellung (`customers(query: "orders_count:
 Kunden — beim ersten ANVIL-Import waren 7.464 von 7.567 Kontakten ohne Bestellung
 (Entscheidungslog 2026-09-29). Kunden aus Bestellungen entstehen ohnehin beim Order-Import.
 
+**Reihenfolge der Erstübernahme (erzwungen seit 2026-09-30):** Die Karte auf dem Monitor
+nummeriert die Schritte: **1 · Produkte** („Produkte aus Shopify verknüpfen/übernehmen"),
+dazwischen am besten die Stücklisten aus Odoo (Einstellungen → Odoo-Übernahme), dann
+**2 · Kunden und Bestellungen**. Bestellungen lassen sich erst übernehmen, wenn mindestens
+eine Variante mit Shopify verknüpft ist und keine Produktübernahme mehr in der Outbox steht.
+Ohne Artikel landete jede Position in der Klärliste, und bereits versandte Bestellungen
+würden als Historie **ohne Positionen** übernommen (ein zweiter Lauf füllt sie nicht nach).
+„Nur Kunden" geht jederzeit.
+
 **Reconciliation (Sicherheitsnetz, Cron alle 15 min):** GraphQL `orders(query: "updated_at:>{last_sync}", sortKey: UPDATED_AT)` paginiert abholen (bis 500 je Lauf) und mit `shopify_order_id` abgleichen — fängt verlorene Webhooks ab (Shopify garantiert keine Zustellung). `last_reconciliation_at` in `shopify_sync_state` rückt bei weiteren Seiten nur bis zur letzten gelesenen Änderung vor (bis 0089 las der Abgleich nur 50 und übersprang den Rest).
 
 **Historie aus dem CSV-Export (seit 0089, Integrationen → Historie aus Shopify):** Die Schnittstelle liefert ohne den geschützten Scope `read_all_orders` nur die **letzten 60 Tage** — die Erstübernahme endete deshalb bei rund 100 Bestellungen. Die ältere Historie kommt aus dem Export des Shop-Admins (Bestellungen → Exportieren → „Alle Bestellungen", CSV):
