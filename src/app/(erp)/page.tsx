@@ -89,9 +89,11 @@ export default async function Dashboard({
       (select count(*) from vertraege v where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
       (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig,
       coalesce((select fremdkapitalbedarf from finanz_unterdeckung('base')), 0) as unterdeckung,
-      -- Reparaturen: in Arbeit (Gerät da, bestätigt, wird repariert) und fertig zum Rückversand.
+      -- Reparaturen: offen (neu — Retourenlabel/Annahme —, Gerät unterwegs, da,
+      -- bestätigt, in Reparatur) und fertig zum Rückversand. Wie der Zähler in
+      -- der Navigation, nur ohne die fertigen (eigene Karte).
       (select count(*) from repair_orders
-        where state in ('received', 'confirmed', 'under_repair'))::int as reparaturen_arbeit,
+        where state not in ('repaired', 'shipped', 'cancel'))::int as reparaturen_arbeit,
       (select count(*) from repair_orders where state = 'repaired')::int as reparaturen_fertig,
       -- Fertigung: offene Aufträge und die, deren Termin heute oder früher ist.
       (select count(*) from manufacturing_orders
@@ -134,7 +136,7 @@ export default async function Dashboard({
   const aufgaben: { label: string; wert: number; anzeige?: string; href: string; warn?: boolean; wichtig?: boolean }[] = [
     ...vorgangsKarten,
     ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_arbeit > 0
-      ? [{ label: 'Reparaturen in Arbeit', wert: s.reparaturen_arbeit, href: '/reparatur' }]
+      ? [{ label: 'Reparaturen offen', wert: s.reparaturen_arbeit, href: '/reparatur' }]
       : []),
     ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_fertig > 0
       ? [{ label: 'Reparaturen fertig zum Rückversand', wert: s.reparaturen_fertig, href: '/reparatur' }]
