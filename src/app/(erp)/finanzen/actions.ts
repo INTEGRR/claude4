@@ -36,6 +36,10 @@ export async function zahlungStornieren(zahlungId: string): Promise<ActionResult
   return serverAktion('finanzen.zahlung_stornieren', { parameter: { zahlung_id: zahlungId } })
 }
 
+export async function vertragAendern(vertragId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('finanzen.vertrag_aendern', { recordId: vertragId, formData })
+}
+
 export async function vertragZahlen(vertragId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('finanzen.vertrag_zahlen', { recordId: vertragId, formData })
 }

@@ -7,7 +7,7 @@ import { ActionForm } from '@/components/action-button'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money } from '@/modules/shared/format'
-import { vertragZahlen } from '../../actions'
+import { vertragAendern, vertragZahlen } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,9 +22,10 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
       beginn: string; ende: string | null; laufzeit_monate: number | null;
       kuendigungsfrist_monate: number; gekuendigt_am: string | null;
       gekuendigt_zum: string | null; status: string; notiz: string | null;
-      kuendbar_zum: string | null; frist_bis: string | null; ansteht: boolean }[]
+      kuendbar_zum: string | null; frist_bis: string | null; ansteht: boolean;
+      beginn_iso: string; ende_iso: string | null }[]
   >`
-    select v.*, p.name as partner,
+    select v.*, p.name as partner, v.beginn::text as beginn_iso, v.ende::text as ende_iso,
            vertrag_naechstes_kuendbar_zum(v)::text as kuendbar_zum,
            vertrag_kuendigungsfrist_bis(v)::text as frist_bis,
            vertrag_kuendigung_ansteht(v.id) as ansteht
@@ -50,17 +51,98 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
   const konten = await sql<{ id: string; name: string }[]>`
     select id, name from bankkonten where aktiv order by sequence, name`
 
+  // Für „Ändern": Kategorien aus den Finanz-Einstellungen, Partner zur Auswahl.
+  const [einstellung] = await sql<{ kategorien: string[] | null }[]>`
+    select array(select jsonb_array_elements_text(value -> 'vertrag_kategorien')) as kategorien
+    from settings where key = 'finanzen'`
+  const kategorien = [...new Set([...(einstellung?.kategorien ?? []), v.kategorie])]
+  const partner = await sql<{ id: string; name: string }[]>`
+    select id, name from partners where active or id = ${v.partner_id} order by name limit 1000`
+
   return (
     <>
       <PageHeader
         title={`${v.nummer} — ${v.name}`}
         subtitle={`${v.kategorie} · ${money(v.betrag, v.waehrung)} ${v.intervall} · Zahltag ${v.zahltag}.`}
-        actions={
-          <Link className="btn small" href={`/aktion/finanzen.vertrag_aendern`}>
-            Ändern
-          </Link>
-        }
       />
+
+      {/* Ändern direkt am Vertrag — die generierte Maske (/aktion) kennt nur
+          belegfreie Aktionen; geschrieben wird über den Torwächter. */}
+      <details className="card" style={{ padding: '10px 14px' }}>
+        <summary className="mono-label" style={{ cursor: 'pointer' }}>Vertrag ändern</summary>
+        <ActionForm action={vertragAendern.bind(null, id)} style={{ marginTop: 10 }}>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <label className="field" style={{ flex: 2 }}>
+              <span>Bezeichnung</span>
+              <input name="name" required maxLength={160} defaultValue={v.name} />
+            </label>
+            <label className="field shrink">
+              <span>Kategorie</span>
+              <select name="kategorie" defaultValue={v.kategorie}>
+                {kategorien.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field" style={{ flex: 1.5 }}>
+              <span>Partner</span>
+              <select name="partner_id" defaultValue={v.partner_id ?? ''}>
+                <option value="">—</option>
+                {partner.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <label className="field shrink">
+              <span>Betrag</span>
+              <input name="betrag" type="number" required min={0.01} step={0.01} defaultValue={Number(v.betrag)} style={{ width: 120 }} />
+            </label>
+            <label className="field shrink">
+              <span>Währung</span>
+              <input name="waehrung" required maxLength={3} defaultValue={v.waehrung} style={{ width: 70 }} />
+            </label>
+            <label className="field shrink">
+              <span>Intervall</span>
+              <select name="intervall" defaultValue={v.intervall}>
+                <option value="monatlich">monatlich</option>
+                <option value="quartalsweise">quartalsweise</option>
+                <option value="jaehrlich">jährlich</option>
+              </select>
+            </label>
+            <label className="field shrink">
+              <span>Zahltag</span>
+              <input name="zahltag" type="number" required min={1} max={28} step={1} defaultValue={v.zahltag} style={{ width: 70 }} />
+            </label>
+            <label className="field shrink">
+              <span>Beginn</span>
+              <input name="beginn" type="date" required defaultValue={v.beginn_iso} />
+            </label>
+            <label className="field shrink">
+              <span>Ende</span>
+              <input name="ende" type="date" defaultValue={v.ende_iso ?? ''} />
+            </label>
+            <label className="field shrink">
+              <span>Mindestlaufzeit (Monate)</span>
+              <input name="laufzeit_monate" type="number" min={1} step={1} defaultValue={v.laufzeit_monate ?? ''} style={{ width: 90 }} />
+            </label>
+            <label className="field shrink">
+              <span>Kündigungsfrist (Monate)</span>
+              <input name="kuendigungsfrist_monate" type="number" required min={0} max={24} step={1} defaultValue={v.kuendigungsfrist_monate} style={{ width: 90 }} />
+            </label>
+          </div>
+          <div className="row">
+            <label className="field" style={{ flex: 3 }}>
+              <span>Notiz</span>
+              <input name="notiz" maxLength={500} defaultValue={v.notiz ?? ''} />
+            </label>
+            <div className="field shrink">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+        </ActionForm>
+      </details>
 
       {v.status === 'aktiv' && v.ansteht && (
         <div className="notice wichtig">
