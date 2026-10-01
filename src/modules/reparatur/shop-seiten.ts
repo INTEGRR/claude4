@@ -101,6 +101,12 @@ const STIL = [
   '@media screen and (min-width:750px){.rp .contact__fields{grid-template-columns:repeat(2,1fr)}}',
   '.rp .field{margin-bottom:1.5rem}',
   '.rp-land{margin-bottom:1.5rem}',
+  // Das Theme lädt seine Select-Stile hier nicht — ohne feste Größe füllt
+  // der Pfeil die ganze Box (erster Test im Shop).
+  '.rp .select{position:relative}',
+  '.rp .select .icon-caret{position:absolute;right:1.5rem;top:calc(50% - 3px);width:10px;height:6px;pointer-events:none}',
+  '.rp .select__select{width:100%;appearance:none;-webkit-appearance:none}',
+  '.rp form{margin-top:2rem}',
   '.rp-land .form__label{display:block;margin-bottom:.6rem}',
   '.rp-fehler{display:block;margin:-1rem 0 1.5rem}',
   '.rp-fehler:empty{display:none}',
@@ -214,7 +220,7 @@ function paar(a: string, b: string): string {
 }
 
 const CARET =
-  '<svg aria-hidden="true" focusable="false" class="icon icon-caret" viewBox="0 0 10 6">' +
+  '<svg aria-hidden="true" focusable="false" class="icon icon-caret" width="10" height="6" viewBox="0 0 10 6">' +
   '<path fill-rule="evenodd" clip-rule="evenodd" d="M9.354.646a.5.5 0 00-.708 0L5 4.293 1.354.646a.5.5 0 ' +
   '00-.708.708l4 4a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" fill="currentColor"></path></svg>'
 
