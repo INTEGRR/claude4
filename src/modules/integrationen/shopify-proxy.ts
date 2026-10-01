@@ -46,12 +46,15 @@ export type ProxyPruefung =
 type Env = Record<string, string | undefined>
 
 /**
- * Der HMAC-Schlüssel des App Proxy: das Client Secret der Dev-Dashboard-App
- * (dasselbe, mit dem Shopify die Webhooks der App signiert). Leer = keine
- * Prüfung möglich → der Aufrufer weist ab.
+ * Der HMAC-Schlüssel des App Proxy: das Client Secret DER App, an der der
+ * Proxy hängt. Empfohlen ist eine eigene kleine App nur mit
+ * `write_app_proxy` (Entscheidungslog 2026-10-01, „Eigene Shopify-App für
+ * den App Proxy") — dann steht ihr Secret in SHOPIFY_PROXY_SECRET. Hängt der
+ * Proxy an der KRNL-App selbst, gilt deren SHOPIFY_CLIENT_SECRET. Leer =
+ * keine Prüfung möglich → der Aufrufer weist ab.
  */
 export function proxySchluessel(env: Env = process.env): string {
-  const secret = env.SHOPIFY_CLIENT_SECRET?.trim() ?? ''
+  const secret = env.SHOPIFY_PROXY_SECRET?.trim() || env.SHOPIFY_CLIENT_SECRET?.trim() || ''
   if (secret) return secret
   return env.SHOPIFY_FAKE === '1' ? PROXY_FAKE_SECRET : ''
 }

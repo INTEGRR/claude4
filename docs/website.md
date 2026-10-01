@@ -163,7 +163,8 @@ KRNL    ──200, Content-Type: application/liquid──▶ Shopify rendert im 
 ```
 
 - **Signatur ist die Zugangskontrolle.** Shopify signiert die Query mit dem
-  Client Secret der App (HMAC-SHA256; alle Parameter außer `signature`,
+  Client Secret der App, an der der Proxy hängt — `SHOPIFY_PROXY_SECRET`
+  (eigene App „reparatur", empfohlen), sonst `SHOPIFY_CLIENT_SECRET` (HMAC-SHA256; alle Parameter außer `signature`,
   dekodiert, Mehrfachwerte mit Komma, `key=value` sortiert und ohne Trenner
   verbunden — [`shopify-proxy.ts`](../src/modules/integrationen/shopify-proxy.ts)).
   Abgewiesen mit `401` als Klartext wird: falsche oder fehlende Signatur,
@@ -244,12 +245,24 @@ stehen.
 
 ### Einrichtung (Betreiber)
 
-1. **Dev Dashboard → App → neue Version:** die bisherigen Scopes
-   übernehmen und `write_app_proxy` ergänzen. Unter **App proxy**: Prefix
-   `apps`, Subpath `reparatur`, URL `https://<erp-domain>/api/shopify/proxy`
-   (die Produktionsdomain des ERP, keine Preview-Adresse).
-2. Die Version **releasen**.
-3. Im **Shop-Admin** die neue Berechtigung der App bestätigen.
+1. **Dev Dashboard → neue App „reparatur"** (empfohlen statt einer neuen
+   Version der KRNL-App: deren Version müsste alle Scopes wieder führen —
+   einer vergessen, und KRNL verliert den Zugriff). Felder der Version:
+   - *App URL:* `https://anvil.gg` (die App hat keine Admin-Oberfläche),
+     **„Embed app in Shopify admin" aus**; Redirect-URLs leer, kein Legacy
+     Install Flow.
+   - *Scopes:* nur `write_app_proxy`.
+   - *App proxy:* Prefix `apps`, Subpath `reparatur`, URL
+     `https://<erp-domain>/api/shopify/proxy` (die Produktionsdomain des
+     ERP, keine Preview-Adresse).
+   Alternativ an der KRNL-App: alle bisherigen Scopes übernehmen und
+   `write_app_proxy` ergänzen — dann entfällt Schritt 3b.
+2. Die Version **releasen** und die App im Shop **installieren**
+   (Distribution: eigener Shop).
+3. Im **Shop-Admin** die Berechtigung bestätigen. 3b: das **Client
+   Secret** der App „reparatur" (Dev Dashboard → Settings) in Vercel als
+   `SHOPIFY_PROXY_SECRET` setzen und neu deployen — sonst weist KRNL jeden
+   Aufruf mit 401 ab.
 4. Optional: Shop-Admin → Einstellungen → Apps → die App →
    **Customize URL**, falls ein anderer Pfad gewünscht ist — das Formular
    übernimmt `path_prefix` von selbst.

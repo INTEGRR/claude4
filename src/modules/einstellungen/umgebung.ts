@@ -36,6 +36,11 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
       { name: 'SHOPIFY_WEBHOOK_SECRET', pflicht: false, zweck: 'nur für Webhooks, die über die Shopify-Admin-Seite angelegt wurden' },
       { name: 'SHOPIFY_ADMIN_TOKEN', pflicht: false, zweck: 'nur Alt-Apps mit statischem Token (statt Client ID/Secret)' },
       {
+        name: 'SHOPIFY_PROXY_SECRET',
+        pflicht: false,
+        zweck: 'Client Secret der eigenen App „reparatur" (App Proxy) — leer = Proxy hängt an der KRNL-App (SHOPIFY_CLIENT_SECRET)',
+      },
+      {
         name: 'REPARATUR_SHOP_URL',
         pflicht: false,
         zweck: 'Reparaturformular im Shop (App Proxy), z. B. https://anvil.gg/apps/reparatur — /service/reparatur leitet dann dorthin um',

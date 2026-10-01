@@ -166,10 +166,12 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 - [ ] Ein Retourenlabel erzeugen und die Mail beim Kunden-Testkonto
       prüfen.
 - [ ] Reparaturanfrage **im Shop** (App Proxy,
-      [website.md „Im Shop (App Proxy)"](website.md)): App-Version mit
-      `write_app_proxy` und App Proxy `apps`/`reparatur` →
-      `https://<erp-domain>/api/shopify/proxy` releasen, Berechtigung im
-      Shop-Admin bestätigen; `/api/shopify/proxy` von der Deployment
+      [website.md „Im Shop (App Proxy)"](website.md)): eigene App
+      „reparatur" nur mit `write_app_proxy`, App URL `https://anvil.gg`,
+      nicht eingebettet, App Proxy `apps`/`reparatur` →
+      `https://<erp-domain>/api/shopify/proxy` releasen und installieren,
+      Berechtigung im Shop-Admin bestätigen, ihr Client Secret als
+      `SHOPIFY_PROXY_SECRET` in Vercel; `/api/shopify/proxy` von der Deployment
       Protection ausnehmen; URL-Weiterleitung `/reparatur` →
       `/apps/reparatur` und Menüpunkt im Shop;
       `REPARATUR_SHOP_URL=https://anvil.gg/apps/reparatur` (alte Links auf

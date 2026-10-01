@@ -9,6 +9,24 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Eigene Shopify-App für den App Proxy
+
+**Anlass:** Der Betreiber legt für das Reparaturformular eine eigene App
+„reparatur" im Dev Dashboard an, statt die KRNL-App zu ändern.
+
+**Entschieden:** Empfohlener Weg. Eine neue Version der KRNL-App müsste
+alle bisherigen Scopes wieder führen — einer vergessen, und Bestellungen,
+Bestand und Fulfillment brechen weg. Die eigene App bekommt nur
+`write_app_proxy` (geringste Rechte), keine Admin-Oberfläche. Ihr Client
+Secret steht in `SHOPIFY_PROXY_SECRET`; `proxySchluessel()` nimmt es vor
+`SHOPIFY_CLIENT_SECRET` (der bleibt Rückfall, wenn der Proxy doch an der
+KRNL-App hängt). Ergänzt den Eintrag „Reparaturformular im Shop über den
+Shopify App Proxy".
+
+Umgesetzt in `shopify-proxy.ts`, `umgebung.ts`, `.env.example`;
+dokumentiert in [website.md](website.md) und [go-live.md](go-live.md);
+Test `tests/shop-proxy.test.ts`.
+
 ## 2026-10-01 — Reparaturformular im Shop über den Shopify App Proxy
 
 **Anlass:** Betreiber: Das öffentliche Reparaturformular

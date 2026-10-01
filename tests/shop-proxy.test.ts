@@ -173,6 +173,9 @@ describe('App Proxy: Signatur', () => {
 
   test('Schlüssel: Client Secret, im Fake-Betrieb die Attrappe, sonst keiner (= abweisen)', () => {
     assert.equal(proxySchluessel({ SHOPIFY_CLIENT_SECRET: 'geheim', SHOPIFY_FAKE: '1' }), 'geheim')
+    // Eigene Proxy-App: deren Secret geht vor, das der KRNL-App ist Rückfall.
+    assert.equal(proxySchluessel({ SHOPIFY_PROXY_SECRET: 'proxy', SHOPIFY_CLIENT_SECRET: 'krnl' }), 'proxy')
+    assert.equal(proxySchluessel({ SHOPIFY_PROXY_SECRET: '  ', SHOPIFY_CLIENT_SECRET: 'krnl' }), 'krnl')
     assert.equal(proxySchluessel({ SHOPIFY_FAKE: '1' }), PROXY_FAKE_SECRET)
     assert.equal(proxySchluessel({ SHOPIFY_CLIENT_SECRET: '  ' }), '')
     assert.equal(proxySchluessel({}), '')
