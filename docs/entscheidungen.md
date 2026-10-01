@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Heute und Zähler: Anfragen, Reparaturen, Fertigung
+
+**Anlass:** Betreiber: Die Reparaturanfrage aus dem Shop kam an, aber ohne
+„1" neben der Navigation, und die Übersicht zeigte nicht, was heute
+ansteht — „da müssen auch Reparaturen, Fertigungsaufträge usw. rein".
+
+**Entschieden:**
+- „Offen" für Vorgänge wird aus dem Prozessgraphen abgeleitet: offen, solange
+  der Prozess vom aktuellen Zustand aus noch eine Aktion anbietet
+  (`offeneVorgaenge()`). Keine Zustandsliste im Code — neue Vorgangs-Prozesse
+  zählen automatisch mit (Chamäleon).
+- Dieselbe Zahl als Zähler am Prozess-Menüpunkt (z. B. „Reparaturanfrage")
+  und an „Vorgänge"; in der Übersicht eine violette Karte je Prozess mit
+  offenen Vorgängen (Entscheidung nötig).
+- Weitere Karten: Reparaturen in Arbeit / fertig zum Rückversand,
+  Fertigungsaufträge fällig (bis heute) bzw. offen, „Label da, nicht
+  ausgebucht", Wareneingänge heute, neue Lieferanten-Mails, Wiedervorlagen.
+
+Umgesetzt in `prozesse/offene-vorgaenge.ts`, `(erp)/layout.tsx`,
+`(erp)/page.tsx`; dokumentiert in [prozesse.md](prozesse.md); Test
+`tests/prozesse/offene-vorgaenge.test.ts`.
+
 ## 2026-10-01 — Reparaturformular im Kleid des Themes, per du
 
 **Anlass:** Erster Blick im Shop: im neuen (dunklen) Theme unlesbar —

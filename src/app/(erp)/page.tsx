@@ -5,6 +5,7 @@ import { type Area, canAccess } from '@/modules/auth/permissions'
 import { befehlsKatalog } from '@/modules/befehle'
 import { Befehlsfeld } from '@/components/befehlsfeld'
 import { money } from '@/modules/shared/format'
+import { offeneVorgaenge } from '@/modules/prozesse/offene-vorgaenge'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +55,14 @@ export default async function Dashboard({
       kuendigungen: number
       zahlungen_faellig: number
       unterdeckung: number
+      reparaturen_arbeit: number
+      reparaturen_fertig: number
+      mos_offen: number
+      mos_faellig: number
+      eingaenge_heute: number
+      posteingang: number
+      wiedervorlagen: number
+      gelabelt_offen: number
     }[]
   >`
     select
@@ -79,11 +88,76 @@ export default async function Dashboard({
         as umsatz_monat,
       (select count(*) from vertraege v where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
       (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig,
-      coalesce((select fremdkapitalbedarf from finanz_unterdeckung('base')), 0) as unterdeckung`
+      coalesce((select fremdkapitalbedarf from finanz_unterdeckung('base')), 0) as unterdeckung,
+      -- Reparaturen: in Arbeit (Gerät da, bestätigt, wird repariert) und fertig zum Rückversand.
+      (select count(*) from repair_orders
+        where state in ('received', 'confirmed', 'under_repair'))::int as reparaturen_arbeit,
+      (select count(*) from repair_orders where state = 'repaired')::int as reparaturen_fertig,
+      -- Fertigung: offene Aufträge und die, deren Termin heute oder früher ist.
+      (select count(*) from manufacturing_orders
+        where state not in ('draft', 'done', 'cancel'))::int as mos_offen,
+      (select count(*) from manufacturing_orders
+        where state not in ('draft', 'done', 'cancel')
+          and scheduled_date::date <= current_date)::int as mos_faellig,
+      (select count(*) from stock_pickings p
+         join operation_types ot on ot.id = p.operation_type_id and ot.kind = 'receipt'
+        where p.state not in ('done', 'cancel')
+          and p.scheduled_date::date = current_date)::int as eingaenge_heute,
+      (select count(*) from mail_threads
+        where status = 'offen' and letzte_richtung = 'eingang')::int as posteingang,
+      (select count(*) from wiedervorlagen
+        where erledigt_am is null and faellig_am <= current_date)::int as wiedervorlagen,
+      -- Label da, Ware nicht ausgebucht — Lager und Shop wissen nichts vom Versand.
+      (select count(distinct p.id) from stock_pickings p
+         join operation_types ot on ot.id = p.operation_type_id and ot.kind = 'delivery'
+         join shipments sh on sh.picking_id = p.id and sh.state not in ('cancelled', 'failure')
+        where p.state = 'assigned')::int as gelabelt_offen`
+
+  // Offene Vorgänge je Prozess (Reparaturanfragen, Anfragen …): eine Karte je
+  // Prozess mit offenen Vorgängen — Projektion der aktiven Prozesse.
+  const offen = await offeneVorgaenge()
+  const vorgangsKarten = (
+    await sql<{ code: string; name: string; bereich: string }[]>`
+      select code, name, bereich from prozesse where aktiv and modell = 'vorgang' order by name`
+  )
+    .filter((p) => (offen.get(p.code) ?? 0) > 0 && sees(p.bereich as Area))
+    .map((p) => ({
+      label: `${p.name}: offen`,
+      wert: offen.get(p.code) ?? 0,
+      href: `/vorgaenge/prozess/${p.code}`,
+      // Eine neue Anfrage wartet auf eine Entscheidung (annehmen, Rückfrage, ablehnen).
+      wichtig: true,
+    }))
 
   // wichtig = Entscheidungssignal (Violett): hier wartet eine Freigabe auf
   // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
   const aufgaben: { label: string; wert: number; anzeige?: string; href: string; warn?: boolean; wichtig?: boolean }[] = [
+    ...vorgangsKarten,
+    ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_arbeit > 0
+      ? [{ label: 'Reparaturen in Arbeit', wert: s.reparaturen_arbeit, href: '/reparatur' }]
+      : []),
+    ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_fertig > 0
+      ? [{ label: 'Reparaturen fertig zum Rückversand', wert: s.reparaturen_fertig, href: '/reparatur' }]
+      : []),
+    ...(sees('fertigung') && prozessAktiv('fertigung') && s.mos_faellig > 0
+      ? [{ label: 'Fertigungsaufträge fällig (bis heute)', wert: s.mos_faellig, href: '/fertigung', warn: true }]
+      : []),
+    // „offen" nur, wenn es mehr sind als die fälligen — sonst zweimal dieselbe Zahl.
+    ...(sees('fertigung') && prozessAktiv('fertigung') && s.mos_offen > s.mos_faellig
+      ? [{ label: 'Fertigungsaufträge offen', wert: s.mos_offen, href: '/fertigung' }]
+      : []),
+    ...(sees('versand') && s.gelabelt_offen > 0
+      ? [{ label: 'Label da, nicht ausgebucht', wert: s.gelabelt_offen, href: '/versand', warn: true }]
+      : []),
+    ...(sees('lager') && s.eingaenge_heute > 0
+      ? [{ label: 'Wareneingänge heute erwartet', wert: s.eingaenge_heute, href: '/lager/zulauf' }]
+      : []),
+    ...(sees('einkauf') && s.posteingang > 0
+      ? [{ label: 'Neue Lieferanten-Mails', wert: s.posteingang, href: '/einkauf/posteingang' }]
+      : []),
+    ...(sees('einkauf') && s.wiedervorlagen > 0
+      ? [{ label: 'Wiedervorlagen fällig', wert: s.wiedervorlagen, href: '/einkauf/wiedervorlagen', warn: true }]
+      : []),
     ...(sees('einkauf') && s.freigaben > 0
       ? [{ label: 'Bestellungen warten auf Freigabe', wert: s.freigaben, href: '/einkauf', wichtig: true }]
       : []),

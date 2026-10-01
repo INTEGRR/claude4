@@ -19,6 +19,7 @@ import { pflichtGilt, sicherheitsEinstellung } from '@/modules/auth/zweifaktor'
 import { DIENST_LABELS, gestoerteDienste } from '@/modules/integrationen/wache'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
+import { offeneVorgaenge } from '@/modules/prozesse/offene-vorgaenge'
 import { ArbeitsplatzWaehler } from '@/components/arbeitsplatz-waehler'
 import { arbeitsplaetzeZurAuswahl, arbeitsplatzIdDesGeraets } from '@/modules/druck/arbeitsplatz'
 import { arbeitsplatzWaehlen } from './arbeitsplatz-action'
@@ -109,6 +110,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   if (einrichtung?.offen) redirect('/einrichtung')
 
   const counts = await badges()
+  // Offene Vorgänge je Prozess (Reparaturanfragen, Anfragen …) — Zähler an
+  // den Prozess-Menüpunkten und an „Vorgänge".
+  const offen = await offeneVorgaenge()
+  const offenGesamt = [...offen.values()].reduce((a, b) => a + b, 0)
   // Shopify-Probelauf (0102): Debug-Box für Admins — was KRNL senden würde.
   const [shopifyEinstellung] = await sql<{ modus: string | null }[]>`
     select value ->> 'modus' as modus from settings where key = 'shopify'`
@@ -193,7 +198,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ...(sees('verkauf')
           ? [
               { href: '/verkauf', label: 'Verkaufsaufträge', count: counts.offene_auftraege },
-              { href: '/vorgaenge', label: 'Vorgänge' },
+              { href: '/vorgaenge', label: 'Vorgänge', count: offenGesamt },
               { href: '/verkauf/shop-verfuegbarkeit', label: 'Shop-Verfügbarkeit' },
             ]
           : []),
@@ -346,7 +351,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   for (const lp of laufzeitProzesse) {
     const bereich = lp.bereich as Area
     if (!sees(bereich)) continue
-    const punkt = { href: `/vorgaenge/prozess/${lp.code}`, label: lp.name }
+    const punkt = { href: `/vorgaenge/prozess/${lp.code}`, label: lp.name, count: offen.get(lp.code) ?? 0 }
     const ziel = GRUPPE_JE_BEREICH[bereich]
     const gruppe = ziel ? rohGruppen.find((g) => g.label === ziel) : undefined
     if (gruppe) {

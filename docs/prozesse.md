@@ -694,6 +694,14 @@ machen:
   (Freigaben, überfälliger Zulauf, Integrationsfehler, Versandbereit,
   Beschaffung, Abwesenheitsanträge, Tickets) — rollen- und
   prozessgefiltert. Keine Signale: eine grüne Zeile, sonst nichts.
+- **Seit 2026-10-01 auch Reparaturen, Fertigung und Anfragen:** je
+  Vorgangs-Prozess mit offenen Vorgängen eine Karte (z. B. „Reparaturanfrage:
+  offen", violett — wartet auf Entscheidung), dazu Reparaturen in Arbeit und
+  fertig zum Rückversand, fällige bzw. offene Fertigungsaufträge, „Label da,
+  nicht ausgebucht", heute erwartete Wareneingänge, neue Lieferanten-Mails
+  und fällige Wiedervorlagen. „Offen" leitet `offeneVorgaenge()` aus dem
+  Prozessgraphen ab (der Zustand bietet noch eine Aktion an) — dieselbe Zahl
+  steht als Zähler am Prozess-Menüpunkt und an „Vorgänge".
 - **Strg/Cmd+K überall**: dasselbe Befehlsfeld als Overlay auf jeder
   Seite (Knopf ⌘K in der Kopfleiste), gemeinsamer Katalog in
   `modules/befehle.ts`.
