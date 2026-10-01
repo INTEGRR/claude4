@@ -101,7 +101,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       220 Zeilen je Stunde) — harmlos, KRNL selbst hat dort keine Fehler.
       Abstellen laut Supabase-Troubleshooting mit einem leeren Schema:
       `create schema pgrst_no_exposed_schemas; alter role authenticator set
-      pgrst.db_schemas = 'pgrst_no_exposed_schemas'; notify pgrst;`
+      pgrst.db_schemas = 'pgrst_no_exposed_schemas'; notify pgrst;` —
+      *in Prod ausgeführt 2026-10-01 (auf Wunsch des Betreibers). Vor einem
+      Wiedereinschalten der Data API zurücknehmen: `alter role authenticator
+      reset pgrst.db_schemas; notify pgrst;`*
 - [ ] „Enforce SSL" einschalten (Database → Settings). Kein Zusatz in
   `DATABASE_URL`/`DIRECT_URL` nötig — KRNL verbindet seit 2026-10-01 von
   sich aus mit TLS (`src/db/ssl.ts`); erst deployen, dann einschalten.
