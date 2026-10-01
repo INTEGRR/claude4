@@ -24,6 +24,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
       id: string
       number: string
       state: string
+      vendor_id: string
       vendor: string
       bill_date: string | null
       vendor_bill_reference: string | null
@@ -34,7 +35,10 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
       net: number
       tax: number
       gross: number
+      reversed_bill_id: string | null
       reversed_number: string | null
+      gutschrift_id: string | null
+      gutschrift_number: string | null
       due_date: string | null
       payment_term_id: string | null
       payment_reference: string | null
@@ -43,11 +47,16 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
     }[]
   >`
     select b.*, p.name as vendor, po.number as po_number, t.net, t.tax, t.gross,
-           rb.number as reversed_number, vendor_bill_match_state(b.id) as match_state
+           rb.number as reversed_number, vendor_bill_match_state(b.id) as match_state,
+           gs.id as gutschrift_id, gs.number as gutschrift_number
     from vendor_bills b
     join partners p on p.id = b.vendor_id
     left join purchase_orders po on po.id = b.purchase_order_id
     left join vendor_bills rb on rb.id = b.reversed_bill_id
+    -- Gegenrichtung: die Gutschrift, die diese Rechnung storniert.
+    left join lateral (
+      select g.id, g.number from vendor_bills g where g.reversed_bill_id = b.id order by g.created_at limit 1
+    ) gs on true
     cross join lateral vendor_bill_total(b.id) t
     where b.id = ${id}`
 
@@ -104,7 +113,7 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
         }
         subtitle={
           <>
-            {bill.vendor}
+            <Link href={`/einkauf/lieferanten/${bill.vendor_id}`}>{bill.vendor}</Link>
             {bill.po_number && (
               <>
                 {' '}· Bestellung{' '}
@@ -114,8 +123,17 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
             {bill.vendor_bill_reference && (
               <> · Lieferantenbeleg <span className="mono">{bill.vendor_bill_reference}</span></>
             )}
-            {bill.reversed_number && (
-              <> · storniert <span className="mono">{bill.reversed_number}</span></>
+            {bill.reversed_number && bill.reversed_bill_id && (
+              <>
+                {' '}· storniert{' '}
+                <Link className="mono" href={`/einkauf/rechnungen/${bill.reversed_bill_id}`}>{bill.reversed_number}</Link>
+              </>
+            )}
+            {bill.gutschrift_id && (
+              <>
+                {' '}· Gutschrift{' '}
+                <Link className="mono" href={`/einkauf/rechnungen/${bill.gutschrift_id}`}>{bill.gutschrift_number}</Link>
+              </>
             )}
             {bill.due_date && <> · fällig <span className="mono">{date(bill.due_date)}</span></>}
             {bill.payment_reference && (
@@ -127,10 +145,16 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
           <>
             <Badge state={bill.state} kind="bill" />
             {bill.po_number && (
-              <span className="actions" style={{ gap: 6 }} title="3-Way-Matching">
+              // Die Ampel führt zu den Wareneingängen der Bestellung — dort klärt sich „fehlt".
+              <Link
+                className="actions"
+                style={{ gap: 6, textDecoration: 'none' }}
+                title="3-Way-Matching — Wareneingänge der Bestellung"
+                href={`/einkauf/${bill.purchase_order_id}#wareneingaenge`}
+              >
                 <span className={`led ${match.led}`} />
                 <span className="mono-label">{match.label}</span>
-              </span>
+              </Link>
             )}
             {/* Zustand und Bedienung getrennt: LED zeigt den Prüfstand, die Taste schaltet ihn. */}
             {bill.checked && (
@@ -271,7 +295,15 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
                       <td className="mono muted">{date(z.gezahlt_am)}</td>
                       <td className="muted">{z.konto ?? '—'}</td>
                       <td className="muted">
-                        {z.quelle === 'po_rate' ? `Zahlplan: ${z.bezeichnung ?? 'Rate'}` : 'Rechnung'}
+                        {z.quelle === 'po_rate' && bill.purchase_order_id ? (
+                          <Link href={`/einkauf/${bill.purchase_order_id}#zahlplan`}>
+                            Zahlplan: {z.bezeichnung ?? 'Rate'}
+                          </Link>
+                        ) : z.quelle === 'po_rate' ? (
+                          `Zahlplan: ${z.bezeichnung ?? 'Rate'}`
+                        ) : (
+                          'Rechnung'
+                        )}
                       </td>
                       <td className="mono" style={{ textAlign: 'right' }}>{money(z.betrag_eur)}</td>
                       <td style={{ textAlign: 'right' }}>

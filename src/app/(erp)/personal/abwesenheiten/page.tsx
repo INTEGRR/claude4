@@ -124,10 +124,14 @@ export default async function AbwesenheitenPage() {
                     </td>
                     <td className="num mono">{Number(a.tage)}</td>
                     <td className="nowrap">
-                      <Badge state={a.state} kind="absence" />
+                      <Badge state={a.state} kind="absence" href={`/personal/${a.employee_id}`} />
                       {a.state === 'requested' && a.schichten > 0 && (
                         <div className="small muted nowrap">
-                          <span className="led warn" /> {a.schichten} Schicht(en) geplant
+                          {/* Kollision → die Woche im Schichtplan, in der sie liegt. */}
+                          <span className="led warn" />{' '}
+                          <Link className="muted" href={`/personal/schichtplan?woche=${a.starts_on}`}>
+                            {a.schichten} Schicht(en) geplant
+                          </Link>
                         </div>
                       )}
                       {a.decided_at && (

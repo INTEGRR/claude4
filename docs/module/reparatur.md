@@ -76,6 +76,15 @@ Kundengerät selbst wird **nie** als Bestand gebucht — es gehört dem Kunden.
 10. **Stornieren** (`cancel`) aus `new`, `awaiting_device`, `received`,
     `confirmed`, `under_repair`; nicht nach `repaired`/`shipped`.
 
+## Querverweise (seit 2026-10-01)
+
+Liste und Auftrag verlinken den **Kunden** (`/kontakte/[id]`), das
+**Produkt** (`/produkte/variante/[id]`), die Herkunft **VG/…** (Vorgang der
+Reparaturanfrage, `origin_model = 'vorgang'`), das **Angebot** (in der Liste
+am Schild „kostenpflichtig"), die Rückgabe-Lieferung (`return_picking_id` →
+`/lager/[id]`), Seriennummer/Los und das Retourenlabel
+(`/versand/retouren`). Teile führen zur Variante.
+
 ## Zustandsmaschine
 
 ```

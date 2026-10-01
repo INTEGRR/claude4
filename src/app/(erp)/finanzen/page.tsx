@@ -59,24 +59,51 @@ export default async function FinanzenSeite({
       : new Date(z.periode_start).toLocaleDateString('de-DE', { month: 'short' }),
   )
 
+  // Partner-ID für den Querverweis: finanz_faellig liefert nur den Namen,
+  // die Quelle (quelle/ref) führt aber eindeutig zum Partner — ein Join je Art.
   const faellig = await sql<
-    { quelle: string; ref: string; label: string; partner: string | null;
+    { quelle: string; ref: string; label: string; partner: string | null; partner_id: string | null;
       faellig_am: string; betrag_eur: number; richtung: string; link: string }[]
-  >`select * from finanz_faellig(current_date + 14)`
+  >`
+    select f.*, coalesce(po.vendor_id, vb.vendor_id, v.partner_id, d.partner_id) as partner_id
+    from finanz_faellig(current_date + 14) f
+    left join zahlplan_raten zr on f.quelle = 'po_rate' and zr.id = f.ref
+    left join purchase_orders po on po.id = zr.purchase_order_id
+    left join vendor_bills vb on f.quelle = 'vendor_bill' and vb.id = f.ref
+    left join vertraege v on f.quelle = 'vertrag' and v.id = f.ref
+    left join darlehen_raten dr on f.quelle = 'darlehen_rate' and dr.id = f.ref
+    left join darlehen d on d.id = dr.darlehen_id
+    order by f.faellig_am`
   const faelligSumme = faellig.reduce((s, f) => s + Number(f.betrag_eur), 0)
   const ueberfaellig = faellig.filter((f) => new Date(f.faellig_am) < new Date())
 
   const zahlungen = await sql<
     { id: string; nummer: string; richtung: string; betrag_eur: number; gezahlt_am: string;
-      quelle: string; verwendungszweck: string | null; partner: string | null;
-      konto: string | null; storniert: boolean }[]
+      quelle: string; verwendungszweck: string | null; partner_id: string | null; partner: string | null;
+      konto: string | null; storniert: boolean; beleg: string | null; beleg_pfad: string | null }[]
   >`
     select z.id, z.nummer, z.richtung, z.betrag_eur, z.gezahlt_am, z.quelle,
-           z.verwendungszweck, p.name as partner, k.name as konto,
-           (z.storniert_am is not null) as storniert
+           z.verwendungszweck, z.partner_id, p.name as partner, k.name as konto,
+           (z.storniert_am is not null) as storniert,
+           -- Querverweis: der Beleg, aus dem die Zahlung stammt.
+           coalesce(vb.number, po.number, v.nummer, d.nummer, s.bezeichnung) as beleg,
+           case
+             when vb.id is not null then '/einkauf/rechnungen/' || vb.id
+             when po.id is not null then '/einkauf/' || po.id
+             when v.id is not null then '/finanzen/vertraege/' || v.id
+             when d.id is not null then '/finanzen/darlehen/' || d.id
+             when s.id is not null then '/finanzen/steuern'
+           end as beleg_pfad
     from zahlungen z
     left join partners p on p.id = z.partner_id
     left join bankkonten k on k.id = z.bankkonto_id
+    left join vendor_bills vb on vb.id = z.vendor_bill_id
+    left join zahlplan_raten zr on zr.id = z.zahlplan_rate_id
+    left join purchase_orders po on po.id = zr.purchase_order_id
+    left join vertraege v on v.id = z.vertrag_id
+    left join darlehen_raten dr on dr.id = z.darlehen_rate_id
+    left join darlehen d on d.id = coalesce(z.darlehen_id, dr.darlehen_id)
+    left join steuerzahlungen s on s.id = z.steuerzahlung_id
     order by z.gezahlt_am desc, z.created_at desc
     limit 15`
 
@@ -263,7 +290,9 @@ export default async function FinanzenSeite({
                   {faellig.map((f) => (
                     <tr key={`${f.quelle}-${f.ref}`}>
                       <td><Link href={f.link}>{f.label}</Link></td>
-                      <td className="muted">{f.partner ?? '—'}</td>
+                      <td className="muted">
+                        {f.partner_id ? <Link href={`/kontakte/${f.partner_id}`}>{f.partner}</Link> : (f.partner ?? '—')}
+                      </td>
                       <td className={new Date(f.faellig_am) < new Date() ? 'mono' : 'mono muted'}>
                         {new Date(f.faellig_am) < new Date() && <span className="led warn" style={{ marginRight: 6 }} />}
                         {date(f.faellig_am)}
@@ -302,8 +331,18 @@ export default async function FinanzenSeite({
                     <td className="mono">{z.nummer}{z.storniert ? ' (storniert)' : ''}</td>
                     <td className="mono muted">{date(z.gezahlt_am)}</td>
                     <td>{z.richtung === 'ein' ? 'Eingang' : 'Ausgang'}</td>
-                    <td className="muted">{z.quelle}</td>
-                    <td className="muted">{z.partner ?? '—'}</td>
+                    <td className="muted">
+                      {z.beleg_pfad ? (
+                        <Link href={z.beleg_pfad} title={z.quelle}>
+                          {z.beleg ?? z.quelle}
+                        </Link>
+                      ) : (
+                        z.quelle
+                      )}
+                    </td>
+                    <td className="muted">
+                      {z.partner_id ? <Link href={`/kontakte/${z.partner_id}`}>{z.partner}</Link> : (z.partner ?? '—')}
+                    </td>
                     <td className="muted">{z.konto ?? '—'}</td>
                     <td className="muted">{z.verwendungszweck ?? '—'}</td>
                     <td className="mono" style={{ textAlign: 'right' }}>

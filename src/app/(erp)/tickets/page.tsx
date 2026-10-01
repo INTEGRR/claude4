@@ -105,14 +105,21 @@ export default async function TicketsPage({
                     <td>
                       <Link href={`/tickets/${t.id}`}>{t.titel}</Link>
                     </td>
-                    <td className="mono small">{t.seite ?? '—'}</td>
+                    <td className="mono small">
+                      {/* Nur interne Pfade verlinken — die Seite stammt aus der Meldung. */}
+                      {t.seite?.startsWith('/') && !t.seite.startsWith('//') ? (
+                        <Link href={t.seite}>{t.seite}</Link>
+                      ) : (
+                        (t.seite ?? '—')
+                      )}
+                    </td>
                     <td>
                       <span className={`badge ${SCHWERE_BADGE[t.schwere] ?? ''}`}>{t.schwere}</span>
                     </td>
                     <td>
-                      <span className={`badge ${STATUS_BADGE[t.status] ?? ''}`}>
+                      <Link className={`badge ${STATUS_BADGE[t.status] ?? ''}`} href={`/tickets/${t.id}`}>
                         {t.status.replace('_', ' ')}
-                      </span>
+                      </Link>
                     </td>
                     <td className="small">
                       {t.commit_sha ? (

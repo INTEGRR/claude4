@@ -811,6 +811,13 @@ Fälligkeits-Auslöser, Kündigungsfristen, Tilgungs-Mathematik,
 USt-Nachrechnung und die vier Deckungskonto-Prüffälle auf neutralisierter
 Datenlage (`tests/finanzen.test.ts`).
 
+Querverweise (seit 2026-10-01): Partner (Fällig-Liste, Register, Darlehens-
+geber, Vertragspartner) führen zum Kontakt; die Partner-ID der Fällig-Liste
+leitet die Seite aus `quelle`/`ref` von `finanz_faellig` ab (ein Join je
+Art, die Funktion bleibt unverändert). Im Register führt die Quelle zum
+Beleg der Zahlung (Lieferantenrechnung, Bestellung des Zahlplans, Vertrag,
+Darlehen, Steuern).
+
 ## Sprachmodus /sprechen: Echtzeit-Gespräch mit Sammel-Transaktion (0062, umgesetzt)
 
 Freisprech-Dialog wie mit einem Gaming-Assistenten — „Ich zähle 788 Switches

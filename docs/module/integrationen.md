@@ -284,6 +284,15 @@ verlinken auf die Schnittstellen. Jeder endgültig fehlgeschlagene Job und jede
 unzugeordnete Shopify-Zeile zählt in den Header-Status („n Vorgänge brauchen
 Aufmerksamkeit") und ins Navigations-Badge.
 
+### Querverweise im Monitor (seit 2026-10-01)
+
+Webhook-Ereignisse und nicht zugeordnete Positionen führen zum Auftrag, der
+aus der Shopify-Order entstand (`sales_orders.shopify_order_id`); Abweichungen
+im Bestandsabgleich zur Variante; im Shopify-Import der Kunde zum Kontakt,
+sobald der Auftrag im ERP ist. Im Transaktionsprotokoll wird die Referenz
+zum Beleg aufgelöst (Auftrag, RMA, Lieferung, Bestellung — ein Query für die
+ganze Seite).
+
 ### Telegram-Benachrichtigungen (seit 0084)
 
 Ein Telegram-Bot des Betreibers bekommt Push-Nachrichten — der einzige Kanal

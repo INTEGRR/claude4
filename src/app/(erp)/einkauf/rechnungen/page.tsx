@@ -13,15 +13,17 @@ export default async function BillsPage() {
       id: string
       number: string
       state: string
+      vendor_id: string
       vendor: string
       bill_date: string | null
       is_credit_note: boolean
+      purchase_order_id: string | null
       po_number: string | null
       gross: number
     }[]
   >`
-    select b.id, b.number, b.state, p.name as vendor, b.bill_date, b.is_credit_note,
-           po.number as po_number, t.gross
+    select b.id, b.number, b.state, b.vendor_id, p.name as vendor, b.bill_date, b.is_credit_note,
+           b.purchase_order_id, po.number as po_number, t.gross
     from vendor_bills b
     join partners p on p.id = b.vendor_id
     left join purchase_orders po on po.id = b.purchase_order_id
@@ -61,10 +63,18 @@ export default async function BillsPage() {
                         {b.is_credit_note && <span className="badge info">Gutschrift</span>}
                       </span>
                     </td>
-                    <td>{b.vendor}</td>
-                    <td className="mono small">{b.po_number ?? '—'}</td>
+                    <td>
+                      <Link href={`/einkauf/lieferanten/${b.vendor_id}`}>{b.vendor}</Link>
+                    </td>
+                    <td className="mono small">
+                      {b.purchase_order_id ? (
+                        <Link href={`/einkauf/${b.purchase_order_id}`}>{b.po_number}</Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="mono nowrap">{date(b.bill_date)}</td>
-                    <td><Badge state={b.state} kind="bill" /></td>
+                    <td><Badge state={b.state} kind="bill" href={`/einkauf/rechnungen/${b.id}`} /></td>
                     <td className="num nowrap">
                       {b.is_credit_note ? `− ${money(b.gross)}` : money(b.gross)}
                     </td>

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
@@ -15,7 +16,7 @@ export default async function DarlehenDetail({ params }: { params: Promise<{ id:
   const { id } = await params
 
   const [d] = await sql<
-    { id: string; nummer: string; name: string; partner: string | null; betrag: number;
+    { id: string; nummer: string; name: string; partner_id: string | null; partner: string | null; betrag: number;
       zinssatz_pct: number; art: string; status: string; auszahlung_am: string;
       laufzeit_monate: number; tilgungsfrei_monate: number; zahltag: number;
       konto: string | null; notiz: string | null }[]
@@ -114,7 +115,10 @@ export default async function DarlehenDetail({ params }: { params: Promise<{ id:
         <TableWrap>
           <table>
             <tbody>
-              <tr><td className="mono-label">Geber</td><td>{d.partner ?? '—'}</td></tr>
+              <tr>
+                <td className="mono-label">Geber</td>
+                <td>{d.partner_id ? <Link href={`/kontakte/${d.partner_id}`}>{d.partner}</Link> : '—'}</td>
+              </tr>
               <tr><td className="mono-label">Auszahlung</td><td className="mono">{date(d.auszahlung_am)}</td></tr>
               <tr><td className="mono-label">Tilgungsfrei</td><td>{d.tilgungsfrei_monate} Monate</td></tr>
               <tr><td className="mono-label">Zahltag</td><td>{d.zahltag}.</td></tr>

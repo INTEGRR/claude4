@@ -5,7 +5,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { date, dateTime, hours, money } from '@/modules/shared/format'
+import { date, dateTime, hours, isoDatum, money } from '@/modules/shared/format'
 import { addTimeEntry, deleteTimeEntry, requestAbsence, updateEmployee } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -82,13 +82,14 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       break_minutes: number
       minutes: number
       cost: number
+      mo_id: string | null
       auftrag: string | null
       arbeitsgang: string | null
     }[]
   >`
     select t.id, t.kind::text, t.started_at, t.ended_at, t.break_minutes, t.minutes,
            round(t.minutes / 60.0 * t.hourly_cost, 2) as cost,
-           mo.number as auftrag, o.name as arbeitsgang
+           mo.id as mo_id, mo.number as auftrag, o.name as arbeitsgang
     from time_entries t
     left join mo_operations o on o.id = t.mo_operation_id
     left join manufacturing_orders mo on mo.id = o.mo_id
@@ -295,7 +296,13 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                     <td className="num mono">{z.ended_at ? hours(z.minutes) : '—'}</td>
                     <td className="num mono muted">{z.ended_at ? money(z.cost) : '—'}</td>
                     <td className="small muted">
-                      {z.auftrag ? `${z.auftrag} · ${z.arbeitsgang}` : '—'}
+                      {z.mo_id ? (
+                        <>
+                          <Link className="mono" href={`/fertigung/${z.mo_id}`}>{z.auftrag}</Link> · {z.arbeitsgang}
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="num">
                       {z.kind === 'attendance' && z.ended_at && (
@@ -366,7 +373,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
                     <td className="mono small nowrap">{date(a.starts_on)}</td>
                     <td className="mono small nowrap">{a.half_day ? 'halber Tag' : date(a.ends_on)}</td>
                     <td className="num mono">{Number(a.tage)}</td>
-                    <td><Badge state={a.state} kind="absence" /></td>
+                    <td><Badge state={a.state} kind="absence" href="/personal/abwesenheiten" /></td>
                     <td className="small muted">{a.reason ?? '—'}</td>
                   </tr>
                 ))}
@@ -427,7 +434,11 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
               <tbody>
                 {schichten.map((s) => (
                   <tr key={s.id}>
-                    <td>{s.name ?? 'Einzelschicht'}</td>
+                    <td>
+                      <Link href={`/personal/schichtplan?woche=${isoDatum(new Date(s.starts_at))}`}>
+                        {s.name ?? 'Einzelschicht'}
+                      </Link>
+                    </td>
                     <td className="mono small nowrap">{dateTime(s.starts_at)}</td>
                     <td className="mono small nowrap">{dateTime(s.ends_at)}</td>
                     <td className="num mono">

@@ -45,15 +45,19 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       lieferant: string | null
       purchase_order_id: string | null
       bestellung: string | null
+      einkaufsprojekt_id: string | null
+      projekt: string | null
       zustaendig_id: string | null
       zugeordnet_durch: string | null
     }[]
   >`
     select t.id, t.betreff, t.status::text as status, t.kanal::text as kanal, t.partner_id, p.name as lieferant,
-           t.purchase_order_id, po.number as bestellung, t.zustaendig_id, t.zugeordnet_durch::text as zugeordnet_durch
+           t.purchase_order_id, po.number as bestellung, t.einkaufsprojekt_id, ep.nummer as projekt,
+           t.zustaendig_id, t.zugeordnet_durch::text as zugeordnet_durch
     from mail_threads t
     left join partners p on p.id = t.partner_id
     left join purchase_orders po on po.id = t.purchase_order_id
+    left join einkaufsprojekte ep on ep.id = t.einkaufsprojekt_id
     where t.id = ${id}`
   if (!t) notFound()
 
@@ -135,6 +139,12 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
               <>
                 {' · '}
                 <Link href={`/einkauf/${t.purchase_order_id}`}>{t.bestellung}</Link>
+              </>
+            ) : null}
+            {t.einkaufsprojekt_id ? (
+              <>
+                {' · Projekt '}
+                <Link href={`/einkauf/projekte/${t.einkaufsprojekt_id}`}>{t.projekt}</Link>
               </>
             ) : null}
             {t.zugeordnet_durch ? ` · zugeordnet ${DURCH[t.zugeordnet_durch]}` : ''}
@@ -249,7 +259,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                     {d.betreff || '(ohne Betreff)'}
                   </Link>
                   <span className="muted small">
-                    <Badge state={d.status} kind="mail_entwurf" /> {d.erstellt_von}
+                    <Badge state={d.status} kind="mail_entwurf" href={`/einkauf/entwuerfe/${d.id}`} /> {d.erstellt_von}
                   </span>
                 </li>
               ))}

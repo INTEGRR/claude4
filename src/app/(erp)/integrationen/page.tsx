@@ -274,10 +274,25 @@ export default async function IntegrationenPage() {
   const dienste = await dienstStatusLesen(sql)
 
   const events = await sql<
-    { id: string; topic: string; status: string; error: string | null; received_at: string; order_id: string | null }[]
+    {
+      id: string
+      topic: string
+      status: string
+      error: string | null
+      received_at: string
+      order_id: string | null
+      so_id: string | null
+      so_number: string | null
+    }[]
   >`
-    select id, topic, status, error, received_at, shopify_order_id as order_id
-    from shopify_webhook_events order by received_at desc limit 20`
+    select e.id, e.topic, e.status, e.error, e.received_at, e.shopify_order_id as order_id,
+           so.id as so_id, so.number as so_number
+    from shopify_webhook_events e
+    -- Querverweis: der Auftrag, der aus der Shopify-Order entstanden ist.
+    left join lateral (
+      select s.id, s.number from sales_orders s where s.shopify_order_id = e.shopify_order_id limit 1
+    ) so on e.shopify_order_id is not null
+    order by e.received_at desc limit 20`
 
   const jobs = await sql<
     {
@@ -295,10 +310,21 @@ export default async function IntegrationenPage() {
     from integration_jobs order by created_at desc limit 25`
 
   const unmatched = await sql<
-    { id: string; order_name: string | null; sku: string | null; title: string | null; qty: number }[]
+    {
+      id: string
+      order_name: string | null
+      sku: string | null
+      title: string | null
+      qty: number
+      so_id: string | null
+    }[]
   >`
-    select id, order_name, sku, title, qty from shopify_unmatched_lines
-    where resolved_at is null order by created_at desc limit 25`
+    select u.id, u.order_name, u.sku, u.title, u.qty, so.id as so_id
+    from shopify_unmatched_lines u
+    left join lateral (
+      select s.id from sales_orders s where s.shopify_order_id = u.shopify_order_id limit 1
+    ) so on true
+    where u.resolved_at is null order by u.created_at desc limit 25`
 
   const variants = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) || coalesce(' · ' || pv.sku, '') as label
@@ -520,7 +546,9 @@ export default async function IntegrationenPage() {
               <tbody>
                 {unmatched.map((u) => (
                   <tr key={u.id}>
-                    <td className="mono small">{u.order_name ?? '—'}</td>
+                    <td className="mono small">
+                      {u.so_id ? <Link href={`/verkauf/${u.so_id}`}>{u.order_name ?? 'Auftrag'}</Link> : (u.order_name ?? '—')}
+                    </td>
                     <td>{u.title}</td>
                     <td className="mono small">{u.sku ?? '—'}</td>
                     <td className="num">{qty(u.qty)}</td>
@@ -681,7 +709,9 @@ export default async function IntegrationenPage() {
                 <tbody>
                   {abweichungen.map((a) => (
                     <tr key={a.variant_id}>
-                      <td className="mono">{a.sku ?? a.variant_id}</td>
+                      <td className="mono">
+                        <Link href={`/produkte/variante/${a.variant_id}`}>{a.sku ?? a.variant_id}</Link>
+                      </td>
                       <td className="num">{qty(a.erp_menge)}</td>
                       <td className="num">{qty(a.shop_menge)}</td>
                       <td className="mono small">{dateTime(a.shop_seen_at)}</td>
@@ -780,7 +810,15 @@ export default async function IntegrationenPage() {
                   <tr key={e.id}>
                     <td className="nowrap small mono">{dateTime(e.received_at)}</td>
                     <td className="mono small">{e.topic}</td>
-                    <td className="mono small">{e.order_id?.split('/').pop() ?? '—'}</td>
+                    <td className="mono small">
+                      {e.order_id?.split('/').pop() ?? '—'}
+                      {e.so_id && (
+                        <>
+                          {' → '}
+                          <Link href={`/verkauf/${e.so_id}`}>{e.so_number}</Link>
+                        </>
+                      )}
+                    </td>
                     <td>
                       <QueueStatus status={e.status} labels={EVENT_STATUS} />
                     </td>

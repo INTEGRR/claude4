@@ -50,6 +50,31 @@ Variante, Beschreibung, **Menge + Einkaufs-Maßeinheit**, Einzelpreis, Steuersat
 - **Liste** mit Filter-Kacheln wie Odoo: **Zu senden**, **Wartend** (gesendet), **Verspätet** (Liefertermin überschritten); Status- und Lieferanten-Filter.
 - **Formular**: Kopf (Lieferant, Lieferantenreferenz, Bestellfrist, erwartete Ankunft), Positionen, Buttons je Status, Smart-Buttons **Wareneingänge (n)** und **Rechnungen (n)**, Beleg-Verlauf (E-Mails, Statuswechsel).
 
+### Querverweise (seit 2026-10-01)
+
+Jeder Name und jede Belegnummer ist ein Link, Statusschilder führen zu den
+Belegen dahinter (`<Badge href>`; Regel „ein Beleg → direkt, mehrere → die
+Karte an der Bestellung", `src/app/(erp)/einkauf/querverweise.ts`):
+
+- **Lieferant** → Lieferantenakte (`/einkauf/lieferanten/[id]`) — in
+  Bestellliste und -kopf, Rechnungsliste und -kopf, Projekten (Anfragen,
+  Angebote, Entscheidung, Bestellungen, Preishistorie).
+- **Bestellliste**: Status „Bestellung" → Wareneingang (`/lager/[id]`),
+  Abrechnung („Rechnung erwartet" / „Vollständig abgerechnet") → Rechnung;
+  das Einkaufsprojekt steht als `EP/…` unter der Nummer.
+- **Bestellung**: dieselben Schilder im Kopf, Projekt im Untertitel,
+  Wareneingangs- und Rechnungsschilder führen zum Beleg; Anker
+  `#wareneingaenge`, `#rechnungen`, `#zahlplan`.
+- **Rechnung**: Bestellung, stornierte Rechnung ↔ Gutschrift in beide
+  Richtungen; die 3-Way-Ampel führt zu den Wareneingängen der Bestellung;
+  eine Zahlplan-Zahlung führt zum Zahlplan der Bestellung.
+- **Lieferantenakte**: Status → Bestellung/Rechnung, Belege an Dateien und
+  Artikel der Lieferantenpreise sind klickbar, Tracking-Nummer → Tracking-Link.
+- **Einkaufstool**: Posteingang und Entwürfe verlinken Bestellung, Projekt
+  und Gespräch; „Gesendet" führt zum Thread; der Anfragestatus im Projekt
+  führt zum Gespräch (sonst zum Entwurf); Wiedervorlagen kennen auch
+  Einkaufsprojekte.
+
 ## Abnahmekriterien
 
 1. Bestellung mit 3 Positionen bestätigen ⇒ genau 1 Wareneingang mit 3 Moves, `expected_arrival` korrekt aus Lieferzeiten.

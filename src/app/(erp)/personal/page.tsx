@@ -138,7 +138,9 @@ export default async function PersonalPage() {
               <tbody>
                 {mitarbeiter.map((m) => (
                   <tr key={m.id}>
-                    <td className="mono small">{m.number}</td>
+                    <td className="mono small">
+                      <Link href={`/personal/${m.id}`}>{m.number}</Link>
+                    </td>
                     <td>
                       <Link href={`/personal/${m.id}`}>{m.name}</Link>
                       {m.department && <div className="small muted">{m.department}</div>}
@@ -158,7 +160,9 @@ export default async function PersonalPage() {
                       ) : m.absent_until ? (
                         <>
                           <span className="led warn" />{' '}
-                          <span className="small muted">abwesend bis {date(m.absent_until)}</span>
+                          <Link className="small muted" href="/personal/abwesenheiten">
+                            abwesend bis {date(m.absent_until)}
+                          </Link>
                         </>
                       ) : m.present ? (
                         <>

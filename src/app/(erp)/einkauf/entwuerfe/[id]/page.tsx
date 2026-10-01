@@ -42,6 +42,8 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
       lieferant: string | null
       purchase_order_id: string | null
       bestellung: string | null
+      einkaufsprojekt_id: string | null
+      projekt: string | null
       an: string[]
       cc: string[]
       betreff: string
@@ -59,13 +61,14 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
     }[]
   >`
     select e.id, e.status::text as status, e.thread_id, t.betreff as thread_betreff, e.partner_id, p.name as lieferant,
-           e.purchase_order_id, po.number as bestellung, e.an, e.cc, e.betreff, e.text_de, e.text_ziel, e.sprache,
+           e.purchase_order_id, po.number as bestellung, e.einkaufsprojekt_id, ep.nummer as projekt, e.an, e.cc, e.betreff, e.text_de, e.text_ziel, e.sprache,
            e.anhang_dokument_ids, e.antwort_erwartet_bis::text as antwort_erwartet_bis, e.quelle, e.erstellt_von,
            e.freigegeben_von, e.freigegeben_am::text as freigegeben_am, e.gesendet_am::text as gesendet_am, e.fehler
     from mail_entwuerfe e
     left join mail_threads t on t.id = e.thread_id
     left join partners p on p.id = e.partner_id
     left join purchase_orders po on po.id = e.purchase_order_id
+    left join einkaufsprojekte ep on ep.id = e.einkaufsprojekt_id
     where e.id = ${id}`
   if (!e) notFound()
 
@@ -109,6 +112,12 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
                 <Link href={`/einkauf/${e.purchase_order_id}`}>{e.bestellung}</Link>
               </>
             )}
+            {e.einkaufsprojekt_id && (
+              <>
+                {' · Projekt '}
+                <Link href={`/einkauf/projekte/${e.einkaufsprojekt_id}`}>{e.projekt}</Link>
+              </>
+            )}
             {e.thread_id && (
               <>
                 {' · '}
@@ -120,7 +129,13 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
         }
         actions={
           <>
-            <Badge state={e.status} kind="mail_entwurf" led />
+            <Badge
+              state={e.status}
+              kind="mail_entwurf"
+              led
+              href={e.status === 'gesendet' && e.thread_id ? `/einkauf/posteingang/${e.thread_id}` : undefined}
+              title={e.status === 'gesendet' && e.thread_id ? 'Zum Gespräch' : undefined}
+            />
             {bearbeitbar && (
               <ActionButton action={entwurfVerwerfen.bind(null, id)} confirm="Entwurf verwerfen?" className="danger">
                 Verwerfen

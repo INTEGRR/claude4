@@ -142,7 +142,7 @@ function PivotTable({ rows, months, unit }: { rows: ReturnType<typeof pivot>; mo
           {rows.map((r) => (
             <tr key={r.id}>
               <td>
-                {r.product}
+                <Link href={`/produkte/variante/${r.id}`}>{r.product}</Link>
                 {r.sku && <span className="muted small mono"> · {r.sku}</span>}
               </td>
               <td className="num" style={summe}>
@@ -338,7 +338,7 @@ export default async function AuswertungenPage({
                   return (
                     <tr key={r.variant_id}>
                       <td>
-                        {r.product}
+                        <Link href={`/produkte/variante/${r.variant_id}`}>{r.product}</Link>
                         {r.sku && <span className="muted small mono"> · {r.sku}</span>}
                       </td>
                       <td className="num">{qty(r.verkauft)}</td>
@@ -421,7 +421,7 @@ export default async function AuswertungenPage({
                 {inventar.map((r) => (
                   <tr key={r.id}>
                     <td>
-                      {r.product}
+                      <Link href={`/produkte/variante/${r.id}`}>{r.product}</Link>
                       {r.sku && <span className="muted small mono"> · {r.sku}</span>}
                     </td>
                     <td className="num">{qty(r.on_hand)}</td>

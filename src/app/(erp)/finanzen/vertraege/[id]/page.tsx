@@ -17,7 +17,7 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
   const { id } = await params
 
   const [v] = await sql<
-    { id: string; nummer: string; name: string; kategorie: string; partner: string | null;
+    { id: string; nummer: string; name: string; kategorie: string; partner_id: string | null; partner: string | null;
       betrag: number; waehrung: string; intervall: string; zahltag: number;
       beginn: string; ende: string | null; laufzeit_monate: number | null;
       kuendigungsfrist_monate: number; gekuendigt_am: string | null;
@@ -90,7 +90,10 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
           <TableWrap>
             <table>
               <tbody>
-                <tr><td className="mono-label">Partner</td><td>{v.partner ?? '—'}</td></tr>
+                <tr>
+                  <td className="mono-label">Partner</td>
+                  <td>{v.partner_id ? <Link href={`/kontakte/${v.partner_id}`}>{v.partner}</Link> : '—'}</td>
+                </tr>
                 <tr><td className="mono-label">Beginn</td><td className="mono">{date(v.beginn)}</td></tr>
                 <tr>
                   <td className="mono-label">Ende</td>

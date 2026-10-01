@@ -42,18 +42,20 @@ export default async function ZeiterfassungPage() {
   const heute = await sql<
     {
       id: string
+      employee_id: string
       name: string
       kind: string
       started_at: string
       ended_at: string | null
       break_minutes: number
       minutes: number
+      mo_id: string | null
       auftrag: string | null
       arbeitsgang: string | null
     }[]
   >`
-    select t.id, e.name, t.kind::text, t.started_at, t.ended_at, t.break_minutes, t.minutes,
-           mo.number as auftrag, o.name as arbeitsgang
+    select t.id, t.employee_id, e.name, t.kind::text, t.started_at, t.ended_at, t.break_minutes, t.minutes,
+           mo.id as mo_id, mo.number as auftrag, o.name as arbeitsgang
     from time_entries t
     join employees e on e.id = t.employee_id
     left join mo_operations o on o.id = t.mo_operation_id
@@ -61,6 +63,11 @@ export default async function ZeiterfassungPage() {
     where t.started_at >= date_trunc('day', now())
     order by t.started_at desc
     limit 60`
+
+  // Querverweise nur, wo die Rolle auch hinkommt — die Stempeluhr steht
+  // auch Werkstattrollen ohne Personal- oder Fertigungsbereich offen.
+  const personalLink = sieht('personal')
+  const fertigungLink = sieht('fertigung')
 
   const tagesminuten = heute
     .filter((h) => h.kind === 'attendance')
@@ -132,9 +139,12 @@ export default async function ZeiterfassungPage() {
               <tbody>
                 {anwesend.map((a) => (
                   <tr key={a.entry_id}>
-                    <td className="mono small">{a.number}</td>
+                    <td className="mono small">
+                      {personalLink ? <Link href={`/personal/${a.employee_id}`}>{a.number}</Link> : a.number}
+                    </td>
                     <td>
-                      <span className="led on" /> {a.name}
+                      <span className="led on" />{' '}
+                      {personalLink ? <Link href={`/personal/${a.employee_id}`}>{a.name}</Link> : a.name}
                       {a.department && <span className="muted small"> · {a.department}</span>}
                     </td>
                     <td className="mono small nowrap">{dateTime(a.started_at)}</td>
@@ -213,7 +223,7 @@ export default async function ZeiterfassungPage() {
               <tbody>
                 {heute.map((h) => (
                   <tr key={h.id}>
-                    <td>{h.name}</td>
+                    <td>{personalLink ? <Link href={`/personal/${h.employee_id}`}>{h.name}</Link> : h.name}</td>
                     <td className="small muted">
                       {h.kind === 'attendance' ? 'Anwesenheit' : 'Auftragszeit'}
                     </td>
@@ -232,7 +242,15 @@ export default async function ZeiterfassungPage() {
                     </td>
                     <td className="num mono">{h.ended_at ? hours(h.minutes) : '—'}</td>
                     <td className="small muted">
-                      {h.auftrag ? `${h.auftrag} · ${h.arbeitsgang}` : '—'}
+                      {h.mo_id && fertigungLink ? (
+                        <>
+                          <Link className="mono" href={`/fertigung/${h.mo_id}`}>{h.auftrag}</Link> · {h.arbeitsgang}
+                        </>
+                      ) : h.auftrag ? (
+                        `${h.auftrag} · ${h.arbeitsgang}`
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
                 ))}

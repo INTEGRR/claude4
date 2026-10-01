@@ -44,6 +44,14 @@ Zwei Arten in einer Tabelle:
 - `absence_days(id)` zählt Arbeitstage (Mo–Fr); ein halber Tag zählt 0,5.
 - `absence_approve` meldet im Verlauf, wenn im Zeitraum bereits Schichten geplant sind — es blockiert aber nicht: die Genehmigung ist die Entscheidung, der Plan wird danach angepasst.
 
+## Querverweise (seit 2026-10-01)
+
+Mitarbeiter (Name und Nummer) führen zur Akte `/personal/[id]` — auch an der
+Stempeluhr, dort nur für Rollen mit Personalbereich. Auftragszeiten führen
+zum Fertigungsauftrag (`/fertigung/[id]`), „abwesend"-Schilder zu den
+Abwesenheiten, eine Kollision „n Schicht(en) geplant" und Schichten in der
+Akte zur passenden Woche im Schichtplan (`?woche=`).
+
 ## Herstellkosten: die Klammer zur Fertigung
 
 ```

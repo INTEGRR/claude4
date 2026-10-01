@@ -17,13 +17,13 @@ export default async function VertraegeSeite() {
   await requireArea('finanzen')
 
   const vertraege = await sql<
-    { id: string; nummer: string; name: string; kategorie: string; partner: string | null;
+    { id: string; nummer: string; name: string; kategorie: string; partner_id: string | null; partner: string | null;
       betrag: number; waehrung: string; intervall: string; status: string;
       beginn: string; ende_effektiv: string | null;
       kuendbar_zum: string | null; frist_bis: string | null; ansteht: boolean;
       naechste_zahlung: string | null; betrag_eur: number }[]
   >`
-    select v.id, v.nummer, v.name, v.kategorie, p.name as partner,
+    select v.id, v.nummer, v.name, v.kategorie, v.partner_id, p.name as partner,
            v.betrag, v.waehrung, v.intervall, v.status, v.beginn,
            vertrag_ende_effektiv(v)::text as ende_effektiv,
            vertrag_naechstes_kuendbar_zum(v)::text as kuendbar_zum,
@@ -92,7 +92,9 @@ export default async function VertraegeSeite() {
                       </Link>
                     </td>
                     <td className="muted">{v.kategorie}</td>
-                    <td className="muted">{v.partner ?? '—'}</td>
+                    <td className="muted">
+                      {v.partner_id ? <Link href={`/kontakte/${v.partner_id}`}>{v.partner}</Link> : '—'}
+                    </td>
                     <td className="mono" style={{ textAlign: 'right' }}>
                       {money(v.betrag, v.waehrung)}
                     </td>

@@ -142,6 +142,9 @@ SQL-Aggregationen über das Bewegungs-Ledger, keine Chart-Bibliothek:
   verkauft ÷ (verkauft + Bestand) über bestätigte Aufträge im Zeitraum,
   mit Monatsverlauf.
 
+Querverweise (seit 2026-10-01): Produkte in allen Tabellen von
+`/auswertungen` und in der RMA-Quote der Kennzahlen führen zur Variante.
+
 ## Scannen — das eine Scanfeld (`/scanner`)
 
 **Eine Nummer, der passende Ablauf** (Entscheidungslog 2026-10-01): Es gibt

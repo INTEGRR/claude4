@@ -86,6 +86,21 @@ export default async function TransaktionenPage({
     order by created_at desc
     limit 200`
 
+  // Querverweis: die Referenz ist meist eine Belegnummer (S…, RMA/…, WH/…,
+  // P…) — ein Query für alle Zeilen löst sie zum Beleg auf.
+  const referenzen = [...new Set(rows.map((r) => r.reference).filter((r): r is string => Boolean(r)))]
+  const belege = referenzen.length
+    ? await sql<{ nummer: string; pfad: string }[]>`
+        select number as nummer, '/verkauf/' || id as pfad from sales_orders where number = any(${referenzen}::text[])
+        union all
+        select number, '/reparatur/' || id from repair_orders where number = any(${referenzen}::text[])
+        union all
+        select number, '/lager/' || id from stock_pickings where number = any(${referenzen}::text[])
+        union all
+        select number, '/einkauf/' || id from purchase_orders where number = any(${referenzen}::text[])`
+    : []
+  const belegPfad = new Map(belege.map((b) => [b.nummer, b.pfad]))
+
   const linkFor = (params: Record<string, string | undefined>) => {
     const merged = { system, nur, q, ...params }
     const query = Object.entries(merged)
@@ -164,7 +179,13 @@ export default async function TransaktionenPage({
                     <td className="nowrap small mono">{dateTime(t.created_at)}</td>
                     <td><span className="badge neutral">{t.system}</span></td>
                     <td className="mono small">{t.kind}</td>
-                    <td className="mono small">{t.reference ?? '—'}</td>
+                    <td className="mono small">
+                      {t.reference && belegPfad.has(t.reference) ? (
+                        <Link href={belegPfad.get(t.reference)!}>{t.reference}</Link>
+                      ) : (
+                        (t.reference ?? '—')
+                      )}
+                    </td>
                     <td>
                       <span className={`badge ${t.ok ? 'success' : 'danger'}`}>
                         {t.ok ? 'ok' : 'Fehler'}

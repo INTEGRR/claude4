@@ -64,10 +64,11 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
         currency: string
         eta: string | null
         tracking_number: string | null
+        tracking_url: string | null
       }[]
     >`
       select po.id, po.number, po.state, po.created_at::text as created_at, t.gross, po.currency,
-             coalesce(po.eta_confirmed, po.expected_arrival)::text as eta, po.tracking_number
+             coalesce(po.eta_confirmed, po.expected_arrival)::text as eta, po.tracking_number, po.tracking_url
       from purchase_orders po cross join lateral purchase_order_total(po.id) t
       where po.vendor_id = ${id}
       order by po.created_at desc limit 30`,
@@ -78,6 +79,7 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
     sql<
       {
         id: string
+        template_id: string
         artikel: string
         min_qty: number
         price: number
@@ -86,15 +88,28 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
         vendor_product_code: string | null
       }[]
     >`
-      select vp.id, pt.name as artikel, vp.min_qty::float as min_qty, vp.price::float as price, vp.currency,
+      select vp.id, vp.template_id, pt.name as artikel, vp.min_qty::float as min_qty, vp.price::float as price, vp.currency,
              vp.lead_time_days, vp.vendor_product_code
       from vendor_prices vp join product_templates pt on pt.id = vp.template_id
       where vp.vendor_id = ${id}
       order by pt.name, vp.min_qty limit 100`,
     // Dateien an Bestellungen/Rechnungen dieses Lieferanten (die eigenen zeigt die Karte darunter).
-    sql<{ id: string; drive_file_id: string; name: string; art: keyof typeof DOKUMENT_ARTEN; groesse: number | null; belege: string | null }[]>`
+    sql<
+      {
+        id: string
+        drive_file_id: string
+        name: string
+        art: keyof typeof DOKUMENT_ARTEN
+        groesse: number | null
+        belege: { pfad: string; nummer: string }[] | null
+      }[]
+    >`
       select d.id, d.drive_file_id, d.name, d.art::text as art, d.groesse::float as groesse,
-             string_agg(coalesce(po.number, vb.number), ', ') as belege
+             -- Querverweis: jeder Beleg mit Pfad, damit die Nummer klickbar ist.
+             json_agg(json_build_object(
+               'pfad', case when po.id is not null then '/einkauf/' || po.id else '/einkauf/rechnungen/' || vb.id end,
+               'nummer', coalesce(po.number, vb.number)
+             ) order by coalesce(po.number, vb.number)) filter (where po.id is not null or vb.id is not null) as belege
       from dokumente d
       join dokument_verweise v on v.dokument_id = d.id and v.modell <> 'partner'
       left join purchase_orders po on v.modell = 'purchase_order' and po.id = v.record_id
@@ -188,7 +203,9 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
 
       <MailThreadsKarte partnerId={id} />
       <WiedervorlagenKarte modell="partner" recordId={id} pfad={`/einkauf/lieferanten/${id}`} />
-      <DokumenteKarte modell="partner" recordId={id} titel="Dateien des Lieferanten" />
+      <div id="dateien">
+        <DokumenteKarte modell="partner" recordId={id} titel="Dateien des Lieferanten" />
+      </div>
 
       {fremdeDateien.length > 0 && (
         <Card title={`Dateien an Bestellungen und Rechnungen (${fremdeDateien.length})`} tight>
@@ -201,7 +218,12 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
                   </a>
                   <div className="muted small">
                     <span className="mono-label">{DOKUMENT_ARTEN[d.art] ?? d.art}</span> · {groesseText(d.groesse)}
-                    {d.belege ? <> · {d.belege}</> : null}
+                    {d.belege?.map((b, i) => (
+                      <span key={b.pfad}>
+                        {i === 0 ? ' · ' : ', '}
+                        <Link className="mono" href={b.pfad}>{b.nummer}</Link>
+                      </span>
+                    ))}
                   </div>
                 </div>
               </li>
@@ -210,6 +232,7 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
         </Card>
       )}
 
+      <div id="bestellungen">
       <Card title={`Bestellungen (${bestellungen.length})`} tight>
         {bestellungen.length === 0 ? (
           <Empty>Noch keine Bestellungen.</Empty>
@@ -233,11 +256,17 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
                       <Link href={`/einkauf/${b.id}`}>{b.number}</Link>
                     </td>
                     <td>
-                      <Badge state={b.state} kind="purchase" />
+                      <Badge state={b.state} kind="purchase" href={`/einkauf/${b.id}`} />
                     </td>
                     <td className="mono small">{date(b.created_at)}</td>
                     <td className="mono small">{date(b.eta)}</td>
-                    <td className="mono small">{b.tracking_number ?? '—'}</td>
+                    <td className="mono small">
+                      {b.tracking_number && b.tracking_url?.startsWith('http') ? (
+                        <a href={b.tracking_url} target="_blank" rel="noreferrer">{b.tracking_number}</a>
+                      ) : (
+                        (b.tracking_number ?? '—')
+                      )}
+                    </td>
                     <td className="num">{money(b.gross, b.currency)}</td>
                   </tr>
                 ))}
@@ -246,6 +275,7 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
           </TableWrap>
         )}
       </Card>
+      </div>
 
       {rechnungen.length > 0 && (
         <Card title={`Offene Rechnungen (${rechnungen.length})`} tight>
@@ -266,7 +296,7 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
                       <Link href={`/einkauf/rechnungen/${r.id}`}>{r.number}</Link>
                     </td>
                     <td>
-                      <Badge state={r.state} kind="bill" />
+                      <Badge state={r.state} kind="bill" href={`/einkauf/rechnungen/${r.id}`} />
                     </td>
                     <td className="mono small">{r.vendor_bill_reference ?? '—'}</td>
                     <td className="mono small">{date(r.due_date)}</td>
@@ -296,7 +326,9 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
               <tbody>
                 {preise.map((v) => (
                   <tr key={v.id}>
-                    <td>{v.artikel}</td>
+                    <td>
+                      <Link href={`/produkte/${v.template_id}`}>{v.artikel}</Link>
+                    </td>
                     <td className="mono small">{v.vendor_product_code ?? '—'}</td>
                     <td className="num">{qty(v.min_qty)}</td>
                     <td className="num nowrap">

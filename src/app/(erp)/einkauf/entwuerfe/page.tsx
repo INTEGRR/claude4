@@ -37,17 +37,22 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
       gesendet_am: string | null
       lieferant: string | null
       partner_id: string | null
+      purchase_order_id: string | null
       bestellung: string | null
+      projekt_id: string | null
+      projekt: string | null
       thread_id: string | null
       fehler: string | null
     }[]
   >`
     select e.id, e.betreff, e.status::text as status, e.sprache, e.an, e.quelle, e.erstellt_von,
            e.created_at::text as created_at, e.gesendet_am::text as gesendet_am, p.name as lieferant, e.partner_id,
-           po.number as bestellung, e.thread_id, e.fehler
+           e.purchase_order_id, po.number as bestellung, e.einkaufsprojekt_id as projekt_id, ep.nummer as projekt,
+           e.thread_id, e.fehler
     from mail_entwuerfe e
     left join partners p on p.id = e.partner_id
     left join purchase_orders po on po.id = e.purchase_order_id
+    left join einkaufsprojekte ep on ep.id = e.einkaufsprojekt_id
     where e.status = any(${ansicht.filter as unknown as string[]}::mail_entwurf_status[])
     order by coalesce(e.gesendet_am, e.created_at) desc
     limit 200`
@@ -100,8 +105,24 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
                       <div className="muted small">
                         {r.quelle === 'agent' ? 'vom Agenten · ' : ''}
                         {r.erstellt_von ?? ''}
-                        {r.bestellung ? ` · ${r.bestellung}` : ''}
-                        {r.thread_id ? ' · Antwort' : ''}
+                        {r.purchase_order_id && (
+                          <>
+                            {' · '}
+                            <Link className="mono" href={`/einkauf/${r.purchase_order_id}`}>{r.bestellung}</Link>
+                          </>
+                        )}
+                        {r.projekt_id && (
+                          <>
+                            {' · '}
+                            <Link className="mono" href={`/einkauf/projekte/${r.projekt_id}`}>{r.projekt}</Link>
+                          </>
+                        )}
+                        {r.thread_id && (
+                          <>
+                            {' · '}
+                            <Link href={`/einkauf/posteingang/${r.thread_id}`}>Antwort</Link>
+                          </>
+                        )}
                       </div>
                       {r.fehler && <div className="small wv-ueberfaellig">{r.fehler}</div>}
                     </td>
@@ -110,7 +131,16 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
                     <td className="small">{SPRACHEN[r.sprache as keyof typeof SPRACHEN] ?? r.sprache}</td>
                     <td className="small nowrap">{dateTime(r.gesendet_am ?? r.created_at)}</td>
                     <td>
-                      <Badge state={r.status} kind="mail_entwurf" />
+                      {/* Gesendet → das Gespräch, sonst der Entwurf. */}
+                      <Badge
+                        state={r.status}
+                        kind="mail_entwurf"
+                        href={
+                          r.status === 'gesendet' && r.thread_id
+                            ? `/einkauf/posteingang/${r.thread_id}`
+                            : `/einkauf/entwuerfe/${r.id}`
+                        }
+                      />
                     </td>
                   </tr>
                 ))}

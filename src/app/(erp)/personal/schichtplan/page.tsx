@@ -150,9 +150,9 @@ export default async function SchichtplanPage({
                       return (
                         <td key={tag} className="small">
                           {frei ? (
-                            <span className="badge warn">
+                            <Link className="badge warn" href="/personal/abwesenheiten">
                               {frei.kind === 'sick' ? 'krank' : 'abwesend'}
-                            </span>
+                            </Link>
                           ) : zellen.length === 0 ? (
                             <span className="muted">—</span>
                           ) : (

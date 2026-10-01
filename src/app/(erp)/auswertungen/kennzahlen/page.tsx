@@ -475,7 +475,9 @@ export default async function KennzahlenPage() {
                 <tbody>
                   {rmaVariante.map((r) => (
                     <tr key={r.variant_id}>
-                      <td>{r.product}</td>
+                      <td>
+                        <Link href={`/produkte/variante/${r.variant_id}`}>{r.product}</Link>
+                      </td>
                       <td className="num mono">{r.rma_count}</td>
                       <td className="num mono muted">{r.repaired}</td>
                       <td className="num mono muted">{qty(r.qty_delivered)}</td>

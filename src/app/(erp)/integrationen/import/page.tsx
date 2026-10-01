@@ -112,8 +112,8 @@ export default async function ImportUebersicht({
 
   // Was davon existiert schon im ERP?
   const vorhandene = orders.length
-    ? await sql<{ shopify_order_id: string; id: string; number: string; state: string }[]>`
-        select shopify_order_id, id, number, state from sales_orders
+    ? await sql<{ shopify_order_id: string; id: string; number: string; state: string; partner_id: string | null }[]>`
+        select shopify_order_id, id, number, state, partner_id from sales_orders
         where shopify_order_id in ${sql(orders.map((o) => o.id))}`
     : []
   const imErp = new Map(vorhandene.map((v) => [v.shopify_order_id, v]))
@@ -218,7 +218,10 @@ export default async function ImportUebersicht({
                     <tr key={o.id}>
                       <td className="mono">{o.name}</td>
                       <td className="mono small nowrap">{dateTime(o.createdAt)}</td>
-                      <td>{kunde}</td>
+                      <td>
+                        {/* Schon im ERP → der Kontakt, unter dem der Auftrag hängt. */}
+                        {erp?.partner_id ? <Link href={`/kontakte/${erp.partner_id}`}>{kunde}</Link> : kunde}
+                      </td>
                       <td className="num">
                         {money(o.totalPriceSet.shopMoney.amount, o.totalPriceSet.shopMoney.currencyCode)}
                       </td>

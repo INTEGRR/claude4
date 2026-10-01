@@ -16,6 +16,7 @@ const ZIEL: Record<string, { art: string; pfad: (id: string) => string }> = {
   partner: { art: 'Lieferant', pfad: (id) => `/einkauf/lieferanten/${id}` },
   purchase_order: { art: 'Bestellung', pfad: (id) => `/einkauf/${id}` },
   vendor_bill: { art: 'Rechnung', pfad: (id) => `/einkauf/rechnungen/${id}` },
+  einkaufsprojekt: { art: 'Projekt', pfad: (id) => `/einkauf/projekte/${id}` },
 }
 
 /**
@@ -54,6 +55,8 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
                                            join partners p on p.id = po.vendor_id where po.id = w.record_id)
                when 'vendor_bill' then (select vb.number || ' · ' || p.name from vendor_bills vb
                                         join partners p on p.id = vb.vendor_id where vb.id = w.record_id)
+               when 'einkaufsprojekt' then (select ep.nummer || ' · ' || ep.titel from einkaufsprojekte ep
+                                            where ep.id = w.record_id)
              end as bezeichnung
       from wiedervorlagen w
       left join users u on u.id = w.zustaendig_id

@@ -61,7 +61,10 @@ export default async function PosteingangPage({
         anzahl: number
         lieferant: string | null
         partner_id: string | null
+        purchase_order_id: string | null
         bestellung: string | null
+        projekt_id: string | null
+        projekt: string | null
         zustaendig: string | null
         vorschau: string | null
         von: string | null
@@ -70,7 +73,8 @@ export default async function PosteingangPage({
     >`
       select t.id, t.betreff, t.status::text as status, t.kanal::text as kanal,
              t.letzte_richtung::text as letzte_richtung, t.letzte_am::text as letzte_am, t.anzahl,
-             p.name as lieferant, t.partner_id, po.number as bestellung, u.name as zustaendig,
+             p.name as lieferant, t.partner_id, t.purchase_order_id, po.number as bestellung,
+             t.einkaufsprojekt_id as projekt_id, ep.nummer as projekt, u.name as zustaendig,
              left(regexp_replace(coalesce(l.text, ''), '\\s+', ' ', 'g'), 160) as vorschau,
              coalesce(l.von_name, l.von) as von,
              (select count(*)::int from mail_anhaenge a join mail_nachrichten n on n.id = a.nachricht_id
@@ -78,6 +82,7 @@ export default async function PosteingangPage({
       from mail_threads t
       left join partners p on p.id = t.partner_id
       left join purchase_orders po on po.id = t.purchase_order_id
+      left join einkaufsprojekte ep on ep.id = t.einkaufsprojekt_id
       left join users u on u.id = t.zustaendig_id
       left join lateral (
         select n.text, n.von, n.von_name from mail_nachrichten n where n.thread_id = t.id
@@ -178,7 +183,13 @@ export default async function PosteingangPage({
                       ) : (
                         <span className="badge warn">nicht zugeordnet</span>
                       )}
-                      {t.bestellung && <div className="mono small">{t.bestellung}</div>}
+                      {(t.purchase_order_id || t.projekt_id) && (
+                        <div className="mono small">
+                          {t.purchase_order_id && <Link href={`/einkauf/${t.purchase_order_id}`}>{t.bestellung}</Link>}
+                          {t.purchase_order_id && t.projekt_id ? ' · ' : ''}
+                          {t.projekt_id && <Link href={`/einkauf/projekte/${t.projekt_id}`}>{t.projekt}</Link>}
+                        </div>
+                      )}
                     </td>
                     <td className="small">{t.zustaendig ?? '—'}</td>
                     <td className="small nowrap">
@@ -193,7 +204,7 @@ export default async function PosteingangPage({
                       </div>
                     </td>
                     <td>
-                      <Badge state={t.status} kind="mail_thread" />
+                      <Badge state={t.status} kind="mail_thread" href={`/einkauf/posteingang/${t.id}`} />
                     </td>
                   </tr>
                 ))}

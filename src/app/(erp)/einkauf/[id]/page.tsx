@@ -26,6 +26,7 @@ import {
   verschiffungErfassen,
   zahlplanRateEntfernen,
 } from '../../finanzen/actions'
+import { belegLink } from '../querverweise'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,11 +52,15 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       net: number
       tax: number
       gross: number
+      einkaufsprojekt_id: string | null
+      projekt_nummer: string | null
     }[]
   >`
-    select po.*, p.name as vendor, p.email as vendor_email, t.net, t.tax, t.gross
+    select po.*, p.name as vendor, p.email as vendor_email, t.net, t.tax, t.gross,
+           ep.nummer as projekt_nummer
     from purchase_orders po
     join partners p on p.id = po.vendor_id
+    left join einkaufsprojekte ep on ep.id = po.einkaufsprojekt_id
     cross join lateral purchase_order_total(po.id) t
     where po.id = ${id}`
 
@@ -163,7 +168,15 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         title={<span className="mono">{order.number}</span>}
         subtitle={
           <>
-            {order.vendor}
+            <Link href={`/einkauf/lieferanten/${order.vendor_id}`}>{order.vendor}</Link>
+            {order.einkaufsprojekt_id && (
+              <>
+                {' '}· Projekt{' '}
+                <Link className="mono" href={`/einkauf/projekte/${order.einkaufsprojekt_id}`}>
+                  {order.projekt_nummer}
+                </Link>
+              </>
+            )}
             {order.vendor_reference && (
               <> · Referenz <span className="mono">{order.vendor_reference}</span></>
             )}
@@ -176,7 +189,31 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         }
         actions={
           <>
-            <Badge state={order.state} kind="purchase" />
+            {/* Bestellt → Wareneingang dahinter; abgerechnet → Rechnung dahinter. */}
+            <Badge
+              state={order.state}
+              kind="purchase"
+              href={belegLink(
+                receipts.filter((r) => r.state !== 'cancel').map((r) => r.id),
+                (x) => `/lager/${x}`,
+                '#wareneingaenge',
+              )}
+              title="Wareneingang öffnen"
+            />
+            {(rechnungAktiv || bills.length > 0) && order.billing_status !== 'nothing' && (
+              <Badge
+                state={order.billing_status}
+                kind="billing"
+                href={
+                  belegLink(
+                    bills.filter((b) => b.state !== 'cancel').map((b) => b.id),
+                    (x) => `/einkauf/rechnungen/${x}`,
+                    '#rechnungen',
+                  ) ?? '#rechnungen'
+                }
+                title="Rechnung öffnen"
+              />
+            )}
             {editable && (
               <ActionButton action={sendPoEmail.bind(null, id)} title={order.vendor_email ?? undefined}>
                 Per E-Mail senden
@@ -457,6 +494,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           Der harte Zahlungspfad läuft über das Register (0058) — hier wird
           geplant und abgehakt. */}
       {darfFinanzen && (
+        <div id="zahlplan">
         <Card title="Zahlplan">
           {zahlplanWarnung.w && (
             <div className="notice warn" style={{ marginBottom: 10 }}>{zahlplanWarnung.w}</div>
@@ -559,9 +597,11 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </ActionForm>
           </div>
         </Card>
+        </div>
       )}
 
       <div className="grid-2">
+        <div id="wareneingaenge">
         <Card title={`Wareneingänge (${receipts.length})`} tight>
           {receipts.length === 0 ? (
             <Empty>Entsteht beim Bestätigen der Bestellung.</Empty>
@@ -572,7 +612,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   {receipts.map((r) => (
                     <tr key={r.id}>
                       <td className="mono"><Link href={`/lager/${r.id}`}>{r.number}</Link></td>
-                      <td><Badge state={r.state} kind="picking" /></td>
+                      <td><Badge state={r.state} kind="picking" href={`/lager/${r.id}`} /></td>
                       <td className="mono nowrap">{date(r.date_done)}</td>
                     </tr>
                   ))}
@@ -581,8 +621,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </TableWrap>
           )}
         </Card>
+        </div>
 
         {(rechnungAktiv || bills.length > 0) && (
+        <div id="rechnungen">
         <Card title={`Rechnungen (${bills.length})`} tight>
           {bills.length === 0 ? (
             <Empty>Noch keine Rechnung.</Empty>
@@ -595,7 +637,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                       <td className="mono">
                         <Link href={`/einkauf/rechnungen/${b.id}`}>{b.number}</Link>
                       </td>
-                      <td><Badge state={b.state} kind="bill" /></td>
+                      <td><Badge state={b.state} kind="bill" href={`/einkauf/rechnungen/${b.id}`} /></td>
                       <td className="mono nowrap">{date(b.bill_date)}</td>
                     </tr>
                   ))}
@@ -604,6 +646,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </TableWrap>
           )}
         </Card>
+        </div>
         )}
       </div>
 

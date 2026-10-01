@@ -5,6 +5,7 @@ import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
 import { createPurchaseOrder } from './actions'
+import { belegLink } from './querverweise'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,20 +22,35 @@ export default async function EinkaufPage({
       id: string
       number: string
       state: string
+      vendor_id: string
       vendor: string
       order_deadline: string | null
       expected_arrival: string | null
       billing_status: string
       gross: number
       late: boolean
+      projekt_id: string | null
+      projekt_nummer: string | null
+      receipt_ids: string[]
+      bill_ids: string[]
     }[]
   >`
-    select po.id, po.number, po.state, p.name as vendor, po.order_deadline, po.expected_arrival,
+    select po.id, po.number, po.state, po.vendor_id, p.name as vendor, po.order_deadline, po.expected_arrival,
            po.billing_status, t.gross,
            (po.order_deadline is not null and po.order_deadline < now()
-            and po.state in ('draft','sent')) as late
+            and po.state in ('draft','sent')) as late,
+           po.einkaufsprojekt_id as projekt_id, ep.nummer as projekt_nummer,
+           -- Querverweise (Belege hinter den Schildern): Wareneingänge und Rechnungen.
+           array(select sp.id from stock_pickings sp
+                 where sp.origin_model = 'purchase_order' and sp.origin_id = po.id
+                   and sp.state <> 'cancel'
+                 order by sp.created_at) as receipt_ids,
+           array(select vb.id from vendor_bills vb
+                 where vb.purchase_order_id = po.id and vb.state <> 'cancel'
+                 order by vb.created_at) as bill_ids
     from purchase_orders po
     join partners p on p.id = po.vendor_id
+    left join einkaufsprojekte ep on ep.id = po.einkaufsprojekt_id
     cross join lateral purchase_order_total(po.id) t
     order by po.created_at desc
     limit 200`
@@ -156,10 +172,34 @@ export default async function EinkaufPage({
                           </>
                         )}
                       </span>
+                      {r.projekt_id && (
+                        <div className="small">
+                          <Link className="muted" href={`/einkauf/projekte/${r.projekt_id}`}>{r.projekt_nummer}</Link>
+                        </div>
+                      )}
                     </td>
-                    <td>{r.vendor}</td>
-                    <td><Badge state={r.state} kind="purchase" /></td>
-                    {rechnungAktiv && <td><Badge state={r.billing_status} kind="billing" /></td>}
+                    <td>
+                      <Link href={`/einkauf/lieferanten/${r.vendor_id}`}>{r.vendor}</Link>
+                    </td>
+                    <td>
+                      {/* Bestellt → der Wareneingang dahinter (einer direkt, mehrere an der Bestellung). */}
+                      <Badge
+                        state={r.state}
+                        kind="purchase"
+                        href={belegLink(r.receipt_ids, (x) => `/lager/${x}`, `/einkauf/${r.id}#wareneingaenge`) ?? `/einkauf/${r.id}`}
+                        title={r.receipt_ids.length > 0 ? 'Wareneingang öffnen' : 'Bestellung öffnen'}
+                      />
+                    </td>
+                    {rechnungAktiv && (
+                      <td>
+                        <Badge
+                          state={r.billing_status}
+                          kind="billing"
+                          href={belegLink(r.bill_ids, (x) => `/einkauf/rechnungen/${x}`, `/einkauf/${r.id}#rechnungen`) ?? `/einkauf/${r.id}#rechnungen`}
+                          title={r.bill_ids.length > 0 ? 'Rechnung öffnen' : 'Rechnungen der Bestellung'}
+                        />
+                      </td>
+                    )}
                     <td className="mono nowrap">{date(r.expected_arrival)}</td>
                     <td className="num nowrap">{money(r.gross)}</td>
                   </tr>

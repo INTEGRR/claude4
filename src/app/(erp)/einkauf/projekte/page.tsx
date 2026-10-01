@@ -41,7 +41,8 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
         positionen: number
         anfragen: number
         angebote: number
-        bestellungen: string | null
+        bestellungen: { id: string; number: string }[] | null
+        lieferant_id: string | null
         lieferant: string | null
       }[]
     >`
@@ -50,12 +51,14 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
              (select count(*)::int from einkaufsprojekt_positionen p where p.projekt_id = ep.id) as positionen,
              (select count(*)::int from lieferantenanfragen a where a.projekt_id = ep.id and a.status <> 'abgesagt') as anfragen,
              (select count(*)::int from lieferantenangebote a where a.projekt_id = ep.id and not a.verworfen) as angebote,
-             (select string_agg(po.number, ', ' order by po.number) from purchase_orders po
+             (select json_agg(json_build_object('id', po.id, 'number', po.number) order by po.number)
+                from purchase_orders po
                where po.einkaufsprojekt_id = ep.id and po.state <> 'cancel') as bestellungen,
-             (select pa.name from lieferantenangebote la join partners pa on pa.id = la.partner_id
-               where la.id = ep.gewaehltes_angebot_id) as lieferant
+             la.partner_id as lieferant_id, pa.name as lieferant
       from einkaufsprojekte ep
       left join users u on u.id = ep.verantwortlich_id
+      left join lieferantenangebote la on la.id = ep.gewaehltes_angebot_id
+      left join partners pa on pa.id = la.partner_id
       where ep.status = any(${ansicht.filter as unknown as string[]}::einkaufsprojekt_status[])
       order by ep.created_at desc
       limit 200`,
@@ -104,20 +107,29 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
                       </Link>
                       {(r.lieferant || r.bestellungen) && (
                         <div className="muted small">
-                          {r.lieferant ?? ''}
-                          {r.bestellungen ? `${r.lieferant ? ' · ' : ''}${r.bestellungen}` : ''}
+                          {r.lieferant_id && (
+                            <Link href={`/einkauf/lieferanten/${r.lieferant_id}`}>{r.lieferant}</Link>
+                          )}
+                          {r.bestellungen?.map((b, i) => (
+                            <span key={b.id}>
+                              {i === 0 ? (r.lieferant_id ? ' · ' : '') : ', '}
+                              <Link className="mono" href={`/einkauf/${b.id}`}>{b.number}</Link>
+                            </span>
+                          ))}
                         </div>
                       )}
                     </td>
                     <td className="small">{PROJEKT_ARTEN[r.art] ?? r.art}</td>
                     <td className="num mono">{r.positionen}</td>
                     <td className="small nowrap">
-                      {r.anfragen} / {r.angebote}
+                      <Link href={`/einkauf/projekte/${r.id}#anfragen`}>
+                        {r.anfragen} / {r.angebote}
+                      </Link>
                     </td>
                     <td className="small nowrap">{r.zieltermin ? date(r.zieltermin) : '—'}</td>
                     <td className="small">{r.verantwortlich ?? '—'}</td>
                     <td>
-                      <Badge state={r.status} kind="einkaufsprojekt" />
+                      <Badge state={r.status} kind="einkaufsprojekt" href={`/einkauf/projekte/${r.id}`} />
                     </td>
                   </tr>
                 ))}

@@ -11,11 +11,11 @@ export default async function DarlehenSeite() {
   await requireArea('finanzen')
 
   const darlehen = await sql<
-    { id: string; nummer: string; name: string; partner: string | null; betrag: number;
+    { id: string; nummer: string; name: string; partner_id: string | null; partner: string | null; betrag: number;
       zinssatz_pct: number; art: string; status: string; auszahlung_am: string;
       restschuld: number; naechste_rate: string | null; rate_summe: number | null }[]
   >`
-    select d.id, d.nummer, d.name, p.name as partner, d.betrag, d.zinssatz_pct,
+    select d.id, d.nummer, d.name, d.partner_id, p.name as partner, d.betrag, d.zinssatz_pct,
            d.art, d.status, d.auszahlung_am,
            coalesce((select min(r.restschuld) from darlehen_raten r
                      where r.darlehen_id = d.id and r.bezahlt_am is not null), d.betrag) as restschuld,
@@ -84,15 +84,21 @@ export default async function DarlehenSeite() {
                         <span className="mono">{d.nummer}</span> {d.name}
                       </Link>
                     </td>
-                    <td className="muted">{d.partner ?? '—'}</td>
+                    <td className="muted">
+                      {d.partner_id ? <Link href={`/kontakte/${d.partner_id}`}>{d.partner}</Link> : '—'}
+                    </td>
                     <td className="mono" style={{ textAlign: 'right' }}>{money(d.betrag)}</td>
                     <td className="mono" style={{ textAlign: 'right' }}>{money(d.restschuld)}</td>
                     <td className="mono muted">{Number(d.zinssatz_pct).toFixed(2)} %</td>
                     <td className="muted">{ART[d.art] ?? d.art}</td>
                     <td className="mono muted">
-                      {d.naechste_rate
-                        ? `${date(d.naechste_rate)} (${money(d.rate_summe ?? 0)})`
-                        : '—'}
+                      {d.naechste_rate ? (
+                        <Link href={`/finanzen/darlehen/${d.id}`}>
+                          {date(d.naechste_rate)} ({money(d.rate_summe ?? 0)})
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td>
                       <span className={`led ${d.status === 'laufend' ? 'on' : d.status === 'getilgt' ? 'ok' : 'off'}`} />{' '}

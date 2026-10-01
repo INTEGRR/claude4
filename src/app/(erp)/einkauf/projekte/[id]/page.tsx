@@ -19,6 +19,7 @@ import {
   bestesAngebot,
 } from '@/modules/einkauf/einkaufsprojekt'
 import { SPRACHEN } from '@/modules/einkauf/mail-vorlagen'
+import { driveLink } from '@/modules/google/drive'
 import { date, dateTime, money } from '@/modules/shared/format'
 import {
   anfragenFreigeben,
@@ -34,6 +35,7 @@ import {
   projektBestellen,
   projektEntscheiden,
 } from '../actions'
+import { belegLink } from '../../querverweise'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +82,7 @@ interface Angebot {
   notiz: string | null
   verworfen: boolean
   quelle_name: string | null
+  quelle_drive_id: string | null
   created_at: string
 }
 
@@ -168,15 +171,31 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
         select a.id, a.partner_id, pa.name as lieferant, a.version, a.waehrung, a.incoterm_code, a.incoterm_ort,
                a.zahlungsbedingung, a.anzahlung_pct::text, a.lieferzeit_tage, a.moq::text, a.werkzeugkosten::text,
                a.musterkosten::text, a.fracht_modus, a.fracht_je_stueck_eur::text, a.gueltig_bis::text as gueltig_bis,
-               a.notiz, a.verworfen, d.name as quelle_name, a.created_at::text as created_at
+               a.notiz, a.verworfen, d.name as quelle_name, d.drive_file_id as quelle_drive_id,
+               a.created_at::text as created_at
         from lieferantenangebote a join partners pa on pa.id = a.partner_id
         left join dokumente d on d.id = a.quell_dokument_id
         where a.projekt_id = ${id} order by a.verworfen, a.created_at`,
-      sql<{ id: string; number: string; state: string; lieferant: string; bestellt: number; eingegangen: number; eta: string | null }[]>`
-        select po.id, po.number, po.state::text as state, pa.name as lieferant,
+      sql<
+        {
+          id: string
+          number: string
+          state: string
+          vendor_id: string
+          lieferant: string
+          bestellt: number
+          eingegangen: number
+          eta: string | null
+          receipt_ids: string[]
+        }[]
+      >`
+        select po.id, po.number, po.state::text as state, po.vendor_id, pa.name as lieferant,
                coalesce(sum(l.qty) filter (where pt.type = 'goods'), 0)::float as bestellt,
                coalesce(sum(least(l.qty_received, l.qty)) filter (where pt.type = 'goods'), 0)::float as eingegangen,
-               coalesce(po.eta_confirmed::timestamptz, po.expected_arrival)::text as eta
+               coalesce(po.eta_confirmed::timestamptz, po.expected_arrival)::text as eta,
+               array(select sp.id from stock_pickings sp
+                     where sp.origin_model = 'purchase_order' and sp.origin_id = po.id and sp.state <> 'cancel'
+                     order by sp.created_at) as receipt_ids
         from purchase_orders po join partners pa on pa.id = po.vendor_id
         left join purchase_order_lines l on l.order_id = po.id
         left join product_variants pv on pv.id = l.variant_id
@@ -216,8 +235,8 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
   const bestes = bestesAngebot(angebote.map((a) => ({ id: a.id, verworfen: a.verworfen, summe: summen.get(a.id)! })))
   const variantIds = positionen.map((x) => x.variant_id).filter((v): v is string => Boolean(v))
   const historie = variantIds.length
-    ? await sql<{ datum: string; bestellung: string; po_id: string; lieferant: string; artikel: string; qty: number; price_unit: number; currency: string }[]>`
-        select po.created_at::text as datum, po.number as bestellung, po.id as po_id, pa.name as lieferant,
+    ? await sql<{ datum: string; bestellung: string; po_id: string; vendor_id: string; lieferant: string; artikel: string; qty: number; price_unit: number; currency: string }[]>`
+        select po.created_at::text as datum, po.number as bestellung, po.id as po_id, po.vendor_id, pa.name as lieferant,
                variant_display_name(l.variant_id) as artikel, l.qty::float as qty, l.price_unit::float as price_unit, po.currency
         from purchase_order_lines l join purchase_orders po on po.id = l.order_id join partners pa on pa.id = po.vendor_id
         where l.variant_id = any(${variantIds}::uuid[]) and po.state in ('purchase', 'done')
@@ -244,7 +263,12 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
           <>
             <Badge state={p.status} kind="einkaufsprojekt" />{' '}
             {p.verantwortlich ?? 'ohne Verantwortlichen'} · Zieltermin {p.zieltermin ? date(p.zieltermin) : 'offen'}
-            {gewaehlt ? ` · gewählt: ${gewaehlt.lieferant}` : ''}
+            {gewaehlt && (
+              <>
+                {' · gewählt: '}
+                <Link href={`/einkauf/lieferanten/${gewaehlt.partner_id}`}>{gewaehlt.lieferant}</Link>
+              </>
+            )}
           </>
         }
         actions={
@@ -382,6 +406,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
       </Card>
 
       {/* Anfragen */}
+      <div id="anfragen">
       <Card
         title={`Anfragen (${anfragen.length})`}
         tight
@@ -433,7 +458,18 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                       {a.angefragt_am && <div className="muted">{dateTime(a.angefragt_am)}</div>}
                     </td>
                     <td>
-                      <Badge state={a.status} kind="lieferantenanfrage" />
+                      {/* Status → das Gespräch (oder der Entwurf) dahinter. */}
+                      <Badge
+                        state={a.status}
+                        kind="lieferantenanfrage"
+                        href={
+                          a.thread_id
+                            ? `/einkauf/posteingang/${a.thread_id}`
+                            : a.entwurf_id
+                              ? `/einkauf/entwuerfe/${a.entwurf_id}`
+                              : undefined
+                        }
+                      />
                     </td>
                   </tr>
                 ))}
@@ -486,6 +522,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
           </details>
         )}
       </Card>
+      </div>
 
       {/* Angebotsvergleich */}
       <Card title={`Angebotsvergleich (${sichtbar.length})`} tight>
@@ -597,7 +634,18 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                             : `Fracht ${FRACHT_MODI[a.fracht_modus ?? 'see']}`}
                         {a.gueltig_bis ? ` · gültig bis ${date(a.gueltig_bis)}` : ''}
                       </div>
-                      {a.quelle_name && <div className="muted">Quelle: {a.quelle_name}</div>}
+                      {a.quelle_name && (
+                        <div className="muted">
+                          Quelle:{' '}
+                          {a.quelle_drive_id ? (
+                            <a href={driveLink(a.quelle_drive_id)} target="_blank" rel="noopener">
+                              {a.quelle_name}
+                            </a>
+                          ) : (
+                            a.quelle_name
+                          )}
+                        </div>
+                      )}
                       {a.notiz && <div className="muted" style={{ whiteSpace: 'pre-wrap' }}>{a.notiz}</div>}
                     </td>
                   ))}
@@ -635,7 +683,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
             {verworfen.map((a, i) => (
               <span key={a.id}>
                 {i > 0 ? ', ' : ''}
-                {a.lieferant}
+                <Link href={`/einkauf/lieferanten/${a.partner_id}`}>{a.lieferant}</Link>
                 {a.version > 1 ? ` v${a.version}` : ''}
                 {darf && offen && (
                   <>
@@ -819,7 +867,9 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
           }
         >
           <p className="small" style={{ margin: 0 }}>
-            <strong>{gewaehlt.lieferant}</strong>
+            <strong>
+              <Link href={`/einkauf/lieferanten/${gewaehlt.partner_id}`}>{gewaehlt.lieferant}</Link>
+            </strong>
             {summen.get(gewaehlt.id)?.gesamt != null ? ` · Einstand ${money(summen.get(gewaehlt.id)!.gesamt!)}` : ''}
             {p.entschieden_von ? ` · ${p.entschieden_von}, ${p.entschieden_am ? dateTime(p.entschieden_am) : ''}` : ''}
           </p>
@@ -861,13 +911,27 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                           {b.number}
                         </Link>
                       </td>
-                      <td className="small">{b.lieferant}</td>
+                      <td className="small">
+                        <Link href={`/einkauf/lieferanten/${b.vendor_id}`}>{b.lieferant}</Link>
+                      </td>
                       <td className="small nowrap">{b.eta ? date(b.eta) : '—'}</td>
                       <td className="num mono small">
-                        {b.bestellt > 0 ? `${stk(b.eingegangen, 0)} / ${stk(b.bestellt, 0)}` : 'Dienstleistung'}
+                        {b.bestellt > 0 ? (
+                          // Eingangsstand → der Wareneingang dahinter.
+                          <Link
+                            href={
+                              belegLink(b.receipt_ids, (x) => `/lager/${x}`, `/einkauf/${b.id}#wareneingaenge`) ??
+                              `/einkauf/${b.id}`
+                            }
+                          >
+                            {stk(b.eingegangen, 0)} / {stk(b.bestellt, 0)}
+                          </Link>
+                        ) : (
+                          'Dienstleistung'
+                        )}
                       </td>
                       <td>
-                        <Badge state={b.state} kind="purchase" />
+                        <Badge state={b.state} kind="purchase" href={`/einkauf/${b.id}`} />
                       </td>
                     </tr>
                   ))}
@@ -923,7 +987,9 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                         {hz.bestellung}
                       </Link>
                     </td>
-                    <td className="small">{hz.lieferant}</td>
+                    <td className="small">
+                      <Link href={`/einkauf/lieferanten/${hz.vendor_id}`}>{hz.lieferant}</Link>
+                    </td>
                     <td className="small">{hz.artikel}</td>
                     <td className="num mono small">{stk(hz.qty, 0)}</td>
                     <td className="num mono small">

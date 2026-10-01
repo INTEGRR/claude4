@@ -68,7 +68,7 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
       {betroffen && m.prozess_code && (
         <Card title="Betroffener Prozess">
           <p style={{ marginTop: 0 }}>
-            <span className="mono">{m.prozess_code}</span> — {betroffen.name}
+            <Link className="mono" href={`/prozesse/${m.prozess_code}`}>{m.prozess_code}</Link> — {betroffen.name}
             {m.schritt_code && (
               <>
                 {' '}· Schritt <span className="mono">{m.schritt_code}</span>
@@ -116,7 +116,12 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
       <Card title="Meldung">
         {m.seite && (
           <p style={{ marginTop: 0 }}>
-            Seite: <Link className="mono" href={m.seite}>{m.seite}</Link>
+            Seite:{' '}
+            {m.seite.startsWith('/') && !m.seite.startsWith('//') ? (
+              <Link className="mono" href={m.seite}>{m.seite}</Link>
+            ) : (
+              <span className="mono">{m.seite}</span>
+            )}
           </p>
         )}
         <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>

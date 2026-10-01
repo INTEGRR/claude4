@@ -47,6 +47,7 @@ export default async function RepairPage({
       number: string
       customer: string
       partner_id: string
+      variant_id: string
       product: string
       qty: number
       under_warranty: boolean
@@ -62,16 +63,23 @@ export default async function RepairPage({
       origin_label: string | null
       received_at: string | null
       customer_email: string | null
+      return_picking_id: string | null
+      return_picking_number: string | null
+      lot_id: string | null
+      lot_name: string | null
     }[]
   >`
-    select r.id, r.number, p.name as customer, r.partner_id,
+    select r.id, r.number, p.name as customer, r.partner_id, r.variant_id,
            variant_display_name(r.variant_id) as product, r.qty, r.under_warranty, r.state,
            r.scheduled_date, r.note, r.sales_order_id, so.number as sales_order_number,
            r.user_id, r.priority,
-           r.origin_model, r.origin_id, r.origin_label, r.received_at, p.email as customer_email
+           r.origin_model, r.origin_id, r.origin_label, r.received_at, p.email as customer_email,
+           r.return_picking_id, rp.number as return_picking_number, r.lot_id, sl.name as lot_name
     from repair_orders r
     join partners p on p.id = r.partner_id
     left join sales_orders so on so.id = r.sales_order_id
+    left join stock_pickings rp on rp.id = r.return_picking_id
+    left join stock_lots sl on sl.id = r.lot_id
     where r.id = ${id}`
 
   if (!repair) notFound()
@@ -105,6 +113,7 @@ export default async function RepairPage({
     {
       id: string
       part_type: 'add' | 'remove' | 'recycle'
+      variant_id: string
       product: string
       qty: number
       qty_done: number
@@ -113,7 +122,7 @@ export default async function RepairPage({
       move_state: string | null
     }[]
   >`
-    select rp.id, rp.part_type, variant_display_name(rp.variant_id) as product,
+    select rp.id, rp.part_type, rp.variant_id, variant_display_name(rp.variant_id) as product,
            rp.qty, rp.qty_done, u.name as uom,
            free_to_use(rp.variant_id) as available, m.state as move_state
     from repair_parts rp
@@ -141,8 +150,15 @@ export default async function RepairPage({
         title={<span className="mono">{repair.number}</span>}
         subtitle={
           <>
-            {repair.customer} · {repair.product} ({qty(repair.qty)}) ·{' '}
-            <span className="mono">{date(repair.scheduled_date)}</span>
+            <Link href={`/kontakte/${repair.partner_id}`}>{repair.customer}</Link> ·{' '}
+            <Link href={`/produkte/variante/${repair.variant_id}`}>{repair.product}</Link> ({qty(repair.qty)})
+            {repair.lot_id && (
+              <>
+                {' '}· SN/Los{' '}
+                <Link className="mono" href={`/lager/lose/${repair.lot_id}`}>{repair.lot_name}</Link>
+              </>
+            )}{' '}
+            · <span className="mono">{date(repair.scheduled_date)}</span>
             {repair.origin_model === 'vorgang' && repair.origin_id && (
               <>
                 {' '}· aus Anfrage{' '}
@@ -158,6 +174,12 @@ export default async function RepairPage({
               <>
                 {' '}· Angebot{' '}
                 <Link className="mono" href={`/verkauf/${repair.sales_order_id}`}>{repair.sales_order_number}</Link>
+              </>
+            )}
+            {repair.return_picking_id && (
+              <>
+                {' '}· Rückgabe{' '}
+                <Link className="mono" href={`/lager/${repair.return_picking_id}`}>{repair.return_picking_number}</Link>
               </>
             )}
           </>
@@ -215,7 +237,9 @@ export default async function RepairPage({
               <div style={{ marginTop: 4 }}>
                 {retoure ? (
                   <>
-                    <span className="mono">{retoure.shipment_number}</span>
+                    <Link className="mono" href="/versand/retouren" title="Alle Retourenlabels">
+                      {retoure.shipment_number ?? 'Retourenlabel'}
+                    </Link>
                     <div className="small muted">
                       {retoure.emailed_at
                         ? `gemailt ${dateTime(retoure.emailed_at)}`
@@ -313,7 +337,9 @@ export default async function RepairPage({
                         <td>
                           <span className="badge neutral">{PART_TYPES[p.part_type].label}</span>
                         </td>
-                        <td>{p.product}</td>
+                        <td>
+                          <Link href={`/produkte/variante/${p.variant_id}`}>{p.product}</Link>
+                        </td>
                         <td className="num">{qty(p.qty)}</td>
                         {/* Deckt der Bestand den geplanten Bedarf? Das war bisher nicht ablesbar. */}
                         <td className="num">
@@ -365,7 +391,9 @@ export default async function RepairPage({
                     <td>
                       <span className="badge neutral">{PART_TYPES[p.part_type].label}</span>
                     </td>
-                    <td>{p.product}</td>
+                    <td>
+                      <Link href={`/produkte/variante/${p.variant_id}`}>{p.product}</Link>
+                    </td>
                     <td className="num">{qty(p.qty)}</td>
                     <td className="num">{p.move_state === 'done' ? qty(p.qty_done) : '—'}</td>
                     <td>{p.uom}</td>

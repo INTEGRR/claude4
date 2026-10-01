@@ -82,8 +82,12 @@ export default async function LieferantenPage({ searchParams }: { searchParams: 
                     <td className="mono">{r.country_code ?? '—'}</td>
                     <td>{r.sprache ? SPRACHEN[r.sprache] : '—'}</td>
                     <td>{r.einkaeufer ?? '—'}</td>
-                    <td className="num">{r.offen}</td>
-                    <td className="num">{r.dateien}</td>
+                    <td className="num">
+                      {r.offen > 0 ? <Link href={`/einkauf/lieferanten/${r.id}#bestellungen`}>{r.offen}</Link> : r.offen}
+                    </td>
+                    <td className="num">
+                      {r.dateien > 0 ? <Link href={`/einkauf/lieferanten/${r.id}#dateien`}>{r.dateien}</Link> : r.dateien}
+                    </td>
                   </tr>
                 ))}
               </tbody>

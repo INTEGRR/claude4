@@ -23,21 +23,30 @@ export default async function ReparaturPage({
     {
       id: string
       number: string
+      partner_id: string
       customer: string
+      variant_id: string
       product: string
       state: string
       under_warranty: boolean
+      sales_order_id: string | null
+      sales_order_number: string | null
       scheduled_date: string
       received_at: string | null
+      origin_model: string | null
+      origin_id: string | null
       origin_label: string | null
       parts: number
     }[]
   >`
-    select r.id, r.number, p.name as customer, variant_display_name(r.variant_id) as product,
-           r.state, r.under_warranty, r.scheduled_date, r.received_at, r.origin_label,
+    select r.id, r.number, r.partner_id, p.name as customer, r.variant_id,
+           variant_display_name(r.variant_id) as product,
+           r.state, r.under_warranty, r.sales_order_id, so.number as sales_order_number,
+           r.scheduled_date, r.received_at, r.origin_model, r.origin_id, r.origin_label,
            (select count(*) from repair_parts rp where rp.repair_id = r.id)::int as parts
     from repair_orders r
     join partners p on p.id = r.partner_id
+    left join sales_orders so on so.id = r.sales_order_id
     where ${filter ? sql`r.state = ${filter}::repair_state` : sql`true`}
     order by
       case r.state
@@ -142,15 +151,38 @@ export default async function ReparaturPage({
                   <tr key={r.id}>
                     <td className="mono">
                       <Link href={`/reparatur/${r.id}`}>{r.number}</Link>
-                      {r.origin_label && <span className="muted small"> · {r.origin_label}</span>}
+                      {r.origin_label && (
+                        <span className="muted small">
+                          {' · '}
+                          {r.origin_model === 'vorgang' && r.origin_id ? (
+                            // Herkunft: die Reparaturanfrage (Vorgang), aus der der Auftrag entstand.
+                            <Link className="muted" href={`/vorgaenge/${r.origin_id}`}>{r.origin_label}</Link>
+                          ) : (
+                            r.origin_label
+                          )}
+                        </span>
+                      )}
                     </td>
-                    <td>{r.customer}</td>
-                    <td>{r.product}</td>
+                    <td>
+                      <Link href={`/kontakte/${r.partner_id}`}>{r.customer}</Link>
+                    </td>
+                    <td>
+                      <Link href={`/produkte/variante/${r.variant_id}`}>{r.product}</Link>
+                    </td>
                     <td className="num">{r.parts}</td>
-                    <td><Badge state={r.state} kind="repair" /></td>
+                    <td><Badge state={r.state} kind="repair" href={`/reparatur/${r.id}`} /></td>
                     <td>
                       {r.under_warranty ? (
                         <span className="badge success">Garantie</span>
+                      ) : r.sales_order_id ? (
+                        // Kostenpflichtig mit Angebot → das Angebot dahinter.
+                        <Link
+                          className="badge neutral"
+                          href={`/verkauf/${r.sales_order_id}`}
+                          title={`Angebot ${r.sales_order_number ?? ''}`}
+                        >
+                          kostenpflichtig · {r.sales_order_number}
+                        </Link>
                       ) : (
                         <span className="badge neutral">kostenpflichtig</span>
                       )}
