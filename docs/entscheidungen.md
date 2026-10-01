@@ -9,6 +9,37 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Shop-Verfügbarkeit: Regeln je Teil, Artikel, Variante und Option
+
+**Anlass:** Die baubare Menge allein bildet nicht ab, wie ANVIL den Shop
+steuert. Betreiber: mit Schwellen arbeiten (Blue Cases unter 2 → alles
+weg), Teile zurückhalten (Yellow Cases), Artikel aus dem Verkauf nehmen
+(Black Week Editions), Switch-Tester immer verfügbar (3D-Druck schnell
+nachgebaut) — und eine Ansicht wie die Produktseite im Shop, in der man je
+Option sieht, was gemeldet wird.
+
+**Entschieden:**
+- Regeln als Daten an Teil (`shop_oos_unter`, `shop_zurueckhalten`),
+  Artikel/Variante (`shop_modus` auto|immer|aus, Variante vor Artikel) und
+  Optionswert (`shop_option_sperren`); alle Änderungen über
+  Registry-Aktionen `verkauf.shop_*`, jede stößt sofort einen Abgleich an.
+- **Nur für den Shop**: `baubar()` bekommt einen Shop-Schalter; ohne ihn
+  bleibt es die Fertigungssicht mit echtem Bestand. Die alte Signatur wird
+  ersetzt (DESTRUKTIV-Zeile in 0101 — sonst wäre `baubar(x)` mehrdeutig).
+- Schwelle bedeutet „unter N ausverkauft": es zählt nur, was über N − 1
+  liegt — so kann Shopify nie das letzte zurückgehaltene Stück verkaufen.
+- **Projekt** an der Vorlage statt Ableitung aus Namen: welche
+  Shopify-Produkte im Shop als Farb-Pills zusammengehören, entscheidet der
+  Betreiber.
+- **Shop-Stand lesen** (nur Queries) in KRNL selbst, von Hand und
+  viertelstündlich: Ist neben Soll, bevor scharfgeschaltet wird.
+
+Umgesetzt in Migration 0101, `src/modules/integrationen/shop-verfuegbarkeit.ts`,
+`inventar.ts` (`shopStandHolen`), Registry `verkauf-shop.ts`, Seite
+`/verkauf/shop-verfuegbarkeit`; dokumentiert in
+[module/integrationen.md](module/integrationen.md); Tests
+`tests/fertigung.test.ts`, `tests/prozesse/shop-verfuegbarkeit.test.ts`.
+
 ## 2026-10-01 — Made-to-Order: baubare Menge an Shopify, Abgleich in Sekunden
 
 **Anlass:** Tastaturen werden auf Auftrag gefertigt — in KRNL immer

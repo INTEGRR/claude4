@@ -1868,3 +1868,26 @@ html[data-splash-gesehen] .splash { display: none; }
   .druck-paket { flex-direction: column; align-items: stretch; }
   .druck-paket .btn { text-align: center; }
 }
+
+/* Shop-Verfügbarkeit (0101): Farb-Pills und Options-Chips wie im Shop. */
+.shop-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+.shop-pill {
+  display: inline-flex; flex-direction: column; gap: 2px;
+  padding: 8px 16px; border: 2px solid var(--border); border-radius: 999px;
+  color: var(--text); text-decoration: none; min-width: 120px;
+}
+.shop-pill .klein { font-size: 11px; color: var(--text-muted); }
+.shop-pill.aktiv { border-color: var(--success); }
+.shop-pill.leer { border-color: var(--danger); }
+.shop-pill.gesperrt { border-style: dashed; opacity: 0.7; }
+.shop-pill[aria-current='page'] { box-shadow: 0 0 0 3px var(--accent-soft); border-width: 3px; }
+.shop-option { margin: 16px 0 6px; }
+.shop-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 6px; }
+.shop-chip { border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+.shop-chip .wert { display: inline-block; font-weight: 600; padding: 4px 14px; border: 1px solid var(--border-strong); border-radius: 999px; }
+.shop-chip .status { margin-top: 6px; }
+.shop-chip .teil, .shop-option .teil { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.shop-chip.aktiv { border-color: var(--success); }
+.shop-chip.aktiv .wert { border-color: var(--success); }
+.shop-chip.leer { border-color: var(--danger); }
+.shop-chip.gesperrt { border-style: dashed; opacity: 0.75; }

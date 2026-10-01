@@ -160,6 +160,44 @@ trotzdem. Früher hatte Shopify für sie gar keinen Bestandsabgleich.
   und je Variante baubar / Engpass / an Shopify / zuletzt gemeldet — auch im
   Modus „nur lesen", vor dem Scharfschalten.
 
+### Shop-Verfügbarkeit: Regeln und Ansicht (0101)
+
+**Verkauf → Shop-Verfügbarkeit** (`/verkauf/shop-verfuegbarkeit`) zeigt, was
+Shopify bekommt — aufgebaut wie die Produktseite im Shop:
+
+- **Projekte mit Farb-Pills**: Shopify erlaubt je Produkt nur begrenzt viele
+  Varianten, darum ist jede Gehäusefarbe der NATIVE 75 ein eigenes
+  Shopify-Produkt (Phoenix Gold, Cosmic Purple …). `product_templates.projekt`
+  fasst sie wie im Shop zusammen; je Pill Ampel und „aktiv x/y · bis N".
+- **Optionen als Chips** (Keycap Set, Mounting Plate, Switches) für die
+  gewählte Farbe: unter jedem Wert die Teile, die er laut Stückliste braucht
+  (aus den Variantenfiltern), ihr freier Bestand, die Regel und „reicht für
+  N", der Zustand (aktiv bis N / ausverkauft · Material / gesperrt) und der
+  gelesene Shop-Stand („im Shop jetzt: x von y verkaufbar"). Gemeinsame
+  Teile (ohne Filter, z. B. das Farb-Gehäuse) stehen darüber.
+- **Regeln** (alle über Registry-Aktionen `verkauf.shop_*`, jede stößt sofort
+  einen Abgleich an; wirken nur für den Shop, die Fertigung sieht weiter
+  den echten Bestand):
+  - **Teil**: Schwelle „ausverkauft unter N" (`shop_oos_unter`: nur was
+    darüber liegt, zählt — Blue Cases unter 2 → alles mit Blue Case weg) und
+    **zurückhalten** (`shop_zurueckhalten`: zählt als 0 — Yellow Cases).
+  - **Artikel / Variante**: `shop_modus` auto (berechnet), **immer**
+    (Deckel — Switch-Tester; der 3D-Druck ist schnell nachgebaut), **aus**
+    (0 — Black Week Editions); die Variante überstimmt den Artikel.
+  - **Optionswert** deaktivieren (`shop_option_sperren`), wahlweise in allen
+    Farben des Projekts (gleicher Options- und Wertname).
+  - Lagerware (Zubehör, einzeln verkaufte Switches) unter „Weitere
+    Shop-Artikel": dieselben Regeln auf den eigenen Bestand.
+- **Shop-Stand holen** (`verkauf.shop_stand_holen`, nur lesend — auch im
+  Modus „nur lesen"; zusätzlich viertelstündlich im Reconcile): je Variante
+  Menge, availableForSale, Mengenverfolgung, inventoryPolicy und
+  Produktstatus nach `shopify_inventory_state` — so steht Ist neben Soll,
+  bevor Shopify scharfgeschaltet wird.
+- Rechnung: `shopify_soll_menge()` prüft in dieser Reihenfolge aus → 0,
+  immer → Deckel, gesperrter Optionswert → 0, Lagerware → `shop_frei`,
+  Made-to-Order → `baubar(…, 0, true)` (Teile mit Schwelle/zurückhalten) +
+  eigener nutzbarer Bestand, minus Puffer, höchstens Deckel.
+
 ## Shopify — Produkt-Sync (beide Richtungen, laufend)
 
 - **ERP → Shop**: „In Shopify anlegen" am Produkt legt Produkt samt Varianten

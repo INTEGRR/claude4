@@ -43,6 +43,13 @@ export function fakeLetzterAufruf(operation: string): Record<string, unknown> | 
   return FAKE_AUFRUFE.get(operation)
 }
 
+/** Shop-Stand der Varianten (productVariants) — für den Vergleich Ist/Soll. */
+let FAKE_SHOP_STAND: unknown[] = []
+
+export function fakeShopStandHinterlegen(varianten: unknown[]): void {
+  FAKE_SHOP_STAND = varianten
+}
+
 export function fakeProdukteHinterlegen(produkte: unknown[]): void {
   FAKE_PRODUKTE = produkte
 }
@@ -129,6 +136,8 @@ export async function fakeShopifyGraphQL<T>(
           }),
         }
       }
+      case 'productVariants':
+        return { productVariants: { nodes: FAKE_SHOP_STAND, pageInfo: { hasNextPage: false, endCursor: null } } }
       case 'productVariantsBulkUpdate':
         return { productVariantsBulkUpdate: { userErrors: [] } }
       case 'customers':

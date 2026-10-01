@@ -80,7 +80,15 @@ export async function GET(request: Request) {
         // Bestandsmeldung über die Outbox statt direkt: der Job hat Retry und
         // Backoff, und der Dedupe-Schlüssel verhindert Stapelbildung.
         await sql`select inventar_abgleich_anstossen()`
-        return NextResponse.json({ task, ...orders, inventar: 'eingereiht' })
+        // Ist-Stand des Shops für die Shop-Verfügbarkeit (nur lesend, best effort).
+        let shopStand: unknown = null
+        try {
+          const { shopStandHolen } = await import('@/modules/integrationen/inventar')
+          shopStand = await shopStandHolen()
+        } catch (err) {
+          shopStand = { fehler: err instanceof Error ? err.message : String(err) }
+        }
+        return NextResponse.json({ task, ...orders, inventar: 'eingereiht', shopStand })
       }
       case 'tracking': {
         if (!dhlConfigured()) return NextResponse.json({ skipped: 'DHL nicht konfiguriert' })

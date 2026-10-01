@@ -10,8 +10,9 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 ### Stammdaten
 - **partners**: Kunden & Lieferanten. Spalten: name, is_company, is_customer, is_vendor, email, phone, street, house_number, zip, city, country_code, vat, active. Einkauf (Lieferantenakte): sprache ('de'|'en'|'zh'), mail_domains text[] (Domains, bei Freemailern volle Adressen — ordnen eingehende Mails zu), einkaeufer_id → users (zuständig), standard_incoterm, standard_waehrung.
 - **uoms**: Maßeinheiten (name, category, factor). Umrechnung: uom_convert(qty, von_uom_id, nach_uom_id).
-- **product_templates**: Produkte. name, uom_id, list_price (VK), standard_cost (Einstand), weight_g, can_be_sold, can_be_purchased, type ('goods'|'service'), route_manufacture, route_mto, route_buy, active.
-- **product_variants**: Varianten je Template (template_id). sku, barcode, display_name, price_extra, active. Anzeigename: variant_display_name(variant_id).
+- **product_templates**: Produkte. name, uom_id, list_price (VK), standard_cost (Einstand), weight_g, can_be_sold, can_be_purchased, type ('goods'|'service'), route_manufacture, route_mto, route_buy, active; projekt (Shop-Projekt: Shopify-Produkte, die im Shop als ein Artikel mit Farb-Pills erscheinen), shop_modus ('auto'|'immer'|'aus' — was Shopify bekommt).
+- **product_variants**: Varianten je Template (template_id). sku, barcode, display_name, price_extra, active. Anzeigename: variant_display_name(variant_id). Shop-Regeln (0101): shop_modus (null = wie Artikel), shop_oos_unter (für den Shop ausverkauft unter N Stück), shop_zurueckhalten (zählt für den Shop als 0); shop_frei(variant_id) = für den Shop nutzbarer Bestand.
+- **shop_option_sperren**: Optionswerte eines Artikels, die Shopify nicht bekommt (template_id, ptav_id, von) — alle Varianten damit melden 0.
 - **product_attributes / product_attribute_values**: Attribute (z. B. Farbe) und Werte (z. B. Weiß).
 - **product_template_attribute_values (ptav)** & **product_variant_attribute_values**: verknüpfen Varianten mit Attributwerten.
 - **vendor_prices**: Lieferantenpreise je Template (vendor_id → partners, price, discount, lead_time_days, min_qty, date_start, date_end).

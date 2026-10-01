@@ -186,6 +186,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           ? [
               { href: '/verkauf', label: 'Verkaufsaufträge', count: counts.offene_auftraege },
               { href: '/vorgaenge', label: 'Vorgänge' },
+              { href: '/verkauf/shop-verfuegbarkeit', label: 'Shop-Verfügbarkeit' },
             ]
           : []),
         ...(sees('versand') && prozessAktiv('versand')

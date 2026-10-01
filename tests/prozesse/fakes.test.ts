@@ -63,7 +63,7 @@ describe('Fake-Weichen', () => {
 
   test('eine unbekannte Shopify-Operation wirft laut', async () => {
     await assert.rejects(
-      () => shopify.shopifyGraphQL('query { productVariants(first: 1) { nodes { id } } }'),
+      () => shopify.shopifyGraphQL('query { giftCards(first: 1) { nodes { id } } }'),
       /kennt die Operation/,
     )
   })

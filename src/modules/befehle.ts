@@ -30,6 +30,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/verkauf', label: 'Verkaufsaufträge', area: 'verkauf' },
   { href: '/verkauf/neu', label: 'Neuer Verkaufsauftrag', area: 'verkauf' },
   { href: '/vorgaenge', label: 'Vorgänge', area: 'verkauf' },
+  { href: '/verkauf/shop-verfuegbarkeit', label: 'Shop-Verfügbarkeit (was Shopify bekommt, Regeln je Teil)', area: 'verkauf' },
   { href: '/versand', label: 'Versand', area: 'versand', prozess: ['versand'] },
   { href: '/kommissionieren', label: 'Kommissionieren (Ware sammeln)', area: 'versand', prozess: ['versand'] },
   { href: '/packtisch', label: 'Packtisch', area: 'versand', prozess: ['versand'] },

@@ -17,6 +17,7 @@ import { PERSONAL } from './personal.ts'
 import { PRODUKTE } from './produkte.ts'
 import { REPARATUR } from './reparatur.ts'
 import { VERKAUF } from './verkauf.ts'
+import { VERKAUF_SHOP } from './verkauf-shop.ts'
 import { VERSAND } from './versand.ts'
 import { VORGANG } from './vorgang.ts'
 
@@ -47,6 +48,7 @@ export const REGISTRY = {
   ...PRODUKTE,
   ...REPARATUR,
   ...VERKAUF,
+  ...VERKAUF_SHOP,
   ...VERSAND,
   ...VORGANG,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

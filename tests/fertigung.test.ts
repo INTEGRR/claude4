@@ -269,6 +269,78 @@ describe('Made-to-Order: baubare Menge und Shopify-Soll (0100)', () => {
   })
 })
 
+describe('Shop-Regeln (0101): Schwelle, zurückhalten, Artikel/Variante/Option', () => {
+  const soll = async (t: TransactionSql, v: string) =>
+    (await t<{ n: number }[]>`select shopify_soll_menge(${v}) as n`)[0].n
+  const baubar = async (t: TransactionSql, v: string, shop: boolean) =>
+    Number((await t<{ m: number }[]>`select menge::float as m from baubar(${v}, 0, ${shop})`)[0].m)
+
+  async function lager(t: TransactionSql) {
+    const s = await keyboardScenario(t)
+    await stockUp(t, s.platine, 50)
+    await stockUp(t, s.switches, 87 * 50)
+    await stockUp(t, s.gehaeuseWeiss, 5)
+    await stockUp(t, s.gehaeuseSchwarz, 40)
+    await t`insert into settings (key, value) values ('shopify', ${t.json({ mto: { modus: 'baubar', puffer: 0, deckel: 99 } })})
+            on conflict (key) do update set value = excluded.value`
+    return s
+  }
+
+  test('Schwelle „ausverkauft unter N": nur was darüber liegt zählt — nur für den Shop', async () => {
+    await withRollback(async (t) => {
+      const s = await lager(t)
+      await t`update product_variants set shop_oos_unter = 2 where id = ${s.gehaeuseWeiss}`
+      assert.equal(await soll(t, s.weiss), 4, '5 Gehäuse, unter 2 aus → 4 verkaufbar')
+      assert.equal(await baubar(t, s.weiss, false), 5, 'die Fertigung sieht weiter 5')
+      await stockUp(t, s.gehaeuseWeiss, 1)
+      assert.equal(await soll(t, s.weiss), 0, '1 Gehäuse < 2 → alles mit weißem Gehäuse weg')
+    })
+  })
+
+  test('Teil zurückhalten: zählt für den Shop als 0', async () => {
+    await withRollback(async (t) => {
+      const s = await lager(t)
+      await t`update product_variants set shop_zurueckhalten = true where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.schwarz), 0)
+      assert.equal(await soll(t, s.weiss), 5, 'andere Farbe unberührt')
+    })
+  })
+
+  test('Artikel aus / immer, Variante vor Artikel', async () => {
+    await withRollback(async (t) => {
+      const s = await lager(t)
+      await t`update product_templates set shop_modus = 'aus' where id = ${s.tplId}`
+      assert.deepEqual([await soll(t, s.weiss), await soll(t, s.schwarz)], [0, 0], 'Black Week: ganzer Artikel aus')
+      await t`update product_variants set shop_modus = 'auto' where id = ${s.schwarz}`
+      assert.equal(await soll(t, s.schwarz), 40, 'Variante überstimmt den Artikel')
+      await t`update product_templates set shop_modus = 'immer' where id = ${s.tplId}`
+      await t`update product_variants set shop_zurueckhalten = true where id = ${s.gehaeuseWeiss}`
+      assert.equal(await soll(t, s.weiss), 99, 'Switch-Tester: immer Deckel, auch ohne Material')
+    })
+  })
+
+  test('Optionswert gesperrt: alle Varianten damit melden 0', async () => {
+    await withRollback(async (t) => {
+      const s = await lager(t)
+      const [ptav] = await t<{ id: string }[]>`
+        select a.ptav_id as id from product_variant_attribute_values a where a.variant_id = ${s.weiss}`
+      await t`insert into shop_option_sperren (template_id, ptav_id) values (${s.tplId}, ${ptav.id})`
+      assert.equal(await soll(t, s.weiss), 0)
+      assert.equal(await soll(t, s.schwarz), 40)
+    })
+  })
+
+  test('Lagerware: Schwelle und zurückhalten gelten auch für den eigenen Bestand', async () => {
+    await withRollback(async (t) => {
+      const s = await lager(t)
+      await t`update product_variants set shop_oos_unter = 10 where id = ${s.platine}`
+      assert.equal(await soll(t, s.platine), 41, '50 frei, unter 10 aus → 41')
+      await t`update product_variants set shop_zurueckhalten = true where id = ${s.platine}`
+      assert.equal(await soll(t, s.platine), 0)
+    })
+  })
+})
+
 describe('Fertigungsauftrag', () => {
   test('verbraucht Komponenten und bucht das Fertigprodukt zu', async () => {
     await withRollback(async (t) => {

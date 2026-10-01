@@ -279,6 +279,64 @@ export async function inventarAbgleichen(): Promise<PushErgebnis & { runden: num
   return gesamt
 }
 
+// --- Shop-Stand lesen (Ist) ------------------------------------------------------
+
+/**
+ * Liest je Shopify-Variante Menge, availableForSale, Mengenverfolgung,
+ * inventoryPolicy und Produktstatus — nur Queries, darum auch im Modus
+ * „nur lesen". Grundlage für den Vergleich Ist (Shop) gegen Soll (KRNL) in
+ * der Shop-Verfügbarkeit; läuft von Hand und viertelstündlich im Reconcile.
+ */
+export async function shopStandHolen(): Promise<{ varianten: number; verkaufbar: number; zugeordnet: number }> {
+  const ergebnis = { varianten: 0, verkaufbar: 0, zugeordnet: 0 }
+  let after: string | null = null
+  for (let seite = 0; seite < 40; seite++) {
+    const data: {
+      productVariants: {
+        nodes: {
+          id: string
+          inventoryQuantity: number | null
+          inventoryPolicy: string
+          availableForSale: boolean
+          product: { status: string }
+          inventoryItem: { id: string; tracked: boolean } | null
+        }[]
+        pageInfo: { hasNextPage: boolean; endCursor: string | null }
+      }
+    } = await shopifyGraphQL(
+      `query shopStand($after: String) {
+         productVariants(first: 250, after: $after) {
+           nodes { id inventoryQuantity inventoryPolicy availableForSale product { status } inventoryItem { id tracked } }
+           pageInfo { hasNextPage endCursor }
+         }
+       }`,
+      { after },
+    )
+    for (const n of data.productVariants.nodes) {
+      ergebnis.varianten++
+      if (n.availableForSale) ergebnis.verkaufbar++
+      const [v] = await sql<{ id: string }[]>`
+        update product_variants
+        set shopify_inventory_item_gid = coalesce(shopify_inventory_item_gid, ${n.inventoryItem?.id ?? null})
+        where shopify_variant_id = ${n.id}
+        returning id`
+      if (!v) continue
+      ergebnis.zugeordnet++
+      await sql`
+        insert into shopify_inventory_state
+          (variant_id, shop_qty, shop_seen_at, shop_verkaufbar, shop_tracked, shop_policy, shop_status)
+        values (${v.id}, ${n.inventoryQuantity}, now(), ${n.availableForSale}, ${n.inventoryItem?.tracked ?? null},
+                ${n.inventoryPolicy}, ${n.product.status})
+        on conflict (variant_id) do update set
+          shop_qty = excluded.shop_qty, shop_seen_at = now(), shop_verkaufbar = excluded.shop_verkaufbar,
+          shop_tracked = excluded.shop_tracked, shop_policy = excluded.shop_policy, shop_status = excluded.shop_status`
+    }
+    if (!data.productVariants.pageInfo.hasNextPage) break
+    after = data.productVariants.pageInfo.endCursor
+  }
+  return ergebnis
+}
+
 // --- Webhook -------------------------------------------------------------------
 
 /**

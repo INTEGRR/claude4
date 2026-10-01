@@ -17,6 +17,7 @@ import * as personal from './registry/personal-ausfuehren.ts'
 import * as produkte from './registry/produkte-ausfuehren.ts'
 import * as reparatur from './registry/reparatur-ausfuehren.ts'
 import * as verkauf from './registry/verkauf-ausfuehren.ts'
+import * as verkaufShop from './registry/verkauf-shop-ausfuehren.ts'
 import * as versand from './registry/versand-ausfuehren.ts'
 import * as vorgang from './registry/vorgang-ausfuehren.ts'
 
@@ -279,5 +280,9 @@ export const AUSFUEHRUNG = {
   'integrationen.odoo_stuecklisten_uebernehmen': integrationen.odooStuecklistenUebernehmen,
   'integrationen.odoo_fertigbestand_zuruecknehmen': integrationen.odooFertigbestandZuruecknehmen,
   'integrationen.odoo_artikel_zusammenfuehren': integrationen.odooArtikelZusammenfuehren,
+  'verkauf.shop_artikel_setzen': verkaufShop.shopArtikelSetzen,
+  'verkauf.shop_variante_setzen': verkaufShop.shopVarianteSetzen,
+  'verkauf.shop_option_setzen': verkaufShop.shopOptionSetzen,
+  'verkauf.shop_stand_holen': verkaufShop.shopStandHolen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>
