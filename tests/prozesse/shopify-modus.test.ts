@@ -14,6 +14,7 @@ import { type Harness, harnessEnde, harnessStart } from './harness.ts'
 import {
   ShopifyError,
   ShopifyNurLesen,
+  ShopifyProbelauf,
   addOrderTags,
 } from '../../src/modules/integrationen/shopify.ts'
 import { runDueJobs } from '../../src/modules/integrationen/jobs.ts'
@@ -30,7 +31,7 @@ after(async () => {
   await harnessEnde(h, DATENBANK)
 })
 
-async function modus(m: 'lesen' | 'schreiben'): Promise<void> {
+async function modus(m: 'lesen' | 'probe' | 'schreiben'): Promise<void> {
   await h.sql`insert into settings (key, value) values ('shopify', ${h.sql.json({ modus: m })})
               on conflict (key) do update set value = excluded.value`
 }
@@ -101,5 +102,96 @@ describe('Shopify nur lesen: eine Naht für alle Mutationen', () => {
     const [ergebnis] = await h.sql<{ last_result: string | null }[]>`
       select last_result from integration_jobs where id = ${neu.id}`
     assert.match(ergebnis.last_result ?? '', /^Tags gesetzt/)
+  })
+})
+
+describe('Shopify-Probelauf (0102): wie scharf, aber nichts senden', () => {
+  test('eine Mutation geht nicht raus, steht als „würde senden" im Protokoll, der Job ist erledigt', async () => {
+    process.env.SHOPIFY_FAKE = '0'
+    await modus('probe')
+    await assert.rejects(
+      addOrderTags('gid://shopify/Order/1', ['krnl']),
+      (e: unknown) => e instanceof ShopifyProbelauf && /würde jetzt an Shopify gehen/.test((e as Error).message),
+    )
+    const [tx] = await h.sql<{ kind: string; ok: boolean; request: { variables: { tags: string[] } } }[]>`
+      select kind, ok, request from api_transactions where system = 'shopify' order by created_at desc limit 1`
+    assert.equal(tx.kind, 'probe:tagsAdd')
+    assert.deepEqual(tx.request.variables.tags, ['krnl'], 'was gesendet worden wäre, steht vollständig drin')
+
+    const [kunde] = await h.sql<{ id: string }[]>`
+      insert into partners (name, is_customer) values ('Probe-Kunde', true) returning id`
+    const [auftrag] = await h.sql<{ id: string }[]>`
+      insert into sales_orders (number, partner_id, shopify_order_id)
+      values (next_sequence('sale'), ${kunde.id}, 'gid://shopify/Order/4712') returning id`
+    const [job] = await h.sql<{ id: string }[]>`
+      select enqueue_job('shopify_tag_add', ${h.sql.json({ sales_order_id: auftrag.id, tags: ['krnl'] })}, 'tag:probe') as id`
+    const lauf = await runDueJobs()
+    assert.deepEqual([lauf.uebersprungen, lauf.failed], [1, 0])
+    const [zeile] = await h.sql<{ status: string; last_result: string }[]>`
+      select status, last_result from integration_jobs where id = ${job.id}`
+    assert.equal(zeile.status, 'done')
+    assert.match(zeile.last_result, /^Probelauf — tagsAdd würde/)
+  })
+
+  test('Bestandsabgleich im Probelauf: nur Änderungen, eigener Probe-Stand, echter Stand bleibt leer', async () => {
+    process.env.SHOPIFY_FAKE = '1'
+    await modus('probe')
+    const [uom] = await h.sql<{ id: string }[]>`select id from uoms where name = 'Stück'`
+    const [tpl] = await h.sql<{ id: string }[]>`
+      insert into product_templates (name, uom_id, can_be_sold) values ('Probe-Deskmat', ${uom.id}, true) returning id`
+    await h.sql`select generate_variants(${tpl.id})`
+    const [v] = await h.sql<{ id: string }[]>`
+      update product_variants set shopify_variant_id = 'gid://shopify/ProductVariant/7001', sku = 'PROBE-DM'
+      where template_id = ${tpl.id} returning id`
+    const lagern = async (menge: number) => {
+      const [lager] = await h.sql<{ id: string }[]>`select id from stock_locations where full_path = 'WH/Stock'`
+      const [ist] = await h.sql<{ n: number }[]>`select coalesce(sum(on_hand), 0)::float as n from stock_quants where variant_id = ${v.id} and location_id = ${lager.id}`
+      const [z] = await h.sql<{ id: string }[]>`
+        insert into inventory_counts (location_id, variant_id, counted_qty, book_qty)
+        values (${lager.id}, ${v.id}, ${menge}, ${ist.n}) returning id`
+      await h.sql`select inventory_apply(${z.id}, 'test')`
+    }
+    await lagern(12)
+    const { inventarAbgleichen } = await import('../../src/modules/integrationen/inventar.ts')
+    const probeEintraege = async () =>
+      h.sql<{ request: { aenderungen: { sku: string; vorher: number | null; neu: number }[] } }[]>`
+        select request from api_transactions where kind = 'probe:inventorySetQuantities' order by created_at desc`
+
+    await inventarAbgleichen()
+    const [erster] = await probeEintraege()
+    assert.deepEqual(erster.request.aenderungen.find((a) => a.sku === 'PROBE-DM'), { sku: 'PROBE-DM', name: 'Probe-Deskmat', vorher: null, neu: 12 })
+
+    const vorher = (await probeEintraege()).length
+    await inventarAbgleichen()
+    assert.equal((await probeEintraege()).length, vorher, 'nichts geändert — kein neuer Eintrag')
+
+    await lagern(9)
+    await inventarAbgleichen()
+    const [zweiter] = await probeEintraege()
+    assert.deepEqual(zweiter.request.aenderungen, [{ sku: 'PROBE-DM', name: 'Probe-Deskmat', vorher: 12, neu: 9 }])
+
+    const [stand] = await h.sql<{ probe_qty: number; pushed_qty: number | null }[]>`
+      select probe_qty::float as probe_qty, pushed_qty from shopify_inventory_state where variant_id = ${v.id}`
+    assert.deepEqual({ ...stand }, { probe_qty: 9, pushed_qty: null }, 'beim Scharfschalten wird alles echt gemeldet')
+  })
+
+  test('jede KRNL-Aktion stößt im Probelauf den Abgleich an, im Lesemodus nicht', async () => {
+    const { aktionAusfuehrenGeprueft } = await import('../../src/modules/prozesse/torwaechter.ts')
+    const zaehler = async () =>
+      Number((await h.sql<{ n: string | null }[]>`select value ->> 'n' as n from shopify_sync_state where key = 'inventar_anstoss'`)[0]?.n ?? 0)
+    const ADMIN = { name: 'probe-test', role: 'admin' as const }
+    const [t] = await h.sql<{ id: string }[]>`select id from product_templates where name = 'Probe-Deskmat'`
+
+    await modus('lesen')
+    const a = await zaehler()
+    await aktionAusfuehrenGeprueft('verkauf.shop_artikel_setzen', { parameter: { template_id: t.id, projekt: 'X' } }, ADMIN)
+    // shop_artikel_setzen stößt selbst an — darum eine Aktion ohne eigenen Anstoß:
+    await aktionAusfuehrenGeprueft('verkauf.shop_stand_holen', {}, ADMIN)
+    const b = await zaehler()
+    await modus('probe')
+    await aktionAusfuehrenGeprueft('verkauf.shop_stand_holen', {}, ADMIN)
+    assert.equal(await zaehler(), b + 1, 'Probelauf: Anstoß nach der Aktion')
+    assert.equal(b, a + 1, 'Lesemodus: nur der eigene Anstoß der Regel-Aktion, keiner vom Torwächter')
+    await modus('lesen')
   })
 })

@@ -364,6 +364,8 @@ export default async function IntegrationenPage() {
             <>
               {modus === 'lesen' ? (
                 <strong>Nur lesend (Staging)</strong>
+              ) : modus === 'probe' ? (
+                <strong>Probelauf (nichts gesendet)</strong>
               ) : (
                 <>Schreibend (scharf)</>
               )}
@@ -481,6 +483,13 @@ export default async function IntegrationenPage() {
           und Produkte kommen herein, Fulfillments, Tracking, Bestände, Produktänderungen und
           Webhook-Registrierung gehen nicht hinaus (Schreibjobs werden als übersprungen abgehakt).
           Scharfschalten unter <Link href="/einstellungen/anbindungen">Einstellungen → Schnittstellen</Link>.
+        </div>
+      )}
+
+      {shopifyConfigured() && modus === 'probe' && (
+        <div className="notice warn">
+          Shopify im <strong>Probelauf</strong>: KRNL arbeitet wie scharf, sendet aber nichts. Was an Shopify gegangen
+          wäre, steht in der Debug-Box unten rechts und im Monitor als <span className="mono">probe:…</span>.
         </div>
       )}
 

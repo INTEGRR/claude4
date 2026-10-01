@@ -3,6 +3,7 @@ import { sql } from '@/db/client'
 import {
   ShopifyError,
   ShopifyNurLesen,
+  ShopifyProbelauf,
   addOrderTags,
   cancelOrder,
   createFulfillment,
@@ -504,6 +505,16 @@ export async function runDueJobs(limit = 20, budgetMs = JOB_BUDGET_MS): Promise<
                 where id = ${job.id}`
       succeeded++
     } catch (err) {
+      if (err instanceof ShopifyProbelauf) {
+        // Probelauf: was gesendet worden wäre, steht im Protokoll (Debug-Box).
+        // Wie „nur lesen" erledigt, nicht gescheitert — läuft nach dem
+        // Scharfschalten nicht nach.
+        uebersprungen++
+        await sql`update integration_jobs
+                  set status = 'done', last_result = ${err.message}, last_error = null, dedupe_key = null
+                  where id = ${job.id}`
+        continue
+      }
       if (err instanceof ShopifyNurLesen) {
         // Staging: der Shop soll nicht beschrieben werden. Der Job ist damit
         // erledigt, nicht gescheitert — er darf nach dem Umschalten NICHT

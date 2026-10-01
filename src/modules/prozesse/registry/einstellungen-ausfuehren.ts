@@ -99,7 +99,7 @@ export async function shopifyMtoSetzen(
 }
 
 export async function shopifyModusSetzen(
-  p: { modus: 'lesen' | 'schreiben' },
+  p: { modus: 'lesen' | 'probe' | 'schreiben' },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   await sql`
@@ -112,7 +112,10 @@ export async function shopifyModusSetzen(
     text:
       p.modus === 'lesen'
         ? 'Shopify nur lesend — Bestellungen und Produkte kommen herein, nichts geht hinaus.'
-        : 'Shopify schreibend — Fulfillments, Tracking, Bestände und Produkte werden ab jetzt ' +
+        : p.modus === 'probe'
+          ? 'Shopify im Probelauf — KRNL arbeitet wie scharf, sendet aber nichts. Was an Shopify ginge, ' +
+            'zeigt die Debug-Box unten rechts.'
+          : 'Shopify schreibend — Fulfillments, Tracking, Bestände und Produkte werden ab jetzt ' +
           'zurückgemeldet. Bestand einmal per „Mit Shopify abgleichen" melden und Webhooks registrieren.',
   }
 }

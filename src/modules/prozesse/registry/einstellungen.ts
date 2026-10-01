@@ -153,15 +153,17 @@ export const EINSTELLUNGEN = {
       'Staging-Modus — Bestellungen, Kunden und Produkte kommen herein, aber nichts geht ' +
       'hinaus (keine Fulfillments, kein Tracking, keine Bestände, keine Produktänderungen, ' +
       'keine Webhook-Registrierung); „schreiben" schaltet alle Rückmeldungen scharf. ' +
-      'Standard ohne Eintrag ist lesen. Schreibjobs aus der Lesezeit laufen nach dem ' +
-      'Umschalten nicht nach.',
+      'Standard ohne Eintrag ist lesen. „probe" (Probelauf) verhält sich wie schreiben, sendet aber ' +
+      'nichts — jede Mutation wird als „würde senden" protokolliert und in der Debug-Box gezeigt. ' +
+      'Schreibjobs aus der Lese- bzw. Probezeit laufen nach dem Umschalten nicht nach.',
     bindung: 'frei',
     schema: z.object({
       modus: z
-        .enum(['lesen', 'schreiben'])
-        .describe('lesen = Staging (nur lesend), schreiben = Rückmeldungen scharf'),
+        .enum(['lesen', 'probe', 'schreiben'])
+        .describe('lesen = Staging (nur lesend), probe = wie scharf, aber nur protokollieren, schreiben = scharf'),
     }),
-    zusammenfassung: (p) => `Shopify ${p.modus === 'schreiben' ? 'schreibend (scharf)' : 'nur lesend'}`,
+    zusammenfassung: (p) =>
+      `Shopify ${p.modus === 'schreiben' ? 'schreibend (scharf)' : p.modus === 'probe' ? 'im Probelauf (nichts gesendet)' : 'nur lesend'}`,
     formdata: (fd) => ({ modus: String(fd.get('modus') ?? 'lesen') }),
     revalidate: ['/einstellungen/anbindungen', '/integrationen'],
   },

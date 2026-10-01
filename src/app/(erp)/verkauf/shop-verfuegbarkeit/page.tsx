@@ -241,7 +241,9 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
         (<Link href="/einstellungen/anbindungen">ändern</Link>).{' '}
         {modus === 'schreiben'
           ? 'Shopify ist scharf: jede Änderung hier geht sofort an den Shop.'
-          : 'Shopify steht auf „nur lesen" — hier lässt sich alles vorbereiten, gemeldet wird erst nach dem Umschalten.'}{' '}
+          : modus === 'probe'
+            ? 'Probelauf: nichts geht an den Shop — was gemeldet würde, zeigt die Debug-Box unten rechts.'
+            : 'Shopify steht auf „nur lesen" — hier lässt sich alles vorbereiten, gemeldet wird erst nach dem Umschalten.'}{' '}
         Shop-Stand zuletzt gelesen: {daten.zuletztGelesen ? dateTime(daten.zuletztGelesen) : 'noch nie'}.
       </div>
 

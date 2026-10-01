@@ -117,7 +117,7 @@ export default async function SchnittstellenPage() {
   await requireArea('einstellungen')
   const shopify = await einstellung<{ modus: string }>('shopify')
   const postfach = await einstellung<PostfachStand>(POSTFACH_SCHLUESSEL)
-  const modus = shopify.modus === 'schreiben' ? 'schreiben' : 'lesen'
+  const modus = shopify.modus === 'schreiben' ? 'schreiben' : shopify.modus === 'probe' ? 'probe' : 'lesen'
   const [mto, mtoZeilen] = await Promise.all([madeToOrderEinstellung(), madeToOrderVorschau()])
   const mtoAus = mtoZeilen.filter((z) => z.soll <= 0).length
   const mtoKnapp = mtoZeilen.filter((z) => z.soll > 0 && z.baubar < 10).length
@@ -173,6 +173,14 @@ export default async function SchnittstellenPage() {
                 <strong>Nur lesen (Staging)</strong> — Bestellungen, Kunden und Produkte kommen herein;
                 Fulfillments, Tracking, Bestände, Produktänderungen und Webhook-Registrierung gehen
                 nicht hinaus. Der Shop bleibt beim Altsystem.
+              </span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+              <input type="radio" name="modus" value="probe" defaultChecked={modus === 'probe'} />
+              <span>
+                <strong>Probelauf (Staging)</strong> — KRNL arbeitet, als wäre es scharf (Bestandsabgleich,
+                Versandmeldungen, Made-to-Order-Einrichtung), sendet aber <strong>nichts</strong>: unten rechts zeigt
+                eine Debug-Box live, was an Shopify gegangen wäre. Zum Testen vor dem Scharfschalten.
               </span>
             </label>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -292,7 +300,8 @@ export default async function SchnittstellenPage() {
               <strong>{qty(mtoZeilen.length)}</strong> Varianten · <strong>{qty(mtoAus)}</strong> ausverkauft ·{' '}
               <strong>{qty(mtoKnapp)}</strong> knapp (unter 10 baubar) · in Shopify eingerichtet:{' '}
               {qty(mtoEingerichtet)} von {qty(mtoZeilen.length)}
-              {modus !== 'schreiben' && ' · Shopify steht auf „nur lesen" — gemeldet wird erst nach dem Umschalten'}
+              {modus === 'lesen' && ' · Shopify steht auf „nur lesen" — gemeldet wird erst nach dem Umschalten'}
+              {modus === 'probe' && ' · Probelauf — was gemeldet würde, zeigt die Debug-Box unten rechts'}
             </p>
             {engpaesse.length > 0 && (
               <p className="small" style={{ margin: '0 0 8px' }}>

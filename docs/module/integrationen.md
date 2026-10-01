@@ -160,6 +160,33 @@ trotzdem. Früher hatte Shopify für sie gar keinen Bestandsabgleich.
   und je Variante baubar / Engpass / an Shopify / zuletzt gemeldet — auch im
   Modus „nur lesen", vor dem Scharfschalten.
 
+### Probelauf vor dem Scharfschalten (0102)
+
+Dritter Modus neben „nur lesen" und „schreiben" (Einstellungen →
+Schnittstellen → Shopify): **Probelauf**. KRNL arbeitet, als wäre es scharf
+— Bestandsabgleich, Versandmeldungen, Made-to-Order-Einrichtung,
+Produkt-Push —, sendet aber **nichts**:
+
+- **Eine Naht**: `shopifyGraphQL()` sendet im Probelauf keine Mutation,
+  sondern protokolliert sie als „würde senden" (`api_transactions`, kind
+  `probe:<operation>`, mit allen Variablen) und wirft `ShopifyProbelauf`;
+  der Job-Runner hakt den Job als erledigt ab (wie „nur lesen", kein
+  Nachlauf nach dem Umschalten).
+- **Bestandsabgleich** rechnet wie scharf, protokolliert aber je Runde nur
+  die Änderungen mit Artikelnamen („Tastatur Blau: 5 → 4") gegen einen
+  eigenen Probe-Stand (`probe_qty`, `probe_eingerichtet_at`). `pushed_qty`
+  und `mto_eingerichtet_at` bleiben unberührt — beim Scharfschalten wird
+  alles einmal wirklich gemeldet und eingerichtet.
+- **Auslöser** wie scharf: nach jeder importierten Bestellung, jede Minute,
+  und **nach jeder KRNL-Aktion** (Torwächter stößt an, die Server-Aktion
+  arbeitet den Job direkt nach der Antwort ab) — auch im Schreibmodus, damit
+  Änderungen in KRNL (Inventur, Wareneingang, Regeln) in Sekunden im Shop
+  sind.
+- **Debug-Box** unten rechts auf jeder Seite (nur Admins, nur im
+  Probelauf): live alle drei Sekunden, was an Shopify gegangen wäre, je
+  Eintrag aufklappbar; „Jetzt abgleichen" rechnet sofort, „Leeren" blendet
+  Älteres aus. Quelle: `/api/shopify/probe`, Anzeige `probe-anzeige.ts`.
+
 ### Shop-Verfügbarkeit: Regeln und Ansicht (0101)
 
 **Verkauf → Shop-Verfügbarkeit** (`/verkauf/shop-verfuegbarkeit`) zeigt, was

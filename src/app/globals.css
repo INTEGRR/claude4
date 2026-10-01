@@ -1891,3 +1891,22 @@ html[data-splash-gesehen] .splash { display: none; }
 .shop-chip.aktiv .wert { border-color: var(--success); }
 .shop-chip.leer { border-color: var(--danger); }
 .shop-chip.gesperrt { border-style: dashed; opacity: 0.75; }
+
+/* Shopify-Probelauf (0102): Debug-Box unten rechts. */
+.probe-box {
+  position: fixed; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  width: min(440px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--warn); border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.probe-kopf {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: transparent; border: 0; padding: 8px 12px; font-weight: 600; cursor: pointer; text-align: left;
+}
+.probe-kopf .muted { margin-left: auto; }
+.probe-neu { background: var(--warn); color: var(--surface); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+.probe-inhalt { border-top: 1px solid var(--border); padding: 8px 12px 10px; max-height: 45vh; overflow: auto; }
+.probe-leiste { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.probe-liste { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.probe-liste > li { border-left: 3px solid var(--warn); padding-left: 8px; }
+.probe-liste ul { margin: 4px 0 0; padding-left: 16px; }

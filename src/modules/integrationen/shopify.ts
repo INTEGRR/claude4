@@ -125,6 +125,20 @@ export class ShopifyError extends Error {
  * Nicht wiederholbar — der Job-Runner hakt solche Jobs als übersprungen ab,
  * statt sie stündlich gegen die Wand laufen zu lassen (jobs.ts).
  */
+/**
+ * Probelauf (0102): die Mutation wurde NICHT gesendet, sondern als „würde
+ * senden" protokolliert. Für den Job-Runner wie „nur lesen": übersprungen.
+ */
+export class ShopifyProbelauf extends ShopifyError {
+  readonly operation: string
+
+  constructor(operation: string) {
+    super(`Probelauf — ${operation} würde jetzt an Shopify gehen (nicht gesendet).`, false)
+    this.name = 'ShopifyProbelauf'
+    this.operation = operation
+  }
+}
+
 export class ShopifyNurLesen extends ShopifyError {
   readonly operation: string
 
@@ -164,7 +178,17 @@ export async function shopifyGraphQL<T>(
   // Tracking, Bestand, Produkte, Webhooks. Vor der Konfigurationsprüfung,
   // damit der Wächter ohne Zugangsdaten und ohne Netz testbar ist; hinter
   // dem Fake, weil der Fake keinen Shop hat, den es zu schützen gäbe.
-  if (istMutation(query) && (await shopifyModus(sql)) !== 'schreiben') {
+  const modus = istMutation(query) ? await shopifyModus(sql) : null
+  if (modus === 'probe') {
+    const operation = operationName(query)
+    const { logTransaction } = await import('./transaktionen')
+    await logTransaction({
+      system: 'shopify', kind: `probe:${operation}`, request: { variables },
+      ok: true, error: 'Probelauf: nicht gesendet',
+    })
+    throw new ShopifyProbelauf(operation)
+  }
+  if (modus !== null && modus !== 'schreiben') {
     const operation = operationName(query)
     const { logTransaction } = await import('./transaktionen')
     await logTransaction({

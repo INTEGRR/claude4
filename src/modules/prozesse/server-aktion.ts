@@ -1,5 +1,7 @@
 import 'server-only'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
+import { sql } from '@/db/client'
 import { requireUser } from '@/modules/auth'
 import { type ActionResult, actionFail, actionInfo } from '@/modules/shared/action'
 import { registrierteAktion } from './registry/index.ts'
@@ -36,6 +38,21 @@ export async function serverAktion(
   } catch (err) {
     return actionFail(err)
   }
+
+  // Shopify-Abgleich (0102): der Torwächter hat ihn angestoßen — direkt nach
+  // der Antwort abarbeiten statt auf den Minuten-Cron zu warten (scharf wie
+  // im Probelauf: man sieht sofort, was an Shopify ginge).
+  after(async () => {
+    try {
+      const [{ modus }] = await sql<{ modus: string }[]>`
+        select coalesce((select value ->> 'modus' from settings where key = 'shopify'), 'lesen') as modus`
+      if (modus === 'lesen') return
+      const { runDueJobs } = await import('@/modules/integrationen/jobs')
+      await runDueJobs(5)
+    } catch {
+      // bewusst still: der Minuten-Cron holt es nach
+    }
+  })
 
   const eintrag = registrierteAktion(name)
   for (const pfad of eintrag?.revalidate ?? []) {

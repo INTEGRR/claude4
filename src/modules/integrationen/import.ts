@@ -556,8 +556,8 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
   // abgleichen, nicht erst im Cron: bei Releases zählt jede Sekunde. Der
   // Webhook arbeitet den Job direkt danach ab (runDueJobs in after()).
   if (bestellungen > 0) {
-    const { shopifyModus } = await import('./shopify-modus')
-    if ((await shopifyModus(sql)) === 'schreiben') await sql`select inventar_abgleich_anstossen()`
+    const { ausloeserAktiv, shopifyModus } = await import('./shopify-modus')
+    if (ausloeserAktiv(await shopifyModus(sql))) await sql`select inventar_abgleich_anstossen()`
   }
 
   return { processed, failed }

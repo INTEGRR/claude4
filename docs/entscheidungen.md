@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Shopify-Probelauf mit Debug-Box
+
+**Anlass:** Betreiber will vor dem Scharfschalten im laufenden Betrieb
+sehen, was KRNL an Shopify schicken würde — „es darf nicht scharf sein,
+sondern nur ausgeben, was er machen würde".
+
+**Entschieden:**
+- Dritter Modus `probe` statt eines Testsystems: KRNL arbeitet mit echten
+  Daten wie scharf, die eine Schreib-Naht (`shopifyGraphQL`) sendet nichts
+  und protokolliert „würde senden" mit allen Variablen.
+- Antworten werden **nicht** vorgetäuscht: Mutationen, deren Antwort IDs
+  nach KRNL zurückschreibt (Fulfillments, Produkte), würden sonst falsche
+  Verknüpfungen hinterlassen. Darum gilt der Job als übersprungen.
+- Bestandsabgleich mit eigenem Probe-Stand: so zeigt die Box nur
+  Änderungen, und das echte Scharfschalten meldet trotzdem alles einmal.
+- Jede KRNL-Aktion stößt (außer im Lesemodus) den Abgleich an und lässt ihn
+  direkt nach der Antwort laufen — im Probelauf sieht man sofort, ob etwas
+  feuert; scharf sind KRNL-Änderungen in Sekunden im Shop.
+- Debug-Box nur für Admins und nur im Probelauf, unten rechts (die Reiter
+  sitzen rechts auf halber Höhe).
+
+Umgesetzt in Migration 0102, `shopify.ts` (`ShopifyProbelauf`),
+`shopify-modus.ts`, `inventar.ts`, `jobs.ts`, `torwaechter.ts`,
+`server-aktion.ts`, `/api/shopify/probe`, `shopify-probe-box.tsx`;
+dokumentiert in [module/integrationen.md](module/integrationen.md); Tests
+`tests/probe-anzeige.test.ts`, `tests/prozesse/shopify-modus.test.ts`.
+
 ## 2026-10-01 — Shop-Verfügbarkeit: Regeln je Teil, Artikel, Variante und Option
 
 **Anlass:** Die baubare Menge allein bildet nicht ab, wie ANVIL den Shop

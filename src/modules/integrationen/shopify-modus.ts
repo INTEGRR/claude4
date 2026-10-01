@@ -11,18 +11,28 @@ import type { Sql, TransactionSql } from 'postgres'
  *
  * Standard ohne Eintrag ist „lesen": Wer Zugangsdaten setzt, hat damit noch
  * nicht entschieden, dass ein zweites System in den Shop schreibt.
+ *
+ * „probe" (Probelauf, 0102) liegt dazwischen: alle Auslöser laufen wie im
+ * Schreibmodus (Bestandsabgleich, Versandmeldungen, Einrichtung), aber jede
+ * Mutation wird an derselben Naht NICHT gesendet, sondern als „würde
+ * senden" protokolliert und in der Debug-Box angezeigt.
  * Durchgesetzt wird der Modus an EINER Naht — shopifyGraphQL() weist jede
  * Mutation ab —, nicht je Aufrufer. Entscheidungslog 2026-09-18.
  */
 
-export type ShopifyModus = 'lesen' | 'schreiben'
+export type ShopifyModus = 'lesen' | 'probe' | 'schreiben'
 
 export const SHOPIFY_MODUS_STANDARD: ShopifyModus = 'lesen'
 
 export async function shopifyModus(db: Sql | TransactionSql): Promise<ShopifyModus> {
   const [row] = await db<{ modus: string | null }[]>`
     select value ->> 'modus' as modus from settings where key = 'shopify'`
-  return row?.modus === 'schreiben' ? 'schreiben' : SHOPIFY_MODUS_STANDARD
+  return row?.modus === 'schreiben' ? 'schreiben' : row?.modus === 'probe' ? 'probe' : SHOPIFY_MODUS_STANDARD
+}
+
+/** Laufen die Auslöser (Abgleich, Rückmeldungen)? In „schreiben" und im Probelauf. */
+export function ausloeserAktiv(modus: ShopifyModus): boolean {
+  return modus !== 'lesen'
 }
 
 /**

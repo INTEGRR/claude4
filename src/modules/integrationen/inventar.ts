@@ -108,19 +108,26 @@ export interface PushErgebnis {
  * ein leerer Durchlauf kostet keinen einzigen API-Aufruf.
  */
 export async function pushInventar(): Promise<PushErgebnis> {
-  const varianten = await sql<(VarianteMitBestand & { mto: boolean; eingerichtet: boolean })[]>`
-    select v.id as variant_id, v.sku,
+  const varianten = await sql<(VarianteMitBestand & ProbeFelder & { mto: boolean; eingerichtet: boolean })[]>`
+    select v.id as variant_id, v.sku, v.display_name as name,
            v.shopify_inventory_item_gid as inventory_item_gid,
            shopify_soll_menge(v.id) as frei,
            s.pushed_qty,
            ist_made_to_order(v.id) as mto,
-           s.mto_eingerichtet_at is not null as eingerichtet
+           s.mto_eingerichtet_at is not null as eingerichtet,
+           s.probe_qty,
+           s.probe_eingerichtet_at is not null as probe_eingerichtet
     from product_variants v
     left join shopify_inventory_state s on s.variant_id = v.id
     where v.shopify_variant_id is not null and v.active
     order by v.sku`
 
   if (varianten.length === 0) return { geprueft: 0, uebertragen: 0, ohneZuordnung: 0 }
+
+  // Probelauf (0102): rechnen wie scharf, aber nichts senden — nur
+  // protokollieren, was gemeldet würde, gegen den eigenen Probe-Stand.
+  const { shopifyModus } = await import('./shopify-modus')
+  if ((await shopifyModus(sql)) === 'probe') return probeInventar(varianten)
 
   await ergaenzeInventoryItems(varianten)
   await madeToOrderEinrichten(varianten.filter((v) => v.mto && !v.eingerichtet))
@@ -163,6 +170,73 @@ export async function pushInventar(): Promise<PushErgebnis> {
     uebertragen: melden.length,
     ohneZuordnung: ohneZuordnung.length,
   }
+}
+
+// --- Probelauf ---------------------------------------------------------------------
+
+interface ProbeFelder {
+  name: string
+  mto: boolean
+  probe_qty: number | null
+  probe_eingerichtet: boolean
+}
+
+/**
+ * Bestandsabgleich im Probelauf: dieselbe Soll-Menge, derselbe Diff — aber
+ * statt inventorySetQuantities ein Protokolleintrag „würde senden" mit
+ * Artikelnamen (für die Debug-Box), und der Probe-Stand (probe_qty) statt
+ * pushed_qty. So zeigt jede Runde nur Änderungen, und beim Scharfschalten
+ * wird trotzdem alles einmal wirklich gemeldet.
+ */
+async function probeInventar(
+  varianten: (VarianteMitBestand & ProbeFelder)[],
+): Promise<PushErgebnis> {
+  const { logTransaction } = await import('./transaktionen')
+  const einrichten = varianten.filter((v) => v.mto && !v.probe_eingerichtet)
+  if (einrichten.length > 0) {
+    await logTransaction({
+      system: 'shopify',
+      kind: 'probe:productVariantsBulkUpdate',
+      request: {
+        zweck: 'Made-to-Order einrichten: Menge verfolgen, nicht ohne Bestand verkaufen',
+        varianten: einrichten.map((v) => v.name),
+      },
+      ok: true,
+      error: 'Probelauf: nicht gesendet',
+    })
+    for (const v of einrichten) {
+      await sql`
+        insert into shopify_inventory_state (variant_id, probe_eingerichtet_at) values (${v.variant_id}, now())
+        on conflict (variant_id) do update set probe_eingerichtet_at = now()`
+    }
+  }
+
+  const melden = varianten.filter(
+    (v) => v.probe_qty === null || Math.floor(Number(v.frei)) !== Math.floor(Number(v.probe_qty)),
+  )
+  if (melden.length > 0) {
+    await logTransaction({
+      system: 'shopify',
+      kind: 'probe:inventorySetQuantities',
+      request: {
+        aenderungen: melden.map((v) => ({
+          sku: v.sku,
+          name: v.name,
+          vorher: v.probe_qty === null ? null : Math.floor(Number(v.probe_qty)),
+          neu: Math.floor(Number(v.frei)),
+        })),
+      },
+      ok: true,
+      error: 'Probelauf: nicht gesendet',
+    })
+    for (const v of melden) {
+      await sql`
+        insert into shopify_inventory_state (variant_id, probe_qty, probe_at)
+        values (${v.variant_id}, ${Math.floor(Number(v.frei))}, now())
+        on conflict (variant_id) do update set probe_qty = excluded.probe_qty, probe_at = now()`
+    }
+  }
+  return { geprueft: varianten.length, uebertragen: melden.length, ohneZuordnung: 0 }
 }
 
 // --- Made-to-Order in Shopify einrichten ----------------------------------------

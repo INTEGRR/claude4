@@ -213,5 +213,12 @@ export async function aktionAusfuehrenGeprueft(
     await sql`select nutzung_zaehlen(${nutzer.id}, 'aktion', ${name})`.catch(() => undefined)
   }
 
+  // Shopify (0102): jede Aktion kann Bestand oder Baubarkeit ändern — scharf
+  // und im Probelauf den Bestandsabgleich anstoßen (gebündelt; ein Lauf ohne
+  // Änderung kostet keinen API-Aufruf). Im Modus „lesen" nichts. Nie blockierend.
+  await sql`select inventar_abgleich_anstossen()
+            where coalesce((select value ->> 'modus' from settings where key = 'shopify'), 'lesen') <> 'lesen'`
+    .catch(() => undefined)
+
   return ergebnis
 }

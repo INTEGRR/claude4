@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentUser, logout } from '@/modules/auth'
+import { ShopifyProbeBox } from '@/components/shopify-probe-box'
 import { type Area, ROLE_LABELS, canAccess } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { AppShell } from '@/components/app-shell'
@@ -108,6 +109,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   if (einrichtung?.offen) redirect('/einrichtung')
 
   const counts = await badges()
+  // Shopify-Probelauf (0102): Debug-Box für Admins — was KRNL senden würde.
+  const [shopifyEinstellung] = await sql<{ modus: string | null }[]>`
+    select value ->> 'modus' as modus from settings where key = 'shopify'`
+  const probeBox = shopifyEinstellung?.modus === 'probe' && user.rollen.includes('admin')
   // Geöffnete Navigationsgruppen des Benutzers (0095) — Standard: alles zu.
   const [navZustand] = await sql<{ nav_offen: string[] }[]>`select nav_offen from users where id = ${user.id}`
   const sees = (area: Area) => canAccess(user.rollen, area, user.befugnisse)
@@ -413,6 +418,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       {/* Der KI-Chat als zweiter Reiter: offen lassen und weiterarbeiten —
           mit Buddy-Modus (Sprachsitzung), wenn der Sprachdienst da ist. */}
       {sees('ki') && kiConfigured() && <KiOverlay sprechen={sprechenKonfiguriert()} />}
+      {probeBox && <ShopifyProbeBox />}
     </AppShell>
     </>
   )
