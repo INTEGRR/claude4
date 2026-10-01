@@ -452,6 +452,10 @@ td.mono { font-size: 12.5px; letter-spacing: 0.02em; }
   white-space: nowrap;
   border: 1px solid transparent;
 }
+/* Klickbare Schilder (Status → Belege dahinter): gleiche Optik, beim
+   Überfahren unterstrichen. Auch für handgebaute <Link className="badge …">. */
+a.badge { text-decoration: none; cursor: pointer; }
+a.badge:hover { text-decoration: underline; text-underline-offset: 2px; filter: brightness(1.05); }
 .badge.neutral { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
 .badge.info    { background: var(--info-soft); color: var(--info); border-color: var(--info); }
 .badge.success { background: var(--success-soft); color: var(--success); border-color: var(--success); }

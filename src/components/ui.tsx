@@ -20,12 +20,33 @@ const LED_BY_TONE: Record<ReturnType<typeof tone>, { cls: string; color?: string
 /**
  * Status-Typenschild. Mit `led` kommt die Statusleuchte davor — gedacht für
  * den Kopf-Status einer Detailseite. In Tabellen bleibt das Schild allein,
- * sonst flimmert die ganze Liste.
+ * sonst flimmert die ganze Liste. Mit `href` führt das Schild zu den Belegen
+ * hinter dem Status (Lieferung → Lieferschein, Fertigung → Aufträge …) —
+ * Status sind Wege, keine Sackgassen (Betreiber 2026-10-01).
  */
-export function Badge({ state, kind, led }: { state: string; kind: keyof typeof LABELS; led?: boolean }) {
+export function Badge({
+  state,
+  kind,
+  led,
+  href,
+  title,
+}: {
+  state: string
+  kind: keyof typeof LABELS
+  led?: boolean
+  href?: string
+  title?: string
+}) {
   const labels = LABELS[kind] as Record<string, string>
   const t = tone(state)
-  const badge = <span className={`badge ${t}`}>{labels[state] ?? state}</span>
+  const text = labels[state] ?? state
+  const badge = href ? (
+    <Link className={`badge badge-link ${t}`} href={href} title={title}>
+      {text}
+    </Link>
+  ) : (
+    <span className={`badge ${t}`} title={title}>{text}</span>
+  )
   if (!led) return badge
   const lamp = LED_BY_TONE[t]
   return (
