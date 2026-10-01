@@ -86,6 +86,25 @@ export interface WeitererArtikel {
   shopVerkaufbar: boolean | null
 }
 
+/** Zweitangebot (0106): weiteres Shop-Angebot mit der SKU eines Artikels. */
+export interface ZweitangebotInfo {
+  id: string
+  /** Titel des Shop-Angebots, z. B. „ANVIL NATIVE 75 - Black Week Editions". */
+  produkt: string | null
+  sku: string | null
+  variantId: string
+  artikel: string
+  modus: Modus
+  /** Was das Angebot bekommt (shopify_soll_menge_zweitangebot). */
+  soll: number
+  /** Was zuletzt wirklich gemeldet wurde (null = noch nie). */
+  gemeldet: number | null
+  shopQty: number | null
+  shopVerkaufbar: boolean | null
+  /** Letzte Ablehnung durch Shopify. */
+  fehler: string | null
+}
+
 const n = (x: unknown) => Number(x ?? 0)
 
 /** Name ohne Projekt-Präfix — als Pill-Beschriftung („Cosmic Purple"). */
@@ -102,6 +121,7 @@ export async function shopVerfuegbarkeit(): Promise<{
   projekte: ProjektInfo[]
   teile: (TeilInfo & { artikel: number })[]
   weitere: WeitererArtikel[]
+  zweitangebote: ZweitangebotInfo[]
   zuletztGelesen: string | null
 }> {
   const artikel = await sql<{ id: string; name: string; projekt: string | null; shop_modus: Modus }[]>`
@@ -113,7 +133,7 @@ export async function shopVerfuegbarkeit(): Promise<{
     order by coalesce(pt.projekt, pt.name), pt.name`
   const ids = artikel.map((a) => a.id)
 
-  const [varianten, optionen, zeilen, weitere, [stand]] = await Promise.all([
+  const [varianten, optionen, zeilen, weitere, zweit, [stand]] = await Promise.all([
     sql<{
       id: string; template_id: string; sku: string | null; name: string; shop_modus: Modus | null; ptavs: string[]
       baubar: number; engpass: string | null; soll: number; shop_qty: number | null; shop_verkaufbar: boolean | null
@@ -163,6 +183,19 @@ export async function shopVerfuegbarkeit(): Promise<{
       left join shopify_inventory_state s on s.variant_id = pv.id
       where pv.active and pt.active and pv.shopify_variant_id is not null and not ist_made_to_order(pv.id)
       order by pt.name, pv.display_name`,
+    sql<{
+      id: string; produkt: string | null; sku: string | null; variant_id: string; artikel: string; shop_modus: Modus
+      soll: number; pushed_qty: number | null; shop_qty: number | null; shop_verkaufbar: boolean | null
+      push_fehler: string | null
+    }[]>`
+      select z.id, z.produkt, coalesce(z.sku, pv.sku) as sku, z.variant_id, pv.display_name as artikel, z.shop_modus,
+             shopify_soll_menge_zweitangebot(z.id) as soll, z.pushed_qty::float as pushed_qty,
+             z.shop_qty::float as shop_qty, z.shop_verkaufbar, z.push_fehler
+      from shopify_zweitangebote z
+      join product_variants pv on pv.id = z.variant_id
+      where pv.active
+        and not exists (select 1 from product_variants x where x.shopify_variant_id = z.shopify_variant_id)
+      order by z.produkt nulls last, pv.display_name`,
     sql<{ zuletzt: string | null }[]>`select max(shop_seen_at)::text as zuletzt from shopify_inventory_state`,
   ])
 
@@ -238,6 +271,11 @@ export async function shopVerfuegbarkeit(): Promise<{
       id: w.id, templateId: w.template_id, sku: w.sku, name: w.name, modus: w.shop_modus, artikelModus: w.t_modus,
       frei: n(w.frei), oosUnter: w.oos_unter, zurueck: w.zurueck, soll: n(w.soll),
       shopQty: w.shop_qty === null ? null : n(w.shop_qty), shopVerkaufbar: w.shop_verkaufbar,
+    })),
+    zweitangebote: zweit.map((z) => ({
+      id: z.id, produkt: z.produkt, sku: z.sku, variantId: z.variant_id, artikel: z.artikel, modus: z.shop_modus,
+      soll: n(z.soll), gemeldet: z.pushed_qty === null ? null : n(z.pushed_qty),
+      shopQty: z.shop_qty === null ? null : n(z.shop_qty), shopVerkaufbar: z.shop_verkaufbar, fehler: z.push_fehler,
     })),
     zuletztGelesen: stand?.zuletzt ?? null,
   }

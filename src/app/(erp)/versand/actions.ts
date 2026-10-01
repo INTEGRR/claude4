@@ -39,3 +39,8 @@ export async function gewichteAusShopify(formData: FormData): Promise<ActionResu
 export async function gelabelteAusbuchen(formData: FormData): Promise<ActionResult> {
   return serverAktion('versand.gelabelte_ausbuchen', { formData })
 }
+
+/** Adresse bei DHL prüfen, ohne Label (versand.adresse_pruefen). */
+export async function adressePruefen(pickingId: string): Promise<ActionResult> {
+  return serverAktion('versand.adresse_pruefen', { recordId: pickingId })
+}

@@ -26,6 +26,7 @@ REST-Nachfolger des alten SOAP-„Geschäftskundenversands" (die Alt-Schnittstel
 ## 2. Label erstellen
 
 - **Endpoint:** `POST /orders` (Array `shipments[]`, Bulk möglich; `?validate=true` für reine Validierung)
+- **Validierung ohne Label** (`?validate=true`, in KRNL die Aktion „Adresse prüfen", seit 2026-10-01): derselbe Request wie beim Label; DHL prüft Schema und Sendung samt Adresse und erzeugt kein Label. Antwort je Sendung `sstatus` (200 gültig, 400 abgelehnt) und `validationMessages[]` mit `property` (Feldpfad, z. B. `shipments[0].consignee.postalCode`), `validationMessage` und `validationState` (`Error` = Label würde abgelehnt, `Warning` = Label ginge, z. B. nicht leitcodierbar). Dieselben Meldungen kommen beim echten Labeldruck. Mit `Accept-Language: de-DE` liefert DHL die Texte auf Deutsch (KRNL sendet den Header bei allen Shipping-Aufrufen; Auswertung und Übersetzung in `versand/dhl-validierung.ts`).
 - **Wichtigste Request-Felder pro Sendung:**
   - `product`: **V01PAK** (DHL Paket national), **V62KP** (DHL Kleinpaket — Warenpost-Nachfolger seit 01/2025, max. 35,5 × 25 × 8 cm und 1 kg; der alte Code V62WP wird seit 31.05.2026 nicht mehr umgeschrieben), **V54EPAK** (Europaket, EU), **V53WPAK** (Paket International, mit Zolldaten), **V66WPI** (Kleinpaket international), **V07PAK** (Retoure)
   - `billingNumber` (muss zum Produkt passen), optional `refNo` (Kundenreferenz — z. B. unsere Auftragsnummer)

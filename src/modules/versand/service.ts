@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { sql } from '@/db/client'
 import {
+  type CreateShipmentInput,
   type CreatedShipment,
   DhlError,
   type TrackingResult,
@@ -17,8 +18,10 @@ import {
   trackShipments,
   trackingUrl,
   unifiedTracking,
+  validateShipment,
 } from './dhl'
 import { brauchtZoll } from './dhl-codes'
+import { type AdressPruefung, adresseEinzeilig, fehlendeAdressfelder } from './dhl-validierung'
 import { billingNumberForProduct } from './regeln-logik'
 import { vorschlaegeFuerPickings } from './regeln'
 
@@ -143,12 +146,8 @@ export interface LabelEmpfaenger {
   phone?: string
 }
 
-/**
- * Der eine DHL-Kern: Absender aus den Firmendaten, Druckformat aus den
- * DHL-Einstellungen, Aufruf, PDF-Ablage. Kein Datenbank-Insert — den macht
- * der Aufrufer, weil Lieferung und Reparatur an verschiedenen Belegen hängen.
- */
-async function dhlLabelErzeugen(input: {
+/** Was eine Sendung für DHL braucht — ohne Beleg-Bezug (Lieferung ODER Reparatur). */
+interface SendungsDaten {
   empfaenger: LabelEmpfaenger
   reference: string
   weightG: number
@@ -158,67 +157,93 @@ async function dhlLabelErzeugen(input: {
   customs: ZollDaten | null
   /** Format des Zieldruckers (0087); sonst der Standard aus settings.dhl. */
   printFormat?: string
-}): Promise<{ result: CreatedShipment; labelPath: string | null; printFormat: string }> {
+}
+
+/**
+ * Der eine DHL-Kern, Teil 1: der Request — Absender aus den Firmendaten,
+ * Druckformat aus den DHL-Einstellungen. Labeldruck und Adressprüfung bauen
+ * ihn hierüber, damit geprüft wird, was gedruckt würde.
+ */
+async function dhlEingabe(input: SendungsDaten): Promise<{ eingabe: CreateShipmentInput; printFormat: string }> {
   const company = await companySettings()
   const [settings] = await sql<{ print_format: string | null }[]>`
     select value ->> 'print_format' as print_format from settings where key = 'dhl'`
   const printFormat = input.printFormat || settings?.print_format || '910-300-700'
   const e = input.empfaenger
-
-  const result = await createShipment({
-    product: input.product,
-    billingNumber: input.billingNumber,
-    insuredValue: input.insuredValue,
-    customs: input.customs,
-    reference: input.reference,
-    weightG: input.weightG,
+  return {
     printFormat,
-    shipper: {
-      name: company.name,
-      street: company.street,
-      houseNumber: company.house,
-      zip: company.zip,
-      city: company.city,
-      country: toAlpha3(company.country),
-      email: company.email,
-      phone: company.phone,
+    eingabe: {
+      product: input.product,
+      billingNumber: input.billingNumber,
+      insuredValue: input.insuredValue,
+      customs: input.customs,
+      reference: input.reference,
+      weightG: input.weightG,
+      printFormat,
+      shipper: {
+        name: company.name,
+        street: company.street,
+        houseNumber: company.house,
+        zip: company.zip,
+        city: company.city,
+        country: toAlpha3(company.country),
+        email: company.email,
+        phone: company.phone,
+      },
+      consignee: {
+        name: e.name,
+        street: e.street,
+        houseNumber: e.houseNumber,
+        addition: e.addition,
+        zip: e.zip,
+        city: e.city,
+        country: toAlpha3(e.countryAlpha2),
+        email: e.email,
+        phone: e.phone,
+      },
     },
-    consignee: {
-      name: e.name,
-      street: e.street,
-      houseNumber: e.houseNumber,
-      addition: e.addition,
-      zip: e.zip,
-      city: e.city,
-      country: toAlpha3(e.countryAlpha2),
-      email: e.email,
-      phone: e.phone,
-    },
-  })
+  }
+}
 
+/**
+ * Der eine DHL-Kern, Teil 2: Aufruf und PDF-Ablage. Kein Datenbank-Insert —
+ * den macht der Aufrufer, weil Lieferung und Reparatur an verschiedenen
+ * Belegen hängen.
+ */
+async function dhlLabelErzeugen(
+  input: SendungsDaten,
+): Promise<{ result: CreatedShipment; labelPath: string | null; printFormat: string }> {
+  const { eingabe, printFormat } = await dhlEingabe(input)
+  const result = await createShipment(eingabe)
   const labelPath = result.labelBase64
     ? await storeLabel(`${result.shipmentNumber}.pdf`, result.labelBase64)
     : null
   return { result, labelPath, printFormat }
 }
 
-/**
- * Erstellt ein DHL-Label für eine Lieferung. Läuft bewusst synchron (nicht
- * über die Outbox): am Packtisch wird das Label sofort gebraucht.
- *
- * Produkt, Abrechnungsnummer und Versicherung kommen aus den Versandregeln
- * (Vorschlag); explizite opts überschreiben sie.
- */
-export async function createLabelForPicking(
-  pickingId: string,
-  opts: { weightG?: number; product?: string; printFormat?: string } = {},
-): Promise<CreateLabelResult> {
-  if (!dhlConfigured()) {
-    throw new DhlError(
-      'DHL ist nicht konfiguriert — API-Key, GKP-Zugang und Abrechnungsnummer sind Umgebungsvariablen; was fehlt, zeigt Einstellungen → Schnittstellen.',
-    )
-  }
+type Versandvorschlag = Awaited<ReturnType<typeof vorschlaegeFuerPickings>> extends Map<string, infer V> ? V : never
 
+/** Die Lieferung, wie DHL sie bekommt — samt Regelvorschlag und Zolldaten. */
+interface LieferSendung extends SendungsDaten {
+  state: string
+  pickingNumber: string
+  salesOrderId: string | null
+  ruleName: string | null
+  vorschlag: Versandvorschlag | undefined
+  zollHinweise: string[]
+}
+
+/**
+ * Stellt die Sendung einer Lieferung zusammen — EINE Quelle für „Label
+ * erstellen" und „Adresse prüfen". Adresse aus dem Auftrag (eingefroren beim
+ * Import), sonst aus dem Kontakt; Produkt, Abrechnungsnummer und
+ * Versicherung aus den Versandregeln (Vorschlag); explizite opts
+ * überschreiben sie.
+ */
+async function sendungFuerPicking(
+  pickingId: string,
+  opts: { weightG?: number; product?: string; printFormat?: string },
+): Promise<LieferSendung> {
   const [picking] = await sql<
     {
       id: string
@@ -264,34 +289,25 @@ export async function createLabelForPicking(
     where p.id = ${pickingId}`
 
   if (!picking) throw new Error('Lieferung nicht gefunden')
-  if (picking.state === 'done') {
-    // Das Label bucht aus (2026-10-01) — ein storniertes Label muss sich
-    // trotzdem ersetzen lassen: eine ausgebuchte Lieferung bekommt ein
-    // neues Label nur, wenn ihr letztes storniert wurde.
-    const [storniert] = await sql<{ n: number }[]>`
-      select count(*)::int as n from shipments
-      where picking_id = ${pickingId} and state = 'cancelled'`
-    if (Number(storniert.n) === 0) throw new Error('Die Lieferung ist bereits abgeschlossen')
-  }
   if (picking.state === 'cancel') throw new Error('Die Lieferung ist storniert')
 
-  const [open] = await sql<{ count: number }[]>`
-    select count(*)::int as count from shipments
-    where picking_id = ${pickingId} and state not in ('cancelled', 'failure')`
-  if (Number(open.count) > 0) {
-    throw new Error('Für diese Lieferung existiert bereits ein Label. Bitte zuerst stornieren.')
+  const empfaenger: LabelEmpfaenger = {
+    name: picking.ship_name ?? picking.partner_name ?? '',
+    street: picking.ship_street ?? picking.partner_street ?? '',
+    houseNumber: picking.ship_house_number ?? picking.partner_house ?? '',
+    addition: picking.ship_street2 ?? undefined,
+    zip: picking.ship_zip ?? picking.partner_zip ?? '',
+    city: picking.ship_city ?? picking.partner_city ?? '',
+    countryAlpha2: picking.ship_country_code ?? picking.partner_country ?? 'DE',
+    email: picking.ship_email ?? picking.partner_email ?? undefined,
+    phone: picking.ship_phone ?? undefined,
   }
-
-  // Adresse aus dem Auftrag (eingefroren beim Import), sonst aus dem Kontakt.
-  const name = picking.ship_name ?? picking.partner_name ?? ''
-  const street = picking.ship_street ?? picking.partner_street ?? ''
-  const houseNumber = picking.ship_house_number ?? picking.partner_house ?? ''
-  const zip = picking.ship_zip ?? picking.partner_zip ?? ''
-  const city = picking.ship_city ?? picking.partner_city ?? ''
-  const countryAlpha2 = picking.ship_country_code ?? picking.partner_country ?? 'DE'
-
-  if (!name || !street || !zip || !city) {
-    throw new Error('Die Lieferadresse ist unvollständig (Name, Straße, PLZ und Ort werden benötigt).')
+  const fehlt = fehlendeAdressfelder(empfaenger)
+  if (fehlt.length > 0) {
+    throw new Error(
+      `Die Lieferadresse ist unvollständig — es fehlt: ${fehlt.join(', ')} ` +
+        '(Name, Straße, PLZ und Ort werden benötigt).',
+    )
   }
 
   const vorschlag = (await vorschlaegeFuerPickings([pickingId])).get(pickingId)
@@ -301,7 +317,7 @@ export async function createLabelForPicking(
     opts.weightG ?? vorschlag?.versandgewichtG ?? Number(picking.weight_g) ?? 0,
     1,
   )
-  const product = opts.product ?? vorschlag?.product ?? productForCountry(countryAlpha2)
+  const product = opts.product ?? vorschlag?.product ?? productForCountry(empfaenger.countryAlpha2)
   // Bei Handwahl zählt die Regel nicht mehr als Urheber.
   const ruleName = opts.product ? null : (vorschlag?.productRegel ?? null)
   // Verfahren in der Abrechnungsnummer muss zum Produkt passen (Kleinpaket
@@ -311,39 +327,94 @@ export async function createLabelForPicking(
   const insuredValue = vorschlag?.insuredValue ?? null
   const reference = picking.sales_order_number ?? picking.number
 
-  const zoll = brauchtZoll(countryAlpha2)
+  const zoll = brauchtZoll(empfaenger.countryAlpha2)
     ? await zolldatenFuerPicking(pickingId, picking.sales_order_id, reference)
     : null
 
-  const { result, labelPath, printFormat } = await dhlLabelErzeugen({
-    printFormat: opts.printFormat,
-    empfaenger: {
-      name,
-      street,
-      houseNumber,
-      addition: picking.ship_street2 ?? undefined,
-      zip,
-      city,
-      countryAlpha2,
-      email: picking.ship_email ?? picking.partner_email ?? undefined,
-      phone: picking.ship_phone ?? undefined,
-    },
+  return {
+    state: picking.state,
+    pickingNumber: picking.number,
+    salesOrderId: picking.sales_order_id,
+    empfaenger,
     reference,
     weightG,
     product,
     billingNumber,
     insuredValue,
     customs: zoll?.customs ?? null,
-  })
+    printFormat: opts.printFormat,
+    ruleName,
+    vorschlag,
+    zollHinweise: zoll?.hinweise ?? [],
+  }
+}
 
-  const warnings = [...result.warnings, ...(zoll?.hinweise ?? [])]
+/**
+ * „Adresse prüfen" (2026-10-01): derselbe DHL-Request wie „Label erstellen"
+ * (sendungFuerPicking + dhlEingabe), nur mit validate=true — kein Label,
+ * keine Buchung, nichts gespeichert. Das Protokoll schreibt der Aufrufer.
+ */
+export async function adresseFuerPickingPruefen(
+  pickingId: string,
+  opts: { weightG?: number; product?: string; printFormat?: string } = {},
+): Promise<{ pruefung: AdressPruefung; adresse: string; pickingNumber: string }> {
+  if (!dhlConfigured()) {
+    throw new DhlError(
+      'DHL ist nicht konfiguriert — API-Key, GKP-Zugang und Abrechnungsnummer sind Umgebungsvariablen; was fehlt, zeigt Einstellungen → Schnittstellen.',
+    )
+  }
+  const sendung = await sendungFuerPicking(pickingId, opts)
+  const { eingabe } = await dhlEingabe(sendung)
+  const pruefung = await validateShipment(eingabe)
+  return { pruefung, adresse: adresseEinzeilig(sendung.empfaenger), pickingNumber: sendung.pickingNumber }
+}
+
+/**
+ * Erstellt ein DHL-Label für eine Lieferung. Läuft bewusst synchron (nicht
+ * über die Outbox): am Packtisch wird das Label sofort gebraucht.
+ *
+ * Produkt, Abrechnungsnummer und Versicherung kommen aus den Versandregeln
+ * (Vorschlag); explizite opts überschreiben sie.
+ */
+export async function createLabelForPicking(
+  pickingId: string,
+  opts: { weightG?: number; product?: string; printFormat?: string } = {},
+): Promise<CreateLabelResult> {
+  if (!dhlConfigured()) {
+    throw new DhlError(
+      'DHL ist nicht konfiguriert — API-Key, GKP-Zugang und Abrechnungsnummer sind Umgebungsvariablen; was fehlt, zeigt Einstellungen → Schnittstellen.',
+    )
+  }
+
+  const sendung = await sendungFuerPicking(pickingId, opts)
+  if (sendung.state === 'done') {
+    // Das Label bucht aus (2026-10-01) — ein storniertes Label muss sich
+    // trotzdem ersetzen lassen: eine ausgebuchte Lieferung bekommt ein
+    // neues Label nur, wenn ihr letztes storniert wurde.
+    const [storniert] = await sql<{ n: number }[]>`
+      select count(*)::int as n from shipments
+      where picking_id = ${pickingId} and state = 'cancelled'`
+    if (Number(storniert.n) === 0) throw new Error('Die Lieferung ist bereits abgeschlossen')
+  }
+
+  const [open] = await sql<{ count: number }[]>`
+    select count(*)::int as count from shipments
+    where picking_id = ${pickingId} and state not in ('cancelled', 'failure')`
+  if (Number(open.count) > 0) {
+    throw new Error('Für diese Lieferung existiert bereits ein Label. Bitte zuerst stornieren.')
+  }
+
+  const { product, billingNumber, weightG, insuredValue, ruleName, vorschlag } = sendung
+  const { result, labelPath, printFormat } = await dhlLabelErzeugen(sendung)
+
+  const warnings = [...result.warnings, ...sendung.zollHinweise]
   const [shipment] = await sql<{ id: string }[]>`
     insert into shipments (
       picking_id, sales_order_id, dhl_product, billing_number, weight_g,
       insured_value, rule_name, packaging_id,
       shipment_number, tracking_url, label_path, label_pdf, label_format, dhl_warnings)
     values (
-      ${pickingId}, ${picking.sales_order_id}, ${product}, ${billingNumber},
+      ${pickingId}, ${sendung.salesOrderId}, ${product}, ${billingNumber},
       ${weightG}, ${insuredValue}, ${ruleName}, ${vorschlag?.kartonage?.id ?? null},
       ${result.shipmentNumber}, ${result.trackingUrl}, ${labelPath},
       ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},

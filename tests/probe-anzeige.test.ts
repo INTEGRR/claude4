@@ -18,6 +18,15 @@ describe('Probelauf-Anzeige', () => {
     assert.deepEqual(erste.details, ['X (X): 3'])
   })
 
+  test('Zweitangebote (0106): eigener Eintrag, je Zeile das Shop-Angebot', () => {
+    const z = probeZeile('probe:inventorySetQuantities', {
+      zweitangebote: true,
+      aenderungen: [{ sku: 'KB-1', name: 'Tastatur Weiß', angebot: 'Black Week Editions', vorher: 3, neu: 2 }],
+    })
+    assert.equal(z.titel, 'Bestand an Zweitangebote: 1 Änderung(en)')
+    assert.deepEqual(z.details, ['Tastatur Weiß (KB-1) → „Black Week Editions": 3 → 2'])
+  })
+
   test('Made-to-Order-Einrichtung und andere Mutationen', () => {
     assert.match(probeZeile('probe:productVariantsBulkUpdate', { varianten: ['A', 'B'] }).titel, /2 Variante/)
     const f = probeZeile('probe:fulfillmentCreate', {

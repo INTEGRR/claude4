@@ -24,9 +24,10 @@ Datenbank-TLS im Code, Konten löschen.
 Druckbrücke und Telegram melden grün; Mail und Google sind nicht
 eingerichtet. Offen vor dem Stichtag vor allem: Mail, PITR, Konten/2FA
 (nur ein Admin hat den zweiten Faktor), DHL-Retouren-Empfänger,
-Retouren-/Reparaturtest, Zweitangebote im Bestand, Adresse prüfen — dann
-Stichtag nach Runbook. `ZWEIFAKTOR_SCHLUESSEL` lässt sich seit 2026-10-01
-gefahrlos nachträglich setzen.
+Retouren-/Reparaturtest — dann Stichtag nach Runbook. Im Code erledigt
+(2026-10-01): Zweitangebote im Bestand und „Adresse prüfen" (nach dem
+Deploy einmal gegenprüfen, §5 und §6). `ZWEIFAKTOR_SCHLUESSEL` lässt sich
+seit 2026-10-01 gefahrlos nachträglich setzen.
 
 ## 1. Geheimnisse und Zugänge (Betreiber, Vercel → Production)
 
@@ -155,8 +156,16 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 
 ## 5. Versand fachlich (KRNL + Betreiber)
 
-- [ ] KRNL: Aktion „Adresse prüfen" (Shipping-API `validate=true`) am
-      Verkaufsauftrag und am Packtisch — offen, zugesagt.
+- [x] KRNL: Aktion „Adresse prüfen" (Shipping-API `validate=true`) am
+      Verkaufsauftrag und am Packtisch. *Stand 2026-10-01: umgesetzt
+      (`versand.adresse_pruefen`, [module/versand.md](module/versand.md)
+      „Adresse prüfen") — Knopf am Verkaufsauftrag (Karte „Lieferadresse"),
+      in der Versandliste (Spalte „Ziel") und im Packablauf des Scanfelds;
+      derselbe Request wie das Label, ohne Label, Ergebnis „Adresse ok" oder
+      die DHL-Beanstandungen in Klartext. Lehnt DHL ein Label wegen der
+      Adresse ab, ist auch diese Meldung jetzt lesbar („PLZ passt nicht zum
+      Ort" statt „consignee.postalCode: …"). Nach dem Deploy einmal an einer
+      echten Lieferung prüfen (Betreiber).*
 - [x] KRNL: Gewichte aus Shopify übernehmen prüfen (Versandgewicht =
       Warengewicht + Kartonage, [module/versand.md](module/versand.md)).
       *Stand 2026-10-01: der Import hatte keine Gewichte geholt. Jetzt
@@ -233,10 +242,20 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       Editions), immer verfügbar (Switch-Tester); Made-to-Order-Puffer und
       -Deckel unter Einstellungen → Anbindungen. Im **Probelauf** in der
       Debug-Box gegenprüfen, was an Shopify ginge.
-- [ ] KRNL, vor dem Schreibmodus: Bestand auch an **Zweitangebote** melden
+- [x] KRNL, vor dem Schreibmodus: Bestand auch an **Zweitangebote** melden
       (Bundle-Bestandteile mit derselben SKU, z. B. „Black Week Editions").
       Heute bekommt nur das verknüpfte Angebot den Bestand; die Bundles-App
       rechnet die Bundle-Verfügbarkeit aber aus den Bestandteilen.
+      *Stand 2026-10-01: umgesetzt (Migration 0106,
+      [module/integrationen.md](module/integrationen.md) „Zweitangebote") —
+      jede Bestandsmeldung geht mit derselben Menge auch an alle
+      Zweitangebote, im Probelauf als eigener Eintrag „Bestand an
+      Zweitangebote" in der Debug-Box. Gefunden werden sie beim nächsten
+      Reconcile (viertelstündlich) bzw. sofort mit „Shop-Stand holen". Je
+      Angebot steuerbar unter Verkauf → Shop-Verfügbarkeit, Karte
+      „Zweitangebote" — Betreiber: dort nach dem Deploy prüfen, dass die
+      Black Week Editions als Zweitangebot (nicht als Artikel) erscheinen,
+      und sie dort auf „aus" stellen, solange die Aktion nicht läuft.*
 - [ ] Stichtag: Shopify-Modus von „Probelauf" auf **schreiben** stellen, dann Webhooks
       registrieren, einmal „Mit Shopify abgleichen" (Bestand), Order-
       Backfill nur ab Stichtag.

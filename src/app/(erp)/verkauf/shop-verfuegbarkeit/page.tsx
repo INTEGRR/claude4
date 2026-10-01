@@ -34,6 +34,10 @@ async function standHolen() {
   'use server'
   return serverAktion('verkauf.shop_stand_holen', {})
 }
+async function zweitangebotSetzen(formData: FormData) {
+  'use server'
+  return serverAktion('verkauf.shop_zweitangebot_setzen', { formData })
+}
 
 const MODI: { wert: Modus; text: string }[] = [
   { wert: 'auto', text: 'berechnet' },
@@ -344,6 +348,76 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
             </tbody>
           </table>
         </TableWrap>
+      </Card>
+
+      <Card title={`Zweitangebote (${daten.zweitangebote.length})`} tight>
+        <p className="small muted" style={{ margin: 0, padding: '10px 12px' }}>
+          Weitere Shop-Angebote mit der SKU eines Artikels — die Bestandteil-Liste eines Bundles (z. B. „Black Week
+          Editions") oder eine Aktions-Edition. Sie bekommen dieselbe Menge wie der Artikel; die Bundles-App rechnet
+          daraus die Bundle-Verfügbarkeit. „aus" meldet nur diesem Angebot 0, der Artikel läuft normal weiter. Gefunden
+          werden sie beim Produktimport und bei „Shop-Stand holen".
+        </p>
+        {daten.zweitangebote.length > 0 && (
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Shop-Angebot</th>
+                  <th>Artikel</th>
+                  <th className="num">an Shopify</th>
+                  <th className="num">zuletzt gemeldet</th>
+                  <th className="num">im Shop jetzt</th>
+                  {darf && <th>Steuerung</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {daten.zweitangebote.map((z) => (
+                  <tr key={z.id}>
+                    <td className="small">
+                      {z.produkt ?? '—'}
+                      {z.sku && <span className="muted mono"> · {z.sku}</span>}
+                      {z.fehler && (
+                        <div className="small" style={{ color: 'var(--danger)' }}>
+                          Shopify lehnt ab: {z.fehler}
+                        </div>
+                      )}
+                    </td>
+                    <td className="small">
+                      <Link href={`/produkte/variante/${z.variantId}`}>{z.artikel}</Link>
+                    </td>
+                    <td className="num mono">{z.soll > 0 ? qty(z.soll) : <Zustand ton="warn">0</Zustand>}</td>
+                    <td className="num mono">{z.gemeldet === null ? '—' : qty(z.gemeldet)}</td>
+                    <td className="num mono">
+                      {z.shopVerkaufbar === null ? '—' : z.shopVerkaufbar ? qty(z.shopQty ?? 0) : 'aus'}
+                    </td>
+                    {darf && (
+                      <td>
+                        <ActionForm action={zweitangebotSetzen}>
+                          <input type="hidden" name="angebot_id" value={z.id} />
+                          <div className="actions">
+                            <select
+                              name="modus"
+                              defaultValue={z.modus}
+                              className="small"
+                              aria-label={`Steuerung ${z.produkt ?? z.artikel}`}
+                            >
+                              <option value="auto">wie der Artikel</option>
+                              <option value="immer">immer verfügbar</option>
+                              <option value="aus">aus (ausverkauft)</option>
+                            </select>
+                            <button type="submit" className="small">
+                              OK
+                            </button>
+                          </div>
+                        </ActionForm>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
       </Card>
 
       <Card title={`Weitere Shop-Artikel (${daten.weitere.length})`} tight>

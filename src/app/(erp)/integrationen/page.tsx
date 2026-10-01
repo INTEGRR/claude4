@@ -65,10 +65,16 @@ async function pushInventarJetzt() {
     const r = await inventarAbgleichen()
     revalidatePath('/integrationen')
     if (r.gesperrt) return actionInfo('Ein Abgleich läuft gerade — er rechnet am Ende noch eine Runde.')
+    // Zweitangebote (0106) bekommen dieselbe Menge — die Zahl gehört dazu.
+    const zweit =
+      r.angebote > 0
+        ? ` Zweitangebote: ${r.angeboteUebertragen} von ${r.angebote} gemeldet` +
+          `${r.angeboteAbgelehnt ? `, ${r.angeboteAbgelehnt} abgelehnt` : ''}.`
+        : ''
     return actionInfo(
-      r.uebertragen > 0
+      (r.uebertragen > 0
         ? `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert.`
-        : `Alles aktuell — ${r.geprueft} Variante(n) geprüft, nichts zu melden.`,
+        : `Alles aktuell — ${r.geprueft} Variante(n) geprüft, nichts zu melden.`) + zweit,
     )
   } catch (err) {
     return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))

@@ -40,12 +40,21 @@ export function probeZeile(kind: string, request: unknown): ProbeZeile {
   const r = (request ?? {}) as Record<string, unknown>
 
   if (operation === 'inventorySetQuantities' && Array.isArray(r.aenderungen)) {
-    const liste = r.aenderungen as { sku: string | null; name: string; vorher: number | null; neu: number }[]
+    const liste = r.aenderungen as {
+      sku: string | null
+      name: string
+      /** Zweitangebot (0106): Titel des weiteren Shop-Angebots. */
+      angebot?: string
+      vorher: number | null
+      neu: number
+    }[]
+    const ziel = r.zweitangebote ? 'Bestand an Zweitangebote' : 'Bestand an Shopify'
     return {
-      titel: `Bestand an Shopify: ${liste.length} Änderung(en)${liste.every((a) => a.vorher === null) ? ' (erste vollständige Meldung)' : ''}`,
+      titel: `${ziel}: ${liste.length} Änderung(en)${liste.every((a) => a.vorher === null) ? ' (erste vollständige Meldung)' : ''}`,
       details: liste.map(
         (a) =>
-          `${a.name}${a.sku ? ` (${a.sku})` : ''}: ${a.vorher === null ? '' : `${a.vorher} → `}${a.neu}${a.neu <= 0 ? ' · ausverkauft' : ''}`,
+          `${a.name}${a.sku ? ` (${a.sku})` : ''}${a.angebot ? ` → „${a.angebot}"` : ''}: ` +
+          `${a.vorher === null ? '' : `${a.vorher} → `}${a.neu}${a.neu <= 0 ? ' · ausverkauft' : ''}`,
       ),
     }
   }

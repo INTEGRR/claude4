@@ -135,6 +135,23 @@ describe('Produktübernahme: Bundles und Zweitangebote', () => {
     assert.equal(stand.value.fertig, true)
     assert.equal(stand.value.zweitangebote, 2)
     assert.equal(stand.value.bundles, 1)
+
+    // Die Zweitangebote sind gemerkt (0106) — der Bestandsabgleich meldet
+    // ihnen dieselbe Menge wie dem Artikel: die Bundle-Liste bekommt den
+    // Bestand von „Nexus White", die doppelte SKU den ihres Artikels.
+    const zweit = await h.sql<{ shopify_variant_id: string; artikel: string; sku: string; produkt: string; item: string }[]>`
+      select z.shopify_variant_id, pt.name as artikel, pv.sku, z.produkt, z.shopify_inventory_item_gid as item
+      from shopify_zweitangebote z
+      join product_variants pv on pv.id = z.variant_id
+      join product_templates pt on pt.id = pv.template_id
+      order by z.shopify_variant_id`
+    assert.deepEqual(
+      zweit.map((z) => [z.shopify_variant_id, z.artikel, z.sku, z.produkt, z.item]),
+      [
+        [gid('ProductVariant', 11), 'Test Nexus White', 'T-WEISS-W', 'Test Black Week Editions', gid('InventoryItem', 11)],
+        [gid('ProductVariant', 42), 'Test Doppel-SKU', 'T-DUP', 'Test Doppel-SKU', gid('InventoryItem', 42)],
+      ],
+    )
   })
 
   test('ein zweiter Lauf legt nichts doppelt an', async () => {
@@ -143,6 +160,8 @@ describe('Produktübernahme: Bundles und Zweitangebote', () => {
     assert.ok(!ergebnisse.some((r) => /Probleme/.test(r)))
     const [{ nachher }] = await h.sql<{ nachher: number }[]>`select count(*)::int as nachher from product_variants`
     assert.equal(nachher, vorher)
+    const [{ zweit }] = await h.sql<{ zweit: number }[]>`select count(*)::int as zweit from shopify_zweitangebote`
+    assert.equal(zweit, 2, 'Zweitangebote auch nicht doppelt')
   })
 
   test('eine Bestellung über die Bundle-Liste landet beim Artikel des normalen Produkts', async () => {

@@ -115,6 +115,28 @@ export const VERKAUF_SHOP = {
     revalidate: ['/verkauf/shop-verfuegbarkeit'],
   },
 
+  'verkauf.shop_zweitangebot_setzen': {
+    label: 'Shop: Zweitangebot steuern',
+    bereich: 'verkauf',
+    prozessfrei: true,
+    ki: true,
+    beschreibung:
+      'Steuert ein Zweitangebot — ein weiteres Shop-Angebot mit der SKU eines Artikels, z. B. die ' +
+      'Bestandteil-Liste eines Bundles („Black Week Editions"): auto = dieselbe Menge wie der Artikel, ' +
+      'immer = Deckel melden, aus = 0 (ausverkauft) — unabhängig vom Artikel selbst.',
+    bindung: 'frei',
+    schema: z.object({
+      angebot_id: z.string().uuid(),
+      modus: MODUS,
+    }),
+    zusammenfassung: (p) => `Zweitangebot an Shopify: ${p.modus}`,
+    formdata: (fd) => ({
+      angebot_id: String(fd.get('angebot_id') ?? ''),
+      modus: leer(fd, 'modus') || undefined,
+    }),
+    revalidate: ['/verkauf/shop-verfuegbarkeit'],
+  },
+
   'verkauf.shop_stand_holen': {
     label: 'Shop: Stand aus Shopify holen',
     bereich: 'verkauf',

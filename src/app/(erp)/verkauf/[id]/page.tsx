@@ -8,6 +8,8 @@ import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { TagEditor } from '@/components/tag-editor'
 import { herkunftHref } from '@/app/(erp)/lager/herkunft'
+import { adressePruefen } from '@/app/(erp)/versand/actions'
+import { dhlConfigured } from '@/modules/versand/dhl'
 import {
   addLine,
   cancelOrder,
@@ -179,6 +181,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           ? `/lager?auftrag=${id}${offeneLieferungen.length > 0 ? '' : '&offen=0'}`
           : undefined
   const quelleHref = herkunftHref(order.origin_model, order.origin_id)
+  // Die Lieferung, deren Sendung „Adresse prüfen" bei DHL prüft: die (erste)
+  // offene — ohne offene Lieferung gibt es nichts mehr zu verschicken.
+  const adressLieferung = offeneLieferungen[0] ?? null
 
   return (
     <>
@@ -299,6 +304,24 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <span className="mono">{order.ship_zip}</span> {order.ship_city}{' '}
               <span className="mono">{order.ship_country_code}</span>
             </div>
+            {/* Adresse prüfen (2026-10-01): an der offenen Lieferung, mit
+                demselben DHL-Request wie das Label — nur validate=true. */}
+            {adressLieferung && (
+              <div style={{ marginTop: 8 }}>
+                <ActionButton
+                  className="small"
+                  action={adressePruefen.bind(null, adressLieferung.id)}
+                  disabled={!dhlConfigured()}
+                  title={
+                    dhlConfigured()
+                      ? `DHL prüft die Sendung von ${adressLieferung.number} samt Adresse, ohne Label`
+                      : 'DHL ist nicht konfiguriert'
+                  }
+                >
+                  Adresse prüfen
+                </ActionButton>
+              </div>
+            )}
           </div>
         </div>
         {order.source === 'shopify' && order.shopify_order_id && (

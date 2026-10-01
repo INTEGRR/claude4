@@ -1,12 +1,21 @@
 import 'server-only'
 import { trackingUrl } from './dhl-codes'
-import type {
-  CreateShipmentInput,
-  CreatedShipment,
-  DhlAddress,
-  ReturnLabelResult,
-  TrackingResult,
+import {
+  type CreateShipmentInput,
+  type CreatedShipment,
+  type DhlAddress,
+  DhlError,
+  type ReturnLabelResult,
+  type TrackingResult,
 } from './dhl'
+import {
+  type AdressPruefung,
+  ablehnungsText,
+  fakeAntwort,
+  fakePruefMeldungen,
+  pruefAntwortAuswerten,
+  warnungenLesbar,
+} from './dhl-validierung'
 
 /**
  * Deterministischer DHL-Ersatz für Prozesstests und Staging (DHL_FAKE=1).
@@ -30,12 +39,38 @@ function nummerAus(reference: string): string {
   return `99${String(h).padStart(10, '0')}00000000`.slice(0, 20)
 }
 
-async function protokoll(kind: string, reference: string, response: unknown): Promise<void> {
+async function protokoll(kind: string, reference: string, response: unknown, request?: unknown): Promise<void> {
   const { logTransaction } = await import('../integrationen/transaktionen')
-  await logTransaction({ system: 'dhl', kind: `fake:${kind}`, reference, ok: true, response })
+  await logTransaction({ system: 'dhl', kind: `fake:${kind}`, reference, ok: true, request, response })
+}
+
+/**
+ * Adressprüfung (validate=true) im Fake: dieselben Regeln wie der Fake-
+ * Labeldruck (dhl-validierung.ts, fakePruefMeldungen) — PLZ in Deutschland
+ * fünf Ziffern, Hausnummer vorhanden —, ausgewertet vom ECHTEN Parser. Die
+ * Eingabe steht im Protokoll wie beim Label: so ist nachprüfbar, dass beide
+ * denselben Request bekommen.
+ */
+export async function fakeValidateShipment(input: CreateShipmentInput): Promise<AdressPruefung> {
+  const { status, json } = fakeAntwort(fakePruefMeldungen(input.consignee))
+  await protokoll('address_validate', input.reference, json, input)
+  return pruefAntwortAuswerten(status, json)!
 }
 
 export async function fakeCreateShipment(input: CreateShipmentInput): Promise<CreatedShipment> {
+  // Was DHL hart ablehnt (ungültige PLZ), lehnt auch der Fake ab — mit
+  // derselben Klartext-Meldung wie der echte Client; Hinweise (keine
+  // Hausnummer) gehen als warnings mit, das Label entsteht trotzdem.
+  const antwort = fakeAntwort(fakePruefMeldungen(input.consignee))
+  if (antwort.status >= 400) {
+    const message = ablehnungsText(antwort.status, antwort.json)
+    const { logTransaction } = await import('../integrationen/transaktionen')
+    await logTransaction({
+      system: 'dhl', kind: 'fake:label_reject', reference: input.reference, ok: false,
+      statusCode: antwort.status, request: input, response: antwort.json, error: message,
+    })
+    throw new DhlError(message, antwort.status, antwort.json)
+  }
   // Jedes Label bekommt eine neue Nummer wie bei DHL — ein Ersatz-Label nach
   // Storno (gleiche Referenz) darf nicht mit dem stornierten kollidieren.
   // Ohne Datenbank (reine Fake-Tests) bleibt es bei der stabilen Nummer.
@@ -50,12 +85,12 @@ export async function fakeCreateShipment(input: CreateShipmentInput): Promise<Cr
     n = 0
   }
   const shipmentNumber = nummerAus(n > 0 ? `${input.reference}#${n}` : input.reference)
-  await protokoll('label_create', input.reference, { shipmentNumber, product: input.product })
+  await protokoll('label_create', input.reference, { shipmentNumber, product: input.product }, input)
   return {
     shipmentNumber,
     trackingUrl: trackingUrl(shipmentNumber),
     labelBase64: LEERES_PDF_BASE64,
-    warnings: [],
+    warnings: warnungenLesbar(antwort.json.items?.[0]),
   }
 }
 

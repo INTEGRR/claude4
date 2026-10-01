@@ -264,6 +264,7 @@ export const AUSFUEHRUNG = {
   'vorgang.status_setzen': vorgang.statusSetzen,
 
   'versand.label_erstellen': versand.labelErstellen,
+  'versand.adresse_pruefen': versand.adressePruefen,
   'versand.packtisch_abschliessen': versand.packtischAbschliessen,
   'versand.label_stornieren': versand.labelStornieren,
   'versand.tracking_aktualisieren': versand.trackingAktualisieren,
@@ -293,6 +294,7 @@ export const AUSFUEHRUNG = {
   'verkauf.shop_artikel_setzen': verkaufShop.shopArtikelSetzen,
   'verkauf.shop_variante_setzen': verkaufShop.shopVarianteSetzen,
   'verkauf.shop_option_setzen': verkaufShop.shopOptionSetzen,
+  'verkauf.shop_zweitangebot_setzen': verkaufShop.shopZweitangebotSetzen,
   'verkauf.shop_stand_holen': verkaufShop.shopStandHolen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

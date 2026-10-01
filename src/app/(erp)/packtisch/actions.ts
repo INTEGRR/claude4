@@ -18,3 +18,8 @@ export async function packtischFertig(
 ): Promise<ActionResult> {
   return serverAktion('versand.packtisch_abschliessen', { recordId: pickingId, formData })
 }
+
+/** Vor dem Label: Adresse bei DHL prüfen, ohne Label (versand.adresse_pruefen). */
+export async function adressePruefen(pickingId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('versand.adresse_pruefen', { recordId: pickingId, formData })
+}

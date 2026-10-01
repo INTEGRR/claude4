@@ -2,8 +2,10 @@ import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   INVENTAR_MUTATION,
+  angeboteZuMelden,
   bestandsInput,
   deuteInventarPayload,
+  fehlerJePosition,
   inBloecken,
   inventoryItemGid,
   zuUebertragen,
@@ -11,6 +13,49 @@ import {
 import { closeDb, makeProduct, stockUp, withRollback } from './helpers.ts'
 
 after(closeDb)
+
+describe('Shopify-Bestandsabgleich: Zweitangebote (0106)', () => {
+  const angebot = (frei: number, pushed: number | null, fehlerQty: number | null = null, gid: string | null = 'gid://shopify/InventoryItem/77') => ({
+    angebot_id: 'a1',
+    produkt: 'Black Week Editions',
+    variant_id: 'v1',
+    sku: 'KB-1',
+    inventory_item_gid: gid,
+    frei,
+    pushed_qty: pushed,
+    push_fehler_qty: fehlerQty,
+  })
+
+  test('ein Zweitangebot meldet wie eine Variante — an sein eigenes InventoryItem', () => {
+    assert.equal(angeboteZuMelden([angebot(4, null)]).melden.length, 1, 'nie gemeldet → melden')
+    assert.equal(angeboteZuMelden([angebot(4, 4)]).melden.length, 0, 'unverändert → nichts')
+    assert.equal(angeboteZuMelden([angebot(4, null, null, null)]).ohneZuordnung.length, 1)
+    const input = bestandsInput([angebot(4.7, null)], 'gid://shopify/Location/1') as {
+      quantities: { inventoryItemId: string; quantity: number }[]
+    }
+    assert.deepEqual(input.quantities.map((q) => [q.inventoryItemId, q.quantity]), [['gid://shopify/InventoryItem/77', 4]])
+  })
+
+  test('eine abgelehnte Menge wird nicht bei jedem Abgleich wiederholt — erst eine neue', () => {
+    assert.equal(angeboteZuMelden([angebot(4, 2, 4)]).melden.length, 0, 'dieselbe Menge schon abgelehnt')
+    assert.equal(angeboteZuMelden([angebot(3, 2, 4)]).melden.length, 1, 'neue Menge → neuer Versuch')
+  })
+
+  test('userErrors treffen die genannte Position — ohne Index alle', () => {
+    const je = fehlerJePosition(3, [
+      { field: ['input', 'quantities', '1', 'inventoryItemId'], message: 'not stocked at location' },
+    ])
+    assert.deepEqual([...je.entries()], [[1, 'not stocked at location']])
+    const alle = fehlerJePosition(2, [{ field: null, message: 'kaputt' }])
+    assert.deepEqual([...alle.keys()], [0, 1])
+    const doppelt = fehlerJePosition(2, [
+      { field: ['input', 'quantities', '0'], message: 'a' },
+      { field: ['input', 'quantities', '0', 'quantity'], message: 'b' },
+    ])
+    assert.deepEqual([...doppelt.entries()], [[0, 'a; b']])
+    assert.equal(fehlerJePosition(2, [{ field: ['input', 'quantities', '9'], message: 'x' }]).size, 2, 'Index außerhalb → alle')
+  })
+})
 
 describe('Shopify-Bestandsabgleich: Logik', () => {
   const variante = (frei: number, pushed: number | null, gid: string | null = 'gid://shopify/InventoryItem/1') => ({

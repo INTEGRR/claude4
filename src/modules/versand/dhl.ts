@@ -1,6 +1,14 @@
 import 'server-only'
 import { productForCountry, toAlpha3, trackingUrl } from './dhl-codes'
 import {
+  type AdressPruefung,
+  type DhlAntwort,
+  ablehnungsText,
+  meldungLesbar,
+  pruefAntwortAuswerten,
+  warnungenLesbar,
+} from './dhl-validierung'
+import {
   MAX_SENDUNGEN_JE_AUFRUF,
   parseZtAntwort,
   trackingStatusAus,
@@ -151,6 +159,9 @@ async function dhlFetch(path: string, init: RequestInit = {}): Promise<Response>
       ...init.headers,
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
+      // Meldungen (validationMessages) auf Deutsch — die stehen 1:1 vor dem
+      // Packer bzw. am Beleg (dhl-validierung.ts übersetzt nur noch Reste).
+      'Accept-Language': 'de-DE',
     },
   })
 }
@@ -219,15 +230,11 @@ function ohneLeere<T extends Record<string, unknown>>(obj: T): Partial<T> {
   ) as Partial<T>
 }
 
-export async function createShipment(input: CreateShipmentInput): Promise<CreatedShipment> {
-  if (process.env.DHL_FAKE === '1') {
-    return (await import('./dhl-fake')).fakeCreateShipment(input)
-  }
-  const c = dhlConfig()
-  const printFormat = input.printFormat ?? '910-300-700'
-
-  // Pflichtfelder des Absenders VOR dem Aufruf prüfen — die kommen aus den
-  // Firmendaten, und ein klarer Hinweis erspart die DHL-Fehlerrunde.
+/**
+ * Pflichtfelder des Absenders VOR dem Aufruf prüfen — die kommen aus den
+ * Firmendaten, und ein klarer Hinweis erspart die DHL-Fehlerrunde.
+ */
+function absenderPruefen(input: CreateShipmentInput): void {
   const fehltBeimAbsender = (
     [
       ['Name', input.shipper.name],
@@ -244,7 +251,15 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
         'Einstellungen → Firma pflegen.',
     )
   }
+}
 
+/**
+ * Der Request für POST /orders — EINE Zusammenstellung für Labeldruck und
+ * Adressprüfung (validate=true): geprüft wird exakt, was gedruckt würde.
+ */
+function sendungsAnfrage(input: CreateShipmentInput, validate: boolean): { pfad: string; body: unknown } {
+  const c = dhlConfig()
+  const printFormat = input.printFormat ?? '910-300-700'
   const body = {
     profile: 'STANDARD_GRUPPENPROFIL',
     shipments: [
@@ -282,30 +297,27 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
       },
     ],
   }
+  const pfad =
+    `/parcel/de/shipping/v2/orders?${validate ? 'validate=true&' : ''}includeDocs=include` +
+    `&printFormat=${encodeURIComponent(printFormat)}&docFormat=PDF`
+  return { pfad, body }
+}
+
+export async function createShipment(input: CreateShipmentInput): Promise<CreatedShipment> {
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeCreateShipment(input)
+  }
+  absenderPruefen(input)
+  const { pfad, body } = sendungsAnfrage(input, false)
 
   const start = Date.now()
-  const res = await dhlFetch(
-    `/parcel/de/shipping/v2/orders?includeDocs=include&printFormat=${encodeURIComponent(printFormat)}&docFormat=PDF`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  )
+  const res = await dhlFetch(pfad, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 
-  const json = (await res.json().catch(() => null)) as {
-    // Fehler kommen je nach Schicht verschachtelt (status.detail) ODER
-    // flach (title/detail direkt am Wurzelobjekt, z. B. Gateway-401er).
-    status?: { title?: string; detail?: string }
-    title?: string
-    detail?: string
-    items?: {
-      shipmentNo?: string
-      sstatus?: { title?: string; detail?: string }
-      validationMessages?: { validationMessage?: string; property?: string }[]
-      label?: { b64?: string; url?: string }
-    }[]
-  } | null
+  const json = (await res.json().catch(() => null)) as DhlAntwort | null
 
   // Fürs Protokoll ohne das Label-PDF (Base64 wäre nur Ballast).
   const responseOhneLabel = json
@@ -319,28 +331,17 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
 
   if (!res.ok || !json) {
     // Die brauchbaren Gründe stehen in den validationMessages der einzelnen
-    // Sendung — die Kopfzeile („0 of 1 shipment successfully printed") sagt
-    // nichts. Alles einsammeln, Feldname voran, sonst auf die Kopfzeile
-    // zurückfallen.
-    const gruende = (json?.items ?? [])
-      .flatMap((i) => [
-        ...(i.validationMessages?.map((m) =>
-          m.property ? `${m.property}: ${m.validationMessage ?? ''}` : (m.validationMessage ?? ''),
-        ) ?? []),
-        i.sstatus?.detail ?? '',
-      ])
-      .filter(Boolean)
-    const kopf =
-      json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'
-    const message = `DHL lehnte die Sendung ab (${res.status}): ${gruende.join(' · ') || kopf}`
+    // Sendung — in Klartext („Hausnummer fehlt", „PLZ passt nicht zum Ort")
+    // statt „consignee.postalCode: …" (dhl-validierung.ts).
+    const message = ablehnungsText(res.status, json)
     await logCreate(false, message)
     throw new DhlError(message, res.status, json)
   }
 
   const item = json.items?.[0]
   if (!item?.shipmentNo) {
-    const messages = item?.validationMessages?.map((m) => m.validationMessage ?? '').filter(Boolean)
-    const message = `DHL hat keine Sendungsnummer geliefert: ${messages?.join('; ') || item?.sstatus?.detail || 'unbekannter Fehler'}`
+    const messages = (item?.validationMessages ?? []).map(meldungLesbar)
+    const message = `DHL hat keine Sendungsnummer geliefert: ${messages.join(' · ') || item?.sstatus?.detail || 'unbekannter Fehler'}`
     await logCreate(false, message)
     throw new DhlError(message, res.status, json)
   }
@@ -353,10 +354,47 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
     labelUrl: item.label?.url,
     // Weiche Adressvalidierung: DHL warnt, bucht aber trotzdem. Nicht
     // leitcodierbare Adressen kosten Nachcodierungs-Entgelt.
-    warnings: (item.validationMessages ?? [])
-      .map((m) => [m.property, m.validationMessage].filter(Boolean).join(': '))
-      .filter(Boolean),
+    warnings: warnungenLesbar(item),
   }
+}
+
+/**
+ * Adresse prüfen: derselbe Request wie beim Labeldruck, nur mit
+ * `validate=true` — DHL prüft die Sendung samt Adresse und erzeugt KEIN
+ * Label (nichts wird gebucht oder berechnet). Beanstandungen kommen als
+ * Ergebnis zurück; geworfen wird nur, wenn DHL gar keine Aussage trifft
+ * (Anmeldung, Rechte, Störung).
+ */
+export async function validateShipment(input: CreateShipmentInput): Promise<AdressPruefung> {
+  if (process.env.DHL_FAKE === '1') {
+    return (await import('./dhl-fake')).fakeValidateShipment(input)
+  }
+  absenderPruefen(input)
+  const { pfad, body } = sendungsAnfrage(input, true)
+
+  const start = Date.now()
+  const res = await dhlFetch(pfad, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json().catch(() => null)) as DhlAntwort | null
+  const pruefung = pruefAntwortAuswerten(res.status, json)
+  await protokoll({
+    kind: 'address_validate', reference: input.reference, request: body, response: json,
+    ok: pruefung !== null, statusCode: res.status,
+    error: pruefung === null ? `Prüfung fehlgeschlagen (${res.status})` : undefined,
+    durationMs: Date.now() - start,
+  })
+  if (!pruefung) {
+    const kopf = json?.status?.detail ?? json?.detail ?? json?.status?.title ?? json?.title
+    throw new DhlError(
+      `DHL-Adressprüfung fehlgeschlagen (${res.status})${kopf ? `: ${kopf}` : ''}`,
+      res.status,
+      json,
+    )
+  }
+  return pruefung
 }
 
 /** Storniert eine Sendung. Möglich nur bis zum Tagesabschluss (Manifest). */

@@ -187,7 +187,13 @@ const handlers = {
     if (r.gesperrt) return 'Abgleich läuft bereits — der laufende rechnet eine weitere Runde'
     const zusatz = r.ohneZuordnung > 0 ? `, ${r.ohneZuordnung} ohne InventoryItem` : ''
     const runden = r.runden > 1 ? ` in ${r.runden} Runden` : ''
-    return `Bestand gemeldet: ${r.uebertragen} Änderung(en) bei ${r.geprueft} Variante(n)${runden}${zusatz}`
+    // Zweitangebote (0106): eigene Mutation, Ablehnungen blockieren die Artikel nicht.
+    const zweit =
+      r.angebote > 0
+        ? `; Zweitangebote: ${r.angeboteUebertragen} von ${r.angebote} gemeldet` +
+          `${r.angeboteAbgelehnt ? `, ${r.angeboteAbgelehnt} von Shopify abgelehnt (Grund in der Shop-Verfügbarkeit)` : ''}`
+        : ''
+    return `Bestand gemeldet: ${r.uebertragen} Änderung(en) bei ${r.geprueft} Variante(n)${runden}${zusatz}${zweit}`
   },
 
   /**

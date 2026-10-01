@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import {
+  adresseFuerPickingPruefen,
   cancelShipmentById,
   consumePackagingForPicking,
   createLabelForPicking,
@@ -7,6 +8,7 @@ import {
   queueFulfillmentForPicking,
   syncTracking,
 } from '@/modules/versand/service'
+import { pruefText } from '@/modules/versand/dhl-validierung'
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
@@ -114,6 +116,40 @@ export async function labelErstellen(
     recordId: result.shipmentId,
     ...(druck.gedruckt ? {} : { link: `/api/label/${result.shipmentId}` }),
   }
+}
+
+/**
+ * Adresse prüfen (Entscheidungslog 2026-10-01): DHL prüft die Sendung mit
+ * validate=true — derselbe Request wie „Label erstellen", im Format des
+ * Labeldruckers am Platz, aber ohne Label und ohne Buchung. Gespeichert wird
+ * nur der Protokolleintrag an der Lieferung. Beanstandet DHL etwas (Fehler
+ * ODER Hinweis), endet die Aktion mit der Meldung als Fehler — rot am Knopf,
+ * damit niemand ein „ok" überliest.
+ */
+export async function adressePruefen(
+  p: { weight_g?: number; dhl_product?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const pickingId = ctx.recordId!
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'versandlabel')
+  let r: Awaited<ReturnType<typeof adresseFuerPickingPruefen>>
+  try {
+    r = await adresseFuerPickingPruefen(pickingId, {
+      weightG: p.weight_g,
+      product: p.dhl_product,
+      printFormat: ziel?.dhlFormat ?? undefined,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await sql`select log_event('stock_picking', ${pickingId}, 'error',
+      ${`Adresse prüfen: ${message.slice(0, 300)}`}, ${ctx.actor})`.catch(() => undefined)
+    throw err
+  }
+  const text = pruefText(r.pruefung, r.adresse)
+  await sql`select log_event('stock_picking', ${pickingId}, ${r.pruefung.ok ? 'note' : 'error'},
+    ${`Adresse bei DHL geprüft: ${text}`.slice(0, 1000)}, ${ctx.actor})`
+  if (!r.pruefung.ok) throw new Error(text)
+  return { text, recordId: pickingId, daten: { ...r.pruefung } }
 }
 
 /**

@@ -130,6 +130,50 @@ Orten, abgerundet auf ganze Stücke), für **Made-to-Order** die baubare Menge
 - **Scopes**: zusätzlich `write_inventory` und `read_locations`;
   `write_products` für die Made-to-Order-Einrichtung.
 
+### Zweitangebote — derselbe Bestand an jedes Angebot der SKU (0106)
+
+Eine SKU ist genau ein Artikel (Abschnitt „Produkt-Sync" unten), im Shop
+kann sie aber in mehreren Angeboten stecken: in der Bestandteil-Liste eines
+Bundles aus Shopifys Bundles-App („ANVIL NATIVE 75 - Black Week Editions")
+oder in einer Aktions-Edition. Die Bundles-App rechnet die
+Bundle-Verfügbarkeit aus den Bestandteilen — bis 2026-10-01 bekam aber nur
+das verknüpfte Angebot (`product_variants.shopify_variant_id`) den Bestand
+(Entscheidungslog 2026-10-01, „Adresse prüfen (DHL validate) und Bestand an
+Zweitangebote").
+
+- **Gemerkt** in `shopify_zweitangebote`: je weiterem Angebot der Artikel
+  (`variant_id`), die eigene Shop-Variante, ihr InventoryItem, der Titel
+  des Shop-Produkts und der gemeldete Stand.
+- **Gefunden** beim Produktimport (Varianten, deren SKU schon einem Artikel
+  gehört — auch die doppelte SKU im selben Produkt; der Webhook
+  `products/update` meldet so eine Variante als Zweitangebot statt als
+  Klärfall) und beim Lesen des Shop-Stands (viertelstündlich im Reconcile
+  und „Shop-Stand holen": unverknüpfte Shop-Variante, deren SKU — sonst der
+  Barcode — ein aktiver Artikel trägt). **Bundles** selbst
+  (`hasVariantsThatRequiresComponents`) sind nie Zweitangebote.
+- **Gemeldet** wird jedem Zweitangebot `shopify_soll_menge_zweitangebot()`:
+  je Angebot steuerbar — auto (Standard) = dieselbe Menge wie der Artikel
+  mit allen Regeln aus 0101, immer = Deckel, aus = 0. So lässt sich eine
+  abgelaufene Aktion („Black Week Editions") abschalten, ohne den Artikel
+  abzuschalten (Registry-Aktion `verkauf.shop_zweitangebot_setzen`, Karte
+  „Zweitangebote" in der Shop-Verfügbarkeit).
+- **Eigene Mutation** nach der Hauptmeldung, gleiche Mechanik
+  (`inventorySetQuantities`, nur Änderungen gegenüber `pushed_qty`). Lehnt
+  Shopify ein Angebot ab (z. B. am Standort nicht geführt), kommen Artikel
+  und übrige Angebote trotzdem an: das Angebot trägt den Grund
+  (`push_fehler`, in der Shop-Verfügbarkeit rot) und wird erst bei einer
+  neuen Menge wieder versucht. Das Job-Ergebnis nennt „Zweitangebote: x von
+  y gemeldet".
+- **Made-to-Order**: Zweitangebote einer Tastatur werden wie die Tastatur
+  einmal auf „Menge verfolgen / nicht ohne Bestand verkaufen" gestellt —
+  sonst verkaufte das Bundle weiter, obwohl die Tastatur bei 0 steht.
+  Der Webhook `inventory_levels/update` behandelt ihr InventoryItem wie das
+  eines Artikels (zu viel → sofort korrigieren, zu wenig → nur merken).
+- **Modi unverändert**: „nur lesen" sendet nichts; im **Probelauf** steht
+  ein eigener Eintrag „Bestand an Zweitangebote" mit Artikel und Shop-Angebot
+  in der Debug-Box, gegen einen eigenen Probe-Stand (`probe_qty`);
+  „schreiben" sendet.
+
 ### Made-to-Order (Tastaturen) — baubare Menge statt Bestand (0100)
 
 Tastaturen werden auf Auftrag gefertigt (Route Fertigen + Auf Auftrag,
@@ -216,11 +260,15 @@ Shopify bekommt — aufgebaut wie die Produktseite im Shop:
     Farben des Projekts (gleicher Options- und Wertname).
   - Lagerware (Zubehör, einzeln verkaufte Switches) unter „Weitere
     Shop-Artikel": dieselben Regeln auf den eigenen Bestand.
+  - **Zweitangebote** (0106, Karte „Zweitangebote"): je weiterem
+    Shop-Angebot derselben SKU wie der Artikel / immer / aus, mit Soll,
+    zuletzt gemeldet, Shop-Stand und einer Ablehnung durch Shopify.
 - **Shop-Stand holen** (`verkauf.shop_stand_holen`, nur lesend — auch im
   Modus „nur lesen"; zusätzlich viertelstündlich im Reconcile): je Variante
   Menge, availableForSale, Mengenverfolgung, inventoryPolicy und
   Produktstatus nach `shopify_inventory_state` — so steht Ist neben Soll,
-  bevor Shopify scharfgeschaltet wird.
+  bevor Shopify scharfgeschaltet wird. Nebenbei findet er Zweitangebote
+  (unverknüpfte Shop-Varianten mit der SKU eines Artikels, 0106).
 - Rechnung: `shopify_soll_menge()` prüft in dieser Reihenfolge aus → 0,
   immer → Deckel, gesperrter Optionswert → 0, Lagerware → `shop_frei`,
   Made-to-Order → `baubar(…, 0, true)` (Teile mit Schwelle/zurückhalten) +
@@ -259,9 +307,10 @@ Shopify bekommt — aufgebaut wie die Produktseite im Shop:
     Artikel, die weitere archiviert. Varianten ohne SKU sind nie Duplikate.
   - Das Ergebnis (Monitor-Karte, Job-Protokoll) nennt Zweitangebote und
     Bundles; am angelegten Produkt steht ein Protokolleintrag mit den SKUs.
-  - **Offen bis zum Schreibmodus:** Der Bestands-Push meldet nur an das
-    verknüpfte Angebot, nicht an Zweitangebote (siehe
-    [go-live.md](../go-live.md) §6).
+  - **Seit 0106 gemerkt und im Bestand:** Zweitangebote stehen in
+    `shopify_zweitangebote` und bekommen bei jedem Abgleich dieselbe Menge
+    wie ihr Artikel (Abschnitt „Zweitangebote" oben). Bis dahin meldete der
+    Bestands-Push nur an das verknüpfte Angebot.
 
 ## E-Mail (Einkauf)
 

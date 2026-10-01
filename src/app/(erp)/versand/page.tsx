@@ -9,6 +9,7 @@ import { sammelMarken } from '@/modules/versand/kommissionieren'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import {
+  adressePruefen,
   artikelgewichtSetzen,
   cancelLabel,
   createLabel,
@@ -356,6 +357,19 @@ export default async function VersandPage({
                       {/* PLZ und Ländercode sind Codes, der Ort bleibt Fließtext. */}
                       <span className="mono">{r.ship_zip}</span> {r.ship_city}{' '}
                       <span className="mono">{r.ship_country_code}</span>
+                      {/* Vor dem Label (2026-10-01): DHL prüft denselben Request
+                          mit validate=true — kein Label, keine Buchung. */}
+                      {configured && Number(r.shipment_count) === 0 && (
+                        <div style={{ marginTop: 4 }}>
+                          <ActionButton
+                            className="small"
+                            action={adressePruefen.bind(null, r.picking_id)}
+                            title="DHL prüft die Sendung samt Adresse, ohne ein Label zu erstellen"
+                          >
+                            Adresse prüfen
+                          </ActionButton>
+                        </div>
+                      )}
                     </td>
                     <td className="num nowrap">
                       {qty((vorschlag?.versandgewichtG ?? Number(r.weight_g)) / 1000)} kg

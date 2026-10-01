@@ -114,7 +114,16 @@ export async function fakeShopifyGraphQL<T>(
             'The @idempotent directive is required for this mutation but was not provided.',
           )
         }
-        return { inventorySetQuantities: { userErrors: [] } }
+        // Ein InventoryItem, das am Standort nicht geführt wird (Kennung endet
+        // auf 404404): Shopify lehnt die GANZE Mutation ab und nennt den Index
+        // im Feldpfad — für den Nachweis, dass ein Zweitangebot die Artikel
+        // nicht blockiert (0106).
+        const userErrors = (input?.quantities ?? []).flatMap((q, i) =>
+          String(q.inventoryItemId ?? '').endsWith('404404')
+            ? [{ field: ['input', 'quantities', String(i), 'inventoryItemId'], message: 'The specified inventory item is not stocked at the location.' }]
+            : [],
+        )
+        return { inventorySetQuantities: { userErrors } }
       }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }

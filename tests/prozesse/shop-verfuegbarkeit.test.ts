@@ -162,7 +162,7 @@ describe('Shop-Verfügbarkeit: Projekte, Regeln, Shop-Stand', () => {
       },
     ])
     const r = await aktionAusfuehrenGeprueft('verkauf.shop_stand_holen', {}, ADMIN)
-    assert.deepEqual(r.daten, { varianten: 2, verkaufbar: 1, zugeordnet: 1 })
+    assert.deepEqual(r.daten, { varianten: 2, verkaufbar: 1, zugeordnet: 1, zweitangebote: 0 })
     const [ist] = await h.sql<{ shop_qty: number; shop_verkaufbar: boolean; shop_policy: string }[]>`
       select s.shop_qty::float as shop_qty, s.shop_verkaufbar, s.shop_policy
       from shopify_inventory_state s join product_variants pv on pv.id = s.variant_id

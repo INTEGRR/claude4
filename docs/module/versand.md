@@ -241,6 +241,9 @@ deutschem Windows liefert „WH-OUT-00003" statt „WH/OUT/00003"
    „wartet auf die Fertigung: WH/MO/…" (der Zettel hängt noch dort),
    „nicht reserviert", „bereits versendet", „Position ohne SKU/Barcode".
    Ein vorhandenes Label ist kein Blocker — es wird wiederverwendet.
+   Neben der Lieferadresse steht „Adresse prüfen" (siehe unten, „Adresse
+   prüfen"): DHL prüft die Sendung vor dem Label, das Ergebnis erscheint in
+   der Meldezeile.
 2. **Artikel scannen** (SKU- oder Artikel-Barcode vom Zettel bzw. vom
    Produkt) oder per +/− abhaken; fremde Artikel lehnt der Tisch mit
    Fehlerton ab.
@@ -470,8 +473,43 @@ created ──(Storno, nur vor Manifest)──▶ cancelled                └�
 
 - **Auth:** OAuth2 ROPC (GKP-Systembenutzer + API-Key/Secret); Token-Refresh im DHL-Client gekapselt. Kein Basic Auth (deprecated).
 - **Request:** Empfängeradresse aus der Lieferung (Straße/Hausnummer getrennt — Feld-Splitting beim Shopify-Import), `country` als ISO-alpha-3, `refNo` = Auftragsnummer, `docFormat: PDF`, `printFormat` konfigurierbar (Default 910-300-700).
-- **Warnings** aus der DHL-Response (weiche Adressvalidierung) am Beleg anzeigen — nicht leitcodierbare Adressen kosten Nachcodierungs-Entgelt.
-- **Fehler:** DHL-Aufruf läuft als synchrone Aktion mit klarer Fehlermeldung (kein stiller Outbox-Retry — der Packer steht am Tisch und braucht das Label jetzt); bei Teilerfolgen im Batch einzelne Fehler anzeigen.
+- **Warnings** aus der DHL-Response (weiche Adressvalidierung) am Beleg anzeigen — nicht leitcodierbare Adressen kosten Nachcodierungs-Entgelt. Sie stehen lesbar an der Sendung (`dhl_warnings`, z. B. „Hausnummer fehlt") und als Protokolleintrag „DHL-Hinweise zur Adresse".
+- **Fehler:** DHL-Aufruf läuft als synchrone Aktion mit klarer Fehlermeldung (kein stiller Outbox-Retry — der Packer steht am Tisch und braucht das Label jetzt); bei Teilerfolgen im Batch einzelne Fehler anzeigen. Seit 2026-10-01 in Klartext: KRNL fragt DHL mit `Accept-Language: de-DE`, übersetzt Feldpfade und bekannte englische Texte (`dhl-validierung.ts`) — „DHL lehnt die Sendung ab: PLZ passt nicht zum Ort" statt „consignee.postalCode: …"; Meldungen zum Absender (Firmendaten) tragen „Absender:" davor. Eine unvollständige Lieferadresse nennt die fehlenden Felder, bevor DHL gefragt wird.
+
+## Adresse prüfen (DHL validate, seit 2026-10-01)
+
+Registry-Aktion **`versand.adresse_pruefen`** (an der Lieferung,
+prozessfrei — ein Prüfwerkzeug ohne Zustandswechsel; Entscheidungslog
+2026-10-01): DHL prüft die Sendung samt Adresse mit
+`POST /orders?validate=true` und erzeugt **kein** Label — nichts wird
+gebucht oder berechnet. Der Request ist derselbe wie bei „Label erstellen"
+(gemeinsame Zusammenstellung `sendungFuerPicking` + `dhlEingabe` in
+`service.ts`, `sendungsAnfrage` in `dhl.ts`): Adresse aus dem Auftrag, sonst
+vom Kontakt, Produkt/Abrechnungsnummer/Versicherung nach Versandregel,
+Paketgewicht, Druckformat des Labeldruckers am Platz. Gewicht und Produkt
+lassen sich wie beim Label überschreiben.
+
+- **Ergebnis in Klartext:** „Adresse ok — DHL hat nichts zu beanstanden
+  (Name, Straße Nr, PLZ Ort, Land)" oder die Beanstandungen: **Fehler**
+  (so lehnt DHL das Label ab, z. B. „PLZ passt nicht zum Ort") und
+  **Hinweise** (Label ginge durch, aber z. B. nicht leitcodierbar —
+  Nachcodierungs-Entgelt). Beides endet als Fehlermeldung am Knopf (rot),
+  damit niemand ein „ok" überliest.
+- **Gespeichert wird nichts außer einem Protokolleintrag** an der Lieferung
+  („Adresse bei DHL geprüft: …", bei Beanstandung als Fehler-Eintrag) —
+  kein Cache, das Ergebnis veraltet mit jeder Adressänderung. Im
+  Transaktionsprotokoll steht der Aufruf als `address_validate`.
+- **Wo:** am Verkaufsauftrag in der Karte „Lieferadresse" (für die offene
+  Lieferung), in der Versandliste in der Spalte „Ziel" (solange die
+  Lieferung kein Label hat) und im Packablauf des Scanfelds neben der
+  Lieferadresse — dort mit dem eingestellten Gewicht/Produkt, und eine
+  Beanstandung ist ein Hinweis an den Packer, kein Abbruch.
+- **DHL-Fake** (`DHL_FAKE=1`): deutsche PLZ ohne fünf Ziffern = Fehler (auch
+  der Fake-Labeldruck lehnt dann ab, mit derselben Klartext-Meldung),
+  fehlende Hausnummer = Hinweis (Label entsteht mit Warnung); Ausland
+  prüft der Fake nicht. Die Regeln und der Parser der DHL-Antwort sind rein
+  und getestet (`tests/dhl-validierung.test.ts`), der Ablauf im Prozesstest
+  `tests/prozesse/adresse-pruefen.test.ts`.
 - **Sandbox** in Entwicklung/Tests (`api-sandbox.dhl.com`, Test-Abrechnungsnummern); Produktions-Keys nur in Vercel-Prod-Env.
 
 ## Tracking-Sync
@@ -501,7 +539,7 @@ Fehlermeldung nennt die gesendete ID.
 
 ## UI
 
-- **Versandbereit-Liste**: alle reservierten, unversandten Lieferungen (Auftrag, Kunde, Shopify-Name, Fertigungsstatus) — die Packstation-Arbeitsliste, mit Auswahl für den Packzettel-Druck und den Kommissionier-Marken. Darüber steht live, wie viele Lieferungen noch auf Ware warten; sie rücken von selbst nach, sobald Bestand gebucht ist (Live-Reservierung, [lager.md](lager.md)).
+- **Versandbereit-Liste**: alle reservierten, unversandten Lieferungen (Auftrag, Kunde, Shopify-Name, Fertigungsstatus) — die Packstation-Arbeitsliste, mit Auswahl für den Packzettel-Druck und den Kommissionier-Marken; je Zeile ohne Label „Adresse prüfen" unter dem Ziel. Darüber steht live, wie viele Lieferungen noch auf Ware warten; sie rücken von selbst nach, sobald Bestand gebucht ist (Live-Reservierung, [lager.md](lager.md)).
 - **Lieferungs-Formular**: Abschnitt „Versand" mit Paketgewicht, DHL-Produkt, Buttons „Label erstellen"/„Label drucken"/„Sendung stornieren", Tracking-Status-Badge + Link, Shopify-Rückmeldestatus.
 - **Sendungsliste**: alle Sendungen mit Status-Filter; Fehler-Feed (fehlgeschlagene Fulfillment-Jobs, DHL-Warnings).
 - **Querverweise (2026-10-01)**: Kunde → Kontakt in Versandbereit-, Sendungs-, Retouren- und Kommissionierliste; Auftrag → Verkauf, Lieferung → Transfer, Reparatur → Reparaturauftrag; die Hinweisleiste „gelabelt, nicht ausgebucht" verlinkt die Lieferungen, „Gewichte fehlen" die Varianten. Wartet eine Lieferung beim Kommissionieren auf die Fertigung, führen die MO-Nummern zu `/fertigung?auftrag=<id>`.

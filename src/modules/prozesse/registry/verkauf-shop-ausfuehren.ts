@@ -102,7 +102,36 @@ export async function shopStandHolen(): Promise<AktionsErgebnis> {
   const { shopStandHolen: holen } = await import('../../integrationen/inventar.ts')
   const r = await holen()
   return {
-    text: `Shop-Stand gelesen: ${r.varianten} Variante(n), davon ${r.verkaufbar} verkaufbar, ${r.zugeordnet} in KRNL zugeordnet.`,
+    text:
+      `Shop-Stand gelesen: ${r.varianten} Variante(n), davon ${r.verkaufbar} verkaufbar, ${r.zugeordnet} in KRNL zugeordnet` +
+      `${r.zweitangebote ? `, ${r.zweitangebote} Zweitangebot(e) mit derselben SKU (bekommen denselben Bestand)` : ''}.`,
     daten: { ...r },
   }
+}
+
+/**
+ * Zweitangebot steuern (0106): eigene Steuerung je weiterem Shop-Angebot
+ * derselben SKU — z. B. „Black Week Editions" aus, während der Artikel
+ * normal weiterläuft.
+ */
+export async function shopZweitangebotSetzen(
+  p: { angebot_id: string; modus: 'auto' | 'immer' | 'aus' },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [z] = await sql<{ produkt: string | null; artikel: string; template_id: string }[]>`
+    update shopify_zweitangebote z set shop_modus = ${p.modus}
+    from product_variants pv
+    where z.id = ${p.angebot_id} and pv.id = z.variant_id
+    returning z.produkt, pv.display_name as artikel, pv.template_id`
+  if (!z) throw new Error('Zweitangebot nicht gefunden')
+  const text = `Zweitangebot „${z.produkt ?? 'ohne Titel'}" (${z.artikel}): ${ZWEIT_TEXT[p.modus]}`
+  await sql`select log_event('product_template', ${z.template_id}, 'note', ${text}, ${ctx.actor})`
+  await anstossen()
+  return { recordId: p.angebot_id, text: `${text}.` }
+}
+
+const ZWEIT_TEXT: Record<string, string> = {
+  auto: 'wie der Artikel',
+  immer: 'immer verfügbar',
+  aus: 'aus (ausverkauft)',
 }

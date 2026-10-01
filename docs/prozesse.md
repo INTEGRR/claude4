@@ -267,6 +267,10 @@ start → ereignis „Bestellung eingegangen" (shop:bestellung_eingegangen, conf
   Label-Schritt erklärt `assigned → done` wie der Packtisch, die Kante
   Label → Buchen heißt „bucht automatisch mit"; „nur Label" lässt den
   Buchen-Schritt offen. Neu prozessfrei: `versand.gelabelte_ausbuchen`.
+- **Adresse prüfen** (2026-10-01, `versand.adresse_pruefen`, prozessfrei):
+  ein Prüfwerkzeug neben dem Label-Schritt, ohne Zustandswechsel — DHL
+  prüft denselben Request mit `validate=true`; nur ein Protokolleintrag an
+  der Lieferung ([module/versand.md](module/versand.md)).
 - **Versand in der Registry** (`versand.*`): label_erstellen (im Prozess),
   massendruck/label_stornieren/tracking_aktualisieren/retourenlabel als
   prozessfreie Werkzeuge; versand/actions.ts sind Dreizeiler um

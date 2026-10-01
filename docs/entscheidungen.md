@@ -9,6 +9,82 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Adresse prüfen (DHL validate) und Bestand an Zweitangebote
+
+**Anlass:** zwei offene KRNL-Punkte des Go-live-Plans
+([go-live.md](go-live.md) §5 und §6). Erstens fiel eine falsche Adresse
+erst beim Label auf — und die Ablehnung war dann nur als
+„consignee.postalCode: …" zu lesen. Zweitens bekam im Shop nur das
+verknüpfte Angebot einer SKU den Bestand; die Bundle-Bestandteile mit
+derselben SKU („Black Week Editions") blieben stehen, und die Bundles-App
+rechnet die Bundle-Verfügbarkeit genau aus ihnen.
+
+**Entschieden — Adresse prüfen:**
+- Neue Registry-Aktion **`versand.adresse_pruefen`** (beleggebunden an die
+  Lieferung, prozessfrei: ein Prüfwerkzeug ohne Zustandswechsel, kein
+  Prozessschritt). Sie schickt **denselben Request wie „Label erstellen"**
+  an `POST /orders`, nur mit `validate=true` — Adresse, Produkt, Gewicht,
+  Abrechnungsnummer und Druckformat kommen aus einer gemeinsamen
+  Zusammenstellung (`sendungFuerPicking` + `dhlEingabe` in
+  `versand/service.ts`, `sendungsAnfrage` in `dhl.ts`). DHL erzeugt dabei
+  kein Label; gespeichert wird nur ein Protokolleintrag an der Lieferung,
+  **keine Migration, keine Cache-Spalte** (das Ergebnis veraltet mit jeder
+  Adressänderung).
+- Ergebnis in Klartext: „Adresse ok" oder die Beanstandungen. DHL-Fehler
+  (so lehnt DHL das Label ab) und Hinweise (Label ginge, aber z. B. nicht
+  leitcodierbar = Nachcodierungs-Entgelt) zählen beide als Beanstandung —
+  die Aktion endet dann mit der Meldung als Fehler (rot am Knopf), damit
+  niemand ein „ok" überliest.
+- **Lesbare Meldungen überall**, auch beim echten Label: KRNL fragt DHL mit
+  `Accept-Language: de-DE` und übersetzt Feldpfade und bekannte englische
+  Texte (`dhl-validierung.ts`: „Hausnummer fehlt", „PLZ passt nicht zum
+  Ort", „Absender: PLZ ungültig"). Eine unvollständige Lieferadresse nennt
+  die fehlenden Felder, bevor DHL gefragt wird.
+- Knöpfe: am Verkaufsauftrag (Karte „Lieferadresse", für die offene
+  Lieferung), in der Versandliste (Spalte „Ziel", solange kein Label
+  existiert) und im Packablauf des Scanfelds (vor dem Label; eine
+  Beanstandung ist dort ein Hinweis, kein Abbruch).
+- Der DHL-Fake prüft mit: deutsche PLZ ohne fünf Ziffern = Fehler (auch der
+  Fake-Labeldruck lehnt ab), fehlende Hausnummer = Hinweis.
+
+**Entschieden — Zweitangebote im Bestand:**
+- Die SKU bleibt genau ein Artikel (Eintrag 2026-09-29). Zweitangebote
+  bekommen eine eigene Tabelle **`shopify_zweitangebote`** (Migration
+  0106): je weiterem Shop-Angebot den Artikel, die eigene Shop-Variante und
+  ihr InventoryItem, den gemeldeten Stand und eine **eigene Steuerung**
+  (auto = wie der Artikel, immer = Deckel, aus = 0) — so lässt sich eine
+  abgelaufene Aktion abschalten, ohne den Artikel abzuschalten.
+- Gefunden werden sie beim Produktimport (die bisher nur gezählten
+  Zweitangebote werden gemerkt, auch die doppelte SKU im selben Produkt)
+  und beim Lesen des Shop-Stands (viertelstündlich und „Shop-Stand holen":
+  unverknüpfte Shop-Variante, deren SKU ein Artikel trägt — nie Bundles).
+  Bestehende Daten füllt also der nächste Reconcile-Lauf, ohne Handarbeit.
+- Jede Bestandsmeldung geht an alle Zweitangebote mit derselben Menge
+  (`shopify_soll_menge_zweitangebot`: aus 0, immer Deckel, sonst
+  `shopify_soll_menge` des Artikels — alle Regeln aus 0101 gelten) — als
+  **eigene Mutation** nach der Hauptmeldung: lehnt Shopify ein Angebot ab
+  (z. B. nicht am Standort geführt), kommt der Artikel trotzdem an, das
+  Angebot trägt den Grund und wird erst bei neuer Menge wieder versucht.
+  Made-to-Order-Zweitangebote werden wie ihr Artikel einmal eingerichtet
+  (Menge verfolgen, DENY), der Webhook `inventory_levels/update` korrigiert
+  sie wie Artikel.
+- **Modi unverändert:** lesen = nichts geht hinaus; Probelauf = ein
+  eigener „würde senden"-Eintrag „Bestand an Zweitangebote" in der
+  Debug-Box mit eigenem Probe-Stand; schreiben = senden.
+
+Umgesetzt in `versand/dhl.ts`, `dhl-validierung.ts`, `dhl-fake.ts`,
+`service.ts`, `registry/versand*.ts`; `integrationen/inventar.ts`,
+`inventar-logik.ts`, `zweitangebote.ts`, `produkt-import.ts`,
+`shop-verfuegbarkeit.ts`, neue Aktion `verkauf.shop_zweitangebot_setzen`
+(Karte „Zweitangebote" in der Shop-Verfügbarkeit). Nachweis:
+`tests/dhl-validierung.test.ts`, `tests/prozesse/adresse-pruefen.test.ts`,
+`tests/prozesse/shopify-zweitangebote.test.ts` (zwei Meldungen für eine
+Variante mit Zweitangebot), Ergänzungen in `tests/inventar.test.ts`,
+`tests/probe-anzeige.test.ts` und `tests/prozesse/produkt-import.test.ts`.
+Doku: [module/versand.md](module/versand.md),
+[module/integrationen.md](module/integrationen.md),
+[api-referenz/dhl.md](api-referenz/dhl.md), [go-live.md](go-live.md).
+
 ## 2026-10-01 — Fertigungs- und Artikel-Etiketten drucken (kein Autodruck beim Bestätigen)
 
 **Anlass:** Seit 0087 gibt es die Druckarten `fertigungsetikett` und

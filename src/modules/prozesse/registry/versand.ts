@@ -34,6 +34,33 @@ export const VERSAND = {
     revalidate: ['/versand', '/lager', '/lager/:id'],
   },
 
+  // Prüfwerkzeug ohne Zustandswechsel (Entscheidungslog 2026-10-01, „Adresse
+  // prüfen"): kein Prozessschritt, sondern ein Knopf neben dem Label — am
+  // Auftrag, in der Versandliste und am Packtisch.
+  'versand.adresse_pruefen': {
+    label: 'Adresse prüfen',
+    bereich: 'versand',
+    ki: true,
+    prozessfrei: true,
+    beschreibung:
+      'Lässt DHL die Sendung einer Lieferung prüfen, ohne ein Label zu erstellen (Shipping-API ' +
+      'validate=true, derselbe Request wie beim Label). Ergebnis in Klartext: „Adresse ok" oder die ' +
+      'Beanstandungen (Hausnummer fehlt, PLZ passt nicht zum Ort …). Gespeichert wird nur ein ' +
+      'Protokolleintrag an der Lieferung.',
+    bindung: 'beleg',
+    modell: 'stock_picking',
+    schema: z.object({
+      weight_g: z.number().positive().optional().describe('Gewicht überschreiben (Gramm)'),
+      dhl_product: z.string().max(20).optional().describe('DHL-Produkt überschreiben'),
+    }),
+    zusammenfassung: () => 'Lieferadresse bei DHL prüfen (ohne Label)',
+    formdata: (fd) => ({
+      weight_g: fd.get('weight_g') ? Number(fd.get('weight_g')) : undefined,
+      dhl_product: String(fd.get('dhl_product') ?? '') || undefined,
+    }),
+    revalidate: ['/lager/:id'],
+  },
+
   'versand.packzettel_drucken': {
     label: 'Packzettel drucken (Auswahl)',
     bereich: 'versand',

@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { artikelgewichtSetzen, packtischFertig } from './actions'
-import { isActionError } from '@/modules/shared/action'
+import { adressePruefen, artikelgewichtSetzen, packtischFertig } from './actions'
+import { isActionError, isActionInfo } from '@/modules/shared/action'
 import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
 import { type AnsageSchluessel, ansageFuerFehler } from '@/modules/scanner-ansagen'
 import { scanGleich } from '@/modules/shared/scan'
@@ -102,6 +102,7 @@ export function Packtisch({
   const [weightG, setWeightG] = useState<string>('')
   const [dhlProduct, setDhlProduct] = useState<string>('')
   const [labelLink, setLabelLink] = useState<string | null>(null)
+  const [pruefend, setPruefend] = useState(false)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [flash, setFlash] = useState<'ok' | 'error' | null>(null)
 
@@ -308,6 +309,28 @@ export function Packtisch({
     }
   }
 
+  // Vor dem Label (2026-10-01): DHL prüft die Sendung — mit Gewicht und
+  // Produkt, wie sie gerade eingestellt sind — per validate=true, ohne Label.
+  // Eine Beanstandung ist ein Hinweis an den Packer, kein Abbruch: er kann
+  // die Adresse am Auftrag korrigieren oder bewusst weitermachen.
+  async function adresseCheck() {
+    if (!doc || pruefend) return
+    setPruefend(true)
+    const fd = new FormData()
+    if (weightG && Number(weightG) > 0) fd.set('weight_g', weightG)
+    if (dhlProduct) fd.set('dhl_product', dhlProduct)
+    try {
+      const result = await adressePruefen(doc.pickingId, fd)
+      if (isActionError(result)) say(result.error, 'warn', 'fehler')
+      else if (isActionInfo(result)) say(result.info, 'ok')
+    } catch (err) {
+      say(err instanceof Error ? err.message : 'Adressprüfung fehlgeschlagen', 'error', 'fehler')
+    } finally {
+      setPruefend(false)
+      refocus()
+    }
+  }
+
   // Fehlendes Artikelgewicht direkt beim Packen setzen (2026-10-01): wird am
   // Artikel gespeichert; danach rechnet KRNL Paketgewicht und DHL-Produkt neu
   // (gescannte Mengen bleiben stehen).
@@ -470,6 +493,18 @@ export function Packtisch({
                 <div>
                   <div className="mono-label">Lieferadresse</div>
                   <div className="small">{doc.adresse.join(', ')}</div>
+                  {!doc.labelVorhanden && phase !== 'done' && (
+                    <button
+                      className="small"
+                      type="button"
+                      onClick={() => void adresseCheck()}
+                      disabled={pruefend || phase === 'booking'}
+                      title="DHL prüft die Sendung samt Adresse, ohne ein Label zu erstellen"
+                      style={{ marginTop: 4 }}
+                    >
+                      {pruefend ? 'Prüft…' : 'Adresse prüfen'}
+                    </button>
+                  )}
                 </div>
               )}
               <button className="small" type="button" onClick={reset}>

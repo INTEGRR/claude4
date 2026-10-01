@@ -9,6 +9,7 @@ import {
   preisAufteilung,
   teileZweitangebote,
 } from './produkt-import-logik'
+import { zweitangebotMerken } from './zweitangebote'
 
 /**
  * Bereits in Shopify existierende Produkte ins ERP holen.
@@ -202,13 +203,34 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<Verarbeitung> {
   // ist ein Zweitangebot — es wird nie angelegt.
   const offen = shopVarianten.filter((sv) => !schonVerknuepft.has(sv.id) && !getroffen.has(sv.id))
   const { neu, zweit } = teileZweitangebote(offen, await vergebeneKennungen(offen))
-  if (getroffen.size > 0) return { ergebnis: 'verknuepft', zweitangebote: zweit.length }
+  // Zweitangebote merken (0106): der Bestandsabgleich meldet ihnen dieselbe
+  // Menge wie dem Artikel — die Bundles-App rechnet aus ihnen.
+  const zweitMerken = async (db: Parameters<typeof zweitangebotMerken>[0]) => {
+    for (const sv of zweit) {
+      await zweitangebotMerken(db, {
+        gid: sv.id,
+        inventoryItemGid: inventoryItemJeGid.get(sv.id) ?? null,
+        productGid: p.id,
+        produkt: p.title,
+        sku: sv.sku,
+        barcode: sv.barcode,
+      })
+    }
+  }
+  if (getroffen.size > 0) {
+    await zweitMerken(sql)
+    return { ergebnis: 'verknuepft', zweitangebote: zweit.length }
+  }
   if (schonVerknuepft.size > 0) {
     // Das Produkt steht schon im ERP; übrig sind Zweitangebote oder neue
     // Shop-Varianten ohne Gegenstück (die meldet der laufende Abgleich).
+    await zweitMerken(sql)
     return { ergebnis: neu.length === 0 ? 'uebersprungen' : 'verknuepft', zweitangebote: zweit.length }
   }
-  if (neu.length === 0) return { ergebnis: 'uebersprungen', zweitangebote: zweit.length }
+  if (neu.length === 0) {
+    await zweitMerken(sql)
+    return { ergebnis: 'uebersprungen', zweitangebote: zweit.length }
+  }
 
   // Stufe 2: im ERP anlegen — Optionen werden Attribute, Werte inklusive.
   const zweitIds = new Set(zweit.map((v) => v.id))
@@ -288,8 +310,11 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<Verarbeitung> {
         'shopify')`
     }
     if (zweit.length > 0) {
+      // Erst jetzt: eine doppelte SKU im selben Produkt gehört dem eben
+      // angelegten Artikel — der steht nur in dieser Transaktion.
+      await zweitMerken(t)
       await t`select log_event('product_template', ${tpl.id}, 'note',
-        ${`${zweit.length} Variante(n) sind schon Artikel eines anderen Shop-Angebots (Zweitangebot, z. B. Bundle-Bestandteil) und hier archiviert — Bestellungen landen über die SKU beim vorhandenen Artikel: ${zweit.map((v) => v.sku ?? v.id).join(', ')}`},
+        ${`${zweit.length} Variante(n) sind schon Artikel eines anderen Shop-Angebots (Zweitangebot, z. B. Bundle-Bestandteil) und hier archiviert — Bestellungen landen über die SKU beim vorhandenen Artikel, der Bestand geht auch an dieses Angebot: ${zweit.map((v) => v.sku ?? v.id).join(', ')}`},
         'shopify')`
     }
     await t`select log_event('product_template', ${tpl.id}, 'note',
@@ -357,6 +382,7 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
             where id = ${templateId}`
 
   let neuVerknuepft = 0
+  let neuZweit = 0
   const offen: string[] = []
   for (const sv of p.variants.nodes) {
     const erpId = erpJeGid.get(sv.id)
@@ -383,6 +409,19 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
                     price_extra = ${extra.get(sv.id) ?? 0}
                 where id = ${treffer.id}`
       neuVerknuepft++
+    } else if (
+      // Die SKU gehört einem Artikel eines anderen Produkts: Zweitangebot
+      // (0106) — kein Klärfall, es bekommt dessen Bestand.
+      await zweitangebotMerken(sql, {
+        gid: sv.id,
+        inventoryItemGid: sv.inventoryItem.id,
+        productGid: p.id,
+        produkt: p.title,
+        sku: sv.sku,
+        barcode: sv.barcode,
+      })
+    ) {
+      neuZweit++
     } else {
       offen.push(sv.sku ?? sv.id)
     }
@@ -395,5 +434,5 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
   }
   await sql`select log_event('product_template', ${templateId}, 'note',
     'Aus Shopify aktualisiert (Titel, Preise, Codes).', 'shopify')`
-  return `„${p.title}" aktualisiert${neuVerknuepft ? `, ${neuVerknuepft} Variante(n) neu verknüpft` : ''}${offen.length ? `, ${offen.length} offen` : ''}`
+  return `„${p.title}" aktualisiert${neuVerknuepft ? `, ${neuVerknuepft} Variante(n) neu verknüpft` : ''}${neuZweit ? `, ${neuZweit} Zweitangebot(e)` : ''}${offen.length ? `, ${offen.length} offen` : ''}`
 }
