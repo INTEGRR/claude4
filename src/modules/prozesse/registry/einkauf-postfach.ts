@@ -14,7 +14,16 @@ import type { RegistrierteAktion } from './typen.ts'
 const uuid = z.string().uuid()
 
 /** Woran eine Wiedervorlage hängen darf (Teilmenge der Dokument-Belege). */
-export const WIEDERVORLAGE_MODELLE = ['mail_thread', 'partner', 'purchase_order', 'vendor_bill', 'einkaufsprojekt'] as const
+export const WIEDERVORLAGE_MODELLE = [
+  'mail_thread',
+  'partner',
+  'purchase_order',
+  'vendor_bill',
+  'einkaufsprojekt',
+  'bemusterung',
+  'werkzeug',
+  'lieferantenvertrag',
+] as const
 export type WiedervorlageModell = (typeof WIEDERVORLAGE_MODELLE)[number]
 
 const leerAlsUndefined = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined

@@ -8,6 +8,10 @@ import { MailThreadsKarte, WiedervorlagenKarte } from '@/components/mail-threads
 import { RecordComments } from '@/components/record-comments'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { DOKUMENT_ARTEN } from '@/modules/einkauf/dokument-modelle'
+import { rundeText } from '@/modules/einkauf/bemusterung'
+import { VERTRAG_ARTEN, type VertragStatus, vertragsLage } from '@/modules/einkauf/lieferantenvertraege'
+import { WERKZEUG_ARTEN } from '@/modules/einkauf/werkzeuge'
+import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { driveLink } from '@/modules/google/drive'
 import { date, money, qty } from '@/modules/shared/format'
 import { lieferantendatenSetzen } from '../../dokumente-actions'
@@ -21,7 +25,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * Seite — Einkaufsdaten (Sprache, Maildomains, Einkäufer, Standards),
  * Dateien (eigene und die seiner Bestellungen/Rechnungen), Bestellungen,
  * offene Rechnungen, Lieferantenpreise, Verlauf; seit Stufe 2a (0093) auch
- * die Mail-Threads und Wiedervorlagen.
+ * die Mail-Threads und Wiedervorlagen, seit Stufe 4 (0107) Verträge,
+ * Werkzeuge und Muster.
  */
 export default async function LieferantenaktePage({ params }: { params: Promise<{ id: string }> }) {
   await requireArea('einkauf')
@@ -49,8 +54,9 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
            einkaeufer_id, standard_incoterm, standard_waehrung
     from partners where id = ${id}`
   if (!p) notFound()
+  const heute = new Date().toISOString().slice(0, 10)
 
-  const [einkaeufer, incoterms, waehrungen, bestellungen, rechnungen, preise, fremdeDateien] = await Promise.all([
+  const [einkaeufer, incoterms, waehrungen, bestellungen, rechnungen, preise, fremdeDateien, vertraege, werkzeuge, muster] = await Promise.all([
     sql<{ id: string; name: string }[]>`select id, name from users where active order by name`,
     sql<{ code: string; name: string }[]>`select code, name from incoterms order by code`,
     sql<{ code: string }[]>`select code from currencies order by code`,
@@ -86,11 +92,14 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
         currency: string
         lead_time_days: number | null
         vendor_product_code: string | null
+        vertrag_id: string | null
+        vertrag: string | null
       }[]
     >`
       select vp.id, vp.template_id, pt.name as artikel, vp.min_qty::float as min_qty, vp.price::float as price, vp.currency,
-             vp.lead_time_days, vp.vendor_product_code
+             vp.lead_time_days, vp.vendor_product_code, vp.vertrag_id, lv.titel as vertrag
       from vendor_prices vp join product_templates pt on pt.id = vp.template_id
+      left join lieferantenvertraege lv on lv.id = vp.vertrag_id
       where vp.vendor_id = ${id}
       order by pt.name, vp.min_qty limit 100`,
     // Dateien an Bestellungen/Rechnungen dieses Lieferanten (die eigenen zeigt die Karte darunter).
@@ -117,6 +126,62 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
       where d.partner_id = ${id}
       group by d.id
       order by d.created_at desc limit 50`,
+    // Stufe 4 (0107): Verträge, Werkzeuge, Muster des Lieferanten.
+    sql<
+      {
+        id: string
+        art: keyof typeof VERTRAG_ARTEN
+        titel: string
+        status: VertragStatus
+        gueltig_bis: string | null
+        ende: string | null
+        stichtag: string | null
+        erinnerung_tage: number
+        preise: number
+      }[]
+    >`
+      select v.id, v.art::text as art, v.titel, v.status::text as status, v.gueltig_bis::text as gueltig_bis,
+             lieferantenvertrag_ende(v)::text as ende, lieferantenvertrag_stichtag(v)::text as stichtag, v.erinnerung_tage,
+             (select count(*)::int from vendor_prices vp where vp.vertrag_id = v.id) as preise
+      from lieferantenvertraege v where v.partner_id = ${id}
+      order by v.status, lieferantenvertrag_stichtag(v) nulls last, v.titel`,
+    sql<
+      {
+        id: string
+        nummer: string
+        bezeichnung: string
+        art: keyof typeof WERKZEUG_ARTEN
+        status: string
+        schuss_zaehler: number
+        lebensdauer_schuss: number | null
+        projekt_id: string | null
+        projekt_nummer: string | null
+      }[]
+    >`
+      select w.id, w.nummer, w.bezeichnung, w.art, w.status::text as status, w.schuss_zaehler, w.lebensdauer_schuss,
+             ep.id as projekt_id, ep.nummer as projekt_nummer
+      from werkzeuge w left join einkaufsprojekte ep on ep.id = w.einkaufsprojekt_id
+      where w.partner_id = ${id}
+      order by w.status = 'ausgemustert', w.nummer`,
+    sql<
+      {
+        id: string
+        runde: number
+        revision: string | null
+        bezeichnung: string | null
+        status: string
+        golden: boolean
+        erhalten_am: string | null
+        projekt_id: string
+        projekt_nummer: string
+        projekt_titel: string
+      }[]
+    >`
+      select b.id, b.runde, b.revision, b.bezeichnung, b.status::text as status, b.golden, b.erhalten_am::text as erhalten_am,
+             ep.id as projekt_id, ep.nummer as projekt_nummer, ep.titel as projekt_titel
+      from bemusterungen b join einkaufsprojekte ep on ep.id = b.projekt_id
+      where b.partner_id = ${id}
+      order by b.created_at desc limit 30`,
   ])
 
   return (
@@ -308,6 +373,151 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
         </Card>
       )}
 
+      <div id="vertraege">
+        <Card
+          title={`Verträge (${vertraege.length})`}
+          tight
+          actions={
+            <Link className="btn small" href={`/einkauf/vertraege?ansicht=alle&lieferant=${id}`}>
+              Neuer Vertrag
+            </Link>
+          }
+        >
+          {vertraege.length === 0 ? (
+            <Empty>Keine Verträge — NDA, QSV, Rahmenvertrag oder Preisliste anlegen.</Empty>
+          ) : (
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Vertrag</th>
+                    <th>Läuft bis</th>
+                    <th>Kündigen bis</th>
+                    <th className="num">Preise</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vertraege.map((v) => {
+                    const lage = vertragsLage(v, heute)
+                    return (
+                      <tr key={v.id}>
+                        <td>
+                          <Link href={`/einkauf/vertraege/${v.id}`}>{v.titel}</Link>
+                          <div className="muted small">{VERTRAG_ARTEN[v.art]}</div>
+                        </td>
+                        <td className="small nowrap">{v.ende ? date(v.ende) : 'unbefristet'}</td>
+                        <td className={`small nowrap${lage === 'faellig' || lage === 'abgelaufen' ? ' wv-ueberfaellig' : ''}`}>
+                          {v.status === 'aktiv' && v.stichtag ? date(v.stichtag) : '—'}
+                        </td>
+                        <td className="num small">
+                          {v.preise > 0 ? <Link href={`/einkauf/vertraege/${v.id}#preise`}>{v.preise}</Link> : '—'}
+                        </td>
+                        <td>
+                          <Badge state={lage} kind="lieferantenvertrag" href={`/einkauf/vertraege/${v.id}`} />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+        </Card>
+      </div>
+
+      {werkzeuge.length > 0 && (
+        <div id="werkzeuge">
+          <Card
+            title={`Werkzeuge beim Lieferanten (${werkzeuge.length})`}
+            tight
+            actions={
+              <Link className="btn small" href={`/einkauf/werkzeuge?lieferant=${id}`}>
+                Werkzeug anlegen
+              </Link>
+            }
+          >
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Werkzeug</th>
+                    <th>Projekt</th>
+                    <th>Schuss</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {werkzeuge.map((w) => (
+                    <tr key={w.id}>
+                      <td>
+                        <Link href={`/einkauf/werkzeuge/${w.id}`}>
+                          <span className="mono">{w.nummer}</span> {w.bezeichnung}
+                        </Link>
+                        <div className="muted small">{WERKZEUG_ARTEN[w.art] ?? w.art}</div>
+                      </td>
+                      <td className="small">
+                        {w.projekt_id ? (
+                          <Link className="mono" href={`/einkauf/projekte/${w.projekt_id}`}>
+                            {w.projekt_nummer}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        <WerkzeugSchuesse zaehler={w.schuss_zaehler} lebensdauerSchuss={w.lebensdauer_schuss} />
+                      </td>
+                      <td>
+                        <Badge state={w.status} kind="werkzeug" href={`/einkauf/werkzeuge/${w.id}`} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </Card>
+        </div>
+      )}
+
+      {muster.length > 0 && (
+        <div id="muster">
+          <Card title={`Muster (${muster.length})`} tight>
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Muster</th>
+                    <th>Projekt</th>
+                    <th>Eingang</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {muster.map((m) => (
+                    <tr key={m.id}>
+                      <td>
+                        <Link href={`/einkauf/muster/${m.id}`}>{rundeText(m)}</Link>
+                      </td>
+                      <td className="small">
+                        <Link href={`/einkauf/projekte/${m.projekt_id}`}>
+                          <span className="mono">{m.projekt_nummer}</span> {m.projekt_titel}
+                        </Link>
+                      </td>
+                      <td className="small nowrap">{m.erhalten_am ? date(m.erhalten_am) : m.status === 'offen' ? 'unterwegs' : '—'}</td>
+                      <td className="nowrap">
+                        <Badge state={m.status} kind="bemusterung" href={`/einkauf/muster/${m.id}`} />
+                        {m.golden && <span className="badge success" style={{ marginLeft: 4 }}>Golden</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </Card>
+        </div>
+      )}
+
       <Card title={`Lieferantenpreise (${preise.length})`} tight>
         {preise.length === 0 ? (
           <Empty>Keine Lieferantenpreise hinterlegt.</Empty>
@@ -329,7 +539,14 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
                     <td>
                       <Link href={`/produkte/${v.template_id}`}>{v.artikel}</Link>
                     </td>
-                    <td className="mono small">{v.vendor_product_code ?? '—'}</td>
+                    <td className="mono small">
+                      {v.vendor_product_code ?? '—'}
+                      {v.vertrag_id && (
+                        <div>
+                          <Link href={`/einkauf/vertraege/${v.vertrag_id}`}>{v.vertrag}</Link>
+                        </div>
+                      )}
+                    </td>
                     <td className="num">{qty(v.min_qty)}</td>
                     <td className="num nowrap">
                       {v.price.toLocaleString('de-DE', { maximumFractionDigits: 6 })} {v.currency}

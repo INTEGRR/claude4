@@ -6,7 +6,9 @@ import { drive } from './drive.ts'
 /**
  * Ordnerbaum der geteilten Ablage „Einkauf" (0092): Lieferanten/<Name>/
  * <Bestellnummer>, Lieferanten/<Name>/Rechnungen, Artikel/<Name>,
- * Projekte/<EP-Nummer Titel> (0097), Eingang (Mail-Anhänge ohne Zuordnung).
+ * Projekte/<EP-Nummer Titel> (0097), Projekte/<EP …>/Muster,
+ * Lieferanten/<Name>/Werkzeuge und /Verträge (0107), Eingang (Mail-Anhänge
+ * ohne Zuordnung).
  * Jeder Ordner entsteht genau einmal — `drive_ordner` merkt ihn sich; fehlt
  * der Eintrag (z. B. nach „Betriebsdaten löschen"), wird erst nach einem
  * gleichnamigen Ordner gesucht statt einen zweiten anzulegen.
@@ -97,6 +99,22 @@ export async function zielOrdner(modell: DokumentModell, recordId: string): Prom
         select nummer, titel from einkaufsprojekte where id = ${recordId}`
       if (!ep) throw new Error('Einkaufsprojekt nicht gefunden')
       return ordnerSichern(`einkaufsprojekt:${recordId}`, ordnerName(`${ep.nummer} ${ep.titel}`), await bereichsOrdner('projekte'))
+    }
+    case 'bemusterung': {
+      // Projekte/EP-00001 Titel/Muster — Fotos und Prüfberichte der Runden.
+      const [b] = await sql<{ projekt_id: string }[]>`select projekt_id from bemusterungen where id = ${recordId}`
+      if (!b) throw new Error('Muster-Runde nicht gefunden')
+      return ordnerSichern(`muster:${b.projekt_id}`, 'Muster', await zielOrdner('einkaufsprojekt', b.projekt_id))
+    }
+    case 'werkzeug': {
+      const [w] = await sql<{ partner_id: string }[]>`select partner_id from werkzeuge where id = ${recordId}`
+      if (!w) throw new Error('Werkzeug nicht gefunden')
+      return ordnerSichern(`werkzeuge:${w.partner_id}`, 'Werkzeuge', await lieferantenOrdner(w.partner_id))
+    }
+    case 'lieferantenvertrag': {
+      const [v] = await sql<{ partner_id: string }[]>`select partner_id from lieferantenvertraege where id = ${recordId}`
+      if (!v) throw new Error('Lieferantenvertrag nicht gefunden')
+      return ordnerSichern(`vertraege:${v.partner_id}`, 'Verträge', await lieferantenOrdner(v.partner_id))
     }
     default: {
       const _nie: never = modell

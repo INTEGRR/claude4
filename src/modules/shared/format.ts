@@ -207,6 +207,26 @@ export const LABELS = {
     angebot: 'Angebot da',
     abgesagt: 'Abgesagt',
   },
+  bemusterung: {
+    offen: 'Offen',
+    freigegeben: 'Freigegeben',
+    abgelehnt: 'Abgelehnt',
+    nachbessern: 'Nachbessern',
+  },
+  werkzeug: {
+    in_auftrag: 'In Auftrag',
+    aktiv: 'Aktiv',
+    gesperrt: 'Gesperrt',
+    ausgemustert: 'Ausgemustert',
+  },
+  // Lage aus Status und Laufzeit (einkauf/lieferantenvertraege.ts vertragsLage).
+  lieferantenvertrag: {
+    aktiv: 'Aktiv',
+    faellig: 'Frist läuft',
+    abgelaufen: 'Abgelaufen',
+    gekuendigt: 'Gekündigt',
+    beendet: 'Beendet',
+  },
 } as const
 
 /** Farbton für Status-Badges. */
@@ -226,6 +246,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'gesendet':
     case 'abgeschlossen':
     case 'angebot':
+    case 'aktiv':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -246,6 +267,9 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'failure':
     case 'rejected':
     case 'abgebrochen':
+    case 'abgelehnt':
+    case 'gesperrt':
+    case 'abgelaufen':
       return 'danger'
     case 'waiting':
     case 'started':
@@ -257,6 +281,10 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'requested':
     case 'awaiting_device':
     case 'bedarf':
+    case 'nachbessern':
+    case 'in_auftrag':
+    case 'faellig':
+    case 'gekuendigt':
       return 'warn'
     default:
       return 'neutral'

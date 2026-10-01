@@ -19,6 +19,9 @@ import {
   bestesAngebot,
 } from '@/modules/einkauf/einkaufsprojekt'
 import { SPRACHEN } from '@/modules/einkauf/mail-vorlagen'
+import { rundeText } from '@/modules/einkauf/bemusterung'
+import { WERKZEUG_ARTEN } from '@/modules/einkauf/werkzeuge'
+import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { driveLink } from '@/modules/google/drive'
 import { date, dateTime, money } from '@/modules/shared/format'
 import {
@@ -36,6 +39,7 @@ import {
   projektEntscheiden,
 } from '../actions'
 import { belegLink } from '../../querverweise'
+import { musterAnfordern } from '../../muster/actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,12 +133,13 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
       abbruch_grund: string | null
       erstellt_von: string | null
       created_at: string
+      muster_pflicht: boolean
     }[]
   >`
     select ep.id, ep.nummer, ep.titel, ep.art, ep.beschreibung, ep.status::text as status, ep.zieltermin::text as zieltermin,
            ep.verantwortlich_id, u.name as verantwortlich, ep.gewaehltes_angebot_id, ep.entscheidung_begruendung,
            ep.entschieden_von, ep.entschieden_am::text as entschieden_am, ep.abgeschlossen_am::text as abgeschlossen_am,
-           ep.abbruch_grund, ep.erstellt_von, ep.created_at::text as created_at
+           ep.abbruch_grund, ep.erstellt_von, ep.created_at::text as created_at, ep.muster_pflicht
     from einkaufsprojekte ep left join users u on u.id = ep.verantwortlich_id
     where ep.id = ${id}`
   if (!p) notFound()
@@ -220,6 +225,50 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
       sql<{ code: string; name: string }[]>`select code, name from incoterms order by code`,
     ])
 
+  // Stufe 4 (0107): Muster-Runden und Werkzeuge des Projekts.
+  const [runden, werkzeuge] = await Promise.all([
+    sql<
+      {
+        id: string
+        partner_id: string
+        lieferant: string
+        runde: number
+        revision: string | null
+        bezeichnung: string | null
+        status: string
+        golden: boolean
+        bestellt_am: string | null
+        erhalten_am: string | null
+        kosten: number | null
+        waehrung: string
+      }[]
+    >`
+      select b.id, b.partner_id, pa.name as lieferant, b.runde, b.revision, b.bezeichnung, b.status::text as status,
+             b.golden, b.bestellt_am::text as bestellt_am, b.erhalten_am::text as erhalten_am,
+             b.kosten::float as kosten, b.waehrung
+      from bemusterungen b join partners pa on pa.id = b.partner_id
+      where b.projekt_id = ${id} order by pa.name, b.runde`,
+    sql<
+      {
+        id: string
+        nummer: string
+        bezeichnung: string
+        art: keyof typeof WERKZEUG_ARTEN
+        status: string
+        partner_id: string
+        lieferant: string
+        schuss_zaehler: number
+        lebensdauer_schuss: number | null
+        kosten: number | null
+        waehrung: string
+      }[]
+    >`
+      select w.id, w.nummer, w.bezeichnung, w.art, w.status::text as status, w.partner_id, pa.name as lieferant,
+             w.schuss_zaehler, w.lebensdauer_schuss, w.kosten::float as kosten, w.waehrung
+      from werkzeuge w join partners pa on pa.id = w.partner_id
+      where w.einkaufsprojekt_id = ${id} order by w.nummer`,
+  ])
+
   // Vergleich: Einstand je Angebot und Position aus der Datenbank (einstand_schaetzen).
   const einstaende = new Map<string, EinstandVoll[]>()
   for (const a of angebote) {
@@ -249,6 +298,15 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
   const gewaehlt = angebote.find((a) => a.id === p.gewaehltes_angebot_id)
   const sichtbar = angebote.filter((a) => !a.verworfen)
   const verworfen = angebote.filter((a) => a.verworfen)
+  // Musterpflicht: fehlt das Golden Sample des gewählten Lieferanten, verweigert die Datenbank die Bestellung.
+  const goldenGewaehlt = gewaehlt ? runden.some((r) => r.partner_id === gewaehlt.partner_id && r.golden) : false
+  const musterFehlt = p.muster_pflicht && !goldenGewaehlt
+  const musterLieferanten = [
+    ...new Map(
+      [...(gewaehlt ? [gewaehlt] : []), ...sichtbar].map((a) => [a.partner_id, { id: a.partner_id, name: a.lieferant }]),
+    ).values(),
+  ]
+  const laeuft = p.status !== 'abgeschlossen' && p.status !== 'abgebrochen'
 
   return (
     <>
@@ -262,6 +320,11 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
         subtitle={
           <>
             <Badge state={p.status} kind="einkaufsprojekt" />{' '}
+            {p.muster_pflicht && (
+              <Link href="#muster" className={`badge ${goldenGewaehlt ? 'success' : 'warn'}`} style={{ marginRight: 4 }}>
+                {goldenGewaehlt ? 'Golden Sample frei' : 'Musterpflicht'}
+              </Link>
+            )}
             {p.verantwortlich ?? 'ohne Verantwortlichen'} · Zieltermin {p.zieltermin ? date(p.zieltermin) : 'offen'}
             {gewaehlt && (
               <>
@@ -855,7 +918,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
         <Card
           title="Entscheidung"
           actions={
-            darf && p.status === 'entschieden' ? (
+            darf && p.status === 'entschieden' && !musterFehlt ? (
               <ActionButton
                 action={projektBestellen.bind(null, id)}
                 className="small primary"
@@ -874,6 +937,192 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
             {p.entschieden_von ? ` · ${p.entschieden_von}, ${p.entschieden_am ? dateTime(p.entschieden_am) : ''}` : ''}
           </p>
           {p.entscheidung_begruendung && <p className="small muted" style={{ margin: '4px 0 0' }}>{p.entscheidung_begruendung}</p>}
+          {musterFehlt && p.status === 'entschieden' && (
+            <div className="notice warn" style={{ margin: '8px 0 0' }}>
+              Musterpflicht: bestellt wird erst, wenn ein Golden Sample von {gewaehlt.lieferant} freigegeben ist —{' '}
+              <Link href="#muster">Muster anfordern bzw. bewerten</Link>.
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Bemusterung (0107) */}
+      {(p.muster_pflicht || runden.length > 0 || (darf && laeuft && angebote.length > 0)) && (
+        <div id="muster">
+          <Card title={`Bemusterung (${runden.length})`} tight>
+            {runden.length === 0 ? (
+              <Empty>
+                Noch kein Muster.{p.muster_pflicht ? ' Mit Musterpflicht braucht die Bestellung ein freigegebenes Golden Sample.' : ''}
+              </Empty>
+            ) : (
+              <TableWrap>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Lieferant</th>
+                      <th>Runde</th>
+                      <th>Angefordert</th>
+                      <th>Eingang</th>
+                      <th className="num">Kosten</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runden.map((r) => (
+                      <tr key={r.id}>
+                        <td className="small">
+                          <Link href={`/einkauf/lieferanten/${r.partner_id}`}>{r.lieferant}</Link>
+                        </td>
+                        <td>
+                          <Link href={`/einkauf/muster/${r.id}`}>{rundeText(r)}</Link>
+                        </td>
+                        <td className="small nowrap">{r.bestellt_am ? date(r.bestellt_am) : '—'}</td>
+                        <td className="small nowrap">{r.erhalten_am ? date(r.erhalten_am) : r.status === 'offen' ? 'unterwegs' : '—'}</td>
+                        <td className="num small">{r.kosten !== null ? money(r.kosten, r.waehrung) : '—'}</td>
+                        <td className="nowrap">
+                          <Badge state={r.status} kind="bemusterung" href={`/einkauf/muster/${r.id}`} />
+                          {r.golden && <span className="badge success" style={{ marginLeft: 4 }}>Golden Sample</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+            )}
+            {darf && laeuft && (
+              <details style={{ padding: '10px 12px' }} open={musterFehlt && runden.length === 0 && Boolean(gewaehlt)}>
+                <summary className="small">Muster anfordern</summary>
+                <ActionForm action={musterAnfordern} style={{ marginTop: 8 }}>
+                  <input type="hidden" name="projekt_id" value={id} />
+                  <div className="row">
+                    <label className="field">
+                      <span>Lieferant</span>
+                      <select name="partner_id" required defaultValue={gewaehlt?.partner_id ?? musterLieferanten[0]?.id ?? ''}>
+                        {musterLieferanten.length > 0 && (
+                          <optgroup label="Mit Angebot">
+                            {musterLieferanten.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        <optgroup label="Alle Lieferanten">
+                          {lieferanten
+                            .filter((l) => !musterLieferanten.some((m) => m.id === l.id))
+                            .map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                        </optgroup>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Was (Bezeichnung)</span>
+                      <input name="bezeichnung" placeholder="z. B. Farbmuster, T1-Muster" />
+                    </label>
+                    <label className="field shrink">
+                      <span>Revision</span>
+                      <input name="revision" placeholder="A" />
+                    </label>
+                    <label className="field shrink">
+                      <span>Menge</span>
+                      <input name="menge" inputMode="decimal" placeholder="3" />
+                    </label>
+                  </div>
+                  <div className="row">
+                    <label className="field shrink">
+                      <span>Kosten (leer = aus dem Angebot)</span>
+                      <input name="kosten" inputMode="decimal" />
+                    </label>
+                    <label className="field shrink">
+                      <span>Währung</span>
+                      <select name="waehrung" defaultValue="" className="mono">
+                        <option value="">wie Angebot</option>
+                        {waehrungen.map((w) => (
+                          <option key={w.code} value={w.code}>
+                            {w.code}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field shrink">
+                      <span>Angefordert am</span>
+                      <input type="date" name="bestellt_am" />
+                    </label>
+                    <label className="field">
+                      <span>Tracking</span>
+                      <input name="tracking" className="mono" placeholder="Sendungsnummer oder Link" />
+                    </label>
+                  </div>
+                  <button type="submit" className="small primary">Muster anfordern</button>
+                  <p className="small muted" style={{ margin: '6px 0 0' }}>
+                    Je Lieferant zählt KRNL die Runden; nach dem Eingang wird bewertet: freigeben (Golden Sample),
+                    nachbessern lassen (nächste Runde) oder ablehnen.
+                  </p>
+                </ActionForm>
+              </details>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Werkzeuge (0107) */}
+      {(werkzeuge.length > 0 || angebote.some((a) => Number(a.werkzeugkosten) > 0)) && (
+        <Card
+          title={`Werkzeuge (${werkzeuge.length})`}
+          tight
+          actions={
+            darf ? (
+              <Link
+                className="btn small"
+                href={`/einkauf/werkzeuge?projekt=${id}${gewaehlt ? `&lieferant=${gewaehlt.partner_id}` : ''}`}
+              >
+                Werkzeug anlegen
+              </Link>
+            ) : undefined
+          }
+        >
+          {werkzeuge.length === 0 ? (
+            <Empty>Noch kein Werkzeug — Werkzeugkosten im gewählten Angebot legen es beim Bestellen an.</Empty>
+          ) : (
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Werkzeug</th>
+                    <th>Standort</th>
+                    <th>Schuss</th>
+                    <th className="num">Kosten</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {werkzeuge.map((w) => (
+                    <tr key={w.id}>
+                      <td>
+                        <Link href={`/einkauf/werkzeuge/${w.id}`}>
+                          <span className="mono">{w.nummer}</span> {w.bezeichnung}
+                        </Link>
+                        <div className="muted small">{WERKZEUG_ARTEN[w.art] ?? w.art}</div>
+                      </td>
+                      <td className="small">
+                        <Link href={`/einkauf/lieferanten/${w.partner_id}`}>{w.lieferant}</Link>
+                      </td>
+                      <td>
+                        <WerkzeugSchuesse zaehler={w.schuss_zaehler} lebensdauerSchuss={w.lebensdauer_schuss} />
+                      </td>
+                      <td className="num small">{w.kosten !== null ? money(w.kosten, w.waehrung) : '—'}</td>
+                      <td>
+                        <Badge state={w.status} kind="werkzeug" href={`/einkauf/werkzeuge/${w.id}`} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
         </Card>
       )}
 
@@ -1050,6 +1299,13 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                 <span>Beschreibung</span>
                 <textarea name="beschreibung" rows={3} defaultValue={p.beschreibung ?? ''} />
               </label>
+              {offen && (
+                <label className="small" style={{ display: 'block', marginBottom: 8 }}>
+                  <input type="hidden" name="muster_pflicht_feld" value="1" />
+                  <input type="checkbox" name="muster_pflicht" defaultChecked={p.muster_pflicht} /> <strong>Musterpflicht</strong>{' '}
+                  — bestellt wird erst mit freigegebenem Golden Sample des gewählten Lieferanten
+                </label>
+              )}
               <button type="submit" className="small">Speichern</button>
             </ActionForm>
           </details>

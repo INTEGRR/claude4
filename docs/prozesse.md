@@ -1359,6 +1359,61 @@ Fixture: `fixtures/einkaufsprojekt.ts` (drei Läufe). Paket: überall, wo der
 Bestellprozess aktiv ist. Details:
 [module/einkaufstool.md](module/einkaufstool.md) (Stufe 3).
 
+## Bemusterung: Prozess `bemusterung` und Musterpflicht im Einkaufsprojekt (Migration 0107, umgesetzt)
+
+Beleg `bemusterung` (`bemusterungen`, Enum-Status offen/freigegeben/
+abgelehnt/nachbessern) — je Muster-Runde ein Beleg, Route
+`/einkauf/muster/:id`.
+
+| Schritt | Art | Aktion / Bedingung | Zustand |
+|---|---|---|---|
+| Muster nötig | start | | |
+| Muster anfordern | aktion | `einkauf.muster_anfordern` | `offen` |
+| Muster da? | xor | `erhalten_am` leer → Eingang erfassen; gesetzt → Bewertung; Ablehnen immer (Default) | |
+| Eingang erfassen | aktion | `einkauf.muster_erhalten` | — |
+| Freigeben (Golden Sample) | aktion | `einkauf.muster_bewerten`, params `ergebnis: freigeben` | `freigegeben` |
+| Nachbessern lassen (neue Runde) | aktion | `einkauf.muster_bewerten`, params `ergebnis: nachbessern` | `nachbessern` |
+| Ablehnen | aktion | `einkauf.muster_bewerten`, params `ergebnis: ablehnen` | `abgelehnt` |
+| Bewertet | ende | | |
+
+- **Der Eingang ist kein Zustand**, sondern eine Tatsache an der Runde
+  (`erhalten_am`): „Eingang erfassen" trägt keinen `zustand`, bewegt den
+  Standort nicht, und die Weiche schaltet danach auf die Bewertung —
+  dasselbe Muster wie „Lagerware dabei?" (0092).
+- **Eine Aktion, drei Schritte:** die Bewertung ist eine Registry-Aktion,
+  die Schritt-params legen das Ergebnis fest (je Zustand genau ein Schritt,
+  wie bei `vorgang.status_setzen`).
+- **Nachbessern endet die Runde** und legt die nächste als neuen Beleg an
+  (Start bei `offen`) — die Prozesse bleiben azyklisch.
+- Prozessfrei: Daten nachtragen (`einkauf.muster_aendern`).
+
+**Einkaufsprojekt, Version 2:** nach „Angebot wählen" die XOR-Weiche
+`muster` „Musterpflicht?":
+
+- `muster_pflicht = false` **oder** `golden_sample = true` → Bestellen;
+- `muster_pflicht = true` **und** `golden_sample = false` → Teilprozess
+  **Bemusterung (Golden Sample)** (`bemusterung`, `teilprozess_link
+  {"spalte": "projekt_id"}`) → Bestellen (oder Abbrechen).
+
+`golden_sample` liefert `prozess_beleg_daten` für Einkaufsprojekte
+(`einkaufsprojekt_golden_sample`: freigegebenes Golden Sample des
+Lieferanten des gewählten Angebots). Die Weiche ist Führung — die harte
+Regel steht im Trigger am Statuswechsel nach `bestellt`: ohne Golden Sample
+des gewählten Lieferanten keine Bestellung, über jeden Weg. Kein zweites
+Token-Modell: der Projektstatus bleibt die Wahrheit, die Runden haben ihren
+eigenen.
+
+Werkzeuge (`werkzeug`) und Lieferantenverträge (`lieferantenvertrag`)
+stehen in `prozess_modelle` (Kommentare, Dokumente, Existenz-Check des
+Torwächters), haben aber bewusst **keinen Prozess**: Betriebsmittel und
+Register, alle Aktionen `prozessfrei` (wie Mail-Threads, 0093).
+
+Fixtures: `fixtures/bemusterung.ts` (Golden Sample, Nachbessern, Absage vor
+dem Eingang) und der Lauf „Musterpflicht" in `fixtures/einkaufsprojekt.ts`
+(Bestellung abgewiesen → Runden → Golden Sample → bestellen, Werkzeug
+entsteht). Paket: überall, wo das Einkaufsprojekt aktiv ist. Details:
+[module/einkaufstool.md](module/einkaufstool.md) (Stufe 4).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

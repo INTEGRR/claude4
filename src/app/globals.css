@@ -1883,6 +1883,19 @@ html[data-splash-gesehen] .splash { display: none; }
 .entwurf-anhaenge label { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .mail-de { margin-top: 10px; padding: 8px 10px; border-left: 2px solid var(--info); background: var(--info-soft); }
 
+/* Stammdaten einer Muster-Runde, eines Werkzeugs, eines Vertrags (0107): Feld links, Wert rechts. */
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+.kv dt { color: var(--text-muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.lebensdauer { display: inline-block; width: 80px; height: 6px; border-radius: 3px; background: var(--border); vertical-align: middle; overflow: hidden; }
+.lebensdauer > span { display: block; height: 100%; background: var(--info); }
+.lebensdauer.bald > span { background: var(--accent); }
+.lebensdauer.ueber > span { background: var(--danger); }
+@media (max-width: 560px) {
+  .kv { grid-template-columns: 1fr; gap: 2px; }
+  .kv dd { margin-bottom: 6px; }
+}
+
 /* Druckbrücke einrichten (Arbeitsplätze & Drucker): je Drucker eine Zeile mit Download. */
 .druck-pakete { display: flex; flex-direction: column; gap: 8px; }
 .druck-paket {

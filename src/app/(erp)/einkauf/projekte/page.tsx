@@ -44,9 +44,12 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
         bestellungen: { id: string; number: string }[] | null
         lieferant_id: string | null
         lieferant: string | null
+        muster_pflicht: boolean
+        golden: boolean
       }[]
     >`
       select ep.id, ep.nummer, ep.titel, ep.art, ep.status::text as status, ep.zieltermin::text as zieltermin,
+             ep.muster_pflicht, einkaufsprojekt_golden_sample(ep.id, ep.gewaehltes_angebot_id) as golden,
              u.name as verantwortlich,
              (select count(*)::int from einkaufsprojekt_positionen p where p.projekt_id = ep.id) as positionen,
              (select count(*)::int from lieferantenanfragen a where a.projekt_id = ep.id and a.status <> 'abgesagt') as anfragen,
@@ -119,7 +122,16 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
                         </div>
                       )}
                     </td>
-                    <td className="small">{PROJEKT_ARTEN[r.art] ?? r.art}</td>
+                    <td className="small">
+                      {PROJEKT_ARTEN[r.art] ?? r.art}
+                      {r.muster_pflicht && (
+                        <div>
+                          <Link href={`/einkauf/projekte/${r.id}#muster`} className={r.golden ? 'muted' : 'wv-ueberfaellig'}>
+                            {r.golden ? 'Golden Sample frei' : 'Musterpflicht'}
+                          </Link>
+                        </div>
+                      )}
+                    </td>
                     <td className="num mono">{r.positionen}</td>
                     <td className="small nowrap">
                       <Link href={`/einkauf/projekte/${r.id}#anfragen`}>
@@ -195,6 +207,10 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
                 </button>
               </div>
             </div>
+            <label className="small" style={{ display: 'block', marginTop: 6 }}>
+              <input type="checkbox" name="muster_pflicht" /> <strong>Musterpflicht</strong> — bestellt wird erst, wenn ein
+              Golden Sample des gewählten Lieferanten freigegeben ist (Neuteile, Formen)
+            </label>
             <p className="small muted" style={{ margin: '8px 0 0' }}>
               Weitere Positionen, Dateien (Zeichnungen, Stücklisten) und die Lieferanten für die Anfrage kommen im Projekt dazu.
               Der Zielpreis ist der Einstand je Stück in Euro (inkl. Fracht und Zoll) — er geht nie an den Lieferanten.

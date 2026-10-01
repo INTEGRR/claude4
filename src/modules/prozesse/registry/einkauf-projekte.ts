@@ -105,7 +105,8 @@ export const EINKAUF_PROJEKTE = {
       'Legt ein Einkaufsprojekt (EP/…) an: Titel, Art (Nachproduktion, Neuteil, Werkzeug, Muster, ' +
       'Betriebsausstattung), Zieltermin, verantwortlicher Einkäufer und Positionen — je Position ' +
       'Bezeichnung oder bestehender Artikel (SKU/Name/ID), Menge, Zielpreis je Stück in EUR, ' +
-      'optional Gewicht (g), HS-Code, Spezifikation.',
+      'optional Gewicht (g), HS-Code, Spezifikation. Mit muster_pflicht wird erst bestellt, wenn ein ' +
+      'Golden Sample des gewählten Lieferanten freigegeben ist.',
     bindung: 'frei',
     modell: 'einkaufsprojekt',
     uebergang: { von: [], nach: ['bedarf'] },
@@ -115,6 +116,7 @@ export const EINKAUF_PROJEKTE = {
       beschreibung: z.string().trim().max(4000).optional(),
       verantwortlich_id: uuid.optional(),
       zieltermin: datum.optional(),
+      muster_pflicht: z.boolean().default(false).describe('Musterpflicht: bestellt wird erst mit freigegebenem Golden Sample'),
       positionen: z.array(positionSchema).max(50).default([]),
     }),
     zusammenfassung: (p) => `Einkaufsprojekt „${p.titel}" mit ${p.positionen.length} Position(en)`,
@@ -128,6 +130,7 @@ export const EINKAUF_PROJEKTE = {
         beschreibung: leer(fd, 'beschreibung'),
         verantwortlich_id: leer(fd, 'verantwortlich_id'),
         zieltermin: leer(fd, 'zieltermin'),
+        muster_pflicht: fd.get('muster_pflicht') === 'on',
         positionen:
           bezeichnung || produkt || menge !== undefined
             ? [{ bezeichnung, produkt, menge, zielpreis_eur: zahl(fd, 'pos_zielpreis') }]
@@ -142,7 +145,9 @@ export const EINKAUF_PROJEKTE = {
     bereich: 'einkauf',
     prozessfrei: true,
     ki: true,
-    beschreibung: 'Ändert Titel, Art, Beschreibung, Verantwortlichen oder Zieltermin eines Einkaufsprojekts.',
+    beschreibung:
+      'Ändert Titel, Art, Beschreibung, Verantwortlichen, Zieltermin oder die Musterpflicht eines ' +
+      'Einkaufsprojekts (Musterpflicht nur bis zur Bestellung).',
     bindung: 'beleg',
     modell: 'einkaufsprojekt',
     schema: z.object({
@@ -151,6 +156,7 @@ export const EINKAUF_PROJEKTE = {
       beschreibung: z.string().trim().max(4000).optional(),
       verantwortlich_id: z.union([uuid, z.literal('')]).optional(),
       zieltermin: z.union([datum, z.literal('')]).optional(),
+      muster_pflicht: z.boolean().optional(),
     }),
     zusammenfassung: () => 'Projekt bearbeiten',
     formdata: (fd) => ({
@@ -159,6 +165,8 @@ export const EINKAUF_PROJEKTE = {
       beschreibung: fd.has('beschreibung') ? String(fd.get('beschreibung') ?? '') : undefined,
       verantwortlich_id: fd.has('verantwortlich_id') ? String(fd.get('verantwortlich_id') ?? '') : undefined,
       zieltermin: fd.has('zieltermin') ? String(fd.get('zieltermin') ?? '') : undefined,
+      // Checkbox: nicht angehakt = nicht gesendet — das Markerfeld sagt, dass sie im Formular stand.
+      muster_pflicht: fd.has('muster_pflicht_feld') ? fd.get('muster_pflicht') === 'on' : undefined,
     }),
     revalidate: ['/einkauf/projekte/:id'],
   },
@@ -316,8 +324,9 @@ export const EINKAUF_PROJEKTE = {
       'Legt aus dem gewählten Angebot die Bestellung an (Entwurf): neue Teile bekommen einen Artikel ' +
       '(mit Gewicht und HS-Code), Positionen zum Staffelpreis in Angebotswährung, Werkzeug- und ' +
       'Musterkosten als Dienstleistungszeilen, Incoterm, Zahlplan aus der Anzahlung (Rest bei ' +
-      'Verschiffung) und Lieferantenpreise aus den Staffeln. Bestätigt wird die Bestellung in ihrem ' +
-      'eigenen Ablauf (Freigabe-Limit).',
+      'Verschiffung) und Lieferantenpreise aus den Staffeln; Werkzeugkosten legen das Werkzeug an ' +
+      '(in Auftrag). Bestätigt wird die Bestellung in ihrem eigenen Ablauf (Freigabe-Limit). Mit ' +
+      'Musterpflicht braucht es ein freigegebenes Golden Sample des gewählten Lieferanten.',
     bindung: 'beleg',
     modell: 'einkaufsprojekt',
     uebergang: { von: ['entschieden'], nach: ['bestellt'] },

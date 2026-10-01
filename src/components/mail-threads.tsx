@@ -161,6 +161,12 @@ export async function MailThreadsKarte({
   )
 }
 
+/** Wohin eine regelbasierte Wiedervorlage führt (Sicht einkauf_regel_wiedervorlagen, 0107). */
+export const REGEL_ZIEL: Record<string, (id: string) => string> = {
+  lieferantenvertrag: (id) => `/einkauf/vertraege/${id}`,
+  werkzeug: (id) => `/einkauf/werkzeuge/${id}`,
+}
+
 /** In 7 Tagen, als JJJJ-MM-TT — Vorgabe für neue Wiedervorlagen. */
 function inTagen(n: number): string {
   return new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10)
@@ -175,7 +181,7 @@ export async function WiedervorlagenKarte({
   recordId: string
   pfad: string
 }) {
-  const [liste, nutzer] = await Promise.all([
+  const [liste, nutzer, regeln] = await Promise.all([
     sql<{ id: string; faellig_am: string; grund: string; zustaendig: string | null; ueberfaellig: boolean }[]>`
       select w.id, w.faellig_am::text as faellig_am, w.grund, u.name as zustaendig,
              w.faellig_am < current_date as ueberfaellig
@@ -183,10 +189,40 @@ export async function WiedervorlagenKarte({
       where w.modell = ${modell} and w.record_id = ${recordId} and w.erledigt_am is null
       order by w.faellig_am`,
     sql<{ id: string; name: string }[]>`select id, name from users where active order by name`,
+    // Regelbasierte Wiedervorlagen (0107): am Beleg selbst, in der Lieferantenakte alle des Lieferanten.
+    sql<{ modell: string; record_id: string; grund: string; frist: string | null; ueberfaellig: boolean }[]>`
+      select r.modell, r.record_id, r.grund, r.frist::text as frist,
+             coalesce(r.frist, r.faellig_am) < current_date as ueberfaellig
+      from einkauf_regel_wiedervorlagen r
+      where (r.modell = ${modell} and r.record_id = ${recordId})
+         or (${modell} = 'partner' and r.partner_id = ${recordId})
+      order by r.faellig_am`,
   ])
 
   return (
-    <Card title={`Wiedervorlagen (${liste.length})`} tight>
+    <Card title={`Wiedervorlagen (${liste.length + regeln.length})`} tight>
+      {regeln.length > 0 && (
+        <ul className="dok-liste">
+          {regeln.map((r) => (
+            <li key={`${r.modell}:${r.record_id}`} className="dok-zeile">
+              <div className="dok-text">
+                <span className={r.ueberfaellig ? 'dok-name wv-ueberfaellig' : 'dok-name'}>{r.grund}</span>
+                <div className="muted small">
+                  <span className="mono-label">Regel</span>
+                  {r.frist ? ` · Frist ${date(r.frist)}` : ''}
+                  {r.ueberfaellig ? ' · überfällig' : ''} · verschwindet von selbst, sobald der Grund behoben ist
+                  {modell === 'partner' && (
+                    <>
+                      {' · '}
+                      <Link href={REGEL_ZIEL[r.modell]?.(r.record_id) ?? '#'}>öffnen</Link>
+                    </>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       {liste.length > 0 && (
         <ul className="dok-liste">
           {liste.map((w) => (

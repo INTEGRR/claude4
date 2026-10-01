@@ -138,6 +138,12 @@ export async function partnerZumBeleg(modell: DokumentModell, recordId: string):
     const [r] = await sql<{ partner_id: string | null }[]>`select partner_id from mail_threads where id = ${recordId}`
     return r?.partner_id ?? null
   }
+  // Stufe 4 (0107): Muster, Werkzeug und Vertrag gehören je einem Lieferanten.
+  if (modell === 'bemusterung' || modell === 'werkzeug' || modell === 'lieferantenvertrag') {
+    const [r] = await sql<{ partner_id: string }[]>`
+      select partner_id from ${sql(DOKUMENT_MODELLE[modell].tabelle)} where id = ${recordId}`
+    return r?.partner_id ?? null
+  }
   return null
 }
 

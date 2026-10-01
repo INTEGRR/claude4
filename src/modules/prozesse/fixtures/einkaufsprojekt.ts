@@ -9,7 +9,9 @@ import type { FixtureKontext, ProzessFixture } from './typen.ts'
  * Werkzeugkosten, USD DDP) → Entscheidung → Bestellung mit neuen Artikeln,
  * Zahlplan und Lieferantenpreisen → Abschluss von selbst beim Wareneingang.
  * Dazu der Kurzweg „Angebot liegt schon vor" (Betriebsausstattung, von
- * Hand abgeschlossen) und der Abbruch.
+ * Hand abgeschlossen), der Abbruch und (Stufe 4, 0107) die Musterpflicht:
+ * ohne Golden Sample verweigert die Datenbank die Bestellung, der Weg führt
+ * durch den Teilprozess Bemusterung; Werkzeugkosten legen das Werkzeug an.
  */
 
 const NUTZER = { name: 'prozesstest', role: 'admin' as const }
@@ -170,6 +172,69 @@ export const EINKAUFSPROJEKT_FIXTURE: ProzessFixture = {
           join product_variants pv on pv.id = l.variant_id join product_templates pt on pt.id = pv.template_id
           where po.einkaufsprojekt_id = ${id}`
         assert.deepEqual(z, { typ: 'service', raten: 1 }, 'Betriebsausstattung kommt nicht ins Lager; Vorkasse als eine Rate')
+      },
+    },
+    {
+      name: 'Musterpflicht: ohne Golden Sample keine Bestellung, nachbessern, freigeben, bestellen mit Werkzeug',
+      pfad: ['anlegen', 'entscheiden', 'bemusterung', 'bestellen'],
+      eingaben: {
+        anlegen: {
+          titel: 'Gehäuse Alu CNC (Prozesstest)',
+          art: 'neuteil',
+          muster_pflicht: true,
+          positionen: [{ bezeichnung: 'Gehäuse Alu CNC (Prozesstest)', menge: 200, zielpreis_eur: 30, gewicht_g: 350, hs_code: '7616' }],
+        },
+        entscheiden: async (ctx, sql) => {
+          const [gehaeuse] = await positionen(sql, projektId(ctx))
+          const r = await aktion('einkauf.angebot_erfassen', projektId(ctx), {
+            partner_id: ctx.cnLieferantId,
+            waehrung: 'CNY',
+            incoterm_code: 'FOB',
+            werkzeugkosten: 1500,
+            musterkosten: 300,
+            staffeln: [{ position_id: gehaeuse.id, ab_menge: 100, preis: 180 }],
+          })
+          return { angebot_id: r.daten!.angebot_id }
+        },
+      },
+      ereignisse: {
+        // Der Teilprozess: Muster-Runden am Projekt, bis das Golden Sample frei ist.
+        bemusterung: async (ctx) => {
+          const id = projektId(ctx)
+          await assert.rejects(
+            aktion('einkauf.projekt_bestellen', id, {}),
+            /Musterpflicht: ohne freigegebenes Golden Sample von Dongguan Keycap Co\. \(Prozesstest\) wird nicht bestellt/,
+          )
+          const erste = await aktion('einkauf.muster_anfordern', undefined, {
+            projekt_id: id,
+            partner_id: ctx.cnLieferantId,
+            bezeichnung: 'Erstmuster Gehäuse',
+            revision: 'A',
+          })
+          const zurueck = await aktion('einkauf.muster_bewerten', erste.recordId, { ergebnis: 'nachbessern', bewertung: 'Kanten nicht entgratet' })
+          const zweite = String(zurueck.daten!.naechste_runde_id)
+          await aktion('einkauf.muster_erhalten', zweite, {})
+          await aktion('einkauf.muster_bewerten', zweite, { ergebnis: 'freigeben', golden: true, note: 4 })
+        },
+      },
+      pruefen: async (sql, _ctx, id) => {
+        const runden = await sql<{ runde: number; revision: string; status: string; golden: boolean; kosten: number | null }[]>`
+          select runde, revision, status::text as status, golden, kosten::float as kosten
+          from bemusterungen where projekt_id = ${id} order by runde`
+        assert.deepEqual(runden.map((r) => ({ ...r })), [
+          { runde: 1, revision: 'A', status: 'nachbessern', golden: false, kosten: 300 },
+          { runde: 2, revision: 'B', status: 'freigegeben', golden: true, kosten: null },
+        ], 'Musterkosten der ersten Runde aus dem Angebot, Revision B für die Nachbesserung')
+        const [wz] = await sql<{ status: string; kosten: number; waehrung: string; eigentuemer: string; zeile: string }[]>`
+          select w.status::text as status, w.kosten::float as kosten, w.waehrung, w.eigentuemer, l.name as zeile
+          from werkzeuge w join purchase_order_lines l on l.id = w.purchase_order_line_id
+          where w.einkaufsprojekt_id = ${id}`
+        assert.equal(wz.zeile.startsWith('Werkzeugkosten laut Angebot'), true)
+        assert.deepEqual(
+          { status: wz.status, kosten: wz.kosten, waehrung: wz.waehrung, eigentuemer: wz.eigentuemer },
+          { status: 'in_auftrag', kosten: 1500, waehrung: 'CNY', eigentuemer: 'wir' },
+          'das bezahlte Werkzeug ist ein Datensatz am Lieferanten',
+        )
       },
     },
     {

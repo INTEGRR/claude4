@@ -17,20 +17,25 @@ const ZIEL: Record<string, { art: string; pfad: (id: string) => string }> = {
   purchase_order: { art: 'Bestellung', pfad: (id) => `/einkauf/${id}` },
   vendor_bill: { art: 'Rechnung', pfad: (id) => `/einkauf/rechnungen/${id}` },
   einkaufsprojekt: { art: 'Projekt', pfad: (id) => `/einkauf/projekte/${id}` },
+  bemusterung: { art: 'Muster', pfad: (id) => `/einkauf/muster/${id}` },
+  werkzeug: { art: 'Werkzeug', pfad: (id) => `/einkauf/werkzeuge/${id}` },
+  lieferantenvertrag: { art: 'Vertrag', pfad: (id) => `/einkauf/vertraege/${id}` },
 }
 
 /**
  * Wiedervorlagen des Einkaufs (0093): „Antwort erwartet bis",
  * „Liefertermin prüfen" — von Hand gesetzt an Thread, Lieferant,
- * Bestellung oder Rechnung. Überfälliges oben. Regelbasierte
- * Wiedervorlagen (fehlende PI, ETA überfällig) kommen mit dem Cockpit.
+ * Bestellung, Rechnung, Projekt, Muster, Werkzeug oder Vertrag.
+ * Überfälliges oben. Darunter die regelbasierten (0107, Sicht
+ * einkauf_regel_wiedervorlagen): ablaufende Verträge, Werkzeuge am Ende der
+ * Lebensdauer; fehlende PI und überfällige ETA kommen mit dem Cockpit.
  */
 export default async function WiedervorlagenPage({ searchParams }: { searchParams: Promise<{ alle?: string }> }) {
   const user = await requireArea('einkauf')
   const { alle } = await searchParams
   const nurMeine = alle !== '1'
 
-  const [offen, erledigt] = await Promise.all([
+  const [offen, erledigt, regeln] = await Promise.all([
     sql<
       {
         id: string
@@ -57,6 +62,12 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
                                         join partners p on p.id = vb.vendor_id where vb.id = w.record_id)
                when 'einkaufsprojekt' then (select ep.nummer || ' · ' || ep.titel from einkaufsprojekte ep
                                             where ep.id = w.record_id)
+               when 'bemusterung' then (select ep.nummer || ' · Runde ' || b.runde || ' · ' || p.name
+                                        from bemusterungen b join einkaufsprojekte ep on ep.id = b.projekt_id
+                                        join partners p on p.id = b.partner_id where b.id = w.record_id)
+               when 'werkzeug' then (select wz.nummer || ' · ' || wz.bezeichnung from werkzeuge wz where wz.id = w.record_id)
+               when 'lieferantenvertrag' then (select v.titel || ' · ' || p.name from lieferantenvertraege v
+                                               join partners p on p.id = v.partner_id where v.id = w.record_id)
              end as bezeichnung
       from wiedervorlagen w
       left join users u on u.id = w.zustaendig_id
@@ -66,6 +77,28 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
     sql<{ id: string; grund: string; erledigt_am: string; erledigt_von: string | null }[]>`
       select id, grund, erledigt_am::text as erledigt_am, erledigt_von from wiedervorlagen
       where erledigt_am is not null order by erledigt_am desc limit 20`,
+    // Regelbasiert (0107): ablaufende Verträge, Werkzeuge am Ende der Lebensdauer — berechnet.
+    sql<
+      {
+        modell: string
+        record_id: string
+        grund: string
+        faellig_am: string
+        frist: string | null
+        ueberfaellig: boolean
+        partner_id: string
+        lieferant: string
+        zustaendig: string | null
+      }[]
+    >`
+      select r.modell, r.record_id, r.grund, r.faellig_am::text as faellig_am, r.frist::text as frist,
+             coalesce(r.frist, r.faellig_am) < current_date as ueberfaellig,
+             r.partner_id, p.name as lieferant, u.name as zustaendig
+      from einkauf_regel_wiedervorlagen r
+      join partners p on p.id = r.partner_id
+      left join users u on u.id = r.zustaendig_id
+      where (${!nurMeine} or r.zustaendig_id = ${user.id} or r.zustaendig_id is null)
+      order by coalesce(r.frist, r.faellig_am), r.grund`,
   ])
 
   return (
@@ -136,6 +169,55 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
           </TableWrap>
         )}
       </Card>
+
+      {regeln.length > 0 && (
+        <Card title={`Von selbst (${regeln.length})`} tight>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Frist</th>
+                  <th>Grund</th>
+                  <th>Lieferant</th>
+                  <th>Zuständig</th>
+                </tr>
+              </thead>
+              <tbody>
+                {regeln.map((r) => {
+                  const ziel = ZIEL[r.modell]
+                  return (
+                    <tr key={`${r.modell}:${r.record_id}`}>
+                      <td className={`mono small nowrap${r.ueberfaellig ? ' wv-ueberfaellig' : ''}`}>
+                        {date(r.frist ?? r.faellig_am)}
+                        {r.ueberfaellig ? ' · überfällig' : ''}
+                      </td>
+                      <td>
+                        {ziel ? (
+                          <>
+                            <span className="mono-label">{ziel.art}</span>{' '}
+                            <Link href={ziel.pfad(r.record_id)}>{r.grund}</Link>
+                          </>
+                        ) : (
+                          r.grund
+                        )}
+                      </td>
+                      <td className="small">
+                        <Link href={`/einkauf/lieferanten/${r.partner_id}`}>{r.lieferant}</Link>
+                      </td>
+                      <td className="small">{r.zustaendig ?? '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+          <p className="small muted" style={{ margin: 0, padding: '8px 12px' }}>
+            Regelbasiert: ablaufende Lieferantenverträge (ab Kündigungsstichtag minus Erinnerung) und Werkzeuge ab 90 % der
+            Lebensdauer. Sie verschwinden von selbst, sobald der Vertrag verlängert, gekündigt oder beendet bzw. das
+            Werkzeug ersetzt ist.
+          </p>
+        </Card>
+      )}
 
       {erledigt.length > 0 && (
         <Card title="Zuletzt erledigt" tight>

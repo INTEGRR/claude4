@@ -6,6 +6,9 @@ import * as einkaufDokumente from './registry/einkauf-dokumente-ausfuehren.ts'
 import * as einkaufPostfach from './registry/einkauf-postfach-ausfuehren.ts'
 import * as einkaufMailversand from './registry/einkauf-mailversand-ausfuehren.ts'
 import * as einkaufProjekte from './registry/einkauf-projekte-ausfuehren.ts'
+import * as einkaufBemusterung from './registry/einkauf-bemusterung-ausfuehren.ts'
+import * as einkaufWerkzeuge from './registry/einkauf-werkzeuge-ausfuehren.ts'
+import * as einkaufVertraege from './registry/einkauf-vertraege-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -70,6 +73,18 @@ export const AUSFUEHRUNG = {
   'einkauf.frachtsatz_setzen': einkaufProjekte.frachtsatzSetzen,
   'einkauf.zolltarif_setzen': einkaufProjekte.zolltarifSetzen,
   'einkauf.ezb_kurse_abrufen': einkaufProjekte.ezbKurseHolen,
+  'einkauf.muster_anfordern': einkaufBemusterung.musterAnfordern,
+  'einkauf.muster_erhalten': einkaufBemusterung.musterErhalten,
+  'einkauf.muster_bewerten': einkaufBemusterung.musterBewerten,
+  'einkauf.muster_aendern': einkaufBemusterung.musterAendern,
+  'einkauf.werkzeug_anlegen': einkaufWerkzeuge.werkzeugAnlegen,
+  'einkauf.werkzeug_aendern': einkaufWerkzeuge.werkzeugAendern,
+  'einkauf.werkzeug_status_setzen': einkaufWerkzeuge.werkzeugStatusSetzen,
+  'einkauf.werkzeug_schuss_buchen': einkaufWerkzeuge.werkzeugSchussBuchen,
+  'einkauf.lieferantenvertrag_anlegen': einkaufVertraege.vertragAnlegen,
+  'einkauf.lieferantenvertrag_aendern': einkaufVertraege.vertragAendern,
+  'einkauf.lieferantenvertrag_status_setzen': einkaufVertraege.vertragStatusSetzen,
+  'einkauf.preisliste_uebernehmen': einkaufVertraege.preislisteUebernehmen,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,

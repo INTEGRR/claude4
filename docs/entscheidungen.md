@@ -9,6 +9,80 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Einkauf Stufe 4: Bemusterung mit Golden Sample, Werkzeuge, Lieferantenverträge
+
+Stufe 4 des Einkaufstools (Migration 0107). Der Betreiber wollte Muster mit
+Freigabe, Werkzeuge/Molds, Rahmenverträge/Preislisten und NDA/QSV „von
+Anfang an" abgebildet haben (Interview 2026-09-29). Entschieden:
+
+- **Die Muster-Runde ist ein Beleg mit eigenem Prozess** `bemusterung`
+  (nicht prozessfrei wie Wiedervorlagen oder Aufgaben): sie hat einen echten
+  Ablauf mit Entscheidung — anfordern → Eingang → freigeben | nachbessern |
+  ablehnen —, einen Zustand, an dem eine Bestellung hängt, und Fotos und
+  Befund als Akte.
+  - **Eine Zeile je Runde** (Runde 1, 2 … je Projekt und Lieferant).
+    „Nachbessern" schließt die Runde und legt die nächste sofort an
+    (Revision A → B); kein Zurückspringen im Graphen, die Prozesse bleiben
+    azyklisch.
+  - **Status-Enum wie geplant** (offen, freigegeben, abgelehnt,
+    nachbessern). Der Eingang ist kein eigener Zustand, sondern die Weiche
+    „Muster da?" über `erhalten_am`: vorher bietet der Prozess
+    „Eingang erfassen" (und Absagen) an, danach die Bewertung. Die drei
+    Bewertungsschritte nutzen dieselbe Aktion `einkauf.muster_bewerten`
+    mit Schritt-params (`ergebnis`) — je Zustand genau ein Schritt.
+  - **Golden Sample** = freigegeben mit Marke `golden`; höchstens eines je
+    Projekt und Lieferant (ein neues ersetzt das alte, Teilindex).
+    Bewerten ist nicht `ki` — über die Serie entscheidet ein Mensch.
+- **Musterpflicht hart in SQL:** `einkaufsprojekte.muster_pflicht`; ein
+  Trigger am Statuswechsel nach `bestellt` verweigert die Bestellung ohne
+  freigegebenes Golden Sample **des gewählten Lieferanten** — gleich über
+  welchen Weg bestellt wird, die Transaktion (Artikel, Bestellung, Preise)
+  rollt zurück. Ein Golden Sample eines anderen Lieferanten zählt nicht.
+  Die Pflicht lässt sich nur bis zur Bestellung ändern; der Wechsel steht im
+  Verlauf.
+- **Neue Version des Einkaufsprojekts:** nach „Angebot wählen" die Weiche
+  „Musterpflicht?" (`muster_pflicht`, abgeleitet `golden_sample` aus
+  `prozess_beleg_daten`); ohne Golden Sample führt der Weg durch den
+  Teilprozess „Bemusterung" (Runden hängen über `projekt_id`). Der Schritt
+  ist „optional" über die Weiche, nicht abschaltbar — die Musterpflicht ist
+  eine Datenregel, die keine Prozessanpassung aushebeln soll.
+- **Werkzeuge sind Betriebsmittel, kein Ablauf** — prozessfrei wie die
+  Mail-Threads (0093); der Status (in Auftrag, aktiv, gesperrt,
+  ausgemustert) ist die einzige Wahrheit, gesetzt per Aktion mit Grund.
+  Ein Prozessgraph ginge auch nicht: aktiv ↔ gesperrt wäre ein Zyklus.
+  - Schüsse werden **von Hand gebucht** (der Lieferant meldet je Los);
+    Korrekturen nach unten, nie unter 0. Die Buchungen stehen im Verlauf,
+    eine eigene Tabelle lohnt (noch) nicht.
+  - **Werkzeugkosten im gewählten Angebot legen beim Bestellen das
+    Werkzeug an** (in Auftrag, Eigentum bei uns, an der Werkzeugkosten-
+    Zeile) — ein vorab angelegtes des Projekts wird verknüpft statt
+    verdoppelt.
+- **Lieferantenverträge sind eine eigene Tabelle** (`lieferantenvertraege`),
+  bewusst getrennt von `vertraege` (Fixkosten der Finanzen, 0059): andere
+  Fragen (Geheimhaltung, Qualität, Preise statt Zahlungen). Prozessfrei
+  (Register). Kündigungsfrist in Monaten wie bei 0059, dazu automatische
+  Verlängerung — ohne sie wäre eine Kündigungsfrist bei befristeten
+  Verträgen bedeutungslos.
+  - **Laufzeitende und Stichtag rechnet nur die Datenbank**
+    (`lieferantenvertrag_ende/_stichtag`); Liste, Akte und Wiedervorlage
+    lesen dieselbe Wahrheit.
+  - **Preisliste → Lieferantenpreise** (`vendor_prices.vertrag_id`) mit der
+    Gültigkeit des Vertrags in seiner Währung, aus Zeilen „Artikel / ab
+    Menge: Preis" (auch aus Excel kopiert). Alles oder nichts; eine zweite
+    Übernahme ersetzt. Gültigkeit folgt Vertragsänderungen, „beenden" kürzt
+    sie.
+- **Regelbasierte Wiedervorlagen als Sicht** `einkauf_regel_wiedervorlagen`
+  (wie im Plan, Leitlinie 8): ablaufende Verträge ab Stichtag − Vorlauf
+  (Standard 30 Tage) und — zusätzlich zum Plan — Werkzeuge ab 90 % der
+  Schuss-Lebensdauer (sonst wäre die Lebensdauer nur eine Zahl). Sie zählen
+  im Menü mit, erscheinen in der Wiedervorlagen-Liste, an der Akte und am
+  Beleg und verschwinden von selbst, wenn der Grund behoben ist —
+  „erledigen" gibt es für sie nicht.
+- **Nummer:** 0107 (der Plan nannte 0096; reserviert war 0105 — weil 0106 vor dieser Stufe ausgerollt wurde, umbenannt, damit Prod und frische Datenbanken dieselbe Reihenfolge fahren).
+
+Doku: [module/einkaufstool.md](module/einkaufstool.md) → Stufe 4,
+[prozesse.md](prozesse.md) → „Bemusterung".
+
 ## 2026-10-01 — Adresse prüfen (DHL validate) und Bestand an Zweitangebote
 
 **Anlass:** zwei offene KRNL-Punkte des Go-live-Plans

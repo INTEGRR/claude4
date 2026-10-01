@@ -20,7 +20,7 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
 | 2a | Einkaufspostfach lesen und zuordnen, Posteingang, Wiedervorlagen (0093) | umgesetzt |
 | 2b | Aus KRNL schreiben, Vorlagen je Sprache, Übersetzung, Bestell-PDF (0094) | umgesetzt |
 | 3 | Einkaufsprojekt: Anfragen, Angebote, Vergleich auf Einstand, Entscheidung, Bestellung, EZB-Kurse (0097) | umgesetzt |
-| 4 | Bemusterung (Golden Sample), Werkzeuge/Molds, Lieferantenverträge | geplant |
+| 4 | Bemusterung (Golden Sample) mit Musterpflicht, Werkzeuge/Molds, Lieferantenverträge und Preislisten, regelbasierte Wiedervorlagen (0107) | umgesetzt |
 | 5 | Eingangssendungen (Sammelfracht), Zoll, Pflichtdokumente, Cockpit, DATEV | geplant |
 | 6 | Agent — nur Entwürfe, bei jeder eingehenden Mail | geplant |
 
@@ -473,3 +473,141 @@ heute (vorher schlug es fehl).
   - Neuteil bis zum Abschluss beim Wareneingang;
   - Betriebsausstattung direkt bestellt;
   - Abbruch.
+  - Musterpflicht: ohne Golden Sample keine Bestellung, nachbessern,
+    freigeben, bestellen mit Werkzeug (Stufe 4).
+
+## Stufe 4 — Bemusterung, Werkzeuge, Lieferantenverträge (0107)
+
+Der Betreiber wollte Muster mit Freigabe (Golden Sample), Werkzeuge/Molds,
+Rahmenverträge/Preislisten und NDA/Qualitätsvereinbarung „von Anfang an"
+abgebildet haben. Begründung der Modellierung: Entscheidungslog
+2026-10-01 „Einkauf Stufe 4".
+
+### Bemusterung (`bemusterungen`, Prozess `bemusterung`)
+
+- **Je Muster-Runde ein Beleg**: Projekt, Lieferant (und sein Angebot),
+  Runde 1, 2 … je Lieferant, Revision, Bezeichnung, Menge, Kosten und
+  Währung (ohne Angabe die Musterkosten aus dem Angebot), angefordert am,
+  Eingang, Tracking (ein Link wird klickbar), Bewertung (Note 1–5, Befund,
+  wer/wann), Fotos und Prüfberichte als Dokumente (Drive-Ordner
+  `Projekte/EP-… Titel/Muster`).
+- **Prozess:** Muster anfordern (`einkauf.muster_anfordern`, `offen`) →
+  Weiche „Muster da?" → **Eingang erfassen** (`einkauf.muster_erhalten`)
+  → **Freigeben** (Golden Sample) | **Nachbessern lassen** | **Ablehnen**
+  (alle drei `einkauf.muster_bewerten`, Zustände `freigegeben`,
+  `nachbessern`, `abgelehnt`). Absagen geht auch vor dem Eingang.
+  - **Nachbessern** braucht einen Befund und legt sofort die nächste Runde
+    an (Revision A → B, 1 → 2, oder wie angegeben).
+  - **Golden Sample**: höchstens eines je Projekt und Lieferant — ein neues
+    ersetzt das alte (im Verlauf beider Runden).
+  - Bewerten ist nicht `ki`; Daten nachtragen (`einkauf.muster_aendern`)
+    ist prozessfrei.
+- **Rückmeldung an den Lieferanten**: „Mail-Entwurf Muster-Feedback" auf
+  der Runde (Vorlage aus Stufe 2b, in seiner Sprache, Deutsch zum
+  Mitlesen).
+- **Musterpflicht** (`einkaufsprojekte.muster_pflicht`, beim Anlegen oder
+  Bearbeiten bis zur Bestellung): ein Trigger verweigert den Wechsel nach
+  `bestellt` ohne freigegebenes Golden Sample **des gewählten
+  Lieferanten** — „EP/00003 hat Musterpflicht: ohne freigegebenes Golden
+  Sample von … wird nicht bestellt." Die neue Version des Projektprozesses
+  führt nach „Angebot wählen" über die Weiche „Musterpflicht?" durch den
+  Teilprozess Bemusterung (siehe [prozesse.md](../prozesse.md)).
+- **Oberfläche:** Karte „Bemusterung" im Projekt (Runden, Status, Golden
+  Sample, „Muster anfordern"; ohne Golden Sample ersetzt ein Hinweis den
+  Knopf „Bestellung anlegen"), `/einkauf/muster` (offen, freigegebene
+  Golden Samples, alle; Menüzähler = eingegangen und unbewertet),
+  `/einkauf/muster/[id]` (Eingang, Bewertung, alle Runden mit dem
+  Lieferanten, Dateien, Wiedervorlagen, Prozess, Verlauf), Karte in der
+  Lieferantenakte.
+
+### Werkzeuge und Formen (`werkzeuge`, WZ/…)
+
+- Bezeichnung, Art (Form, Stanz-/Schneidwerkzeug, Vorrichtung), **Standort
+  beim Lieferanten**, Eigentümer (wir/Lieferant), Kosten und Währung,
+  **Werkzeugkosten-Zeile der Bestellung**, Einkaufsprojekt, Artikel,
+  **Schuss-Lebensdauer und -Zähler**, Status (in Auftrag, aktiv, gesperrt,
+  ausgemustert) mit Grund. Prozessfrei — ein Betriebsmittel, kein Ablauf.
+- **Von selbst:** bestellt ein Einkaufsprojekt Werkzeugkosten, legt
+  `einkauf.projekt_bestellen` das Werkzeug an (in Auftrag, Eigentum bei uns,
+  an der Werkzeugkosten-Zeile); ein vorab angelegtes Werkzeug des Projekts
+  beim selben Lieferanten wird verknüpft statt verdoppelt.
+- **Aktionen:** `einkauf.werkzeug_anlegen` (mit Bestellzeile kommen
+  Lieferant, Kosten, Währung und Projekt von dort), `_aendern`,
+  `_status_setzen` (Sperren und Ausmustern mit Grund, Ausmustern ist
+  endgültig), `einkauf.werkzeug_schuss_buchen` (von Hand, z. B. je Los
+  laut Lieferant; negativ = Korrektur, nie unter 0; positiv nur in Betrieb
+  oder in Auftrag — T0-Muster entstehen vor der Freigabe).
+- **Ab 90 % der Lebensdauer** erscheint eine regelbasierte Wiedervorlage.
+- **Oberfläche:** `/einkauf/werkzeuge` (Liste mit Zählerbalken, „Neues
+  Werkzeug", vorbelegbar mit `?projekt=` und `?lieferant=`),
+  `/einkauf/werkzeuge/[id]` (Schüsse buchen, Status, Stammdaten,
+  Zeichnungen und Fotos — Drive `Lieferanten/‹Name›/Werkzeuge`,
+  Wiedervorlagen, Verlauf), Karten in Projekt und Lieferantenakte.
+
+### Lieferantenverträge (`lieferantenvertraege`)
+
+- **Nicht** die Fixkosten-Verträge der Finanzen (`vertraege`, 0059).
+- Art (NDA, QSV, Rahmenvertrag, Preisliste), Titel, gültig von/bis (ohne
+  Ende = unbefristet), **Kündigungsfrist in Monaten**, **automatische
+  Verlängerung** in Monaten, **Erinnerung** (Tage vor dem Stichtag,
+  Standard 30), Währung der Preise, Status (aktiv, gekündigt, beendet).
+  Die Vertragsdatei hängt als Dokument am Vertrag (Drive
+  `Lieferanten/‹Name›/Verträge`). Prozessfrei.
+- **Laufzeitende und Kündigungsstichtag rechnet die Datenbank**
+  (`lieferantenvertrag_ende`, `lieferantenvertrag_stichtag`): mit
+  Verlängerung das nächste Ende, dessen Stichtag noch nicht verstrichen ist.
+  Die Lage („Frist läuft", „abgelaufen" …) liest die Oberfläche daraus.
+- **Status:** gekündigt (läuft bis zum Ende, keine Verlängerung, keine
+  Erinnerung), beendet (endet zum Datum; Preise aus dem Vertrag gelten bis
+  dahin), wieder aktiv.
+- **Preisliste übernehmen** (`einkauf.preisliste_uebernehmen`, `ki`, bei
+  Preisliste und Rahmenvertrag): eine Zeile je Preis — „KC-PBT-01 / 500:
+  7,20", „KC-PULL: 0,35" (ab 1) oder aus Excel kopiert (SKU⇥Menge⇥Preis).
+  Daraus werden **Lieferantenpreise mit der Gültigkeit des Vertrags** in
+  seiner Währung (`vendor_prices.vertrag_id`, optional Lieferzeit).
+  - Alles oder nichts: eine unlesbare Zeile oder ein unbekannter Artikel
+    verhindert die Übernahme und wird genannt.
+  - Eine zweite Übernahme ersetzt die Preise des Vertrags.
+  - Ändert sich die Laufzeit, ziehen die Preise mit; die Währung lässt sich
+    nicht mehr umstellen, solange Preise daraus stammen.
+- **Oberfläche:** `/einkauf/vertraege` (aktiv, gekündigt, beendet; sortiert
+  nach Stichtag; „Neuer Vertrag", vorbelegbar mit `?lieferant=`),
+  `/einkauf/vertraege/[id]` (Status, Bearbeiten, Preise aus dem Vertrag und
+  Übernahme, Dateien, Wiedervorlagen, Verlauf), Karte in der
+  Lieferantenakte; Lieferantenpreise zeigen ihren Vertrag.
+
+### Regelbasierte Wiedervorlagen (Sicht `einkauf_regel_wiedervorlagen`)
+
+- Berechnet, nie gespeichert: **ablaufende Verträge** (aktiv, mit Ende;
+  erscheinen ab Stichtag − Erinnerung, fällig ist der Stichtag) und
+  **Werkzeuge ab 90 % der Schuss-Lebensdauer** (aktiv).
+- Sie stehen in `/einkauf/wiedervorlagen` unter „Von selbst", in der
+  Karte „Wiedervorlagen" am Beleg und in der Lieferantenakte, zählen im
+  Menü mit und verschwinden, sobald der Grund behoben ist (verlängert,
+  gekündigt, beendet; Werkzeug ersetzt oder Lebensdauer angepasst).
+- Manuelle Wiedervorlagen gehen jetzt auch an Muster, Werkzeug und
+  Vertrag.
+
+### Nachweis
+
+- `tests/einkauf-stufe4.test.ts` — Preisliste aus Text (Mengen, ab 1,
+  Excel-Spalten, Schrägstriche in der SKU, unlesbare Zeilen), Lage eines
+  Vertrags, Revisionsfolge, Tracking-Link, Lebensdauer und Buchbarkeit,
+  Formular-Adapter (Musterpflicht-Checkbox, Golden-Sample-Marke).
+- `tests/prozesse/einkauf-bemusterung.test.ts`:
+  - Bestellung ohne Golden Sample abgewiesen, nichts halb angelegt; ein
+    Golden Sample eines anderen Lieferanten zählt nicht;
+  - Runden mit Kosten aus dem Angebot, Weiche „Muster da?", Nachbessern
+    legt Runde 2 an, Teilprozess-Stand;
+  - Golden Sample öffnet die Bestellung, ein neues ersetzt das alte;
+  - Bestellen legt das Werkzeug an der Werkzeugkosten-Zeile an;
+  - Werkzeug mit Artikel, Schüsse, Wiedervorlage ab 90 %, Sperren,
+    Korrektur, Ausmustern endgültig, Anlage aus einer Bestellzeile;
+  - Preisliste → Lieferantenpreise mit Gültigkeit, alles oder nichts,
+    Ersetzen, Gültigkeit folgt dem Vertrag, Beenden kürzt sie
+    (`best_vendor_price`);
+  - ablaufender, rollierender und ferner Vertrag in der Sicht, Kündigung
+    räumt die Wiedervorlage;
+  - Dokumente und manuelle Wiedervorlagen an den neuen Belegen.
+- Fixture `fixtures/bemusterung.ts` (Golden Sample, Nachbessern, Absage)
+  und der vierte Lauf in `fixtures/einkaufsprojekt.ts` (Musterpflicht).

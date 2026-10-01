@@ -142,7 +142,7 @@ describe('Neustart: demodaten_loeschen', () => {
     const prozesse = await sql<{ code: string }[]>`
       select code from prozesse order by code`
     assert.deepEqual(prozesse.map((p) => p.code),
-      ['anfrage', 'artikel_anlegen', 'bug_ticket', 'einkauf_wareneingang_rechnung', 'einkaufsprojekt',
+      ['anfrage', 'artikel_anlegen', 'bemusterung', 'bug_ticket', 'einkauf_wareneingang_rechnung', 'einkaufsprojekt',
        'fertigung', 'inventur', 'lieferantenrechnung', 'mail_versand', 'reparatur', 'reparatur_anfrage',
        'shopify_bestellung_versand', 'verkauf', 'vertrag_fixkosten', 'wareneingang'])
     const [{ schritte }] = await sql<{ schritte: number }[]>`

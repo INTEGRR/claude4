@@ -53,6 +53,7 @@ async function badges() {
       wiedervorlagen: number
       entwuerfe: number
       einkaufsprojekte: number
+      muster: number
     }[]
   >`
     select
@@ -78,10 +79,14 @@ async function badges() {
         where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
       (select count(*) from mail_threads
         where status = 'offen' and letzte_richtung = 'eingang')::int as posteingang,
-      (select count(*) from wiedervorlagen
-        where erledigt_am is null and faellig_am <= current_date)::int as wiedervorlagen,
+      ((select count(*) from wiedervorlagen
+         where erledigt_am is null and faellig_am <= current_date)
+       + (select count(*) from einkauf_regel_wiedervorlagen
+          where faellig_am <= current_date))::int as wiedervorlagen,
       (select count(*) from mail_entwuerfe where status = 'entwurf')::int as entwuerfe,
-      (select count(*) from einkaufsprojekte where status in ('bedarf', 'angefragt', 'entschieden'))::int as einkaufsprojekte`
+      (select count(*) from einkaufsprojekte where status in ('bedarf', 'angefragt', 'entschieden'))::int as einkaufsprojekte,
+      -- Muster, die da sind und auf unsere Bewertung warten (0107).
+      (select count(*) from bemusterungen where status = 'offen' and erhalten_am is not null)::int as muster`
   return row
 }
 
@@ -231,10 +236,13 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ? [
             { href: '/einkauf', label: 'Bestellungen' },
             { href: '/einkauf/projekte', label: 'Einkaufsprojekte', count: counts.einkaufsprojekte },
+            { href: '/einkauf/muster', label: 'Muster', count: counts.muster },
             { href: '/einkauf/posteingang', label: 'Posteingang', count: counts.posteingang },
             { href: '/einkauf/entwuerfe', label: 'Mail-Entwürfe', count: counts.entwuerfe },
             { href: '/einkauf/wiedervorlagen', label: 'Wiedervorlagen', count: counts.wiedervorlagen },
             { href: '/einkauf/lieferanten', label: 'Lieferanten' },
+            { href: '/einkauf/vertraege', label: 'Lieferantenverträge' },
+            { href: '/einkauf/werkzeuge', label: 'Werkzeuge & Formen' },
             { href: '/einkauf/rechnungen', label: 'Rechnungen' },
             { href: '/einkauf/kurse', label: 'Wechselkurse' },
             { href: '/einkauf/einstand', label: 'Einstand (Fracht & Zoll)' },

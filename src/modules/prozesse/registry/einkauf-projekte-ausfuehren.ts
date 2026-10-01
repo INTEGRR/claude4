@@ -11,6 +11,7 @@ import type { Sprache } from '@/modules/einkauf/mail-vorlagen'
 import { money } from '@/modules/shared/format'
 import { varianteAufloesen } from './aufloesen.ts'
 import { entwurfAnlegen, entwurfLesen, freigabeEinreihen, freigabePruefen } from './einkauf-mailversand-ausfuehren.ts'
+import { werkzeugAusBestellung } from './einkauf-werkzeuge-ausfuehren.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung Einkauf Stufe 3 (0097): Einkaufsprojekt, Anfragen, Angebote, Entscheidung, Bestellung. */
@@ -26,6 +27,7 @@ interface Projekt {
   zieltermin: string | null
   verantwortlich_id: string | null
   gewaehltes_angebot_id: string | null
+  muster_pflicht: boolean
 }
 
 const STATUS_TEXT: Record<Status, string> = {
@@ -40,7 +42,7 @@ const STATUS_TEXT: Record<Status, string> = {
 async function projektLesen(id: string, erlaubt?: Status[], wofuer?: string): Promise<Projekt> {
   const [p] = await sql<Projekt[]>`
     select id, nummer, titel, art, status::text as status, zieltermin::text as zieltermin,
-           verantwortlich_id, gewaehltes_angebot_id
+           verantwortlich_id, gewaehltes_angebot_id, muster_pflicht
     from einkaufsprojekte where id = ${id}`
   if (!p) throw new Error('Einkaufsprojekt nicht gefunden.')
   if (erlaubt && !erlaubt.includes(p.status)) {
@@ -72,6 +74,8 @@ async function ereignis(projektId: string, text: string, actor: string, art = 'i
 
 // --- Projekt und Positionen ------------------------------------------------
 
+const VOR_BESTELLUNG: Status[] = ['bedarf', 'angefragt', 'entschieden']
+
 export async function projektAnlegen(
   p: {
     titel: string
@@ -79,6 +83,7 @@ export async function projektAnlegen(
     beschreibung?: string
     verantwortlich_id?: string
     zieltermin?: string
+    muster_pflicht?: boolean
     positionen: PositionEingabe[]
   },
   ctx: AktionsKontext,
@@ -88,9 +93,9 @@ export async function projektAnlegen(
 
   const projekt = await tx(async (t) => {
     const [ep] = await t<{ id: string; nummer: string }[]>`
-      insert into einkaufsprojekte (nummer, titel, art, beschreibung, verantwortlich_id, zieltermin, erstellt_von)
+      insert into einkaufsprojekte (nummer, titel, art, beschreibung, verantwortlich_id, zieltermin, muster_pflicht, erstellt_von)
       values (next_sequence('einkaufsprojekt'), ${p.titel}, ${p.art}, ${p.beschreibung ?? null},
-              ${p.verantwortlich_id ?? ctx.userId ?? null}, ${p.zieltermin ?? null}, ${ctx.actor})
+              ${p.verantwortlich_id ?? ctx.userId ?? null}, ${p.zieltermin ?? null}, ${p.muster_pflicht ?? false}, ${ctx.actor})
       returning id, nummer`
     for (const [i, pos] of positionen.entries()) {
       await t`
@@ -100,7 +105,7 @@ export async function projektAnlegen(
                 ${pos.gewicht_g ?? null}, ${pos.hs_code ?? null}, ${pos.spezifikation ?? null})`
     }
     await t`select log_event('einkaufsprojekt', ${ep.id}, 'state',
-                             ${`Projekt angelegt (${positionen.length} Position(en))`}, ${ctx.actor})`
+                             ${`Projekt angelegt (${positionen.length} Position(en)${p.muster_pflicht ? ', mit Musterpflicht' : ''})`}, ${ctx.actor})`
     return ep
   })
   return {
@@ -111,10 +116,14 @@ export async function projektAnlegen(
 }
 
 export async function projektAendern(
-  p: { titel?: string; art?: string; beschreibung?: string; verantwortlich_id?: string; zieltermin?: string },
+  p: { titel?: string; art?: string; beschreibung?: string; verantwortlich_id?: string; zieltermin?: string; muster_pflicht?: boolean },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const projekt = await projektLesen(ctx.recordId!)
+  const pflichtWechsel = p.muster_pflicht !== undefined && p.muster_pflicht !== projekt.muster_pflicht
+  if (pflichtWechsel && !VOR_BESTELLUNG.includes(projekt.status)) {
+    throw new Error(`${projekt.nummer} ist ${STATUS_TEXT[projekt.status]} — die Musterpflicht gilt bis zur Bestellung.`)
+  }
   await sql`
     update einkaufsprojekte set
       titel = coalesce(${p.titel ?? null}, titel),
@@ -122,12 +131,15 @@ export async function projektAendern(
       beschreibung = case when ${p.beschreibung !== undefined} then nullif(${p.beschreibung ?? ''}, '') else beschreibung end,
       verantwortlich_id = case when ${p.verantwortlich_id !== undefined}
                                then nullif(${p.verantwortlich_id ?? ''}, '')::uuid else verantwortlich_id end,
-      zieltermin = case when ${p.zieltermin !== undefined} then nullif(${p.zieltermin ?? ''}, '')::date else zieltermin end
+      zieltermin = case when ${p.zieltermin !== undefined} then nullif(${p.zieltermin ?? ''}, '')::date else zieltermin end,
+      muster_pflicht = coalesce(${p.muster_pflicht ?? null}, muster_pflicht)
     where id = ${projekt.id}`
+  // Die Musterpflicht ist eine Bestellregel — ihr Wechsel gehört in den Verlauf.
+  if (pflichtWechsel) {
+    await ereignis(projekt.id, p.muster_pflicht ? 'Musterpflicht gesetzt' : 'Musterpflicht aufgehoben', ctx.actor)
+  }
   return { text: 'Projekt gespeichert.', recordId: projekt.id }
 }
-
-const VOR_BESTELLUNG: Status[] = ['bedarf', 'angefragt', 'entschieden']
 
 export async function positionSetzen(p: PositionEingabe & { position_id?: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   const projekt = await projektLesen(ctx.recordId!, VOR_BESTELLUNG, 'Positionen ändern sich nur bis zur Bestellung')
@@ -583,14 +595,16 @@ export async function projektBestellen(_p: object, ctx: AktionsKontext): Promise
 
     let sequence = 10
     const zeile = async (variantId: string, name: string, menge: number, preis: number, staffelId: string | null) => {
-      await t`
+      const [neu] = await t<{ id: string }[]>`
         insert into purchase_order_lines
           (order_id, sequence, variant_id, name, qty, uom_id, price_unit, discount, tax_id, tax_rate, angebot_staffel_id)
         select ${po.id}, ${sequence}, ${variantId}, ${name}, ${menge}, coalesce(pt.purchase_uom_id, pt.uom_id), ${preis}, 0,
                pt.purchase_tax_id, coalesce((select amount from taxes where id = pt.purchase_tax_id), 19), ${staffelId}
         from product_variants pv join product_templates pt on pt.id = pv.template_id
-        where pv.id = ${variantId}`
+        where pv.id = ${variantId}
+        returning id`
       sequence += 10
+      return neu.id
     }
     for (const pos of positionen) {
       const s = staffelFuer(staffeln.filter((x) => x.position_id === pos.id), Number(pos.menge))!
@@ -598,9 +612,25 @@ export async function projektBestellen(_p: object, ctx: AktionsKontext): Promise
     }
     const werkzeug = Number(a.werkzeugkosten)
     const muster = Number(a.musterkosten)
+    let werkzeugNr: string | null = null
     if (werkzeug > 0 || muster > 0) {
       const kosten = await kostenArtikel(t)
-      if (werkzeug > 0) await zeile(kosten, `Werkzeugkosten laut Angebot (${projekt.nummer})`, 1, werkzeug, null)
+      if (werkzeug > 0) {
+        const zeileId = await zeile(kosten, `Werkzeugkosten laut Angebot (${projekt.nummer})`, 1, werkzeug, null)
+        // Stufe 4 (0107): das bezahlte Werkzeug wird ein Datensatz am Lieferanten.
+        const wz = await werkzeugAusBestellung(t, {
+          projektId: projekt.id,
+          projektNummer: projekt.nummer,
+          projektTitel: projekt.titel,
+          partnerId: a.partner_id,
+          zeileId,
+          bestellnummer: po.number,
+          kosten: werkzeug,
+          waehrung: a.waehrung,
+          actor: ctx.actor,
+        })
+        werkzeugNr = wz.nummer
+      }
       if (muster > 0) await zeile(kosten, `Musterkosten laut Angebot (${projekt.nummer})`, 1, muster, null)
     }
 
@@ -635,13 +665,14 @@ export async function projektBestellen(_p: object, ctx: AktionsKontext): Promise
     await t`select log_event('einkaufsprojekt', ${projekt.id}, 'state',
                              ${`Bestellung ${po.number} bei ${a.partner} angelegt${neueArtikel.length ? ` — neue Artikel: ${neueArtikel.join(', ')}` : ''}`},
                              ${ctx.actor})`
-    return { ...po, neueArtikel }
+    return { ...po, neueArtikel, werkzeugNr }
   })
 
   return {
     text:
       `Bestellung ${bestellung.number} bei ${a.partner} angelegt (Entwurf)` +
       (bestellung.neueArtikel.length ? ` — neue Artikel: ${bestellung.neueArtikel.join(', ')}` : '') +
+      (bestellung.werkzeugNr ? ` — Werkzeug ${bestellung.werkzeugNr}` : '') +
       '. Bestätigen in der Bestellung.',
     recordId: projekt.id,
     link: `/einkauf/${bestellung.id}`,

@@ -36,6 +36,9 @@ export const KOMMENTAR_MODELLE = {
   mail_thread: { tabelle: 'mail_threads', bereich: 'einkauf' },
   mail_entwurf: { tabelle: 'mail_entwuerfe', bereich: 'einkauf' },
   einkaufsprojekt: { tabelle: 'einkaufsprojekte', bereich: 'einkauf' },
+  bemusterung: { tabelle: 'bemusterungen', bereich: 'einkauf' },
+  werkzeug: { tabelle: 'werkzeuge', bereich: 'einkauf' },
+  lieferantenvertrag: { tabelle: 'lieferantenvertraege', bereich: 'einkauf' },
 } satisfies Record<string, { tabelle: string; bereich: Area }>
 
 /**

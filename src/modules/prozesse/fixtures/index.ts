@@ -2,6 +2,7 @@ import { ANFRAGE } from './anfrage.ts'
 import { FINANZEN_VERTRAG } from './finanzen.ts'
 import { ARTIKEL_ANLEGEN } from './artikel-anlegen.ts'
 import { BASIS } from './basis.ts'
+import { BEMUSTERUNG_FIXTURE } from './bemusterung.ts'
 import { BUG_TICKET } from './bug-ticket.ts'
 import { EINKAUF_FIXTURE, LIEFERANTENRECHNUNG_FIXTURE } from './einkauf.ts'
 import { EINKAUF_MAIL } from './einkauf-mail.ts'
@@ -28,6 +29,7 @@ export const FIXTURES = {
   anfrage: ANFRAGE,
   vertrag_fixkosten: FINANZEN_VERTRAG,
   artikel_anlegen: ARTIKEL_ANLEGEN,
+  bemusterung: BEMUSTERUNG_FIXTURE,
   bug_ticket: BUG_TICKET,
   einkauf_wareneingang_rechnung: EINKAUF_FIXTURE,
   einkaufsprojekt: EINKAUFSPROJEKT_FIXTURE,

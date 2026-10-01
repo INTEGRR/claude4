@@ -13,6 +13,9 @@ export const DOKUMENT_MODELLE = {
   product_template: { tabelle: 'product_templates', bereich: 'produkte', label: 'Artikel' },
   mail_thread: { tabelle: 'mail_threads', bereich: 'einkauf', label: 'Mail-Thread' },
   einkaufsprojekt: { tabelle: 'einkaufsprojekte', bereich: 'einkauf', label: 'Einkaufsprojekt' },
+  bemusterung: { tabelle: 'bemusterungen', bereich: 'einkauf', label: 'Muster-Runde' },
+  werkzeug: { tabelle: 'werkzeuge', bereich: 'einkauf', label: 'Werkzeug' },
+  lieferantenvertrag: { tabelle: 'lieferantenvertraege', bereich: 'einkauf', label: 'Lieferantenvertrag' },
 } satisfies Record<string, { tabelle: string; bereich: Area; label: string }>
 
 export type DokumentModell = keyof typeof DOKUMENT_MODELLE
