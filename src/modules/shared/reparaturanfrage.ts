@@ -75,8 +75,9 @@ export const ANFRAGE_BESCHRIFTUNG: Record<AnfrageFeld, string> = {
 
 export const ANFRAGE_PLATZHALTER: Partial<Record<AnfrageFeld, string>> = {
   bestellnummer: 'z. B. #1042',
-  fehlerbeschreibung:
-    'z. B. „Die Leertaste prellt — jeder zweite Anschlag kommt doppelt. Seit etwa zwei Wochen."',
+  // Alltagssprache statt Fachbegriffe (Betreiber 2026-10-01: „prellt" sagt
+  // kein Kunde).
+  fehlerbeschreibung: 'Was ist passiert und seit wann? Zum Beispiel: Einige Tasten reagieren nicht mehr.',
 }
 
 /** Länderauswahl beider Formulare (ISO-2-Code und Anzeigename). */

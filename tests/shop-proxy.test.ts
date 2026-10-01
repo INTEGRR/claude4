@@ -19,6 +19,7 @@ import {
   pfadPraefix,
   reparaturShopUrl,
   stoerungSeite,
+  THEME_CSS,
 } from '../src/modules/reparatur/shop-seiten.ts'
 import { ANFRAGE_BESCHRIFTUNG, ANFRAGE_FELDER } from '../src/modules/shared/reparaturanfrage.ts'
 
@@ -266,18 +267,31 @@ describe('App Proxy: Seiten sind selbsttragend und verraten nichts', () => {
     }
   })
 
-  test('Theme-Rahmen, Theme-Variablen mit Rückfall, Klassen mit Präfix rp-', () => {
+  // Im Kleid des Themes (Betreiber 2026-10-01): Markup wie das
+  // Kontaktformular (Dawn), keine eigenen Farben oder Schriften — sonst
+  // dunkle Schrift auf dunklem Theme.
+  const THEME_KLASSEN = new Set([
+    'color-background-1', 'gradient', 'contact', 'page-width', 'page-width--narrow', 'main-page-title',
+    'page-title', 'h0', 'rte', 'caption', 'isolate', 'contact__fields', 'contact__button', 'field',
+    'field__input', 'field__label', 'form__label', 'form__message', 'text-area', 'select', 'select__select',
+    'icon', 'icon-caret', 'button', 'rp',
+  ])
+
+  test('Theme-Rahmen und Theme-Klassen, kein eigenes Farb- oder Schrift-CSS', () => {
     for (const html of alle) {
-      assert.ok(html.includes('<div class="page-width rp">'))
-      assert.ok(html.includes('rgb(var(--color-foreground,18,18,18))'))
-      assert.ok(html.includes('var(--font-body-family,inherit)'))
+      assert.ok(html.includes('<div class="color-background-1 gradient rp">'))
+      assert.ok(html.includes('class="contact page-width page-width--narrow"'))
       const klassen = [...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/))
-      for (const k of klassen) assert.ok(k === 'page-width' || k === 'rp' || k.startsWith('rp-'), k)
+      for (const k of klassen) assert.ok(THEME_KLASSEN.has(k) || k.startsWith('rp-'), k)
+      const stil = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+      assert.ok(!/(^|[;{])\s*(color|background|font|border)[a-z-]*\s*:/.test(stil), `eigene Optik im CSS: ${stil}`)
     }
+    assert.ok(formular.includes(THEME_CSS), 'Formular lädt das Kontaktformular-CSS des Themes')
+    assert.ok(!nichtGefundenSeite('/apps/reparatur').includes('asset_url'), 'Hinweisseiten ohne Liquid')
   })
 
   test('das Formular: alle Felder mit den Kundenbeschriftungen, Honigtopf, POST an den Shop-Pfad', () => {
-    assert.match(formular, /<form id="rp-formular" class="rp-form" method="post" action="\/apps\/reparatur"/)
+    assert.match(formular, /<form id="rp-formular" class="isolate" method="post" action="\/apps\/reparatur"/)
     for (const feld of ANFRAGE_FELDER) {
       assert.ok(formular.includes(`name="${feld}"`), feld)
       assert.ok(formular.includes(`>${liquidSicher(ANFRAGE_BESCHRIFTUNG[feld])}`), `Beschriftung ${feld}`)

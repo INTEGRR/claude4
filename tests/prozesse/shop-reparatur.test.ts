@@ -124,7 +124,7 @@ describe('Reparaturformular im Shop: Route, Signatur, Eingang', () => {
     assert.ok(html.includes('action="/apps/reparatur"'))
     assert.ok(html.includes('{{ shop.name | escape }}'))
     assert.ok(!html.includes('/_next') && !/krnl/i.test(html) && !html.includes('erp.example.test'))
-    assert.ok(!html.includes('aus Ihrem Kundenkonto'), 'Gast: nichts vorbelegt')
+    assert.ok(!html.includes('aus deinem Kundenkonto'), 'Gast: nichts vorbelegt')
   })
 
   test('unbekannter Unterpfad: neutrale 404-Seite im Theme statt der Next-Seite', async () => {
@@ -208,7 +208,7 @@ describe('Reparaturformular im Shop: Route, Signatur, Eingang', () => {
     const res = await senden({ ...ANFRAGE, email: 'bot@example.com', webseite: 'https://spam.example' })
     assert.equal(res.status, 200)
     const html = await res.text()
-    assert.ok(html.includes('Danke.'))
+    assert.ok(html.includes('Danke!'))
     assert.ok(!html.includes('VG/'))
     assert.equal(await anzahlVorgaenge(), vorher)
   })
@@ -224,7 +224,7 @@ describe('Reparaturformular im Shop: Route, Signatur, Eingang', () => {
                        ('S-SHOP-2', ${p.id}, 'shopify', 'gid://shopify/Order/2', '#1077')`
 
     const html = await (await holen({ kunde: '777' })).text()
-    assert.ok(html.includes('aus Ihrem Kundenkonto'))
+    assert.ok(html.includes('aus deinem Kundenkonto'))
     assert.ok(html.includes('value="Max &#123;&#123; Kunde &#125;&#125;"'), 'auch Stammdaten werden entschärft')
     assert.ok(html.includes('value="max@example.com"'))
     assert.ok(html.includes('value="Hafenstraße"') && html.includes('value="12a"'))
@@ -232,7 +232,7 @@ describe('Reparaturformular im Shop: Route, Signatur, Eingang', () => {
     assert.ok(html.includes('<option value="#1042"></option>') && html.includes('<option value="#1077"></option>'))
 
     const fremd = await (await holen({ kunde: '778' })).text()
-    assert.ok(!fremd.includes('Hafenstraße') && !fremd.includes('aus Ihrem Kundenkonto'))
+    assert.ok(!fremd.includes('Hafenstraße') && !fremd.includes('aus deinem Kundenkonto'))
     const unsinn = await (await holen({ kunde: '777 or 1=1' })).text()
     assert.ok(!unsinn.includes('Hafenstraße'), 'nur numerische Kunden-IDs')
   })

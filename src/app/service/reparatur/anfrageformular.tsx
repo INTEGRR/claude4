@@ -89,12 +89,12 @@ export function Anfrageformular() {
       <div className="anzeige">
         <p className="mono" style={{ color: '#FF5A1F', margin: '0 0 10px' }}>{'// Anfrage eingegangen'}</p>
         <h3 style={{ fontSize: 23, margin: '0 0 8px', color: '#f4f3ef' }}>
-          Danke{nummer ? ` — Ihre Anfrage hat die Nummer ${nummer}` : ''}.
+          Danke!{nummer ? ` Deine Anfrage hat die Nummer ${nummer}.` : ''}
         </h3>
         <p style={{ color: '#9a9c9f', margin: 0 }}>
-          Sie erhalten gleich eine Bestätigung per E-Mail. Wir prüfen die Anfrage und melden uns
-          mit dem Retourenlabel oder einer Rückfrage. Bitte schicken Sie das Gerät erst nach Erhalt
-          des Labels.
+          Du bekommst gleich eine Bestätigung per E-Mail. Wir prüfen die Anfrage und melden uns
+          mit dem Retourenlabel oder einer Rückfrage. Bitte schick dein Board erst los, wenn du das
+          Label hast.
         </p>
       </div>
     )
@@ -233,7 +233,7 @@ export function Anfrageformular() {
         {status === 'sendet' ? 'SENDE …' : 'Reparaturanfrage absenden'}
       </button>
       <p className="hinweis" style={{ marginTop: 12 }}>
-        Ihre Daten werden nur zur Bearbeitung der Reparatur verwendet.
+        Deine Daten werden nur zur Bearbeitung der Reparatur verwendet.
       </p>
     </form>
   )

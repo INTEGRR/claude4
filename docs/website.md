@@ -180,13 +180,17 @@ KRNL    ──200, Content-Type: application/liquid──▶ Shopify rendert im 
   abgeschaltet (`skipTrailingSlashRedirect`) — ihr relativer `Location`
   landete über Shopify im Browser auf der Shop-Domain (404).
 - **Liquid im Theme.** `application/liquid` lässt Shopify die Antwort im
-  Theme rendern (Kopf, Navigation, Fuß des Shops). Die Seite ist
-  selbsttragend ([`shop-seiten.ts`](../src/modules/reparatur/shop-seiten.ts)):
-  Inline-Stil mit `rp-`-Klassen auf den Theme-Variablen
-  (`--color-foreground`, `--color-button`, `--font-body-family` … jeweils
-  mit Rückfall), Rahmen `page-width`, keine Assets oder absoluten URLs
-  unseres Hosts, kein Systemname, keine Marke. Den Shopnamen liefert
-  `{{ shop.name | escape }}`.
+  Theme rendern (Kopf, Navigation, Fuß des Shops). Die Seite trägt das
+  **Kleid des Themes** ([`shop-seiten.ts`](../src/modules/reparatur/shop-seiten.ts)):
+  Markup wie das Kontaktformular eines Dawn-Themes (`color-background-1`,
+  `page-width page-width--narrow`, `field`/`field__input`/`field__label`,
+  `select__select`, `button`), dazu dessen Stylesheet per
+  `{{ 'section-contact-form.css' | asset_url | stylesheet_tag }}`. Eigenes CSS
+  nur für Layout-Rückfälle — keine eigenen Farben oder Schriften (die
+  ersten Fassung mit festen Rückfallfarben war im dunklen Theme
+  unlesbar). Keine Assets oder absoluten URLs unseres Hosts, kein
+  Systemname, keine Marke. Den Shopnamen liefert `{{ shop.name | escape }}`.
+  Kunden werden **geduzt** wie im Shop, ohne Fachbegriffe.
 - **Liquid-Injection ist ausgeschlossen.** Jeder Wert aus Kundeneingabe oder
   Datenbank wird HTML-escaped **und** `{`, `}`, `%` werden als
   `&#123;` `&#125;` `&#37;` geschrieben — ein getipptes `{{ … }}` oder

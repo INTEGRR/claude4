@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Reparaturformular im Kleid des Themes, per du
+
+**Anlass:** Erster Blick im Shop: im neuen (dunklen) Theme unlesbar —
+die festen Rückfallfarben ergaben dunkle Schrift auf dunklem Grund. Dazu:
+der Shop duzt, das Formular siezte, und der Platzhalter „Die Leertaste
+prellt" ist Fachjargon („sagt man in DE nicht").
+
+**Entschieden:**
+- Das Formular nutzt das Markup und Stylesheet des Theme-Kontaktformulars
+  (Dawn: `field`/`field__input`/`field__label`, `button`, `page-width
+  page-width--narrow`, `color-background-1`; CSS per
+  `asset_url | stylesheet_tag`). Eigenes CSS nur für Layout-Rückfälle, keine
+  Farben, Schriften, Rahmen — ein Test wacht darüber. Hinweisseiten bleiben
+  ohne Liquid (Fehlerstatus wird evtl. nicht gerendert).
+- Kundentexte (Formular, Danke- und Hinweisseiten, Eingangsbestätigung,
+  Retourenlabel-Mail, Website-Formular) duzen.
+- Platzhalter in Alltagssprache; im Theme-Formular steht der Feldname als
+  Platzhalter (schwebendes Label), der Hinweis darunter.
+
+Umgesetzt in `reparatur/shop-seiten.ts`, `shared/reparaturanfrage.ts`,
+`service/reparatur/*`, `integrationen/jobs.ts`; dokumentiert in
+[website.md](website.md); Tests `tests/shop-proxy.test.ts`,
+`tests/prozesse/shop-reparatur.test.ts`.
+
 ## 2026-10-01 — Gewichte im Versand
 
 **Anlass:** Betreiber: „Wir brauchen eine Funktion, Gewichte im

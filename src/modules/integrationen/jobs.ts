@@ -333,14 +333,15 @@ const handlers = {
     if (!label) return 'Retourenlabel nicht gefunden'
     if (!label.email) throw new Error(`${label.name} hat keine E-Mail-Adresse`)
 
+    // Kunden werden geduzt wie im Shop (Betreiber 2026-10-01).
     const betreff = label.rma
-      ? `Ihr Retourenlabel für die Reparatur ${label.rma}`
-      : `Ihr Retourenlabel (${label.shipment_number})`
+      ? `Dein Retourenlabel für die Reparatur ${label.rma}`
+      : `Dein Retourenlabel (${label.shipment_number})`
     const einleitung = label.rma
-      ? `<p>anbei das Retourenlabel für Ihre Reparatur <strong>${htmlSicher(label.rma)}</strong>. ` +
-        `Bitte kleben Sie das Label auf das Paket und legen Sie einen Zettel mit der Nummer ` +
+      ? `<p>anbei das Retourenlabel für deine Reparatur <strong>${htmlSicher(label.rma)}</strong>. ` +
+        `Bitte kleb das Label auf das Paket und leg einen Zettel mit der Nummer ` +
         `<strong>${htmlSicher(label.rma)}</strong> und einer kurzen Fehlerbeschreibung bei.</p>`
-      : '<p>anbei Ihr Retourenlabel.</p>'
+      : '<p>anbei dein Retourenlabel.</p>'
 
     await sendMail({
       to: label.email,
@@ -378,13 +379,13 @@ const handlers = {
 
     await sendMail({
       to: email,
-      subject: `Ihre Reparaturanfrage ${v.number} ist eingegangen`,
+      subject: `Deine Reparaturanfrage ${v.number} ist eingegangen`,
       html:
         `<p>Hallo ${htmlSicher(name)},</p>` +
-        `<p>vielen Dank — Ihre Reparaturanfrage ist bei uns eingegangen und hat die Nummer ` +
+        `<p>danke! Deine Reparaturanfrage ist bei uns eingegangen und hat die Nummer ` +
         `<strong>${htmlSicher(v.number)}</strong>.</p>` +
         `<p>Wir prüfen die Anfrage und melden uns mit einem Retourenlabel für den Versand ` +
-        `des Geräts oder mit einer Rückfrage. Bitte schicken Sie das Gerät erst nach Erhalt des Labels.</p>`,
+        `oder mit einer Rückfrage. Bitte schick dein Board erst los, wenn du das Label hast.</p>`,
     })
     return `Eingangsbestätigung an ${email} gesendet`
   },

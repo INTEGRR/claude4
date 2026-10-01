@@ -18,8 +18,12 @@ import { EMAIL_MUSTER } from '../shared/registrierung.ts'
  * Shopify rendert Antworten mit `Content-Type: application/liquid` im
  * Theme des Shops. Daraus folgen die Regeln dieser Datei:
  *
- *   - **Selbsttragend:** Stil und Skript inline, Klassen mit Präfix `rp-`,
- *     Farben und Schriften aus den CSS-Variablen des Themes (mit Rückfall).
+ *   - **Im Kleid des Themes:** Markup wie das Kontaktformular eines
+ *     Dawn-Themes (`field`/`field__input`/`field__label`, `button`,
+ *     `page-width page-width--narrow`, `color-background-1`), dazu dessen
+ *     Stylesheet per Liquid (`section-contact-form.css`). Eigenes CSS nur
+ *     für Layout-Rückfälle, keine eigenen Farben oder Schriften — sonst sieht
+ *     es in einem dunklen Theme falsch aus (Betreiber 2026-10-01).
  *     Keine Assets von unserem Host, keine absoluten URLs dorthin, kein
  *     Produktname des Systems dahinter — der Kunde soll den Shop sehen,
  *     nicht, was dahinter läuft.
@@ -35,7 +39,8 @@ import { EMAIL_MUSTER } from '../shared/registrierung.ts'
  */
 
 /** Die fest eingebauten Liquid-Ausdrücke — alles andere wäre ein Leck. */
-export const LIQUID_AUSDRUECKE = ['{{ shop.name | escape }}', '{{ routes.root_url }}'] as const
+export const THEME_CSS = "{{ 'section-contact-form.css' | asset_url | stylesheet_tag }}"
+export const LIQUID_AUSDRUECKE = ['{{ shop.name | escape }}', '{{ routes.root_url }}', THEME_CSS] as const
 
 /** Standard-Pfad im Shop, falls path_prefix fehlt oder unbrauchbar ist. */
 export const STANDARD_PFAD = '/apps/reparatur'
@@ -86,40 +91,20 @@ export function reparaturShopUrl(env: Record<string, string | undefined> = proce
   }
 }
 
+/**
+ * Nur Layout-Rückfälle (falls das Theme section-contact-form.css nicht hat)
+ * und der unsichtbare Honigtopf — Farben, Schriften, Felder und Knopf kommen
+ * vom Theme.
+ */
 const STIL = [
-  '.rp{--rp-text:rgb(var(--color-foreground,18,18,18));--rp-leise:rgba(var(--color-foreground,18,18,18),.72);',
-  '--rp-rand:rgba(var(--color-foreground,18,18,18),.3);--rp-flaeche:rgba(var(--color-foreground,18,18,18),.05);',
-  '--rp-grund:rgb(var(--color-background,255,255,255));--rp-knopf:rgb(var(--color-button,18,18,18));',
-  '--rp-knopf-text:rgb(var(--color-button-text,255,255,255));--rp-fehler:#b3261e;',
-  'color:var(--rp-text);font-family:var(--font-body-family,inherit);padding-top:2.5rem;padding-bottom:4rem}',
-  '.rp-inhalt{max-width:46rem}',
-  '.rp-titel{font-family:var(--font-heading-family,inherit);font-weight:var(--font-heading-weight,600);',
-  'font-size:clamp(1.7rem,4vw,2.5rem);line-height:1.2;margin:0 0 1rem}',
-  '.rp p{line-height:1.6;margin:0 0 .9rem}',
-  '.rp a{color:inherit;text-decoration:underline;text-underline-offset:.2em}',
-  '.rp-leise{color:var(--rp-leise);font-size:.92em}',
-  '.rp-fuss{margin-top:1.2rem}',
-  '.rp-hinweis{background:var(--rp-flaeche);padding:.8rem 1rem;margin:1.2rem 0}',
-  '.rp-form{margin-top:2rem}',
-  '.rp-paar{display:grid;grid-template-columns:1fr 1fr;gap:0 1.2rem}',
-  '@media (max-width:640px){.rp-paar{grid-template-columns:1fr}}',
-  '.rp-feld{display:flex;flex-direction:column;margin-bottom:1.1rem}',
-  '.rp-feld label{font-size:.95em;margin-bottom:.35rem}',
-  '.rp-feld input,.rp-feld select,.rp-feld textarea{font:inherit;font-size:1rem;color:var(--rp-text);',
-  'background:var(--rp-grund);border:1px solid var(--rp-rand);border-radius:var(--inputs-radius,0);',
-  'padding:.7rem .8rem;width:100%;max-width:100%;box-sizing:border-box;margin:0}',
-  '.rp-feld textarea{min-height:9rem;resize:vertical}',
-  '.rp-feld input:focus,.rp-feld select:focus,.rp-feld textarea:focus{outline:2px solid var(--rp-text);outline-offset:1px}',
-  '.rp-feld [aria-invalid=true]{border-color:var(--rp-fehler)}',
-  '.rp-fehler{color:var(--rp-fehler);font-size:.88em;margin-top:.3rem}',
+  '.rp .contact__fields{display:grid;grid-template-columns:1fr;column-gap:2rem}',
+  '@media screen and (min-width:750px){.rp .contact__fields{grid-template-columns:repeat(2,1fr)}}',
+  '.rp .field{margin-bottom:1.5rem}',
+  '.rp-land{margin-bottom:1.5rem}',
+  '.rp-land .form__label{display:block;margin-bottom:.6rem}',
+  '.rp-fehler{display:block;margin:-1rem 0 1.5rem}',
   '.rp-fehler:empty{display:none}',
-  '.rp-meldung{border:1px solid var(--rp-fehler);color:var(--rp-fehler);padding:.8rem 1rem;margin:0 0 1.2rem}',
   '.rp-honig{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}',
-  '.rp-knopf{font:inherit;font-size:1rem;cursor:pointer;border:0;border-radius:var(--buttons-radius,0);',
-  'background:var(--rp-knopf);color:var(--rp-knopf-text);padding:.9rem 1.8rem;min-height:3rem}',
-  '.rp-knopf[disabled]{opacity:.6;cursor:default}',
-  '.rp-karte{border:1px solid var(--rp-rand);padding:1.5rem 1.6rem}',
-  '.rp-marke{text-transform:uppercase;letter-spacing:.08em;font-size:.8em;color:var(--rp-leise)}',
 ].join('')
 
 /**
@@ -157,10 +142,13 @@ const SKRIPT = `(function () {
 /** Ersetzt nach dem Erfolg den POST-Eintrag im Verlauf — Neuladen schickt nichts erneut. */
 const SKRIPT_VERLAUF = `if (window.history && history.replaceState) history.replaceState(null, '', location.href);`
 
-function seite(inhalt: string, skript = ''): string {
+function seite(inhalt: string, skript = '', themeCss = true): string {
   return (
+    (themeCss ? `${THEME_CSS}\n` : '') +
     `<style>${STIL}</style>\n` +
-    `<div class="page-width rp"><div class="rp-inhalt">\n${inhalt}\n</div></div>\n` +
+    '<div class="color-background-1 gradient rp">' +
+    '<div class="contact page-width page-width--narrow" style="padding-top:36px;padding-bottom:36px">\n' +
+    `${inhalt}\n</div></div>\n` +
     (skript ? `<script>\n${skript}\n</script>\n` : '')
   )
 }
@@ -185,13 +173,9 @@ interface FeldOptionen {
   optional?: boolean
 }
 
-function beschriftung(name: AnfrageFeld, optional?: boolean): string {
+function beschriftungText(name: AnfrageFeld, optional?: boolean): string {
   const pflicht = ANFRAGE_PFLICHT.includes(name)
-  return (
-    `<label for="rp-${name}">${liquidSicher(B[name])}` +
-    (pflicht ? ' <span aria-hidden="true">*</span>' : optional ? ' (optional)' : '') +
-    '</label>'
-  )
+  return liquidSicher(B[name]) + (pflicht ? ' <span aria-hidden="true">*</span>' : optional ? ' (optional)' : '')
 }
 
 function attribute(name: AnfrageFeld, d: FormularDaten): string {
@@ -207,27 +191,32 @@ function attribute(name: AnfrageFeld, d: FormularDaten): string {
 }
 
 function fehlerZeile(name: AnfrageFeld, d: FormularDaten): string {
-  return `<span class="rp-fehler" id="rp-${name}-fehler">${liquidSicher(d.fehler?.[name] ?? '')}</span>`
+  return `<small class="form__message rp-fehler" id="rp-${name}-fehler">${liquidSicher(d.fehler?.[name] ?? '')}</small>`
 }
 
+/** Feld wie im Kontaktformular des Themes: Eingabe, dann schwebendes Label (braucht placeholder). */
 function eingabe(name: AnfrageFeld, d: FormularDaten, o: FeldOptionen = {}): string {
-  const platzhalter = ANFRAGE_PLATZHALTER[name]
   return (
-    '<div class="rp-feld">' +
-    beschriftung(name, o.optional) +
-    `<input type="${o.typ ?? 'text'}" ${attribute(name, d)} value="${liquidSicher(d.werte[name] ?? '')}"` +
+    '<div class="field">' +
+    `<input class="field__input" type="${o.typ ?? 'text'}" ${attribute(name, d)} ` +
+    `value="${liquidSicher(d.werte[name] ?? '')}" placeholder="${liquidSicher(B[name])}"` +
     (o.autocomplete ? ` autocomplete="${o.autocomplete}"` : '') +
     (o.liste ? ` list="${o.liste}"` : '') +
-    (platzhalter ? ` placeholder="${liquidSicher(platzhalter)}"` : '') +
     '>' +
-    fehlerZeile(name, d) +
-    '</div>'
+    `<label class="field__label" for="rp-${name}">${beschriftungText(name, o.optional)}</label>` +
+    '</div>' +
+    fehlerZeile(name, d)
   )
 }
 
 function paar(a: string, b: string): string {
-  return `<div class="rp-paar">${a}${b}</div>`
+  return `<div class="contact__fields">${a}${b}</div>`
 }
+
+const CARET =
+  '<svg aria-hidden="true" focusable="false" class="icon icon-caret" viewBox="0 0 10 6">' +
+  '<path fill-rule="evenodd" clip-rule="evenodd" d="M9.354.646a.5.5 0 00-.708 0L5 4.293 1.354.646a.5.5 0 ' +
+  '00-.708.708l4 4a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" fill="currentColor"></path></svg>'
 
 function landAuswahl(d: FormularDaten): string {
   const gewaehlt = (d.werte.land || 'DE').toUpperCase()
@@ -242,24 +231,26 @@ function landAuswahl(d: FormularDaten): string {
     )
     .join('')
   return (
-    '<div class="rp-feld">' +
-    beschriftung('land') +
-    `<select ${attribute('land', d)} autocomplete="country">${optionen}</select>` +
-    fehlerZeile('land', d) +
-    '</div>'
+    '<div class="rp-land">' +
+    `<label class="form__label" for="rp-land">${beschriftungText('land')}</label>` +
+    `<div class="select"><select class="select__select" ${attribute('land', d)} autocomplete="country">` +
+    `${optionen}</select>${CARET}</div>` +
+    '</div>' +
+    fehlerZeile('land', d)
   )
 }
 
 function beschreibung(d: FormularDaten): string {
-  const platzhalter = ANFRAGE_PLATZHALTER.fehlerbeschreibung
+  const hinweis = ANFRAGE_PLATZHALTER.fehlerbeschreibung
   return (
-    '<div class="rp-feld">' +
-    beschriftung('fehlerbeschreibung') +
-    `<textarea ${attribute('fehlerbeschreibung', d)} minlength="${FEHLERBESCHREIBUNG_MIN}" rows="6"` +
-    (platzhalter ? ` placeholder="${liquidSicher(platzhalter)}"` : '') +
-    `>${liquidSicher(d.werte.fehlerbeschreibung ?? '')}</textarea>` +
+    '<div class="field">' +
+    `<textarea class="text-area field__input" ${attribute('fehlerbeschreibung', d)} ` +
+    `minlength="${FEHLERBESCHREIBUNG_MIN}" rows="8" placeholder="${liquidSicher(B.fehlerbeschreibung)}">` +
+    `${liquidSicher(d.werte.fehlerbeschreibung ?? '')}</textarea>` +
+    `<label class="form__label field__label" for="rp-fehlerbeschreibung">${beschriftungText('fehlerbeschreibung')}</label>` +
+    '</div>' +
     fehlerZeile('fehlerbeschreibung', d) +
-    '</div>'
+    (hinweis ? `<p class="caption">${liquidSicher(hinweis)}</p>` : '')
   )
 }
 
@@ -274,22 +265,22 @@ export function formularSeite(d: FormularDaten): string {
   const hatFehler = Object.values(d.fehler ?? {}).some(Boolean)
 
   const inhalt = [
-    '<h1 class="rp-titel">Reparatur anfragen</h1>',
-    '<p>Etwas kaputt? Wir schauen uns das an. Beschreiben Sie kurz, was nicht funktioniert, und ' +
-      'geben Sie Ihre Adresse an. Wir prüfen die Anfrage und schicken Ihnen ein ' +
-      '<strong>Retourenlabel</strong> per E-Mail — bitte senden Sie das Gerät erst danach. Nach der ' +
-      'Reparatur geht es an dieselbe Adresse zurück.</p>',
-    '<p class="rp-leise">Innerhalb der Garantie ist die Reparatur kostenlos. Andernfalls erhalten ' +
-      'Sie vor der Rücksendung ein Angebot.</p>',
+    '<h1 class="main-page-title page-title h0">Reparatur anfragen</h1>',
+    '<div class="rte"><p>Etwas kaputt? Wir schauen uns das an. Beschreib kurz, was nicht funktioniert, und gib ' +
+      'deine Adresse an. Wir prüfen die Anfrage und schicken dir ein <strong>Retourenlabel</strong> ' +
+      'per E-Mail. Bitte schick dein Board erst danach los. Nach der Reparatur geht es an dieselbe ' +
+      'Adresse zurück.</p>',
+    '<p class="caption">Innerhalb der Garantie ist die Reparatur kostenlos. Andernfalls bekommst ' +
+      'du vor der Rücksendung ein Angebot.</p></div>',
     d.vorausgefuellt
-      ? '<p class="rp-hinweis">Wir haben Ihre Angaben aus Ihrem Kundenkonto übernommen — bitte kurz ' +
-        'prüfen, besonders die Adresse für das Retourenlabel.</p>'
+      ? '<p class="caption">Wir haben deine Angaben aus deinem Kundenkonto übernommen. Bitte ' +
+        'kurz prüfen, besonders die Adresse für das Retourenlabel.</p>'
       : '',
-    `<form id="rp-formular" class="rp-form" method="post" action="${liquidSicher(pfadPraefix(d.aktion))}" ` +
+    `<form id="rp-formular" class="isolate" method="post" action="${liquidSicher(pfadPraefix(d.aktion))}" ` +
       'accept-charset="UTF-8">',
-    d.meldung ? `<p class="rp-meldung" role="alert">${liquidSicher(d.meldung)}</p>` : '',
+    d.meldung ? `<p class="form__message" role="alert">${liquidSicher(d.meldung)}</p>` : '',
     hatFehler
-      ? '<p class="rp-meldung" role="alert">Bitte prüfen Sie die markierten Felder.</p>'
+      ? '<p class="form__message" role="alert">Bitte prüf die markierten Felder.</p>'
       : '',
     paar(
       eingabe('kontakt_name', d, { autocomplete: 'name' }),
@@ -313,9 +304,9 @@ export function formularSeite(d: FormularDaten): string {
     // Honigtopf: für Menschen unsichtbar, Bots füllen ihn aus.
     '<div class="rp-honig" aria-hidden="true"><label for="rp-webseite">Webseite</label>' +
       '<input id="rp-webseite" name="webseite" type="text" tabindex="-1" autocomplete="off" value=""></div>',
-    '<button type="submit" class="rp-knopf">Reparaturanfrage absenden</button>',
+    '<div class="contact__button"><button type="submit" class="button">Reparaturanfrage absenden</button></div>',
     '</form>',
-    '<p class="rp-leise rp-fuss">{{ shop.name | escape }} verwendet Ihre Angaben nur ' +
+    '<p class="caption">{{ shop.name | escape }} verwendet deine Angaben nur ' +
       'zur Bearbeitung der Reparatur.</p>',
   ]
     .filter(Boolean)
@@ -327,18 +318,17 @@ export function formularSeite(d: FormularDaten): string {
 /** Danke-Seite nach dem Absenden. Ohne Nummer (Honigtopf) bleibt sie bewusst allgemein. */
 export function dankeSeite(nummer?: string): string {
   const inhalt = [
-    '<div class="rp-karte" role="status">',
-    '<p class="rp-marke">Anfrage eingegangen</p>',
-    `<h1 class="rp-titel">Danke${nummer ? ` — Ihre Anfrage hat die Nummer ${liquidSicher(nummer)}` : ''}.</h1>`,
-    '<p>Sie erhalten gleich eine Bestätigung per E-Mail. Wir prüfen die Anfrage und melden uns mit ' +
-      'dem Retourenlabel oder einer Rückfrage. Bitte schicken Sie das Gerät erst nach Erhalt des ' +
-      'Labels.</p>',
+    `<h1 class="main-page-title page-title h0" role="status">Danke!${nummer ? ` Deine Anfrage hat die Nummer ${liquidSicher(nummer)}.` : ''}</h1>`,
+    '<div class="rte">',
+    '<p>Du bekommst gleich eine Bestätigung per E-Mail. Wir prüfen die Anfrage und melden uns mit ' +
+      'dem Retourenlabel oder einer Rückfrage. Bitte schick dein Board erst los, wenn du das Label ' +
+      'hast.</p>',
     nummer
-      ? '<p class="rp-leise">Halten Sie die Nummer bei Rückfragen bereit — sie hilft uns, Ihre ' +
-        'Anfrage sofort zu finden.</p>'
+      ? '<p class="caption">Halte die Nummer bei Rückfragen bereit, dann finden wir deine Anfrage ' +
+        'sofort.</p>'
       : '',
-    '<p><a href="{{ routes.root_url }}">Zurück zum Shop</a></p>',
     '</div>',
+    '<p><a class="button" href="{{ routes.root_url }}">Zurück zum Shop</a></p>',
   ]
     .filter(Boolean)
     .join('\n')
@@ -352,23 +342,21 @@ export function dankeSeite(nummer?: string): string {
  */
 export function hinweisSeite(h: { titel: string; text: string; aktion?: string; link?: string }): string {
   const inhalt = [
-    '<div class="rp-karte">',
-    `<h1 class="rp-titel">${liquidSicher(h.titel)}</h1>`,
-    `<p>${liquidSicher(h.text)}</p>`,
+    `<h1 class="main-page-title page-title h0">${liquidSicher(h.titel)}</h1>`,
+    `<div class="rte"><p>${liquidSicher(h.text)}</p></div>`,
     h.aktion && h.link
       ? `<p><a href="${liquidSicher(pfadPraefix(h.aktion))}">${liquidSicher(h.link)}</a></p>`
       : '',
-    '</div>',
   ]
     .filter(Boolean)
     .join('\n')
-  return seite(inhalt)
+  return seite(inhalt, '', false)
 }
 
 export function nichtGefundenSeite(aktion: string): string {
   return hinweisSeite({
     titel: 'Diese Seite gibt es nicht',
-    text: 'Der Link ist vielleicht veraltet. Das Reparaturformular finden Sie hier:',
+    text: 'Der Link ist vielleicht veraltet. Das Reparaturformular findest du hier:',
     aktion,
     link: 'Zur Reparaturanfrage',
   })
@@ -379,7 +367,7 @@ export function stoerungSeite(aktion: string): string {
     titel: 'Das hat gerade nicht geklappt',
     // Kein „nichts gespeichert": bricht es erst nach dem Speichern ab, liefert
     // der zweite Versuch dank Dublettenprüfung dieselbe Nummer.
-    text: 'Bitte versuchen Sie es in ein paar Minuten noch einmal.',
+    text: 'Bitte versuch es in ein paar Minuten noch einmal.',
     aktion,
     link: 'Zurück zur Reparaturanfrage',
   })
@@ -388,6 +376,6 @@ export function stoerungSeite(aktion: string): string {
 export function nichtVerfuegbarSeite(): string {
   return hinweisSeite({
     titel: 'Reparaturanfragen nehmen wir gerade nicht online entgegen',
-    text: 'Bitte melden Sie sich per E-Mail bei uns — wir helfen trotzdem weiter.',
+    text: 'Schreib uns einfach eine E-Mail, wir helfen trotzdem weiter.',
   })
 }

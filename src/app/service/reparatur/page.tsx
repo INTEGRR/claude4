@@ -67,13 +67,12 @@ export default async function ReparaturAnfrageSeite() {
             <div style={{ maxWidth: 720 }}>
               <h1 style={{ marginTop: 18 }}>Etwas kaputt? Wir schauen uns das an.</h1>
               <p>
-                Beschreiben Sie kurz, was nicht funktioniert, und geben Sie Ihre Adresse an.
-                Wir prüfen die Anfrage und schicken Ihnen ein <strong>Retourenlabel</strong> per
-                E-Mail — bitte senden Sie das Gerät erst danach. Nach der Reparatur geht es an
-                dieselbe Adresse zurück.
+                Beschreib kurz, was nicht funktioniert, und gib deine Adresse an. Wir prüfen die
+                Anfrage und schicken dir ein <strong>Retourenlabel</strong> per E-Mail. Bitte schick
+                dein Board erst danach los. Nach der Reparatur geht es an dieselbe Adresse zurück.
               </p>
               <p className="hinweis" style={{ marginTop: 8 }}>
-                Innerhalb der Garantie ist die Reparatur kostenlos. Andernfalls erhalten Sie vor
+                Innerhalb der Garantie ist die Reparatur kostenlos. Andernfalls bekommst du vor
                 der Rücksendung ein Angebot.
               </p>
             </div>
@@ -92,7 +91,7 @@ export default async function ReparaturAnfrageSeite() {
                     Reparaturanfragen nehmen wir gerade nicht online entgegen.
                   </h3>
                   <p style={{ color: '#9a9c9f', margin: 0 }}>
-                    Bitte melden Sie sich per E-Mail — wir helfen trotzdem weiter.
+                    Schreib uns einfach eine E-Mail, wir helfen trotzdem weiter.
                   </p>
                 </div>
               )}
@@ -104,7 +103,7 @@ export default async function ReparaturAnfrageSeite() {
       <footer>
         <div className="bahn">
           <span className="mono">
-            {firma?.name ?? 'KRNL'} · Ihre Daten werden nur zur Bearbeitung der Reparatur verwendet.
+            {firma?.name ?? 'KRNL'} · Deine Daten werden nur zur Bearbeitung der Reparatur verwendet.
           </span>
         </div>
       </footer>
