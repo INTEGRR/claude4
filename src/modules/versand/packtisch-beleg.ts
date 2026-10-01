@@ -24,6 +24,8 @@ export interface PacktischZeile {
   barcode: string | null
   qty: number
   uom: string
+  /** Artikelgewicht in Gramm je Stück — 0 = nicht gepflegt (im Packablauf setzbar). */
+  gewichtG: number
 }
 
 export interface PacktischDoc {
@@ -121,9 +123,11 @@ export async function packtischBelegLaden(code: string): Promise<PacktischErgebn
     select m.variant_id as "variantId",
            variant_display_name(m.variant_id) as product,
            pv.sku, pv.barcode,
-           sum(m.qty)::float as qty, min(u.name) as uom
+           sum(m.qty)::float as qty, min(u.name) as uom,
+           coalesce(max(pt.weight_g), 0)::int as "gewichtG"
     from stock_moves m
     join product_variants pv on pv.id = m.variant_id
+    join product_templates pt on pt.id = pv.template_id
     join uoms u on u.id = m.uom_id
     where m.picking_id = ${picking.id} and m.state <> 'cancel'
     group by m.variant_id, pv.sku, pv.barcode

@@ -137,6 +137,42 @@ export const VERSAND = {
     revalidate: ['/versand', '/lager'],
   },
 
+  'versand.artikelgewicht_setzen': {
+    label: 'Artikelgewicht setzen',
+    bereich: 'versand',
+    beschreibung:
+      'Setzt das Gewicht eines Artikels (Gramm je Stück) direkt im Versand — für Artikel ohne ' +
+      'gepflegtes Gewicht (aus Shopify nicht übernommen). Gilt für alle Varianten des Artikels; ' +
+      'Paketgewicht und DHL-Produktvorschlag rechnen danach damit.',
+    bindung: 'frei',
+    prozessfrei: true,
+    ki: true,
+    schema: z.object({
+      variant_id: z.string().uuid(),
+      weight_g: z.number().int().min(1, 'Gewicht in Gramm, mindestens 1').max(100000),
+    }),
+    zusammenfassung: (p) => `Artikelgewicht ${p.weight_g} g`,
+    formdata: (fd) => ({
+      variant_id: String(fd.get('variant_id') ?? ''),
+      weight_g: Math.round(Number(String(fd.get('weight_g') ?? '').replace(',', '.'))),
+    }),
+    revalidate: ['/versand', '/scanner'],
+  },
+
+  'versand.gewichte_aus_shopify': {
+    label: 'Gewichte aus Shopify übernehmen',
+    bereich: 'versand',
+    beschreibung:
+      'Holt je verknüpfter Shop-Variante das Gewicht aus Shopify (nur lesend) und setzt es am ' +
+      'Artikel, wo KRNL noch keines führt; mit „überschreiben" auch gepflegte.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({ ueberschreiben: z.boolean().default(false) }),
+    zusammenfassung: (p) => (p.ueberschreiben ? 'Gewichte aus Shopify (überschreiben)' : 'Gewichte aus Shopify'),
+    formdata: (fd) => ({ ueberschreiben: fd.get('ueberschreiben') === 'on' }),
+    revalidate: ['/versand', '/scanner', '/produkte'],
+  },
+
   'versand.gelabelte_ausbuchen': {
     label: 'Gelabelte Lieferungen ausbuchen',
     bereich: 'versand',

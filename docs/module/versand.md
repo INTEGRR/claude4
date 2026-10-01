@@ -49,6 +49,27 @@ Label-Erstellung").
 - Im Shopify-Probelauf steht die Rückmeldung als „Bestellung als versendet
   melden" in der Debug-Box; im Modus „nur lesen" wird sie übersprungen.
 
+## Artikelgewichte (Versandgewicht)
+
+Das Paketgewicht ist Warengewicht (Gewicht je Stück am Artikel,
+`product_templates.weight_g`) plus Leergewicht der Kartonage. Der
+Shopify-Produktimport hatte keine Gewichte übernommen — ohne sie rechnet der
+Versand mit 0 g, und Versandregeln wählen das falsche DHL-Produkt.
+Seit 2026-10-01 (Entscheidungslog „Gewichte im Versand"):
+
+- **Versand → Karte „Gewichte fehlen":** alle Artikel offener Lieferungen
+  ohne Gewicht, je Zeile ein Feld „g je Stück" (`versand.artikelgewicht_setzen`
+  — Bereich Versand, darf also auch die Lager-Rolle) und der Knopf
+  **„Gewichte aus Shopify übernehmen"** (`versand.gewichte_aus_shopify`):
+  liest je verknüpfter Shop-Variante `inventoryItem.measurement.weight`
+  (reine Abfrage, auch im Modus „nur lesen" und im Probelauf), rechnet in
+  Gramm um und setzt es nur, wo KRNL noch keines führt (mit „überschreiben"
+  auch gepflegte).
+- **Beim Packen im Scanfeld:** eine Position ohne Gewicht zeigt „Gewicht
+  fehlt" mit Eingabefeld; gespeichert wird am Artikel, danach rechnet KRNL
+  Paketgewicht und DHL-Produktvorschlag neu — die gescannten Mengen bleiben.
+- Das Gewicht gilt je Artikel (alle Varianten).
+
 ## Versandregeln (Kleinpaket/Paket-Wahl)
 
 Regelwerk nach Sendcloud-Vorbild („wenn Bedingung, dann Aktion"), gepflegt

@@ -150,8 +150,13 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 
 - [ ] KRNL: Aktion „Adresse prüfen" (Shipping-API `validate=true`) am
       Verkaufsauftrag und am Packtisch — offen, zugesagt.
-- [ ] KRNL: Gewichte aus Shopify übernehmen prüfen (Versandgewicht =
+- [x] KRNL: Gewichte aus Shopify übernehmen prüfen (Versandgewicht =
       Warengewicht + Kartonage, [module/versand.md](module/versand.md)).
+      *Stand 2026-10-01: der Import hatte keine Gewichte geholt. Jetzt
+      Versand → „Gewichte fehlen" → „Gewichte aus Shopify übernehmen" bzw.
+      je Artikel setzen; beim Packen fragt das Scanfeld fehlende Gewichte ab.*
+- [ ] Betreiber: in Versand → „Gewichte fehlen" einmal „Gewichte aus Shopify
+      übernehmen" ausführen, Rest von Hand setzen.
 - [ ] Betreiber: Versandregeln und Abrechnungsnummern je Produkt
       (national, Kleinpaket, Europaket, International) hinterlegen.
       *Stand 2026-10-01: drei Versandregeln, noch keine Kartonagen.*

@@ -8,7 +8,15 @@ import { dhlConfigured, productForCountry } from '@/modules/versand/dhl'
 import { sammelMarken } from '@/modules/versand/kommissionieren'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
-import { cancelLabel, createLabel, gelabelteAusbuchen, massLabels, refreshTracking } from './actions'
+import {
+  artikelgewichtSetzen,
+  cancelLabel,
+  createLabel,
+  gelabelteAusbuchen,
+  gewichteAusShopify,
+  massLabels,
+  refreshTracking,
+} from './actions'
 import { AuswahlAlle, AuswahlBereich, AuswahlBox, PackzettelLeiste } from './packzettel-auswahl'
 
 export const dynamic = 'force-dynamic'
@@ -47,6 +55,21 @@ export default async function VersandPage({
   // Zeit, als Ausbuchen ein Haken war, oder bewusst „nur Label".
   const gelabelt = await gelabeltNichtAusgebucht()
   const gelabeltIds = new Set(gelabelt.map((g) => g.picking_id))
+  // Artikel ohne Gewicht in versandbereiten Lieferungen (2026-10-01): aus
+  // Shopify nicht übernommen — ohne Gewicht stimmen Paketgewicht und
+  // DHL-Produkt nicht. Hier direkt setzen oder aus Shopify holen.
+  const ohneGewicht = await sql<{ variant_id: string; artikel: string; sku: string | null; lieferungen: number }[]>`
+    select pv.id as variant_id, variant_display_name(pv.id) as artikel, pv.sku,
+           count(distinct p.id)::int as lieferungen
+    from stock_pickings p
+    join operation_types ot on ot.id = p.operation_type_id and ot.kind = 'delivery'
+    join stock_moves m on m.picking_id = p.id and m.state <> 'cancel'
+    join product_variants pv on pv.id = m.variant_id
+    join product_templates pt on pt.id = pv.template_id
+    where p.state in ('assigned', 'confirmed', 'waiting') and coalesce(pt.weight_g, 0) <= 0
+    group by pv.id, pv.sku
+    order by count(distinct p.id) desc, 2
+    limit 30`
 
   const shipments = await sql<
     {
@@ -134,6 +157,62 @@ export default async function VersandPage({
             </div>
           </ActionForm>
         </div>
+      )}
+
+      {ohneGewicht.length > 0 && (
+        <Card title={`Gewichte fehlen (${ohneGewicht.length}${ohneGewicht.length === 30 ? '+' : ''})`} tight>
+          <div style={{ padding: '10px 12px' }}>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Diese Artikel in offenen Lieferungen haben kein Gewicht — Paketgewicht und DHL-Produkt
+              stimmen sonst nicht. Gewicht je Stück in Gramm setzen (gilt für den Artikel) oder aus
+              Shopify übernehmen (nur wo KRNL noch keines hat).
+            </p>
+            <ActionForm action={gewichteAusShopify}>
+              <button className="small" type="submit">Gewichte aus Shopify übernehmen</button>
+            </ActionForm>
+          </div>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Artikel</th>
+                  <th>SKU</th>
+                  <th className="num">Lieferungen</th>
+                  <th style={{ width: 240 }}>Gewicht je Stück</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ohneGewicht.map((a) => (
+                  <tr key={a.variant_id}>
+                    <td>{a.artikel}</td>
+                    <td className="mono small">{a.sku ?? '—'}</td>
+                    <td className="num">{a.lieferungen}</td>
+                    <td>
+                      <ActionForm action={artikelgewichtSetzen}>
+                        <input type="hidden" name="variant_id" value={a.variant_id} />
+                        <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+                          <div className="shrink" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <input
+                              name="weight_g"
+                              inputMode="numeric"
+                              required
+                              aria-label={`Gewicht von ${a.artikel} in Gramm`}
+                              style={{ width: 84 }}
+                            />
+                            <span className="mono-label">g</span>
+                          </div>
+                          <div className="shrink">
+                            <button className="small" type="submit">Speichern</button>
+                          </div>
+                        </div>
+                      </ActionForm>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
       )}
 
       {wartend > 0 && (

@@ -28,6 +28,14 @@ export async function createReturnLabel(formData: FormData): Promise<ActionResul
   return serverAktion('versand.retourenlabel_erstellen', { formData })
 }
 
+export async function artikelgewichtSetzen(formData: FormData): Promise<ActionResult> {
+  return serverAktion('versand.artikelgewicht_setzen', { formData })
+}
+
+export async function gewichteAusShopify(formData: FormData): Promise<ActionResult> {
+  return serverAktion('versand.gewichte_aus_shopify', { formData })
+}
+
 export async function gelabelteAusbuchen(formData: FormData): Promise<ActionResult> {
   return serverAktion('versand.gelabelte_ausbuchen', { formData })
 }

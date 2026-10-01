@@ -9,6 +9,31 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Gewichte im Versand
+
+**Anlass:** Betreiber: „Wir brauchen eine Funktion, Gewichte im
+Versandprozess zu setzen, falls keine gepflegt sind — die wurden aus
+Shopify nicht übernommen." Der Produktimport las tatsächlich keine Gewichte.
+
+**Entschieden:**
+- `versand.gewichte_aus_shopify`: Gewicht je Shop-Variante
+  (`inventoryItem.measurement.weight`) lesen, in Gramm umrechnen, nur dort
+  setzen, wo KRNL keines führt (überschreiben nur auf Wunsch) — gepflegte
+  Gewichte gehen nicht verloren. Reine Abfrage, daher auch im Lesemodus.
+- `versand.artikelgewicht_setzen` im Bereich **Versand**, nicht Produkte:
+  die Lager-Rolle packt und darf Produkte nur lesen — sie muss das fehlende
+  Gewicht trotzdem am Tisch setzen können. Gespeichert wird am Artikel
+  (`product_templates.weight_g`), also für alle Varianten.
+- Erfassung dort, wo es auffällt: Karte „Gewichte fehlen" in der
+  Versandliste und Eingabe je Position beim Packen (danach Neuberechnung
+  von Paketgewicht und DHL-Produkt).
+
+Umgesetzt in `integrationen/gewichte.ts` (+ `gewichte-logik.ts`),
+`registry/versand.ts`, `versand-ausfuehren.ts`, `versand/packtisch-beleg.ts`,
+Versandseite, `packtisch.tsx`; dokumentiert in
+[module/versand.md](module/versand.md); Tests `tests/gewichte-logik.test.ts`,
+`tests/prozesse/gewichte.test.ts`.
+
 ## 2026-10-01 — Sprachansagen im Scanfeld
 
 **Anlass:** Betreiber: „Wir brauchen Feedback-Sounds, Stimme, wenn Dinge

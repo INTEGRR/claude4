@@ -10,6 +10,7 @@ import {
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
+import { gewichteAusShopify } from '@/modules/integrationen/gewichte'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
@@ -295,6 +296,33 @@ export async function massendruck(
   // Über die Brücke gedruckt: kein Sammel-PDF obendrauf (Doppeldruck).
   if (meldung) return { text: `${teile.join(' — ')}. ${meldung}` }
   return { text: teile.join(' — ') + '.', link: `/api/label/sammel?ids=${shipmentIds.join(',')}` }
+}
+
+/** Artikelgewicht im Versand setzen (2026-10-01) — am Artikel, für alle Varianten. */
+export async function artikelgewichtSetzen(
+  p: { variant_id: string; weight_g: number },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [artikel] = await sql<{ id: string; name: string }[]>`
+    update product_templates pt set weight_g = ${p.weight_g}
+    from product_variants pv
+    where pv.id = ${p.variant_id} and pt.id = pv.template_id
+    returning pt.id, pt.name`
+  if (!artikel) throw new Error('Artikel nicht gefunden')
+  await sql`select log_event('product_template', ${artikel.id}, 'note',
+    ${`Gewicht im Versand gesetzt: ${p.weight_g} g`}, ${ctx.actor})`
+  return { text: `${artikel.name}: ${p.weight_g} g gespeichert.`, daten: { weight_g: p.weight_g } }
+}
+
+/** Gewichte aus Shopify übernehmen (2026-10-01) — nur wo keines gepflegt ist. */
+export async function gewichteAusShopifyUebernehmen(p: { ueberschreiben: boolean }): Promise<AktionsErgebnis> {
+  const r = await gewichteAusShopify(p.ueberschreiben)
+  const teile = [
+    `${r.gesetzt} Gewicht${r.gesetzt === 1 ? '' : 'e'} übernommen`,
+    r.schonGepflegt ? `${r.schonGepflegt} schon gepflegt` : null,
+    r.ohneGewichtImShop ? `${r.ohneGewichtImShop} ohne Gewicht im Shop` : null,
+  ].filter(Boolean)
+  return { text: `${teile.join(' · ')} (${r.gelesen} Shop-Varianten gelesen).`, daten: { ...r } }
 }
 
 /**

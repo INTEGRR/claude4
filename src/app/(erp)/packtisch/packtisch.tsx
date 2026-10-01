@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { packtischFertig } from './actions'
+import { artikelgewichtSetzen, packtischFertig } from './actions'
 import { isActionError } from '@/modules/shared/action'
 import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
 import { type AnsageSchluessel, ansageFuerFehler } from '@/modules/scanner-ansagen'
@@ -308,6 +308,35 @@ export function Packtisch({
     }
   }
 
+  // Fehlendes Artikelgewicht direkt beim Packen setzen (2026-10-01): wird am
+  // Artikel gespeichert; danach rechnet KRNL Paketgewicht und DHL-Produkt neu
+  // (gescannte Mengen bleiben stehen).
+  async function gewichtSpeichern(variantId: string, eingabe: string) {
+    if (!doc) return
+    const gramm = Math.round(Number(eingabe.replace(',', '.')))
+    if (!Number.isFinite(gramm) || gramm < 1) {
+      say('Gewicht in Gramm eingeben (mindestens 1)', 'warn')
+      return
+    }
+    const fd = new FormData()
+    fd.set('variant_id', variantId)
+    fd.set('weight_g', String(gramm))
+    const result = await artikelgewichtSetzen(fd)
+    if (isActionError(result)) {
+      say(result.error, 'error', 'fehler')
+      return
+    }
+    const res = await fetch(`/api/packtisch/lookup?code=${encodeURIComponent(doc.number)}`)
+    if (res.ok) {
+      const neu = (await res.json()) as PacktischDoc
+      setDoc((alt) => (alt ? { ...alt, lines: neu.lines, weightG: neu.weightG, dhlProduct: neu.dhlProduct } : alt))
+      if (neu.weightG != null && neu.weightG > 0) setWeightG(String(neu.weightG))
+      if (neu.dhlProduct) setDhlProduct(neu.dhlProduct)
+    }
+    say(`Gewicht gespeichert: ${gramm} g je Stück`, 'ok')
+    refocus()
+  }
+
   const adjust = (variantId: string, delta: number, max: number) => {
     setCounts((c) => ({
       ...c,
@@ -472,6 +501,32 @@ export function Packtisch({
                       <span className={`led ${zeilenLed}`} />
                       <span className="mono-label">{zeilenWort}</span>
                     </div>
+                    {Number(l.gewichtG) <= 0 && (
+                      // Gewicht fehlt (aus Shopify nicht übernommen): hier setzen,
+                      // sonst stimmen Paketgewicht und DHL-Produkt nicht.
+                      <form
+                        className="actions"
+                        style={{ gap: 6, marginTop: 4 }}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          const feld = e.currentTarget.elements.namedItem('gramm') as HTMLInputElement
+                          void gewichtSpeichern(l.variantId, feld.value)
+                        }}
+                      >
+                        <span className="led warn" />
+                        <span className="mono-label">Gewicht fehlt</span>
+                        <input
+                          name="gramm"
+                          inputMode="numeric"
+                          placeholder="g je Stück"
+                          aria-label={`Gewicht von ${l.product} in Gramm`}
+                          style={{ width: 96 }}
+                        />
+                        <button className="small" type="submit">
+                          Speichern
+                        </button>
+                      </form>
+                    )}
                   </div>
                   <div className="scanner-line-qty">
                     <button
