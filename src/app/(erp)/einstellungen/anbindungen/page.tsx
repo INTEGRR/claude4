@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
-import { Card, Zustand } from '@/components/ui'
+import { Card, TableWrap, Zustand } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { ANBINDUNGEN, type AnbindungsStand, anbindungsStand } from '@/modules/einstellungen/umgebung'
 import { type DienstStatus, dienstStatusLesen } from '@/modules/integrationen/wache'
-import { dateTime } from '@/modules/shared/format'
+import { dateTime, qty } from '@/modules/shared/format'
+import { madeToOrderEinstellung, madeToOrderVorschau } from '@/modules/integrationen/made-to-order'
 import { POSTFACH_SCHLUESSEL, type PostfachStand } from '@/modules/einkauf/postfach-abgleich'
 import { postfachKonfiguriert } from '@/modules/google/auth'
 
@@ -26,6 +27,11 @@ async function shopifyModusSpeichern(formData: FormData) {
   'use server'
   // Registry-Aktion, damit der Wechsel auditiert ist (wer hat wann scharf geschaltet).
   return serverAktion('einstellungen.shopify_modus_setzen', { formData })
+}
+
+async function madeToOrderSpeichern(formData: FormData) {
+  'use server'
+  return serverAktion('einstellungen.shopify_mto_setzen', { formData })
 }
 
 async function einkaufsablageEinrichten() {
@@ -112,6 +118,22 @@ export default async function SchnittstellenPage() {
   const shopify = await einstellung<{ modus: string }>('shopify')
   const postfach = await einstellung<PostfachStand>(POSTFACH_SCHLUESSEL)
   const modus = shopify.modus === 'schreiben' ? 'schreiben' : 'lesen'
+  const [mto, mtoZeilen] = await Promise.all([madeToOrderEinstellung(), madeToOrderVorschau()])
+  const mtoAus = mtoZeilen.filter((z) => z.soll <= 0).length
+  const mtoKnapp = mtoZeilen.filter((z) => z.soll > 0 && z.baubar < 10).length
+  const mtoEingerichtet = mtoZeilen.filter((z) => z.eingerichtet).length
+  const engpaesse = [
+    ...mtoZeilen
+      .reduce((m, z) => {
+        if (!z.engpass) return m
+        const e = m.get(z.engpass) ?? { varianten: 0, baubar: Infinity }
+        m.set(z.engpass, { varianten: e.varianten + 1, baubar: Math.min(e.baubar, z.baubar) })
+        return m
+      }, new Map<string, { varianten: number; baubar: number }>())
+      .entries(),
+  ]
+    .sort((a, b) => a[1].baubar - b[1].baubar)
+    .slice(0, 6)
   const wache = Object.fromEntries((await dienstStatusLesen(sql)).map((d) => [d.dienst, d])) as Record<
     string,
     DienstStatus | undefined
@@ -217,12 +239,104 @@ export default async function SchnittstellenPage() {
             Bestellungen über <a href="/integrationen/historie">Historie aus Shopify</a> —,{' '}
             <span className="mono">write_orders</span>,{' '}
             <span className="mono">read_customers</span>, <span className="mono">read_products</span>,{' '}
+            <span className="mono">write_products</span> (Produkte anlegen, Made-to-Order einrichten),{' '}
             <span className="mono">write_merchant_managed_fulfillment_orders</span>,{' '}
             <span className="mono">read_inventory</span>, <span className="mono">write_inventory</span>,{' '}
             <span className="mono">read_locations</span>) und im eigenen Shop installieren. Client ID und
             Secret stehen unter Settings → Credentials; das Access Token holt das ERP selbst.
           </p>
         </details>
+      </Card>
+
+      <Card title="Made-to-Order an Shopify (Tastaturen)">
+        <p className="small" style={{ marginTop: 0 }}>
+          Artikel mit Route „Fertigen + Auf Auftrag" haben nie Lagerbestand. Shopify bekommt für sie die{' '}
+          <strong>baubare Menge</strong>: was das freie Material laut Stückliste noch hergibt (offene Aufträge sind
+          eingerechnet — ihre Fertigungsaufträge reservieren die Teile). Fehlt ein Teil, ist die Variante
+          ausverkauft. Abgeglichen wird nach jeder Shopify-Bestellung sofort, Änderungen in KRNL binnen einer
+          Minute. Beim ersten Abgleich stellt KRNL die Varianten in Shopify auf „Menge verfolgen" und „nicht ohne
+          Bestand verkaufen".
+        </p>
+        <ActionForm action={madeToOrderSpeichern}>
+          <div className="row">
+            <label className="field">
+              <span>Meldung</span>
+              <select name="modus" defaultValue={mto.modus}>
+                <option value="baubar">baubare Menge − Puffer (höchstens Deckel)</option>
+                <option value="fest">fest der Deckel, solange mehr als der Puffer baubar ist</option>
+              </select>
+            </label>
+            <label className="field shrink">
+              <span>Puffer</span>
+              <input name="puffer" type="number" min={0} max={100} defaultValue={mto.puffer} style={{ width: 90 }} />
+            </label>
+            <label className="field shrink">
+              <span>Deckel</span>
+              <input name="deckel" type="number" min={1} max={10000} defaultValue={mto.deckel} style={{ width: 90 }} />
+            </label>
+            <div className="shrink field">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+        </ActionForm>
+        <p className="small muted" style={{ margin: '8px 0 12px' }}>
+          Der Puffer fängt die Sekunden zwischen Bestellung und Abgleich ab — für Releases und Aktionen
+          gern höher stellen. „baubar" ist sicherer als „fest": Shopify zieht bei jeder Bestellung selbst ab und
+          stoppt bei 0, auch bevor KRNL neu gemeldet hat.
+        </p>
+        {mtoZeilen.length === 0 ? (
+          <p className="small muted" style={{ margin: 0 }}>Keine Shopify-gekoppelten Made-to-Order-Artikel.</p>
+        ) : (
+          <>
+            <p className="small" style={{ margin: '0 0 8px' }}>
+              <strong>{qty(mtoZeilen.length)}</strong> Varianten · <strong>{qty(mtoAus)}</strong> ausverkauft ·{' '}
+              <strong>{qty(mtoKnapp)}</strong> knapp (unter 10 baubar) · in Shopify eingerichtet:{' '}
+              {qty(mtoEingerichtet)} von {qty(mtoZeilen.length)}
+              {modus !== 'schreiben' && ' · Shopify steht auf „nur lesen" — gemeldet wird erst nach dem Umschalten'}
+            </p>
+            {engpaesse.length > 0 && (
+              <p className="small" style={{ margin: '0 0 8px' }}>
+                Engpässe:{' '}
+                {engpaesse
+                  .map(([teil, e]) => `${teil.replace(/^\[[^\]]*\]\s*/, '')} (reicht für ${qty(e.baubar)}, ${qty(e.varianten)} Variante(n))`)
+                  .join(' · ')}
+              </p>
+            )}
+            <details>
+              <summary className="small" style={{ cursor: 'pointer' }}>Vorschau: was Shopify bekommt (knappste zuerst)</summary>
+              <TableWrap>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Variante</th>
+                      <th className="num">baubar</th>
+                      <th>Engpass</th>
+                      <th className="num">an Shopify</th>
+                      <th className="num">zuletzt gemeldet</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mtoZeilen.slice(0, 40).map((z) => (
+                      <tr key={z.id}>
+                        <td className="small">
+                          {z.name}
+                          {z.sku && <span className="muted mono"> · {z.sku}</span>}
+                        </td>
+                        <td className="num mono">{qty(z.baubar)}</td>
+                        <td className="small">{z.engpass?.replace(/^\[[^\]]*\]\s*/, '') ?? '—'}</td>
+                        <td className="num mono">{z.soll <= 0 ? <Zustand ton="warn">ausverkauft</Zustand> : qty(z.soll)}</td>
+                        <td className="num mono">{z.gemeldet === null ? '—' : qty(z.gemeldet)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+              {mtoZeilen.length > 40 && (
+                <p className="small muted" style={{ margin: '6px 0 0' }}>… und {qty(mtoZeilen.length - 40)} weitere mit mehr Material.</p>
+              )}
+            </details>
+          </>
+        )}
       </Card>
 
       <Card title="DHL Parcel DE" actions={<Link className="btn small" href="/einstellungen/versand">Labelformat &amp; Druckweg</Link>}>

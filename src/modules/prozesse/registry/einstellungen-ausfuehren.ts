@@ -79,6 +79,25 @@ export async function druckbrueckeSetzen(
  * Lese-/Schreibmodus der Shopify-Anbindung. Gilt sofort an der Naht
  * shopifyGraphQL() — kein Redeploy, kein Neustart (shopify-modus.ts).
  */
+export async function shopifyMtoSetzen(
+  p: { modus: 'baubar' | 'fest'; puffer: number; deckel: number },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const mto = { modus: p.modus, puffer: p.puffer, deckel: p.deckel }
+  await sql`
+    insert into settings (key, value)
+    values ('shopify', ${sql.json({ mto })})
+    on conflict (key) do update set value = settings.value || ${sql.json({ mto })}::jsonb`
+  // Gilt sofort: neu rechnen und melden (im Lesemodus übersprungen).
+  await sql`select inventar_abgleich_anstossen()`
+  return {
+    text:
+      p.modus === 'fest'
+        ? `Made-to-Order: Shopify bekommt ${p.deckel}, solange mehr als ${p.puffer} baubar sind, sonst 0.`
+        : `Made-to-Order: Shopify bekommt die baubare Menge − ${p.puffer}, höchstens ${p.deckel}.`,
+  }
+}
+
 export async function shopifyModusSetzen(
   p: { modus: 'lesen' | 'schreiben' },
   _ctx: AktionsKontext,

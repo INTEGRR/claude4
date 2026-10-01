@@ -61,9 +61,10 @@ async function pushInventarJetzt() {
   'use server'
   await requireAdmin()
   try {
-    const { pushInventar } = await import('@/modules/integrationen/inventar')
-    const r = await pushInventar()
+    const { inventarAbgleichen } = await import('@/modules/integrationen/inventar')
+    const r = await inventarAbgleichen()
     revalidatePath('/integrationen')
+    if (r.gesperrt) return actionInfo('Ein Abgleich läuft gerade — er rechnet am Ende noch eine Runde.')
     return actionInfo(
       r.uebertragen > 0
         ? `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert.`

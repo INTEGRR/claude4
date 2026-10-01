@@ -9,6 +9,41 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Made-to-Order: baubare Menge an Shopify, Abgleich in Sekunden
+
+**Anlass:** Tastaturen werden auf Auftrag gefertigt — in KRNL immer
+Bestand 0, verkauft werden müssen sie trotzdem. Shopify hatte für sie gar
+keinen Bestandsabgleich; fehlte Material, wurde trotzdem verkauft.
+Betreiber: berechnen, was baubar ist, ausverkauft setzen, wenn Teile
+fehlen — und „vor allem schnell abgleichen, z. B. bei Releases oder
+Aktionen".
+
+**Entschieden:**
+- **Baubare Menge statt Lagerbestand** für alles mit Route Fertigen + Auf
+  Auftrag und aktiver Stückliste (aus den Daten abgeleitet, keine Liste):
+  `baubar()` über die gefilterte Stückliste, Engpass-Teil inklusive;
+  offene Aufträge über die Reservierungen ihrer Fertigungsaufträge.
+- **Meldung = baubar − Puffer, höchstens 99** (Standard), alternativ
+  „fest 99 solange baubar". Empfehlung baubar: Shopify stoppt dann selbst
+  bei 0, auch zwischen zwei Abgleichen.
+- **Schnell**: Anstoß nach jeder importierten Shopify-Bestellung, im
+  Webhook direkt nach der Antwort abgearbeitet (Sekunden); KRNL-Änderungen
+  jede Minute; ein Abgleich zur Zeit mit Zähler-Nachlauf, damit bei
+  Bestellwellen kein Anstoß verpufft (der Dedupe-Schlüssel ist belegt,
+  solange ein Job läuft).
+- **Nie still hochsetzen**: meldet der Shop weniger als KRNL, wird nicht
+  sofort überschrieben (meist eine noch nicht importierte Bestellung).
+- **Shopify-Einrichtung durch KRNL**: Mengenverfolgung an, Verkauf ohne
+  Bestand aus — sonst wirkt keine Meldung. Erst mit Modus „schreiben".
+
+Umgesetzt in Migration 0100 (`baubar`, `ist_made_to_order`,
+`shopify_soll_menge`, `inventar_abgleich_anstossen`, Sicht
+`shopify_inventory_drift`), `src/modules/integrationen/inventar.ts`,
+`made-to-order.ts`, `import.ts`, Cron, Einstellung
+`einstellungen.shopify_mto_setzen`; dokumentiert in
+[module/integrationen.md](module/integrationen.md); Tests
+`tests/fertigung.test.ts`, `tests/prozesse/shopify-made-to-order.test.ts`.
+
 ## 2026-09-30 — Doppelte Artikel zusammenführen (Shop-Artikel ↔ Odoo-Komponente)
 
 **Anlass:** GATERON-Switches, PCB Foam u. a. gibt es zweimal — als

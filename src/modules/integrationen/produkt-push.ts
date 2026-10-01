@@ -200,7 +200,7 @@ export async function pushProduktZuShopify(templateId: string): Promise<ProduktP
   await sql`select log_event('product_template', ${templateId}, 'note',
     'In Shopify angelegt und verknüpft.', 'system')`
   // Bestand sofort melden, damit der Shop nicht mit 0 startet.
-  await sql`select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'inventar-abgleich')`
+  await sql`select inventar_abgleich_anstossen()`
 
   return { produktGid, varianten: varianten.length }
 }

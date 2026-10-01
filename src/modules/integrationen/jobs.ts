@@ -181,10 +181,12 @@ const handlers = {
    * einzigen Durchlauf.
    */
   async shopify_inventory_push() {
-    const { pushInventar } = await import('./inventar')
-    const r = await pushInventar()
+    const { inventarAbgleichen } = await import('./inventar')
+    const r = await inventarAbgleichen()
+    if (r.gesperrt) return 'Abgleich läuft bereits — der laufende rechnet eine weitere Runde'
     const zusatz = r.ohneZuordnung > 0 ? `, ${r.ohneZuordnung} ohne InventoryItem` : ''
-    return `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert${zusatz}`
+    const runden = r.runden > 1 ? ` in ${r.runden} Runden` : ''
+    return `Bestand gemeldet: ${r.uebertragen} Änderung(en) bei ${r.geprueft} Variante(n)${runden}${zusatz}`
   },
 
   /**

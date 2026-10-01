@@ -189,6 +189,86 @@ describe('Stückliste: Auf Varianten anwenden', () => {
   })
 })
 
+describe('Made-to-Order: baubare Menge und Shopify-Soll (0100)', () => {
+  const baubar = async (t: TransactionSql, v: string) => {
+    const [r] = await t<{ menge: number; engpass: string | null }[]>`
+      select menge::float as menge, engpass from baubar(${v})`
+    return { menge: Number(r.menge), engpass: r.engpass }
+  }
+  const soll = async (t: TransactionSql, v: string) =>
+    (await t<{ n: number }[]>`select shopify_soll_menge(${v}) as n`)[0].n
+
+  test('je Variante das knappste Teil laut gefilterter Stückliste', async () => {
+    await withRollback(async (t) => {
+      const s = await keyboardScenario(t)
+      await stockUp(t, s.platine, 10)
+      await stockUp(t, s.switches, 261) // 3 × 87
+      await stockUp(t, s.gehaeuseWeiss, 2)
+      await stockUp(t, s.gehaeuseSchwarz, 5)
+      assert.deepEqual(await baubar(t, s.weiss), { menge: 2, engpass: s.gehaeuseWeiss })
+      assert.deepEqual(await baubar(t, s.schwarz), { menge: 3, engpass: s.switches }, 'Schwarz: Gehäuse reicht, Switches nicht')
+    })
+  })
+
+  test('offene Aufträge sind eingerechnet: der Fertigungsauftrag reserviert die Teile', async () => {
+    await withRollback(async (t) => {
+      const s = await keyboardScenario(t)
+      await stockUp(t, s.platine, 10)
+      await stockUp(t, s.switches, 261)
+      await stockUp(t, s.gehaeuseWeiss, 2)
+      await stockUp(t, s.gehaeuseSchwarz, 5)
+      const [mo] = await t<{ id: string }[]>`select create_manufacturing_order(${s.weiss}, 1) as id`
+      await t`select mo_confirm(${mo.id})`
+      assert.equal((await baubar(t, s.weiss)).menge, 1, 'ein weißes Gehäuse ist vergeben')
+      assert.equal((await baubar(t, s.schwarz)).menge, 2, 'die geteilten Switches auch: 174 frei')
+    })
+  })
+
+  test('Halbfabrikat: freier Bestand plus was aus seinen Teilen baubar ist', async () => {
+    await withRollback(async (t) => {
+      const s = await keyboardScenario(t)
+      const chip = await makeProduct(t, `Chip ${s.tplId.slice(0, 6)}`)
+      const [tpl] = await t<{ template_id: string }[]>`select template_id from product_variants where id = ${s.platine}`
+      const [bom] = await t<{ id: string }[]>`
+        insert into boms (template_id, qty, uom_id) values (${tpl.template_id}, 1, ${s.uom}) returning id`
+      await t`insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id)
+              values (${bom.id}, 10, ${chip}, 2, ${s.uom})`
+      await stockUp(t, s.platine, 1)
+      await stockUp(t, chip, 8) // 4 Platinen baubar
+      await stockUp(t, s.switches, 870)
+      await stockUp(t, s.gehaeuseWeiss, 20)
+      assert.deepEqual(await baubar(t, s.weiss), { menge: 5, engpass: s.platine }, '1 Platine + 4 aus Chips')
+    })
+  })
+
+  test('Soll an Shopify: Puffer, Deckel, Modus fest; normale Artikel melden den freien Bestand', async () => {
+    await withRollback(async (t) => {
+      const s = await keyboardScenario(t)
+      await stockUp(t, s.platine, 200)
+      await stockUp(t, s.switches, 87 * 200)
+      await stockUp(t, s.gehaeuseWeiss, 150)
+      await stockUp(t, s.gehaeuseSchwarz, 3)
+      const mto = async (cfg: { modus: string; puffer: number; deckel: number }) =>
+        t`insert into settings (key, value) values ('shopify', ${t.json({ mto: cfg })})
+          on conflict (key) do update set value = settings.value || ${t.json({ mto: cfg })}::jsonb`
+
+      await t`delete from settings where key = 'shopify'`
+      assert.equal(await soll(t, s.weiss), 99, 'Standard: baubar 150 − 2, gedeckelt auf 99')
+      assert.equal(await soll(t, s.schwarz), 1, '3 − Puffer 2')
+      await mto({ modus: 'baubar', puffer: 3, deckel: 99 })
+      assert.equal(await soll(t, s.schwarz), 0, 'Puffer frisst den Rest: ausverkauft')
+      await mto({ modus: 'fest', puffer: 2, deckel: 99 })
+      assert.equal(await soll(t, s.schwarz), 99, 'fest: 99, solange mehr als der Puffer baubar ist')
+      await mto({ modus: 'fest', puffer: 3, deckel: 99 })
+      assert.equal(await soll(t, s.schwarz), 0)
+
+      // Ein normaler Artikel (keine Route Auf Auftrag): freier Bestand wie bisher.
+      await stockUp(t, s.platine, 7)
+      assert.equal(await soll(t, s.platine), 7)
+    })
+  })
+})
+
 describe('Fertigungsauftrag', () => {
   test('verbraucht Komponenten und bucht das Fertigprodukt zu', async () => {
     await withRollback(async (t) => {

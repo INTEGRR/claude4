@@ -90,6 +90,7 @@ export const AUSFUEHRUNG = {
   'einstellungen.ki_modelle_setzen': einstellungen.kiModelleSetzen,
   'einstellungen.druckbruecke_setzen': einstellungen.druckbrueckeSetzen,
   'einstellungen.shopify_modus_setzen': einstellungen.shopifyModusSetzen,
+  'einstellungen.shopify_mto_setzen': einstellungen.shopifyMtoSetzen,
   'einstellungen.demodaten_einspielen': einstellungen.demodatenEinspielenAktion,
   'einstellungen.einrichtung_abschliessen': einstellungen.einrichtungAbschliessen,
   'einstellungen.prozessschritt_schalten': einstellungen.prozessschrittSchalten,

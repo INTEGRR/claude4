@@ -478,6 +478,7 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
 
   let processed = 0
   let failed = 0
+  let bestellungen = 0
 
   for (const event of events) {
     try {
@@ -535,6 +536,7 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
         set status = 'done', processed_at = now(), error = ${result.message}
         where id = ${event.id}`
       processed++
+      bestellungen++
     } catch (err) {
       failed++
       // Gleiche Backoff-Staffel wie die Job-Queue statt Sofort-Wiederholung.
@@ -548,6 +550,14 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
               mins => (array[1, 5, 15, 60, 180])[least(attempts + 1, 5)])
         where id = ${event.id}`
     }
+  }
+
+  // Jede Bestellung (auch Storno) ändert, was baubar bzw. frei ist — sofort
+  // abgleichen, nicht erst im Cron: bei Releases zählt jede Sekunde. Der
+  // Webhook arbeitet den Job direkt danach ab (runDueJobs in after()).
+  if (bestellungen > 0) {
+    const { shopifyModus } = await import('./shopify-modus')
+    if ((await shopifyModus(sql)) === 'schreiben') await sql`select inventar_abgleich_anstossen()`
   }
 
   return { processed, failed }

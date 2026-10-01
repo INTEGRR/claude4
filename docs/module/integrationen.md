@@ -90,16 +90,28 @@ Die Rückmeldung, die bei Sendcloud die Integration übernommen hätte, machen w
 
 ## Shopify — Bestandsabgleich (Inventar-Push)
 
-Das ERP ist die Quelle der Wahrheit für Bestände; der Shop bekommt die frei
+Das ERP ist die Quelle der Wahrheit für Bestände; der Shop bekommt
+`shopify_soll_menge()` (0100) gemeldet: für normale Artikel die frei
 verfügbare Menge (`free_to_use`: Bestand minus Reservierungen an internen
-Orten, abgerundet auf ganze Stücke) gemeldet.
+Orten, abgerundet auf ganze Stücke), für **Made-to-Order** die baubare Menge
+(Abschnitt darunter).
 
-- **Push**: Outbox-Job `shopify_inventory_push`, angestoßen viertelstündlich
-  vom Reconcile-Cron, von Hand über die Monitor-Karte, und automatisch bei
-  erkannter Abweichung. Der Dedupe-Schlüssel `inventar-abgleich` bündelt
-  beliebig viele Auslöser zu einem Durchlauf. Übertragen wird nur, was sich
-  seit der letzten Meldung geändert hat (`shopify_inventory_state.pushed_qty`)
-  — ein leerer Durchlauf kostet keinen API-Aufruf.
+- **Push**: Outbox-Job `shopify_inventory_push`, angestoßen über
+  `inventar_abgleich_anstossen()` — **nach jeder importierten
+  Shopify-Bestellung (auch Storno) sofort** (der Webhook arbeitet den Job
+  direkt nach der Antwort ab: Sekunden), **jede Minute** im Job-Cron
+  (Änderungen in KRNL: Wareneingang, Inventur, Fertigmeldung — beides nur im
+  Modus „schreiben"), viertelstündlich vom Reconcile-Cron, von Hand über die
+  Monitor-Karte und bei Abweichung. Der Dedupe-Schlüssel `inventar-abgleich`
+  bündelt beliebig viele Auslöser. Übertragen wird nur, was sich seit der
+  letzten Meldung geändert hat (`shopify_inventory_state.pushed_qty`) — ein
+  leerer Durchlauf kostet keinen API-Aufruf.
+- **Ein Abgleich zur Zeit, nichts geht verloren**: Sperre mit Ablauf
+  (`shopify_sync_state.inventar_sperre`, 90 s). Läuft ein Abgleich, verpufft
+  ein neues Einreihen (Schlüssel belegt) — darum zählt jeder Anstoß einen
+  Zähler hoch (`inventar_anstoss`), und der laufende Abgleich rechnet eine
+  weitere Runde, wenn sich der Zähler währenddessen bewegt hat (höchstens
+  fünf). Wichtig bei Releases mit vielen Bestellungen in kurzer Zeit.
 - **Mechanik**: `inventorySetQuantities` (name `available`, reason
   `correction`, `ignoreCompareQuantity: true` — das ERP hat recht), höchstens
   200 Mengen je Aufruf. Adressiert wird das InventoryItem der Variante; die
@@ -107,11 +119,46 @@ Orten, abgerundet auf ganze Stücke) gemeldet.
   gespeichert (`shopify_inventory_item_gid`). Der Standort ist der erste
   aktive des Shops und wird in `shopify_sync_state` festgehalten.
 - **Abweichungserkennung**: Webhook `inventory_levels/update` schreibt den
-  Shop-Stand nach `shopify_inventory_state.shop_qty`. Weicht er vom ERP ab
-  (Handkorrektur im Shopify-Admin), zeigt die Sicht
-  `shopify_inventory_drift` die Differenz auf der Monitor-Seite, und ein
-  korrigierender Push wird eingereiht.
-- **Scopes**: zusätzlich `write_inventory` und `read_locations`.
+  Shop-Stand nach `shopify_inventory_state.shop_qty`; die Sicht
+  `shopify_inventory_drift` zeigt Differenzen zur Soll-Menge auf der
+  Monitor-Seite. **Asymmetrisch** (seit 0100): zeigt der Shop MEHR als das
+  ERP hergibt, wird sofort korrigiert; zeigt er WENIGER, hat Shopify meist
+  eine Bestellung abgezogen, die das ERP noch nicht importiert hat — dann
+  wird nicht hochgesetzt (das überschriebe die Bestellung), sondern nur der
+  Shop-Stand als gemeldet gemerkt; der nächste reguläre Abgleich setzt die
+  richtige Menge.
+- **Scopes**: zusätzlich `write_inventory` und `read_locations`;
+  `write_products` für die Made-to-Order-Einrichtung.
+
+### Made-to-Order (Tastaturen) — baubare Menge statt Bestand (0100)
+
+Tastaturen werden auf Auftrag gefertigt (Route Fertigen + Auf Auftrag,
+aktive Stückliste): ihr Lagerbestand ist immer 0, verkauft werden sie
+trotzdem. Früher hatte Shopify für sie gar keinen Bestandsabgleich.
+
+- **Rechnung** `baubar(variante)`: über die gefilterte Stückliste je Teil
+  freier Bestand ÷ Menge je Stück, das Minimum ist die baubare Menge, das
+  Teil der Engpass. Halbfabrikate mit eigener Stückliste zählen ihren
+  freien Bestand plus das daraus Baubare (bis Tiefe 3). Offene Aufträge sind
+  eingerechnet: ihre Fertigungsaufträge reservieren die Teile.
+- **Meldung** `shopify_soll_menge()` je Einstellung
+  (`settings.shopify.mto`, Einstellungen → Schnittstellen, Karte
+  „Made-to-Order an Shopify"): „baubar" (Standard) = baubare Menge + freier
+  Bestand des Fertigprodukts − Puffer (Standard 2), höchstens Deckel (99);
+  „fest" = der Deckel, solange mehr als der Puffer baubar ist, sonst 0.
+  „baubar" ist sicherer: Shopify zieht bei jeder Bestellung selbst ab und
+  stoppt bei 0, auch bevor KRNL neu gemeldet hat.
+- **Geteilte Teile** (Clicky Blue in 36 Varianten): jede Variante zeigt die
+  volle baubare Menge; nach jeder Bestellung sinken alle sofort (Anstoß),
+  der Puffer fängt die Sekunden dazwischen ab — für Releases gern höher.
+- **Einrichtung in Shopify**: beim ersten Abgleich stellt KRNL jede
+  Made-to-Order-Variante auf „Menge verfolgen" und „nicht ohne Bestand
+  verkaufen" (`productVariantsBulkUpdate`, `inventoryPolicy: DENY`,
+  `inventoryItem.tracked`), gemerkt in
+  `shopify_inventory_state.mto_eingerichtet_at`.
+- **Vorschau** auf derselben Karte: Varianten, ausverkauft, knapp, Engpässe
+  und je Variante baubar / Engpass / an Shopify / zuletzt gemeldet — auch im
+  Modus „nur lesen", vor dem Scharfschalten.
 
 ## Shopify — Produkt-Sync (beide Richtungen, laufend)
 

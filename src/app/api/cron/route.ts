@@ -13,6 +13,7 @@ import { datenbankAusfallMelden, wacheAusfuehren } from '@/modules/integrationen
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
 import { pruneLoginVersuche, pruneSessions, pruneGeraete } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
+import { shopifyModus } from '@/modules/integrationen/shopify-modus'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { postfachKonfiguriert } from '@/modules/google/auth'
 import { postfachAbgleichen } from '@/modules/einkauf/postfach-abgleich'
@@ -54,6 +55,12 @@ export async function GET(request: Request) {
         return NextResponse.json({ task, ...(await processPendingWebhooks()) })
       }
       case 'jobs': {
+        // Minütlicher Bestandsabgleich (nur schreibend): Änderungen in KRNL —
+        // Wareneingang, Inventur, Fertigmeldung — erreichen den Shop binnen
+        // einer Minute; ein Lauf ohne Änderung kostet keinen API-Aufruf.
+        if (shopifyConfigured() && (await shopifyModus(sql)) === 'schreiben') {
+          await sql`select inventar_abgleich_anstossen()`
+        }
         const jobs = await runDueJobs()
         // Telegram: endgültig gescheiterte Jobs melden, dann die Outbox der
         // Benachrichtigungen senden (Anmeldungen, Fehlversuche, Dienste).
@@ -72,7 +79,7 @@ export async function GET(request: Request) {
         const orders = await reconcileOrders()
         // Bestandsmeldung über die Outbox statt direkt: der Job hat Retry und
         // Backoff, und der Dedupe-Schlüssel verhindert Stapelbildung.
-        await sql`select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'inventar-abgleich')`
+        await sql`select inventar_abgleich_anstossen()`
         return NextResponse.json({ task, ...orders, inventar: 'eingereiht' })
       }
       case 'tracking': {

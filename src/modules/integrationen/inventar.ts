@@ -13,11 +13,18 @@ import {
 /**
  * Bestandsabgleich mit Shopify.
  *
- * Das ERP ist die Quelle der Wahrheit: gemeldet wird die frei verfügbare
- * Menge (free_to_use — Bestand minus Reservierungen an internen Orten).
- * Der Abgleich läuft über die Outbox (Job `shopify_inventory_push`), wird
- * viertelstündlich vom Reconcile-Cron angestoßen und zusätzlich, sobald der
- * Webhook inventory_levels/update eine Abweichung zeigt.
+ * Das ERP ist die Quelle der Wahrheit: gemeldet wird shopify_soll_menge()
+ * (0100) — für normale Artikel die frei verfügbare Menge (Bestand minus
+ * Reservierungen an internen Orten), für Made-to-Order-Tastaturen die
+ * BAUBARE Menge aus freiem Material laut Stückliste (mit Puffer und Deckel).
+ *
+ * Schnell, weil es bei Releases und Aktionen darauf ankommt
+ * (Entscheidungslog 2026-10-01): jede importierte Shopify-Bestellung stößt
+ * den Abgleich an (inventar_abgleich_anstossen), der Webhook arbeitet ihn
+ * direkt nach der Antwort ab — Sekunden statt Minuten. Dazu jede Minute
+ * (Änderungen in KRNL: Wareneingang, Inventur, Fertigmeldung) und
+ * viertelstündlich als Sicherheitsnetz. Läuft schon ein Abgleich, rechnet er
+ * am Ende eine weitere Runde, statt den Anstoß zu verlieren.
  */
 
 // --- Standort ----------------------------------------------------------------
@@ -101,11 +108,13 @@ export interface PushErgebnis {
  * ein leerer Durchlauf kostet keinen einzigen API-Aufruf.
  */
 export async function pushInventar(): Promise<PushErgebnis> {
-  const varianten = await sql<VarianteMitBestand[]>`
+  const varianten = await sql<(VarianteMitBestand & { mto: boolean; eingerichtet: boolean })[]>`
     select v.id as variant_id, v.sku,
            v.shopify_inventory_item_gid as inventory_item_gid,
-           free_to_use(v.id) as frei,
-           s.pushed_qty
+           shopify_soll_menge(v.id) as frei,
+           s.pushed_qty,
+           ist_made_to_order(v.id) as mto,
+           s.mto_eingerichtet_at is not null as eingerichtet
     from product_variants v
     left join shopify_inventory_state s on s.variant_id = v.id
     where v.shopify_variant_id is not null and v.active
@@ -114,6 +123,7 @@ export async function pushInventar(): Promise<PushErgebnis> {
   if (varianten.length === 0) return { geprueft: 0, uebertragen: 0, ohneZuordnung: 0 }
 
   await ergaenzeInventoryItems(varianten)
+  await madeToOrderEinrichten(varianten.filter((v) => v.mto && !v.eingerichtet))
   const { melden, ohneZuordnung } = zuUebertragen(varianten)
   if (melden.length === 0) {
     return { geprueft: varianten.length, uebertragen: 0, ohneZuordnung: ohneZuordnung.length }
@@ -155,6 +165,120 @@ export async function pushInventar(): Promise<PushErgebnis> {
   }
 }
 
+// --- Made-to-Order in Shopify einrichten ----------------------------------------
+
+/**
+ * Für Tastaturen hatte Shopify keinen Bestandsabgleich (keine
+ * Mengenverfolgung, Verkauf ohne Bestand). Damit die gemeldete baubare
+ * Menge wirkt und 0 wirklich „ausverkauft" heißt, wird jede
+ * Made-to-Order-Variante einmal umgestellt: Menge verfolgen an,
+ * inventoryPolicy DENY. Danach gemerkt (mto_eingerichtet_at).
+ */
+async function madeToOrderEinrichten(varianten: { variant_id: string }[]): Promise<number> {
+  if (varianten.length === 0) return 0
+  const gids = await sql<{ id: string; gid: string }[]>`
+    select id, shopify_variant_id as gid from product_variants
+    where id in ${sql(varianten.map((v) => v.variant_id))}`
+  const varianteZuGid = new Map(gids.map((r) => [r.gid, r.id]))
+
+  const jeProdukt = new Map<string, string[]>()
+  const fertig: string[] = []
+  for (const block of inBloecken([...varianteZuGid.keys()], 100)) {
+    const data = await shopifyGraphQL<{
+      nodes: ({
+        id: string
+        inventoryPolicy: string
+        product: { id: string }
+        inventoryItem: { tracked: boolean } | null
+      } | null)[]
+    }>(
+      `query mtoStand($ids: [ID!]!) {
+         nodes(ids: $ids) { ... on ProductVariant { id inventoryPolicy product { id } inventoryItem { tracked } } }
+       }`,
+      { ids: block },
+    )
+    for (const node of data.nodes) {
+      if (!node) continue
+      const variantId = varianteZuGid.get(node.id)
+      if (!variantId) continue
+      if (node.inventoryPolicy === 'DENY' && node.inventoryItem?.tracked) {
+        fertig.push(variantId)
+        continue
+      }
+      jeProdukt.set(node.product.id, [...(jeProdukt.get(node.product.id) ?? []), node.id])
+    }
+  }
+
+  for (const [productId, ids] of jeProdukt) {
+    const data = await shopifyGraphQL<{
+      productVariantsBulkUpdate: { userErrors: { field: string[] | null; message: string }[] }
+    }>(
+      `mutation mtoEinrichten($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+         productVariantsBulkUpdate(productId: $productId, variants: $variants) { userErrors { field message } }
+       }`,
+      {
+        productId,
+        variants: ids.map((id) => ({ id, inventoryPolicy: 'DENY', inventoryItem: { tracked: true } })),
+      },
+    )
+    const fehler = data.productVariantsBulkUpdate.userErrors
+    if (fehler.length > 0) {
+      throw new ShopifyError(`Made-to-Order-Einrichtung abgelehnt: ${fehler.map((f) => f.message).join('; ')}`, false)
+    }
+    for (const gid of ids) fertig.push(varianteZuGid.get(gid)!)
+  }
+
+  for (const variantId of fertig) {
+    await sql`
+      insert into shopify_inventory_state (variant_id, mto_eingerichtet_at) values (${variantId}, now())
+      on conflict (variant_id) do update set mto_eingerichtet_at = now()`
+  }
+  return fertig.length
+}
+
+// --- Abgleich mit Sperre und Nachlauf ---------------------------------------------
+
+const SPERRE_SEKUNDEN = 90
+
+async function anstossZaehler(): Promise<number> {
+  const [row] = await sql<{ n: string | null }[]>`
+    select value ->> 'n' as n from shopify_sync_state where key = 'inventar_anstoss'`
+  return Number(row?.n ?? 0)
+}
+
+/**
+ * Ein Abgleich zur Zeit (Sperre mit Ablauf, falls ein Lauf abstürzt). Wer die
+ * Sperre nicht bekommt, kehrt sofort zurück — der laufende Abgleich sieht
+ * den Anstoß am Zähler und rechnet eine weitere Runde (höchstens fünf).
+ */
+export async function inventarAbgleichen(): Promise<PushErgebnis & { runden: number; gesperrt: boolean }> {
+  const gesperrt = await sql`
+    insert into shopify_sync_state (key, value)
+    values ('inventar_sperre', jsonb_build_object('bis', now() + make_interval(secs => ${SPERRE_SEKUNDEN})))
+    on conflict (key) do update set value = excluded.value, updated_at = now()
+    where (shopify_sync_state.value ->> 'bis')::timestamptz < now()
+    returning key`
+  if (gesperrt.length === 0) return { geprueft: 0, uebertragen: 0, ohneZuordnung: 0, runden: 0, gesperrt: true }
+
+  const gesamt = { geprueft: 0, uebertragen: 0, ohneZuordnung: 0, runden: 0, gesperrt: false }
+  try {
+    let vorher: number
+    do {
+      vorher = await anstossZaehler()
+      const r = await pushInventar()
+      gesamt.geprueft = r.geprueft
+      gesamt.uebertragen += r.uebertragen
+      gesamt.ohneZuordnung = r.ohneZuordnung
+      gesamt.runden++
+    } while ((await anstossZaehler()) !== vorher && gesamt.runden < 5)
+  } finally {
+    await sql`
+      update shopify_sync_state set value = jsonb_build_object('bis', now()), updated_at = now()
+      where key = 'inventar_sperre'`
+  }
+  return gesamt
+}
+
 // --- Webhook -------------------------------------------------------------------
 
 /**
@@ -169,7 +293,7 @@ export async function verarbeiteInventarWebhook(
   if (!meldung) return 'Kein verwertbarer Bestands-Payload — übersprungen'
 
   const [variante] = await sql<{ id: string; sku: string | null; frei: number }[]>`
-    select id, sku, free_to_use(id) as frei
+    select id, sku, shopify_soll_menge(id) as frei
     from product_variants
     where shopify_inventory_item_gid = ${meldung.inventoryItemGid}`
   if (!variante) return 'InventoryItem keiner Variante zugeordnet — übersprungen'
@@ -180,11 +304,23 @@ export async function verarbeiteInventarWebhook(
     on conflict (variant_id) do update
       set shop_qty = excluded.shop_qty, shop_seen_at = now()`
 
-  if (meldung.verfuegbar !== Math.floor(variante.frei)) {
-    // Nicht selbst pushen (Webhooks kommen in Wellen) — ein Job mit
-    // Dedupe-Schlüssel bündelt beliebig viele Abweichungen zu einem Abgleich.
-    await sql`select enqueue_job('shopify_inventory_push', '{}'::jsonb, 'inventar-abgleich')`
-    return `Abweichung bei ${variante.sku ?? variante.id}: Shop ${meldung.verfuegbar}, ERP ${variante.frei} — Abgleich eingereiht`
+  const soll = Math.floor(variante.frei)
+  if (meldung.verfuegbar > soll) {
+    // Shop bietet mehr an als das ERP hergibt — sofort korrigieren. Nicht
+    // selbst pushen (Webhooks kommen in Wellen): der Anstoß bündelt.
+    await sql`select inventar_abgleich_anstossen()`
+    return `Abweichung bei ${variante.sku ?? variante.id}: Shop ${meldung.verfuegbar}, ERP ${soll} — Abgleich angestoßen`
+  }
+  if (meldung.verfuegbar < soll) {
+    // Shop zeigt weniger: meist hat Shopify eine Bestellung abgezogen, die
+    // das ERP noch nicht importiert hat. NICHT sofort hochsetzen (das würde
+    // die Bestellung überschreiben, Überverkauf!) — nur den Shop-Stand als
+    // gemeldet merken; der nächste reguläre Abgleich (nach dem Import bzw.
+    // minütlich) setzt die richtige Menge.
+    await sql`
+      update shopify_inventory_state set pushed_qty = ${meldung.verfuegbar}
+      where variant_id = ${variante.id}`
+    return `Shop niedriger bei ${variante.sku ?? variante.id}: Shop ${meldung.verfuegbar}, ERP ${soll} — wird beim nächsten Abgleich gesetzt`
   }
   return `Stand bestätigt (${variante.sku ?? variante.id}: ${meldung.verfuegbar})`
 }

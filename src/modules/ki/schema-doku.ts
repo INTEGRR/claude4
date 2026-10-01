@@ -108,7 +108,7 @@ Alle IDs sind UUIDs. Zeitstempel: timestamptz. Mengen: numeric.
 ### Versand-Extras & Shopify-Abgleich
 - **operation_types**: Transferarten (name, kind 'receipt'|'delivery'|'internal'|'repair', sequence_code). **warehouses**: Lagerhäuser (code, name).
 - **packagings**: Kartonagen (name, Innenmaße, max_weight_g, kosten). **shipping_rules**: Versandregeln zur Kartonagen-/Produktwahl (priority, bedingungen, packaging_id). **return_labels**: Retourenlabels (shipment_number, partner_id, sales_order_id, repair_order_id — Retoure zu einer Reparatur mit RMA-Nummer als Referenz —, emailed_at).
-- **shopify_unmatched_lines**: Klärliste nicht zuordenbarer Shopify-Positionen (order_name, sku, title, resolved_at). **shopify_inventory_state** / **shopify_sync_state**: Abgleich-Zustand (variant_id bzw. Schlüssel, zuletzt gemeldete Menge/Cursor).
+- **shopify_unmatched_lines**: Klärliste nicht zuordenbarer Shopify-Positionen (order_name, sku, title, resolved_at). **shopify_inventory_state** / **shopify_sync_state**: Abgleich-Zustand (variant_id bzw. Schlüssel, zuletzt gemeldete Menge/Cursor; mto_eingerichtet_at = Made-to-Order-Variante in Shopify auf Mengenverfolgung/DENY gestellt). Gemeldet wird shopify_soll_menge(variant_id): normale Artikel free_to_use, Made-to-Order (ist_made_to_order: Route Fertigen + Auf Auftrag + Stückliste) die baubare Menge aus **baubar(variant_id)** → (menge, engpass) mit Puffer/Deckel aus settings.shopify.mto.
 - **uom_categories**: Einheitenkategorien. **product_template_attribute_lines**: welche Attribute ein Template nutzt. **bom_byproducts**: Kuppelprodukte einer Stückliste (variant_id, qty).
 
 ### Sonstiges

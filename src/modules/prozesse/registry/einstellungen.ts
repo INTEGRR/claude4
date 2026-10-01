@@ -166,6 +166,33 @@ export const EINSTELLUNGEN = {
     revalidate: ['/einstellungen/anbindungen', '/integrationen'],
   },
 
+  'einstellungen.shopify_mto_setzen': {
+    label: 'Shopify: Made-to-Order-Meldung',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Was Shopify für Made-to-Order-Artikel (Route Fertigen + Auf Auftrag) bekommt (settings.shopify.mto): ' +
+      '„baubar" = baubare Menge aus freiem Material minus Puffer, höchstens der Deckel; „fest" = der Deckel, ' +
+      'solange mehr als der Puffer baubar ist, sonst 0 (ausverkauft). Stößt sofort einen Abgleich an.',
+    bindung: 'frei',
+    schema: z.object({
+      modus: z.enum(['baubar', 'fest']).describe('baubar = echte Menge (gedeckelt), fest = Deckel oder 0'),
+      puffer: z.number({ invalid_type_error: 'Puffer: ganze Zahl' }).int().min(0).max(100),
+      deckel: z.number({ invalid_type_error: 'Deckel: ganze Zahl' }).int().min(1).max(10000),
+    }),
+    zusammenfassung: (p) =>
+      p.modus === 'fest'
+        ? `Made-to-Order: ${p.deckel}, solange mehr als ${p.puffer} baubar`
+        : `Made-to-Order: baubare Menge − ${p.puffer}, höchstens ${p.deckel}`,
+    formdata: (fd) => ({
+      modus: String(fd.get('modus') ?? 'baubar'),
+      puffer: Number(String(fd.get('puffer') ?? '2').trim() || '0'),
+      deckel: Number(String(fd.get('deckel') ?? '99').trim() || '0'),
+    }),
+    revalidate: ['/einstellungen/anbindungen', '/integrationen'],
+  },
+
   'einstellungen.versand_vorgaben_setzen': {
     label: 'Versand: Labelformat',
     bereich: 'einstellungen',

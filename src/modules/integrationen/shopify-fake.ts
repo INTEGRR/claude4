@@ -111,6 +111,26 @@ export async function fakeShopifyGraphQL<T>(
       }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }
+      case 'locations':
+        return { locations: { nodes: [{ id: 'gid://shopify/Location/1', name: 'Lager (Fake)', isActive: true }] } }
+      case 'nodes': {
+        // Varianten wie im echten Shop: InventoryItem, Produkt, und für
+        // Tastaturen anfangs ohne Mengenverfolgung (so war es bei ANVIL).
+        const ids = (variables.ids as string[] | undefined) ?? []
+        return {
+          nodes: ids.map((id) => {
+            const nr = id.split('/').pop()
+            return {
+              id,
+              inventoryItem: { id: `gid://shopify/InventoryItem/${nr}`, tracked: false },
+              product: { id: `gid://shopify/Product/${nr}` },
+              inventoryPolicy: 'CONTINUE',
+            }
+          }),
+        }
+      }
+      case 'productVariantsBulkUpdate':
+        return { productVariantsBulkUpdate: { userErrors: [] } }
       case 'customers':
         return { customers: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } }
       case 'orders': {
