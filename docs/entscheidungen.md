@@ -9,6 +9,37 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Querverweise überall
+
+**Anlass:** Betreiber in der Verkaufsliste: „Mir fehlen Links, überall —
+zwischen Status, von Auftrag zu Auftrag. Ich sehe ‚1 offen', ‚Lieferung
+begonnen', da muss ich draufklicken können." Und im Versand: „Warum kann
+ich hier nicht auf den Kunden klicken? Prüfe das in der gesamten App."
+
+**Entschieden:**
+- **Status sind Wege, keine Sackgassen.** Ein Statusschild führt zu dem
+  Beleg dahinter: Lieferstatus → die eine (offene) Lieferung, bei mehreren
+  die Transfers des Auftrags (`/lager?auftrag=<id>`); „N offen" in der
+  Fertigung → `/fertigung?auftrag=<id>`; Abrechnung → Rechnung;
+  Wareneingang → Eingang. Dafür kann `Badge` ein `href` tragen.
+- **Namen führen zur Akte, Nummern zum Beleg:** Kunden zu `/kontakte/<id>`,
+  Lieferanten im Einkauf zur Lieferantenakte, Belegnummern und Herkunft
+  (origin) zur Detailseite — in beide Richtungen (Rückstand ↔ Original,
+  Reparatur ↔ Vorgang ↔ Auftrag, Gutschrift ↔ Rechnung). Die Herkunfts-
+  Zuordnung steht an einer Stelle (`lager/herkunft.ts`,
+  `einkauf/querverweise.ts`).
+- Zusatzdaten für die Links kommen aus Joins/Arrays derselben Abfrage —
+  kein N+1. Fachlogik bleibt unberührt.
+- **Wächter `tests/querverweise.test.ts`:** eine Tabellenzelle, die nur
+  Kunde, Lieferant oder Belegnummer als Text zeigt, macht die Suite rot
+  (Seiten und Bausteine); Ausnahmen nur in einer geschlossenen,
+  begründeten Liste — derzeit leer.
+- Bewusst ohne Link: Sendungen gehen weiter zur DHL-Verfolgung (keine
+  interne Sendungsseite), Kundenrechnungen gibt es noch nicht.
+
+Umgesetzt quer durch `src/app/(erp)/**` und `components/`; dokumentiert
+in den Modul-Dokus (Abschnitte „Querverweise") und [prozesse.md](prozesse.md).
+
 ## 2026-10-01 — Aufgaben für Mitarbeiter
 
 **Anlass:** Betreiber: „Aufgaben für meine Mitarbeiter anlegen — feg mal
