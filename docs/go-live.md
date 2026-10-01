@@ -22,9 +22,11 @@ Datenbank-TLS im Code, Konten löschen.
 
 **Kurzlage 2026-10-01:** DHL, Shopify (Probelauf), KI, Sprache,
 Druckbrücke und Telegram melden grün; Mail und Google sind nicht
-eingerichtet. Offen vor dem Stichtag vor allem: Mail, Enforce SSL, PITR,
-Konten/2FA, Retouren-/Reparaturtest, Zweitangebote im Bestand, Adresse
-prüfen — dann Stichtag nach Runbook.
+eingerichtet. Offen vor dem Stichtag vor allem: Mail, PITR, Konten/2FA
+(nur ein Admin hat den zweiten Faktor), DHL-Retouren-Empfänger,
+Retouren-/Reparaturtest, Zweitangebote im Bestand, Adresse prüfen — dann
+Stichtag nach Runbook. `ZWEIFAKTOR_SCHLUESSEL` lässt sich seit 2026-10-01
+gefahrlos nachträglich setzen.
 
 ## 1. Geheimnisse und Zugänge (Betreiber, Vercel → Production)
 
@@ -106,9 +108,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       *in Prod ausgeführt 2026-10-01 (auf Wunsch des Betreibers). Vor einem
       Wiedereinschalten der Data API zurücknehmen: `alter role authenticator
       reset pgrst.db_schemas; notify pgrst;`*
-- [ ] „Enforce SSL" einschalten (Database → Settings). Kein Zusatz in
+- [x] „Enforce SSL" einschalten (Database → Settings). Kein Zusatz in
   `DATABASE_URL`/`DIRECT_URL` nötig — KRNL verbindet seit 2026-10-01 von
   sich aus mit TLS (`src/db/ssl.ts`); erst deployen, dann einschalten.
+  *Stand 2026-10-01: laut Betreiber eingeschaltet.*
 - [ ] Point-in-Time-Recovery buchen — der Rollback-Pfad des Cutovers.
 - [ ] Auftragsverarbeitungsvertrag (DPA) im Dashboard abschließen.
 - [ ] Bekannt und akzeptiert: btree_gist liegt in public (einzige
@@ -191,7 +194,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       ohne verräterische Header, im ERP annehmen, Retourenlabel mit
       RMA-Nummer im Geschäftskundenportal sichtbar; Rückversand-Label aus
       einer Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
-      *Stand 2026-10-01: im Code fertig (KRNL), Shopify-Schritte offen.*
+      *Stand 2026-10-01: App „reparatur" mit Proxy läuft — Shop vorerst auf
+      www.nvil.gg, `https://www.nvil.gg/apps/reparatur` antwortet (Formular im
+      Theme, keine verräterischen Header). Offen: `REPARATUR_SHOP_URL`,
+      Weiterleitung und Menüpunkt, Mail-Absender, Testanfragen.*
 - [x] Druckbrücke einrichten
       ([module/versand.md „Druckbrücke"](module/versand.md)): unter
       Einstellungen → Arbeitsplätze & Drucker Packtische, Montagetische,
@@ -253,6 +259,31 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       konfiguriert und erreichbar, der Ereignis-Monitor `/integrationen` ist ruhig,
       die Cron-Ergebnisse der ersten Stunde durchsehen (Outbox leer,
       Tracking ohne `fehler`).
+
+## 7b. Einkaufstool (Betreiber, vor dem echten Postfach-Betrieb)
+
+Stufen 1–3 sind in Prod (Ablage, Postfach, Mails, Projekte); ohne Google
+laufen sie nicht an. Anleitung: [module/einkaufstool.md](module/einkaufstool.md).
+
+- [ ] Google Workspace: Postfach `einkauf@…` anlegen und delegieren,
+      Dienstkonto mit domänenweiter Delegation (nur `gmail.modify`, nur
+      dieses Postfach), geteilte Ablage „Einkauf" mit dem Dienstkonto als
+      Inhaltsmanager; in Vercel `GOOGLE_DIENSTKONTO_JSON`, `EINKAUF_POSTFACH`,
+      `GOOGLE_EINKAUF_ABLAGE_ID`, dann Einstellungen → Anbindungen →
+      „Ablage einrichten".
+- [ ] Firmendaten: EORI und USt-IdNr. eintragen (Spediteur, Zoll).
+- [ ] Lieferanten pflegen: Sprache, Maildomain(s), Einkäufer, Standard-
+      Incoterm und -Währung — damit ordnet das Postfach selbst zu.
+- [ ] Steuerberater: DATEV-Beleg-Mail klären (Upload-Adresse, Absender-
+      Freigabe, ein Beleg je Mail, Größengrenze) — Voraussetzung für die
+      DATEV-Übergabe in Stufe 5.
+
+## 7c. Entscheidungen, die der Betreiber treffen muss
+
+- [ ] Kundenrechnungen (Ausgangsrechnung, Zahlungseingang, Mahnwesen) aus
+      KRNL — oder weiter aus Shopify? Erst danach baut KRNL sie.
+- [ ] Stichtag festlegen; vorher einen frischen Odoo-Dump für den lokalen
+      Probelauf bereitstellen.
 
 ## 8. Nachlauf
 
