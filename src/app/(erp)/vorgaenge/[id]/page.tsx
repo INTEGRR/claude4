@@ -156,6 +156,11 @@ export default async function VorgangDetail({
                 Kundenformular
               </span>
             )}
+            {v.quelle === 'shop' && (
+              <span className="badge neutral" title="Über das Reparaturformular im Shop eingegangen (App Proxy)">
+                Shop-Formular
+              </span>
+            )}
             {auftrag && (
               <Link className="btn" href={`/verkauf/${auftrag.id}`}>
                 Auftrag {auftrag.number}

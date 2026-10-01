@@ -134,6 +134,7 @@ RESEND_API_KEY           Mailversand an Lieferanten
 MAIL_FROM                "Einkauf <einkauf@example.com>"
 REGISTRIERUNG_MAIL       Empfänger der Hinweis-Mail bei neuen Registrierungen
 REPARATUR_MAIL           Empfänger der Hinweis-Mail bei Reparaturanfragen (/service/reparatur); leer = Firmen-E-Mail
+REPARATUR_SHOP_URL       Reparaturformular im Shop, z. B. https://anvil.gg/apps/reparatur — /service/reparatur leitet dann um (308)
 INSTANZ_REGION           Anzeige in der Ersteinrichtung, z. B. "EU-Central · Frankfurt"
 ```
 
@@ -228,13 +229,19 @@ und Sendungsverfolgung hängen dann bis zum nächsten Tag fest. Zwei Wege:
 Das ERP enthält Kunden- und Lieferantendaten und gehört nicht ins offene Netz.
 Unter **Settings → Deployment Protection** *Vercel Authentication* einschalten.
 
-Zwei Pfade müssen davon ausgenommen bleiben, sonst funktionieren Shopify und
-Cron nicht mehr:
+Drei Pfade müssen davon ausgenommen bleiben, sonst funktionieren Shopify,
+Cron und das Reparaturformular im Shop nicht mehr:
 
 - `/api/webhooks/shopify` — prüft die HMAC-Signatur selbst und weist alles ohne
   gültige Signatur mit 401 ab.
 - `/api/cron/*` — abgesichert über `CRON_SECRET` (Pflicht auf Vercel — ohne
   gesetztes Secret antwortet der Endpunkt mit 401).
+- `/api/shopify/proxy/*` — der Shopify App Proxy (Reparaturformular unter
+  `https://<shop>/apps/reparatur`); prüft die App-Proxy-Signatur selbst
+  (Client Secret, Zeitfenster 90 Sekunden, eigener Shop) und weist alles
+  andere mit 401 ab. Shopify ruft serverseitig und kann sich nicht bei
+  Vercel anmelden — ohne Ausnahme sähe der Kunde im Shop die Fehlerseite.
+  Einrichtung: [website.md](website.md), Abschnitt „Im Shop (App Proxy)".
 
 Die öffentliche Startseite `/start` wird von der Deployment Protection
 ebenfalls ausgesperrt — sie ist dann nur nach Vercel-Anmeldung sichtbar.

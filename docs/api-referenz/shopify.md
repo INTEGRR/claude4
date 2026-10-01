@@ -15,6 +15,7 @@ Stand: 2026-08-05. Aktuelle stabile Shopify-API-Version: **2026-07**.
 **Benötigte Scopes:**
 - Lesen: `read_orders`. Standardmäßig nur die **letzten 60 Tage** abrufbar; ältere Orders benötigen `read_all_orders`. Das ist ein **geschützter Scope**: er muss bei Shopify separat beantragt werden, bis zur Freigabe weist das Dev Dashboard ihn als ungültig ab (2026-09-29). KRNL braucht ihn nicht — die Historie davor kommt aus dem **CSV-Export** des Shop-Admins (Integrationen → Historie aus Shopify, Migration 0089).
 - Schreiben: `write_orders` (Tags/Order-Update), `write_merchant_managed_fulfillment_orders` (+ ggf. `write_assigned_fulfillment_orders`) für Fulfillments.
+- App Proxy: `write_app_proxy` — Voraussetzung, damit die App-Version einen App Proxy (`/apps/reparatur` → `/api/shopify/proxy`) konfigurieren darf. Shopify signiert die weitergeleitete Query mit dem Client Secret (HMAC-SHA256 hex über die sortierten `key=value`-Paare ohne Trenner, Mehrfachwerte mit Komma); `Content-Type: application/liquid` rendert die Antwort im Theme, Cookies werden gestrichen, 30x folgt Shopify selbst. Umsetzung und Einrichtung: [website.md](../website.md), „Im Shop (App Proxy)".
 
 **Webhooks (Order-Topics):** `orders/create`, `orders/paid`, `orders/updated`, `orders/cancelled`, `orders/fulfilled`, `orders/partially_fulfilled`, `orders/edited`, `orders/delete`. Payload = volles Order-JSON. Subscription per `webhookSubscriptionCreate`-Mutation oder `shopify.app.toml`. Zustellung an HTTPS-Endpoint (alternativ Pub/Sub, EventBridge).
 

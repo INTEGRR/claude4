@@ -1,5 +1,7 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { REGISTRY } from '../src/modules/prozesse/registry/index.ts'
 import { aktionErlaubt } from '../src/modules/prozesse/torwaechter.ts'
 import { JOB_KATALOG } from '../src/modules/prozesse/jobs-katalog.ts'
@@ -170,5 +172,45 @@ describe('Reparaturanfrage: die Bearbeitung läuft über die Registry', () => {
 
   test('die Eingangsbestätigung ist ein Outbox-Job mit anbieterneutraler Fähigkeit', () => {
     assert.equal(JOB_KATALOG.send_repair_request_email.faehigkeit, 'mail:anfrage_bestaetigung')
+  })
+})
+
+/**
+ * Die Ausnahme vom Torwächter bleibt EIN Codepfad (Entscheidungslog
+ * 2026-10-01): modules/reparatur/anfrage-eingang.ts schreibt, genau zwei
+ * Routen rufen ihn (Website-Formular und Formular im Shop), und keine der
+ * beiden schreibt selbst. Beide Listen sind geschlossen — ein dritter Kanal
+ * oder ein dritter Ort, der Vorgänge anlegt, macht die Suite rot und
+ * braucht einen Eintrag im Entscheidungslog.
+ */
+describe('Reparaturanfrage: genau ein Schreibweg ohne Sitzung', () => {
+  const SRC = new URL('../src', import.meta.url).pathname
+  const dateien = (readdirSync(SRC, { recursive: true }) as string[])
+    .filter((f) => /\.(ts|tsx)$/.test(f))
+    .map((f) => f.split('\\').join('/'))
+  const inhalt = (f: string) => readFileSync(join(SRC, f), 'utf8')
+
+  const KANAELE = ['app/api/reparaturanfrage/route.ts', 'app/api/shopify/proxy/[[...pfad]]/route.ts']
+
+  test('nur die beiden Kanal-Routen rufen den Eingang auf, und sie schreiben selbst nichts', () => {
+    const aufrufer = dateien
+      .filter((f) => f !== 'modules/reparatur/anfrage-eingang.ts')
+      .filter((f) => inhalt(f).includes('reparaturanfrageAufnehmen('))
+      .sort()
+    assert.deepEqual(aufrufer, [...KANAELE].sort())
+    for (const route of KANAELE) {
+      assert.ok(
+        !/\b(insert\s+into|delete\s+from)\b|\bupdate\s+[a-z_]+\s+set\b/i.test(inhalt(route)),
+        `${route} schreibt selbst — das gehört in anfrage-eingang.ts`,
+      )
+    }
+  })
+
+  test('Vorgänge entstehen nur im Eingang und im Registry-Executor', () => {
+    const schreiber = dateien.filter((f) => /insert\s+into\s+vorgaenge\b/.test(inhalt(f))).sort()
+    assert.deepEqual(schreiber, [
+      'modules/prozesse/registry/vorgang-ausfuehren.ts',
+      'modules/reparatur/anfrage-eingang.ts',
+    ])
   })
 })

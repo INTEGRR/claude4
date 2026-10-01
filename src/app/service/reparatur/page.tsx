@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { permanentRedirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { HexcoreMark, Wortmarke } from '@/components/marke'
+import { reparaturShopUrl } from '@/modules/reparatur/shop-seiten'
 import { Anfrageformular } from './anfrageformular'
 import '../../start/start.css'
 
@@ -14,6 +16,9 @@ import '../../start/start.css'
  * Der Prozess-Schalter ist der Formular-Schalter: ist reparatur_anfrage
  * abgeschaltet (Paketwechsel), zeigt die Seite das statt eines Formulars,
  * dessen Absenden ins Leere liefe — Chamäleon bis nach außen.
+ *
+ * Ist REPARATUR_SHOP_URL gesetzt, läuft das Formular im Shop (App Proxy,
+ * /api/shopify/proxy) und diese Seite leitet nur noch dorthin um.
  */
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +31,11 @@ export const metadata: Metadata = {
 }
 
 export default async function ReparaturAnfrageSeite() {
+  // Läuft das Formular im Shop (App Proxy, Entscheidungslog 2026-10-01),
+  // schickt diese Seite alte Links dorthin — 308, der Shop ist die Adresse.
+  const imShop = reparaturShopUrl()
+  if (imShop) permanentRedirect(imShop)
+
   const [prozess] = await sql<{ aktiv: boolean }[]>`
     select aktiv from prozesse where code = 'reparatur_anfrage' and modell = 'vorgang'`
   const [firma] = await sql<{ name: string | null }[]>`

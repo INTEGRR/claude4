@@ -81,11 +81,12 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       ([module/integrationen.md](module/integrationen.md)).
       *Stand 2026-10-01: App per Client-Credentials verbunden, Modus
       „Probelauf" (würde senden, sendet nichts — Debug-Box).*
-- [ ] **Mail**: `RESEND_API_KEY`, `MAIL_FROM` mit verifizierter Domain,
-      `REGISTRIERUNG_MAIL`. *Stand 2026-10-01: Wächter „unbekannt" — nicht
-      eingerichtet.* `MAIL_FROM` auf eine anvil.gg-Adresse (Resend-Domain
-      verifizieren), sonst sehen Kunden — auch beim Reparaturformular im
-      Shop — einen fremden Absender.
+- [ ] **Mail**: `RESEND_API_KEY`, `MAIL_FROM` mit verifizierter Domain
+      (Shop-Domain anvil.gg — Kunden bekommen die Reparatur-Bestätigung von
+      dieser Adresse), `REGISTRIERUNG_MAIL`. *Stand 2026-10-01: Wächter
+      „unbekannt" — nicht eingerichtet.* Ohne anvil.gg-Absender sehen
+      Kunden einen fremden Absender; `MAIL_FROM` gilt für alle Mails (auch
+      an Lieferanten).
 - [x] **KI** (optional): `ANTHROPIC_API_KEY`; `OPENAI_API_KEY` nur, wenn
       das Diktat gebraucht wird. *Stand 2026-10-01: KI und Sprache grün.*
 - [ ] `INSTANZ_REGION="EU-Central · Frankfurt"` für die Anzeige.
@@ -164,15 +165,22 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       prüfen.*
 - [ ] Ein Retourenlabel erzeugen und die Mail beim Kunden-Testkonto
       prüfen.
-- [ ] Reparaturanfrage: Link im Shop und auf der Website auf
-      `https://<erp>/service/reparatur` setzen (Link, kein iframe —
-      X-Frame-Options DENY); `REPARATUR_MAIL` auf den Service-Posteingang;
-      *Stand 2026-10-01: in Arbeit — das Formular kommt in den Shop
-      (Shopify App Proxy unter anvil.gg/apps/reparatur, ohne Spur zum ERP);
-      dann entfällt der Link auf die ERP-Domain.*
-      Testanfrage abschicken, im ERP annehmen, Retourenlabel mit RMA-Nummer
-      im Geschäftskundenportal sichtbar; Rückversand-Label aus einer
-      Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
+- [ ] Reparaturanfrage **im Shop** (App Proxy,
+      [website.md „Im Shop (App Proxy)"](website.md)): App-Version mit
+      `write_app_proxy` und App Proxy `apps`/`reparatur` →
+      `https://<erp-domain>/api/shopify/proxy` releasen, Berechtigung im
+      Shop-Admin bestätigen; `/api/shopify/proxy` von der Deployment
+      Protection ausnehmen; URL-Weiterleitung `/reparatur` →
+      `/apps/reparatur` und Menüpunkt im Shop;
+      `REPARATUR_SHOP_URL=https://anvil.gg/apps/reparatur` (alte Links auf
+      `/service/reparatur` landen im Shop); `MAIL_FROM` mit anvil.gg-Absender
+      (Resend-Domain verifiziert); `REPARATUR_MAIL` auf den
+      Service-Posteingang. Testen: abgemeldet und angemeldet je eine Anfrage
+      (Vorbelegung, Bestellnummern), `curl -sI https://anvil.gg/apps/reparatur`
+      ohne verräterische Header, im ERP annehmen, Retourenlabel mit
+      RMA-Nummer im Geschäftskundenportal sichtbar; Rückversand-Label aus
+      einer Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
+      *Stand 2026-10-01: im Code fertig (KRNL), Shopify-Schritte offen.*
 - [x] Druckbrücke einrichten
       ([module/versand.md „Druckbrücke"](module/versand.md)): unter
       Einstellungen → Arbeitsplätze & Drucker Packtische, Montagetische,

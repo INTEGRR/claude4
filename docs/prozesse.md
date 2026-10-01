@@ -1383,6 +1383,16 @@ Das öffentliche Formular `/service/reparatur` legt den Vorgang ohne Sitzung
 an (Quelle `kundenformular`, Absender-Hash zur Drosselung) — der zweite
 sanktionierte Schreibweg neben der Registrierung.
 
+**Seit 2026-10-01 auch im Shop:** dasselbe Formular unter
+`https://<shop>/apps/reparatur` über den Shopify App Proxy (Route
+`/api/shopify/proxy`, Signatur mit dem Client Secret, Antwort als Liquid im
+Theme, Quelle `shop`). Beide Kanäle rufen denselben Eingang
+`reparaturanfrageAufnehmen` (`modules/reparatur/anfrage-eingang.ts`) — die
+Ausnahme vom Torwächter bleibt ein Codepfad; danach läuft alles wie oben
+über die Registry. Dubletten (gleiche E-Mail und Beschreibung binnen
+10 Minuten) bekommen die Nummer der ersten Anfrage. Entscheidungslog
+2026-10-01, Einrichtung in [website.md](website.md).
+
 **Prozess `reparatur` v2** (per `prozess_version_kopieren`, v1 archiviert):
 neue Schritte `retourenlabel` (`reparatur.retourenlabel_senden` →
 `awaiting_device`, optional), `eingang` (`reparatur.geraet_eingegangen` →

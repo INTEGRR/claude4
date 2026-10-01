@@ -9,6 +9,86 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Reparaturformular im Shop über den Shopify App Proxy
+
+**Anlass:** Betreiber: Das öffentliche Reparaturformular
+(`/service/reparatur` auf der Vercel-Domain) soll im Shop auf anvil.gg
+laufen. Kunden sollen die Vercel-Domain nicht benutzen, und es soll nicht
+nachvollziehbar sein, dass ein ERP dahinter steht.
+
+**Entschieden:** Shopify **App Proxy**. `https://anvil.gg/apps/reparatur`
+wird von Shopify serverseitig an `/api/shopify/proxy` weitergeleitet (Query
+mit `shop`, `logged_in_customer_id`, `path_prefix`, `timestamp`,
+`signature`); die Antwort mit `Content-Type: application/liquid` rendert
+Shopify im Theme. Einzelheiten:
+
+- **Signatur ist die Zugangskontrolle**: HMAC-SHA256 mit dem Client Secret
+  der Dev-Dashboard-App (dasselbe Secret wie für Webhooks und Token —
+  keine neue Variable), konstante Vergleichszeit, Zeitfenster 90 Sekunden
+  (wie Shopifys eigene Bibliothek), `shop` muss der eigene sein. Ohne
+  Schlüssel wird abgewiesen; im Fake-Betrieb gilt ein fester
+  Attrappen-Schlüssel statt einer übersprungenen Prüfung. Shopifys drei
+  abgedruckte Beispielsignaturen (Secret „hush") rechnet der Test exakt
+  nach.
+- **Ein Codepfad, zwei Kanäle**: Die Eingangslogik der Route
+  `/api/reparaturanfrage` zieht nach `modules/reparatur/anfrage-eingang.ts`
+  (`reparaturanfrageAufnehmen`); Website-Route und Proxy-Route rufen nur
+  noch sie. Die Ausnahme vom Torwächter (2026-09-19) bleibt damit eine
+  Stelle — kein vorgetäuschter Nutzer, keine Registry-Aktion. Ein Wächter
+  hält die Liste der Aufrufer und der Orte, die Vorgänge anlegen, geschlossen.
+- **Kanal als `vorgaenge.quelle = 'shop'`**, nicht als `zusatz.kanal`: der
+  `zusatz` zeigt in der Vorgangsmaske jeden Schlüssel ohne Felddefinition
+  als „Feld wurde entfernt" (dieselbe Begründung wie beim `absender_hash`
+  2026-09-19). Die Spalte ist Freitext, keine Migration; das
+  Tabelleninventar (`schema-doku.ts`) nennt den neuen Wert, am Vorgang
+  steht das Badge „Shop-Formular".
+- **Drossel ohne IP**: Shopify ruft serverseitig, Vercel überschreibt
+  `X-Forwarded-For` — ein IP-Hash zählte Shopifys Egress-Adressen und
+  sperrte nach fünf Anfragen den ganzen Shop. Schlüssel ist der Hash aus
+  `shop:` + angemeldetem Kunden, sonst E-Mail; Grenze wie bisher 5 in 10
+  Minuten.
+- **Dubletten** (gleiche E-Mail und Fehlerbeschreibung binnen 10 Minuten)
+  bekommen die Nummer der ersten Anfrage — für beide Kanäle, weil ohne
+  JavaScript und ohne Post-Redirect-Get (Shopify folgt Redirects selbst)
+  ein Doppelklick oder Neuladen sonst zwei Vorgänge erzeugte. Gleichzeitige
+  Requests serialisiert ein Advisory-Lock je E-Mail; Insert, Audit und
+  Outbox-Job laufen in einer Transaktion.
+- **Seiten selbsttragend und Liquid-sicher**: Inline-Stil auf den
+  Theme-Variablen, keine Assets oder URLs unseres Hosts, kein Systemname;
+  jeder Wert HTML-escaped und `{ } %` als Entitäten, damit Kundeneingaben
+  nie als Liquid ausgewertet werden. Bedienbar ohne JavaScript.
+- **Vorbelegung** angemeldeter Kunden nur aus `partners.shopify_customer_id`
+  (kein Admin-API-Aufruf, kein neuer Scope außer `write_app_proxy`), dazu
+  die letzten fünf Bestellnummern. Der Vorgang bekommt keinen Partner —
+  die Zuordnung bleibt Sache der Annahme (schmaler Schreibweg).
+- **Service-Hinweis nach der Antwort** (`after()`), damit Shopify und Kunde
+  nicht auf den Mailversand warten.
+- **`REPARATUR_SHOP_URL`** (optional) lässt `/service/reparatur` mit 308 in
+  den Shop umleiten; ohne Variable bleibt alles wie bisher.
+
+**Verworfen:**
+- **iframe** der Vercel-Seite im Shop: `X-Frame-Options: DENY` verbietet
+  es (bewusst, Clickjacking), und die Vercel-Domain stünde im Quelltext —
+  genau die Nachvollziehbarkeit, die vermieden werden soll.
+- **Theme App Extension** (App-Block im Theme-Editor): sauberer für den
+  Händler, braucht aber eine eigene Extension mit Build und Deploy über die
+  Shopify CLI; die Daten müssten trotzdem über einen App Proxy kommen.
+  Spätere Ausbaustufe, wenn das Formular frei platzierbar sein soll.
+- **Shopify Forms / Kontaktformular**: landet als Mail bzw. in Shopify,
+  nicht als Vorgang mit Prüfregeln, Drossel und Outbox-Bestätigung — der
+  Prozess `reparatur_anfrage` bekäme seinen Eingang über einen
+  Medienbruch.
+
+Umgesetzt in `src/app/api/shopify/proxy/[[...pfad]]/route.ts`,
+`src/modules/integrationen/shopify-proxy.ts`,
+`src/modules/reparatur/anfrage-eingang.ts`,
+`src/modules/reparatur/shop-seiten.ts`, `scripts/shop-proxy-url.ts`;
+dokumentiert in [website.md](website.md) („Im Shop (App Proxy)", mit
+Betreiberschritten), [vercel-supabase.md](vercel-supabase.md)
+(Deployment-Protection-Ausnahme), [go-live.md](go-live.md); Tests
+`tests/shop-proxy.test.ts`, `tests/prozesse/shop-reparatur.test.ts`,
+Wächter in `tests/reparatur-anfrage.test.ts`.
+
 ## 2026-10-01 — Konten löschen
 
 **Anlass:** Betreiber: „Ich kann Konten nicht löschen" — das Seed-Konto

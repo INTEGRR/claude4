@@ -18,9 +18,14 @@ Kundengerät selbst wird **nie** als Bestand gebucht — es gehört dem Kunden.
 
 1. **Reparaturanfrage** — Vorgang `reparatur_anfrage`, Bereich Reparatur,
    Menüpunkt „Reparaturanfrage" unter Service.
-   - Eingang über das öffentliche Formular `/service/reparatur` (Kontakt,
-     Adresse, Fehlerbeschreibung, Bestellnummer optional; Quelle
-     `kundenformular`) oder intern über „Anfrage erfassen" (Telefon).
+   - Eingang über das öffentliche Formular (Kontakt, Adresse,
+     Fehlerbeschreibung, Bestellnummer optional) — im Shop unter
+     `/apps/reparatur` (App Proxy, Quelle `shop`, angemeldete Kunden
+     vorbelegt) oder auf `/service/reparatur` (Quelle `kundenformular`;
+     leitet mit `REPARATUR_SHOP_URL` in den Shop um) — oder intern über
+     „Anfrage erfassen" (Telefon). Beide Formulare schreiben über denselben
+     Eingang (`modules/reparatur/anfrage-eingang.ts`, Begründung und
+     Einrichtung in [website.md](../website.md)).
    - Der Kunde bekommt eine Eingangsbestätigung mit Vorgangsnummer (Outbox-
      Job `send_repair_request_email`), der Service eine Hinweis-Mail.
    - Schritte: Anfrage erfassen → (Rückfrage beim Kunden, optional) →

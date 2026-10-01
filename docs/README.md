@@ -13,7 +13,8 @@ der [AGENTS.md](../AGENTS.md).
 - [vercel-supabase.md](vercel-supabase.md) — Deployment auf Vercel +
   Supabase, so läuft die Prod-Instanz.
 - [website.md](website.md) — die öffentliche Startseite vor dem Login,
-  das Registrierungsformular und der einzige Schreibweg ohne Sitzung;
+  das Registrierungsformular, die Reparaturanfrage (auf der Website und
+  im Shop über den Shopify App Proxy) und die Schreibwege ohne Sitzung;
   dazu die Liste offener Platzhalter vor dem Livegang.
 
 ## Für Entwickler

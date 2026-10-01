@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import {
+  ANFRAGE_BESCHRIFTUNG as B,
+  ANFRAGE_LAENDER,
+  ANFRAGE_PLATZHALTER,
   type AnfrageFeld,
   normalisiereAnfrage,
   pruefeAnfrage,
@@ -101,7 +104,7 @@ export function Anfrageformular() {
     <form className="formular" onSubmit={(e) => void absenden(e)} noValidate>
       <div className="paar">
         <div className="feld">
-          <label htmlFor="ra-name">Name *</label>
+          <label htmlFor="ra-name">{B.kontakt_name} *</label>
           <input
             id="ra-name"
             value={werte.kontakt_name}
@@ -111,7 +114,7 @@ export function Anfrageformular() {
           {fehler.kontakt_name && <span className="fehler">{fehler.kontakt_name}</span>}
         </div>
         <div className="feld">
-          <label htmlFor="ra-mail">E-Mail *</label>
+          <label htmlFor="ra-mail">{B.email} *</label>
           <input
             id="ra-mail"
             type="email"
@@ -125,7 +128,7 @@ export function Anfrageformular() {
 
       <div className="paar">
         <div className="feld">
-          <label htmlFor="ra-tel">Telefon</label>
+          <label htmlFor="ra-tel">{B.telefon}</label>
           <input
             id="ra-tel"
             value={werte.telefon}
@@ -134,19 +137,19 @@ export function Anfrageformular() {
           />
         </div>
         <div className="feld">
-          <label htmlFor="ra-bestellung">Bestellnummer (optional)</label>
+          <label htmlFor="ra-bestellung">{B.bestellnummer} (optional)</label>
           <input
             id="ra-bestellung"
             value={werte.bestellnummer}
             onChange={(e) => aendern('bestellnummer', e.target.value)}
-            placeholder="z. B. #1042"
+            placeholder={ANFRAGE_PLATZHALTER.bestellnummer}
           />
         </div>
       </div>
 
       <div className="paar">
         <div className="feld">
-          <label htmlFor="ra-strasse">Straße *</label>
+          <label htmlFor="ra-strasse">{B.strasse} *</label>
           <input
             id="ra-strasse"
             value={werte.strasse}
@@ -156,7 +159,7 @@ export function Anfrageformular() {
           {fehler.strasse && <span className="fehler">{fehler.strasse}</span>}
         </div>
         <div className="feld">
-          <label htmlFor="ra-hausnummer">Hausnummer *</label>
+          <label htmlFor="ra-hausnummer">{B.hausnummer} *</label>
           <input
             id="ra-hausnummer"
             value={werte.hausnummer}
@@ -168,7 +171,7 @@ export function Anfrageformular() {
 
       <div className="paar">
         <div className="feld">
-          <label htmlFor="ra-plz">PLZ *</label>
+          <label htmlFor="ra-plz">{B.plz} *</label>
           <input
             id="ra-plz"
             value={werte.plz}
@@ -178,7 +181,7 @@ export function Anfrageformular() {
           {fehler.plz && <span className="fehler">{fehler.plz}</span>}
         </div>
         <div className="feld">
-          <label htmlFor="ra-ort">Ort *</label>
+          <label htmlFor="ra-ort">{B.ort} *</label>
           <input
             id="ra-ort"
             value={werte.ort}
@@ -190,27 +193,22 @@ export function Anfrageformular() {
       </div>
 
       <div className="feld">
-        <label htmlFor="ra-land">Land *</label>
+        <label htmlFor="ra-land">{B.land} *</label>
         <select id="ra-land" value={werte.land} onChange={(e) => aendern('land', e.target.value)}>
-          <option value="DE">Deutschland</option>
-          <option value="AT">Österreich</option>
-          <option value="CH">Schweiz</option>
-          <option value="NL">Niederlande</option>
-          <option value="BE">Belgien</option>
-          <option value="FR">Frankreich</option>
-          <option value="DK">Dänemark</option>
-          <option value="PL">Polen</option>
+          {ANFRAGE_LAENDER.map((l) => (
+            <option key={l.code} value={l.code}>{l.name}</option>
+          ))}
         </select>
         {fehler.land && <span className="fehler">{fehler.land}</span>}
       </div>
 
       <div className="feld">
-        <label htmlFor="ra-fehler">Was funktioniert nicht? *</label>
+        <label htmlFor="ra-fehler">{B.fehlerbeschreibung} *</label>
         <textarea
           id="ra-fehler"
           value={werte.fehlerbeschreibung}
           onChange={(e) => aendern('fehlerbeschreibung', e.target.value)}
-          placeholder="z. B. „Die Leertaste prellt — jeder zweite Anschlag kommt doppelt. Seit etwa zwei Wochen."
+          placeholder={ANFRAGE_PLATZHALTER.fehlerbeschreibung}
         />
         {fehler.fehlerbeschreibung && <span className="fehler">{fehler.fehlerbeschreibung}</span>}
       </div>

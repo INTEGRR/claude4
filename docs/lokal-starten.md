@@ -502,7 +502,9 @@ Apps nicht mehr):
    ältere Bestellungen über den CSV-Export, Integrationen → Historie aus Shopify),
    `write_orders`, `read_customers`, `read_products`,
    `write_merchant_managed_fulfillment_orders`, `read_inventory`,
-   `write_inventory`, `read_locations`.
+   `write_inventory`, `read_locations` — und `write_app_proxy`, wenn das
+   Reparaturformular im Shop laufen soll ([website.md](website.md),
+   „Im Shop (App Proxy)"; lokal: `scripts/shop-proxy-url.ts`).
 2. App im eigenen Shop **installieren**.
 3. **Settings → Credentials**: Client ID und Secret kopieren.
 

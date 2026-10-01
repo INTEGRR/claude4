@@ -1,8 +1,9 @@
 /**
  * Reparaturanfrage aus dem Kundenformular — die Prüfregeln, pur.
  *
- * Eine Quelle für Formular (Browser), API-Route (Server) und den Executor,
- * der die Anfrage annimmt: kein Datenbank-, kein Next-Import, damit das
+ * Eine Quelle für Formular (Browser), API-Route (Server), das Formular im
+ * Shop (App Proxy, modules/reparatur/) und den Executor, der die Anfrage
+ * annimmt: kein Datenbank-, kein Next-Import, damit das
  * Modul unter blankem Node testbar bleibt (Muster shared/registrierung.ts).
  *
  * Die Feldnamen sind zugleich die feld_definitionen des Prozesses
@@ -41,7 +42,8 @@ export const LAENGEN: Record<AnfrageFeld, number> = {
   bestellnummer: 60,
 }
 
-const PFLICHT: AnfrageFeld[] = [
+/** Pflichtfelder — dieselben im Formular (Website und Shop), in der Route und bei der Annahme. */
+export const ANFRAGE_PFLICHT: readonly AnfrageFeld[] = [
   'kontakt_name',
   'email',
   'strasse',
@@ -51,6 +53,46 @@ const PFLICHT: AnfrageFeld[] = [
   'land',
   'fehlerbeschreibung',
 ]
+
+/**
+ * Beschriftungen für Kunden — eine Quelle für das Formular auf der Website
+ * (service/reparatur/anfrageformular.tsx) und das im Shop
+ * (modules/reparatur/shop-seiten.ts). Bewusst nicht die Labels der
+ * feld_definitionen: die sind für Mitarbeiter („Land (ISO-2)").
+ */
+export const ANFRAGE_BESCHRIFTUNG: Record<AnfrageFeld, string> = {
+  kontakt_name: 'Name',
+  email: 'E-Mail',
+  telefon: 'Telefon',
+  strasse: 'Straße',
+  hausnummer: 'Hausnummer',
+  plz: 'PLZ',
+  ort: 'Ort',
+  land: 'Land',
+  fehlerbeschreibung: 'Was funktioniert nicht?',
+  bestellnummer: 'Bestellnummer',
+}
+
+export const ANFRAGE_PLATZHALTER: Partial<Record<AnfrageFeld, string>> = {
+  bestellnummer: 'z. B. #1042',
+  fehlerbeschreibung:
+    'z. B. „Die Leertaste prellt — jeder zweite Anschlag kommt doppelt. Seit etwa zwei Wochen."',
+}
+
+/** Länderauswahl beider Formulare (ISO-2-Code und Anzeigename). */
+export const ANFRAGE_LAENDER: readonly { code: string; name: string }[] = [
+  { code: 'DE', name: 'Deutschland' },
+  { code: 'AT', name: 'Österreich' },
+  { code: 'CH', name: 'Schweiz' },
+  { code: 'NL', name: 'Niederlande' },
+  { code: 'BE', name: 'Belgien' },
+  { code: 'FR', name: 'Frankreich' },
+  { code: 'DK', name: 'Dänemark' },
+  { code: 'PL', name: 'Polen' },
+]
+
+/** Mindestlänge der Fehlerbeschreibung — Prüfregel unten, im Shop zusätzlich als minlength. */
+export const FEHLERBESCHREIBUNG_MIN = 10
 
 const LAND_MUSTER = /^[A-Z]{2}$/
 
@@ -72,12 +114,12 @@ export function normalisiereAnfrage(roh: Record<string, unknown>): Anfrage {
 /** Feldfehler in Klartext — leer heißt: alles in Ordnung. */
 export function pruefeAnfrage(daten: Anfrage): Partial<Record<AnfrageFeld, string>> {
   const fehler: Partial<Record<AnfrageFeld, string>> = {}
-  for (const feld of PFLICHT) {
+  for (const feld of ANFRAGE_PFLICHT) {
     if (!daten[feld]) fehler[feld] = 'Bitte ausfüllen'
   }
   if (daten.email && !EMAIL_MUSTER.test(daten.email)) fehler.email = 'Bitte eine gültige E-Mail-Adresse angeben'
   if (daten.land && !LAND_MUSTER.test(daten.land)) fehler.land = 'Land als zweistelliger ISO-Code (z. B. DE)'
-  if (daten.fehlerbeschreibung && daten.fehlerbeschreibung.length < 10) {
+  if (daten.fehlerbeschreibung && daten.fehlerbeschreibung.length < FEHLERBESCHREIBUNG_MIN) {
     fehler.fehlerbeschreibung = 'Bitte kurz beschreiben, was nicht funktioniert'
   }
   return fehler

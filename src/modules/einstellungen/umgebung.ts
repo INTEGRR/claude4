@@ -35,6 +35,11 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
       { name: 'SHOPIFY_CLIENT_SECRET', pflicht: true, zweck: 'dazu; das ERP holt und erneuert das Access Token selbst' },
       { name: 'SHOPIFY_WEBHOOK_SECRET', pflicht: false, zweck: 'nur für Webhooks, die über die Shopify-Admin-Seite angelegt wurden' },
       { name: 'SHOPIFY_ADMIN_TOKEN', pflicht: false, zweck: 'nur Alt-Apps mit statischem Token (statt Client ID/Secret)' },
+      {
+        name: 'REPARATUR_SHOP_URL',
+        pflicht: false,
+        zweck: 'Reparaturformular im Shop (App Proxy), z. B. https://anvil.gg/apps/reparatur — /service/reparatur leitet dann dorthin um',
+      },
     ],
   },
   {
