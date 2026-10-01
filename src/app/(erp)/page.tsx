@@ -55,6 +55,7 @@ export default async function Dashboard({
       kuendigungen: number
       zahlungen_faellig: number
       unterdeckung: number
+      reparaturen_erwartet: number
       reparaturen_arbeit: number
       reparaturen_fertig: number
       mos_offen: number
@@ -89,11 +90,13 @@ export default async function Dashboard({
       (select count(*) from vertraege v where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
       (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig,
       coalesce((select fremdkapitalbedarf from finanz_unterdeckung('base')), 0) as unterdeckung,
-      -- Reparaturen: offen (neu — Retourenlabel/Annahme —, Gerät unterwegs, da,
-      -- bestätigt, in Reparatur) und fertig zum Rückversand. Wie der Zähler in
-      -- der Navigation, nur ohne die fertigen (eigene Karte).
+      -- Reparaturen nach Lage: erwartet (angenommen, Gerät noch nicht da —
+      -- „neu" und „wartet auf Gerät"), in Arbeit (Gerät da, bestätigt, in
+      -- Reparatur), fertig zum Rückversand. Zusammen = Zähler der Navigation.
       (select count(*) from repair_orders
-        where state not in ('repaired', 'shipped', 'cancel'))::int as reparaturen_arbeit,
+        where state in ('new', 'awaiting_device'))::int as reparaturen_erwartet,
+      (select count(*) from repair_orders
+        where state in ('received', 'confirmed', 'under_repair'))::int as reparaturen_arbeit,
       (select count(*) from repair_orders where state = 'repaired')::int as reparaturen_fertig,
       -- Fertigung: offene Aufträge und die, deren Termin heute oder früher ist.
       (select count(*) from manufacturing_orders
@@ -135,8 +138,11 @@ export default async function Dashboard({
   // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
   const aufgaben: { label: string; wert: number; anzeige?: string; href: string; warn?: boolean; wichtig?: boolean }[] = [
     ...vorgangsKarten,
+    ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_erwartet > 0
+      ? [{ label: 'Reparaturen erwartet', wert: s.reparaturen_erwartet, href: '/reparatur' }]
+      : []),
     ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_arbeit > 0
-      ? [{ label: 'Reparaturen offen', wert: s.reparaturen_arbeit, href: '/reparatur' }]
+      ? [{ label: 'Reparaturen in Arbeit', wert: s.reparaturen_arbeit, href: '/reparatur' }]
       : []),
     ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_fertig > 0
       ? [{ label: 'Reparaturen fertig zum Rückversand', wert: s.reparaturen_fertig, href: '/reparatur' }]
