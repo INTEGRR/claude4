@@ -261,6 +261,7 @@ export const AUSFUEHRUNG = {
   'versand.label_stornieren': versand.labelStornieren,
   'versand.tracking_aktualisieren': versand.trackingAktualisieren,
   'versand.massendruck': versand.massendruck,
+  'versand.gelabelte_ausbuchen': versand.gelabelteAusbuchen,
   'versand.packzettel_drucken': versand.packzettelDrucken,
   'versand.retourenlabel_erstellen': versand.retourenlabelErstellen,
   'versand.kartonage_speichern': versand.kartonageSpeichern,

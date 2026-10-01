@@ -6,8 +6,9 @@ import { Badge, Card, Empty, PageHeader, TableWrap, Zustand } from '@/components
 import { dateTime, qty } from '@/modules/shared/format'
 import { dhlConfigured, productForCountry } from '@/modules/versand/dhl'
 import { sammelMarken } from '@/modules/versand/kommissionieren'
+import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
-import { cancelLabel, createLabel, massLabels, refreshTracking } from './actions'
+import { cancelLabel, createLabel, gelabelteAusbuchen, massLabels, refreshTracking } from './actions'
 import { AuswahlAlle, AuswahlBereich, AuswahlBox, PackzettelLeiste } from './packzettel-auswahl'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,10 @@ export default async function VersandPage({
     select count(*)::int as wartend
     from stock_pickings p join operation_types ot on ot.id = p.operation_type_id
     where ot.kind = 'delivery' and p.state in ('waiting', 'confirmed')`
+  // Label da, Ware nicht ausgebucht (Entscheidungslog 2026-10-01): aus der
+  // Zeit, als Ausbuchen ein Haken war, oder bewusst „nur Label".
+  const gelabelt = await gelabeltNichtAusgebucht()
+  const gelabeltIds = new Set(gelabelt.map((g) => g.picking_id))
 
   const shipments = await sql<
     {
@@ -59,6 +64,7 @@ export default async function VersandPage({
       customer: string | null
       shopify_fulfillment_id: string | null
       last_event: { description?: string } | null
+      ersatz_moeglich: boolean
     }[]
   >`
     select s.id, s.shipment_number, s.state, s.tracking_url, s.dhl_product,
@@ -66,7 +72,14 @@ export default async function VersandPage({
            s.created_at, p.number as picking_number, p.id as picking_id,
            r.id as repair_id, r.number as repair_number,
            coalesce(part.name, rpart.name) as customer, s.shopify_fulfillment_id,
-           s.last_tracking_event as last_event
+           s.last_tracking_event as last_event,
+           -- Ersatz-Label (2026-10-01): jüngste stornierte Sendung einer
+           -- ausgebuchten Lieferung, die keine gültige Sendung mehr hat.
+           (s.state = 'cancelled' and p.state = 'done'
+            and not exists (select 1 from shipments x
+                            where x.picking_id = s.picking_id
+                              and (x.state not in ('cancelled', 'failure') or x.created_at > s.created_at))
+           ) as ersatz_moeglich
     from shipments s
     -- Eine Sendung gehört zu einer Lieferung ODER zu einer Reparatur (0081).
     left join stock_pickings p on p.id = s.picking_id
@@ -103,6 +116,23 @@ export default async function VersandPage({
         <div className="notice warn">
           DHL ist noch nicht konfiguriert. Hinterlege API-Key, GKP-Zugangsdaten und Abrechnungsnummer
           als Umgebungsvariablen (siehe <code className="mono">.env.example</code>), dann lassen sich hier Labels erzeugen.
+        </div>
+      )}
+
+      {gelabelt.length > 0 && (
+        <div className="notice warn">
+          <ActionForm action={gelabelteAusbuchen}>
+            <div className="row" style={{ alignItems: 'center', gap: 12 }}>
+              <div>
+                {gelabelt.length} Lieferung(en) haben ein Label, sind aber noch nicht ausgebucht — Lager
+                und Shopify wissen nichts vom Versand ({gelabelt.slice(0, 5).map((g) => g.picking_number).join(', ')}
+                {gelabelt.length > 5 ? ' …' : ''}).
+              </div>
+              <div className="shrink">
+                <button className="primary small" type="submit">Alle ausbuchen</button>
+              </div>
+            </div>
+          </ActionForm>
         </div>
       )}
 
@@ -231,17 +261,31 @@ export default async function VersandPage({
                     </td>
                     <td>
                       {Number(r.shipment_count) > 0 ? (
-                        // Direkt zum PDF — die Route löst die jüngste Sendung
-                        // dieser Lieferung mit Label auf.
-                        <a
-                          className="badge success"
-                          href={`/api/label/lieferung/${r.picking_id}`}
-                          target="_blank"
-                          rel="noopener"
-                          title="Label-PDF öffnen"
-                        >
-                          Label öffnen
-                        </a>
+                        <div className="actions" style={{ gap: 6 }}>
+                          {/* Direkt zum PDF — die Route löst die jüngste Sendung
+                              dieser Lieferung mit Label auf. */}
+                          <a
+                            className="badge success"
+                            href={`/api/label/lieferung/${r.picking_id}`}
+                            target="_blank"
+                            rel="noopener"
+                            title="Label-PDF öffnen"
+                          >
+                            Label öffnen
+                          </a>
+                          {gelabeltIds.has(r.picking_id) && (
+                            <ActionForm action={gelabelteAusbuchen}>
+                              <input type="hidden" name="ids" value={r.picking_id} />
+                              <button
+                                className="small"
+                                type="submit"
+                                title="Warenausgang buchen, Kartonage verbrauchen, Sendung an Shopify melden"
+                              >
+                                Ausbuchen
+                              </button>
+                            </ActionForm>
+                          )}
+                        </div>
                       ) : (
                         <ActionForm action={createLabel.bind(null, r.picking_id)}>
                           <div className="row" style={{ gap: 6 }}>
@@ -279,10 +323,24 @@ export default async function VersandPage({
                             </div>
                             <div className="shrink">
                               {/* Zeilenaktion bleibt neutral — Orange ist der Kopfzeile vorbehalten. */}
-                              <button className="small" type="submit" disabled={!configured}>
+                              <button
+                                className="small"
+                                type="submit"
+                                disabled={!configured}
+                                title="Label erstellen und ausbuchen: Warenausgang, Kartonage, Shopify-Meldung"
+                              >
                                 Label erstellen
                               </button>
                             </div>
+                            {/* Das Label bucht aus (2026-10-01) — der Haken ist die Ausnahme. */}
+                            <label
+                              className="shrink small muted"
+                              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                              title="Nur das Label drucken — Warenausgang und Shopify-Meldung später über „Ausbuchen“"
+                            >
+                              <input type="checkbox" name="nicht_ausbuchen" />
+                              <span>nur Label</span>
+                            </label>
                           </div>
                           {(vorschlag?.productRegel || vorschlag?.insuredValue || vorschlag?.kartonage) && (
                             <div className="muted small" style={{ marginTop: 4 }}>
@@ -322,9 +380,10 @@ export default async function VersandPage({
                     Massendruck: {Math.min(ready.filter((r) => Number(r.shipment_count) === 0).length, 25)} Labels nach Regeln
                   </button>
                 </div>
+                {/* Jedes Label bucht aus (2026-10-01) — der Haken ist die Ausnahme. */}
                 <label className="shrink" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="checkbox" name="ausbuchen" />
-                  <span>nach dem Druck direkt ausbuchen (Warenausgang + Shopify-Meldung)</span>
+                  <input type="checkbox" name="nicht_ausbuchen" />
+                  <span>nicht ausbuchen — nur Labels drucken (sonst: Warenausgang + Shopify-Meldung)</span>
                 </label>
               </div>
             </ActionForm>
@@ -388,6 +447,18 @@ export default async function VersandPage({
                           <a className="btn small" href={`/api/label/${s.id}`} target="_blank" rel="noopener">
                             Label
                           </a>
+                        )}
+                        {s.ersatz_moeglich && s.picking_id && (
+                          <ActionForm action={createLabel.bind(null, s.picking_id)}>
+                            <button
+                              className="small"
+                              type="submit"
+                              disabled={!configured}
+                              title="Die Lieferung ist schon ausgebucht — neues Label nach Regel, die neue Sendungsnummer geht an Shopify"
+                            >
+                              Ersatz-Label
+                            </button>
+                          </ActionForm>
                         )}
                         {s.state === 'created' && (
                           <ActionButton

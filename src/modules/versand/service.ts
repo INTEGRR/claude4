@@ -264,7 +264,15 @@ export async function createLabelForPicking(
     where p.id = ${pickingId}`
 
   if (!picking) throw new Error('Lieferung nicht gefunden')
-  if (picking.state === 'done') throw new Error('Die Lieferung ist bereits abgeschlossen')
+  if (picking.state === 'done') {
+    // Das Label bucht aus (2026-10-01) — ein storniertes Label muss sich
+    // trotzdem ersetzen lassen: eine ausgebuchte Lieferung bekommt ein
+    // neues Label nur, wenn ihr letztes storniert wurde.
+    const [storniert] = await sql<{ n: number }[]>`
+      select count(*)::int as n from shipments
+      where picking_id = ${pickingId} and state = 'cancelled'`
+    if (Number(storniert.n) === 0) throw new Error('Die Lieferung ist bereits abgeschlossen')
+  }
   if (picking.state === 'cancel') throw new Error('Die Lieferung ist storniert')
 
   const [open] = await sql<{ count: number }[]>`

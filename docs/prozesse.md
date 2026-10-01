@@ -263,6 +263,10 @@ start → ereignis „Bestellung eingegangen" (shop:bestellung_eingegangen, conf
       → ende
 ```
 
+- **Seit 0103 bucht das Label aus** (Entscheidungslog 2026-10-01): der
+  Label-Schritt erklärt `assigned → done` wie der Packtisch, die Kante
+  Label → Buchen heißt „bucht automatisch mit"; „nur Label" lässt den
+  Buchen-Schritt offen. Neu prozessfrei: `versand.gelabelte_ausbuchen`.
 - **Versand in der Registry** (`versand.*`): label_erstellen (im Prozess),
   massendruck/label_stornieren/tracking_aktualisieren/retourenlabel als
   prozessfreie Werkzeuge; versand/actions.ts sind Dreizeiler um

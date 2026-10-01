@@ -12,18 +12,26 @@ export const VERSAND = {
     bereich: 'versand',
     beschreibung:
       'Erstellt das Versandlabel für eine Lieferung — Produkt und Versicherung nach den ' +
-      'Versandregeln (überschreibbar), Zolldaten bei Drittland automatisch.',
+      'Versandregeln (überschreibbar), Zolldaten bei Drittland automatisch — und bucht sie ' +
+      'aus: Warenausgang, Kartonage, Shop-Rückmeldung mit Sendungsnummer. Nur mit ' +
+      '„nicht ausbuchen" bleibt es beim Label. Eine ausgebuchte Lieferung bekommt nach ' +
+      'einem Storno ein Ersatz-Label (die neue Nummer geht an den Shop).',
     bindung: 'beleg',
     modell: 'stock_picking',
+    // Entscheidungslog 2026-10-01, „Label bucht aus": das Label IST der
+    // Warenausgang — wie beim Packtisch-Abschluss.
+    uebergang: { von: ['assigned'], nach: ['done'] },
     schema: z.object({
       weight_g: z.number().positive().optional().describe('Gewicht überschreiben (Gramm)'),
       dhl_product: z.string().max(20).optional().describe('DHL-Produkt überschreiben'),
+      nicht_ausbuchen: z.boolean().default(false).describe('Nur das Label, nicht ausbuchen'),
     }),
     formdata: (fd) => ({
       weight_g: fd.get('weight_g') ? Number(fd.get('weight_g')) : undefined,
       dhl_product: String(fd.get('dhl_product') ?? '') || undefined,
+      nicht_ausbuchen: fd.get('nicht_ausbuchen') === 'on',
     }),
-    revalidate: ['/versand', '/lager/:id'],
+    revalidate: ['/versand', '/lager', '/lager/:id'],
   },
 
   'versand.packzettel_drucken': {
@@ -107,8 +115,9 @@ export const VERSAND = {
     label: 'Massendruck',
     bereich: 'versand',
     beschreibung:
-      'Labels für alle gefilterten versandbereiten Lieferungen nach Regelvorschlag; ' +
-      'wahlweise direkt ausbuchen (Warenausgang + Shopify-Rückmeldung).',
+      'Labels für alle gefilterten versandbereiten Lieferungen nach Regelvorschlag — jede ' +
+      'wird dabei ausgebucht (Warenausgang + Shopify-Rückmeldung); nur mit „nicht ' +
+      'ausbuchen" bleibt es bei den Labels.',
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
@@ -116,15 +125,36 @@ export const VERSAND = {
       sku: z.string().max(60).default(''),
       land: z.string().max(8).default(''),
       produkt: z.string().max(20).default(''),
-      ausbuchen: z.boolean().default(false).describe('Nach dem Label direkt ausbuchen'),
+      nicht_ausbuchen: z.boolean().default(false).describe('Nur Labels, nicht ausbuchen'),
     }),
     formdata: (fd) => ({
       einzel: fd.get('einzel') === 'on',
       sku: String(fd.get('sku') ?? ''),
       land: String(fd.get('land') ?? ''),
       produkt: String(fd.get('produkt') ?? ''),
-      ausbuchen: fd.get('ausbuchen') === 'on',
+      nicht_ausbuchen: fd.get('nicht_ausbuchen') === 'on',
     }),
+    revalidate: ['/versand', '/lager'],
+  },
+
+  'versand.gelabelte_ausbuchen': {
+    label: 'Gelabelte Lieferungen ausbuchen',
+    bereich: 'versand',
+    beschreibung:
+      'Bucht Lieferungen aus, die schon ein Label haben, aber noch nicht ausgebucht sind ' +
+      '(Warenausgang, Kartonage, Shop-Rückmeldung mit Sendungsnummer) — Labels aus der Zeit, ' +
+      'als Ausbuchen ein Haken war, oder bewusst „nur Label". Ohne Auswahl alle.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      ids: z.array(z.string().uuid()).min(1).max(500).optional().describe('Lieferungen; leer = alle'),
+    }),
+    zusammenfassung: (p) =>
+      p.ids ? `${p.ids.length} gelabelte Lieferung(en) ausbuchen` : 'alle gelabelten Lieferungen ausbuchen',
+    formdata: (fd) => {
+      const ids = fd.getAll('ids').map(String).filter(Boolean)
+      return { ids: ids.length ? ids : undefined }
+    },
     revalidate: ['/versand', '/lager'],
   },
 

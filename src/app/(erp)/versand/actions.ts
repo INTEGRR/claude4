@@ -27,3 +27,7 @@ export async function refreshTracking(): Promise<ActionResult> {
 export async function createReturnLabel(formData: FormData): Promise<ActionResult> {
   return serverAktion('versand.retourenlabel_erstellen', { formData })
 }
+
+export async function gelabelteAusbuchen(formData: FormData): Promise<ActionResult> {
+  return serverAktion('versand.gelabelte_ausbuchen', { formData })
+}

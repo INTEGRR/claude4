@@ -36,7 +36,20 @@ async function protokoll(kind: string, reference: string, response: unknown): Pr
 }
 
 export async function fakeCreateShipment(input: CreateShipmentInput): Promise<CreatedShipment> {
-  const shipmentNumber = nummerAus(input.reference)
+  // Jedes Label bekommt eine neue Nummer wie bei DHL — ein Ersatz-Label nach
+  // Storno (gleiche Referenz) darf nicht mit dem stornierten kollidieren.
+  // Ohne Datenbank (reine Fake-Tests) bleibt es bei der stabilen Nummer.
+  let n = 0
+  try {
+    const { sql } = await import('@/db/client')
+    const [zeile] = await sql<{ n: number }[]>`
+      select count(*)::int as n from api_transactions
+      where system = 'dhl' and kind = 'fake:label_create' and reference = ${input.reference}`
+    n = zeile.n
+  } catch {
+    n = 0
+  }
+  const shipmentNumber = nummerAus(n > 0 ? `${input.reference}#${n}` : input.reference)
   await protokoll('label_create', input.reference, { shipmentNumber, product: input.product })
   return {
     shipmentNumber,

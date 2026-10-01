@@ -11,18 +11,43 @@ Ersetzt Sendcloud vollständig: Unser System erstellt DHL-Versandlabels direkt (
 ```
 Fertigung abgeschlossen (alle MOs des Auftrags done)
   → Lieferung (WH/OUT) wird reserviert und erscheint in „Versandbereit"
-  → Packen: Lieferung öffnen → „DHL-Label erstellen"
+  → Packen: „Label erstellen" (Versandliste, Packtisch oder Massendruck)
       → POST /orders (Parcel DE Shipping API): shipment_number + Label-PDF
       → Label-PDF in Supabase Storage persistieren (DHL hält es nur ~3 Tage vor!)
-      → Label drucken (PDF; ZPL-Thermodruck als Erweiterung)
-  → Lieferung validieren (Warenausgang bucht Bestand aus)
+      → im selben Schritt ausbuchen (0103): Warenausgang bucht Bestand aus,
+        Kartonage wird verbraucht
       → Outbox-Job „shopify_fulfillment_create": fulfillmentCreate mit
         trackingInfo { company: "DHL", number, url } + notifyCustomer: true
         (Shopify verschickt die Versandbestätigung an den Kunden)
+      → Label drucken (Labeldrucker des Arbeitsplatzes, sonst PDF)
   → Tracking-Sync aktualisiert den Sendungsstatus bis „zugestellt"
 ```
 
-Reihenfolge-Entscheidung: Label **vor** Validierung (physisch: Label aufs Paket, dann raus); die Shopify-Rückmeldung hängt an der **Validierung** der Lieferung — das entspricht Sendclouds Verhalten „Rückmeldung bei Label-Erstellung", nur sauberer an unseren Warenausgang gekoppelt.
+**Das Label bucht aus** (Entscheidungslog 2026-10-01, Migration 0103):
+sobald das Label rausgeht, ist die Ware weg — Einzel-Label, Massendruck und
+Packtisch buchen den Warenausgang mit und reihen die Shop-Rückmeldung ein.
+Bis dahin brauchte es einen eigenen Buchen-Schritt bzw. im Massendruck den
+Haken „direkt ausbuchen"; ohne ihn blieb die Ware im Lager und Shopify
+erfuhr nichts. Die Shopify-Rückmeldung hängt weiterhin am **Warenausgang**,
+der jetzt mit dem Label zusammenfällt (wie Sendclouds „Rückmeldung bei
+Label-Erstellung").
+
+- **Ausnahme „nur Label"** (Haken am Einzel-Label bzw. „nicht ausbuchen" im
+  Massendruck): die Lieferung bleibt reserviert, der Buchen-Schritt bleibt
+  angeboten.
+- **Nachholen:** Lieferungen mit Label, die nicht ausgebucht sind, zeigt die
+  Versandseite oben mit „Alle ausbuchen" und je Zeile „Ausbuchen"
+  (`versand.gelabelte_ausbuchen`) — bucht wie direkt nach dem Label.
+- **Ersatz-Label nach Storno:** eine ausgebuchte Lieferung, deren Label
+  storniert wurde, bekommt in der Sendungsliste „Ersatz-Label"; die neue
+  Sendungsnummer geht an Shopify (war schon gemeldet: Tracking-Nachtrag am
+  bestehenden Fulfillment). Ohne Storno bleibt eine ausgebuchte Lieferung
+  gesperrt.
+- Nur reservierte Lieferungen (`assigned`) werden ausgebucht; scheitert die
+  Buchung, bleibt das Label gültig, der Grund steht am Beleg und die
+  Lieferung erscheint unter „Nachholen".
+- Im Shopify-Probelauf steht die Rückmeldung als „Bestellung als versendet
+  melden" in der Debug-Box; im Modus „nur lesen" wird sie übersprungen.
 
 ## Versandregeln (Kleinpaket/Paket-Wahl)
 
@@ -341,10 +366,10 @@ Zielland, DHL-Produkt laut Regel) — „alle Single-Line mit SKU KC-*" ist ein
 Filter plus ein Klick. Der Massendruck erstellt Labels für die gefilterte
 Liste nach Regelvorschlag (bis 25 je Lauf) und druckt sie am Labeldrucker
 des Arbeitsplatzes (im Format dieses Druckers); ohne Drucker liefert er ein
-**Sammel-PDF** über `/api/label/sammel?ids=…`. Auf Wunsch bucht er je Lauf direkt aus
-(Warenausgang + Shopify-Fulfillment); Standard ist „nur Labels", ausgebucht
-wird beim Packen. Fehler einzelner Lieferungen brechen den Lauf nicht ab und
-stehen am jeweiligen Beleg.
+**Sammel-PDF** über `/api/label/sammel?ids=…`. Jede Lieferung wird dabei
+ausgebucht (Warenausgang + Shopify-Fulfillment, 0103); nur mit dem Haken
+„nicht ausbuchen" bleibt es bei den Labels. Fehler einzelner Lieferungen
+brechen den Lauf nicht ab und stehen am jeweiligen Beleg.
 
 ## Zolldaten (Drittland)
 

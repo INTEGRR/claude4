@@ -332,11 +332,10 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
       // Bestätigung (at_confirm) — der Beleg steht danach AUF dem Schritt,
       // der Prozess bietet direkt das Label an. Der Schritt bleibt der Weg
       // für Bestellungen ohne Bestand.
-      pfad: ['bestellung', 'label', 'buchen', 'fulfillment'],
+      // Das Label bucht den Warenausgang mit (0103) — danach direkt die
+      // Shop-Rückmeldung, kein eigener Buchen-Schritt.
+      pfad: ['bestellung', 'label', 'fulfillment'],
       ereignisse: { bestellung: bestellungEinspeisen },
-      eingaben: {
-        buchen: { mengen: {}, lose: {}, backorder: false },
-      },
       pruefen: async (sql, ctx, pickingId) => {
         const [picking] = await sql<{ state: string }[]>`
           select state from stock_pickings where id = ${pickingId}`
@@ -367,6 +366,8 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
     },
     {
       name: 'unbekannte SKU: Klärfall auflösen heilt den Auftrag, dann Versand',
+      // Hier bewusst „nur Label" (0103): der Beleg bleibt reserviert, der
+      // Buchen-Schritt holt Warenausgang und Shop-Rückmeldung nach.
       pfad: ['bestellung', 'klaerung', 'label', 'buchen', 'fulfillment'],
       ereignisse: {
         bestellung: klaerfallProvozieren,
@@ -375,6 +376,7 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
       },
       eingaben: {
         klaerung: (ctx) => ({ variant_id: ctx.klaerArtikelId }),
+        label: { nicht_ausbuchen: true },
         buchen: { mengen: {}, lose: {}, backorder: false },
       },
       pruefen: async (sql, ctx, pickingId) => {
@@ -413,13 +415,10 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
       // 'verfuegbarkeit' fehlt im Pfad: die Fertigmeldung reserviert die
       // Lieferung selbst (mo_produce), der Beleg steht danach schon dort.
       name: 'Produktionsartikel: Fertigungsauftrag entsteht, dann Versand',
-      pfad: ['bestellung', 'fertigen', 'label', 'buchen', 'fulfillment'],
+      pfad: ['bestellung', 'fertigen', 'label', 'fulfillment'],
       ereignisse: {
         bestellung: mtoBestellungEinspeisen,
         fertigen: fertigungBereitstellen,
-      },
-      eingaben: {
-        buchen: { mengen: {}, lose: {}, backorder: false },
       },
       pruefen: async (sql, ctx, pickingId) => {
         const [picking] = await sql<{ state: string }[]>`

@@ -9,13 +9,71 @@ import {
 } from '@/modules/versand/service'
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
+import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Versand-Aktionen — Fachlogik aus versand/actions.ts. */
 
+/**
+ * Was nach dem Label passiert (Entscheidungslog 2026-10-01, „Label bucht
+ * aus"): sobald das Label rausgeht, ist die Ware weg — Warenausgang buchen,
+ * Kartonage verbrauchen, Shop-Rückmeldung einreihen. `nichtAusbuchen` ist
+ * der bewusste Ausnahmefall (nur das Label drucken). Ein Ersatz-Label für
+ * eine schon ausgebuchte Lieferung (nach Storno) meldet nur die neue
+ * Sendungsnummer an den Shop. Scheitert das Buchen, bleibt das Label gültig
+ * und der Grund steht am Beleg — nachholen über „Gelabelte ausbuchen".
+ */
+export async function nachLabelAusbuchen(
+  pickingId: string,
+  shipmentId: string,
+  nichtAusbuchen: boolean,
+): Promise<{ ausgebucht: boolean; hinweis: string | null }> {
+  const [zustand] = await sql<{ state: string }[]>`
+    select state from stock_pickings where id = ${pickingId}`
+
+  if (zustand?.state === 'done') {
+    // Ersatz-Label: schon gemeldet → der Job reicht nur die neue Nummer nach.
+    await sql`
+      update shipments set shopify_fulfillment_id = (
+        select alt.shopify_fulfillment_id from shipments alt
+        where alt.picking_id = ${pickingId} and alt.id <> ${shipmentId}
+          and alt.shopify_fulfillment_id is not null
+        order by alt.created_at desc limit 1)
+      where id = ${shipmentId} and shopify_fulfillment_id is null`
+    await sql`
+      select enqueue_job('shopify_fulfillment_create', ${sql.json({ shipment_id: shipmentId })},
+                         ${`fulfillment:${shipmentId}`})
+      from shipments s join sales_orders so on so.id = s.sales_order_id
+      where s.id = ${shipmentId} and so.shopify_order_id is not null`
+    return { ausgebucht: false, hinweis: 'Lieferung war schon ausgebucht — die neue Sendungsnummer geht an den Shop' }
+  }
+  if (nichtAusbuchen) return { ausgebucht: false, hinweis: 'nicht ausgebucht (nur Label)' }
+  if (zustand?.state !== 'assigned') {
+    return { ausgebucht: false, hinweis: 'nicht ausgebucht — die Lieferung ist noch nicht reserviert' }
+  }
+
+  try {
+    await sql`select picking_validate(${pickingId}, ${sql.json({})}, false)`
+  } catch (err) {
+    const message = (err instanceof Error ? err.message : String(err)).replace(/^error: /, '')
+    await sql`select log_event('stock_picking', ${pickingId}, 'error',
+      ${`Ausbuchen nach dem Label fehlgeschlagen: ${message.slice(0, 300)}`}, 'system')`.catch(() => undefined)
+    return { ausgebucht: false, hinweis: `Ausbuchen fehlgeschlagen: ${message}` }
+  }
+  await consumePackagingForPicking(pickingId).catch(() => undefined)
+  try {
+    await queueFulfillmentForPicking(pickingId)
+  } catch (err) {
+    await sql`select log_event('stock_picking', ${pickingId}, 'error',
+      ${`Shopify-Rückmeldung konnte nicht eingereiht werden: ${err instanceof Error ? err.message : String(err)}`})`
+      .catch(() => undefined)
+  }
+  return { ausgebucht: true, hinweis: null }
+}
+
 export async function labelErstellen(
-  p: { weight_g?: number; dhl_product?: string },
+  p: { weight_g?: number; dhl_product?: string; nicht_ausbuchen: boolean },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const pickingId = ctx.recordId!
@@ -39,14 +97,19 @@ export async function labelErstellen(
       ${`DHL-Label fehlgeschlagen: ${message.slice(0, 300)}`}, 'system')`.catch(() => undefined)
     throw err
   }
+  const buchung = await nachLabelAusbuchen(pickingId, result.shipmentId, p.nicht_ausbuchen)
   const druck = await drucken(
     'versandlabel',
     { art: 'label', shipmentId: result.shipmentId },
     { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
     ziel,
   )
+  const teile = [
+    `Label ${result.shipmentNumber} erstellt (${result.product})`,
+    buchung.ausgebucht ? 'ausgebucht, Shop-Rückmeldung eingereiht' : buchung.hinweis,
+  ].filter(Boolean)
   return {
-    text: `Label ${result.shipmentNumber} erstellt (${result.product}).${druck.gedruckt ? ` ${druck.meldung}` : ''}`,
+    text: `${teile.join(' — ')}.${druck.gedruckt ? ` ${druck.meldung}` : ''}`,
     recordId: result.shipmentId,
     ...(druck.gedruckt ? {} : { link: `/api/label/${result.shipmentId}` }),
   }
@@ -176,7 +239,7 @@ export async function massendruck(
     sku: string
     land: string
     produkt: string
-    ausbuchen: boolean
+    nicht_ausbuchen: boolean
   },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
@@ -194,6 +257,7 @@ export async function massendruck(
   const fehler: string[] = []
   const ziel = await zielDrucker(ctx.arbeitsplatzId, 'versandlabel')
   let meldung: string | null = null
+  let ausgebucht = 0
 
   for (const r of stapel) {
     try {
@@ -208,11 +272,9 @@ export async function massendruck(
         ziel,
       )
       if (druck.gedruckt) meldung = druck.meldung
-      if (p.ausbuchen) {
-        await sql`select picking_validate(${r.picking_id}, ${sql.json({})}, false)`
-        await consumePackagingForPicking(r.picking_id)
-        await queueFulfillmentForPicking(r.picking_id)
-      }
+      const buchung = await nachLabelAusbuchen(r.picking_id, result.shipmentId, p.nicht_ausbuchen)
+      if (buchung.ausgebucht) ausgebucht++
+      else if (!p.nicht_ausbuchen && buchung.hinweis) fehler.push(`${r.picking_number}: ${buchung.hinweis}`)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       fehler.push(`${r.picking_number}: ${message}`)
@@ -224,7 +286,7 @@ export async function massendruck(
   const rest = offen.length - stapel.length
   const teile = [
     `${shipmentIds.length} Label${shipmentIds.length === 1 ? '' : 's'} erstellt`,
-    p.ausbuchen ? 'Lieferungen ausgebucht' : null,
+    p.nicht_ausbuchen ? 'nicht ausgebucht (nur Labels)' : `${ausgebucht} ausgebucht`,
     rest > 0 ? `${rest} weitere warten (Grenze ${MASSENDRUCK_LIMIT} je Lauf)` : null,
     fehler.length ? `${fehler.length} Fehler: ${fehler.slice(0, 3).join(' | ')}` : null,
   ].filter(Boolean)
@@ -233,6 +295,29 @@ export async function massendruck(
   // Über die Brücke gedruckt: kein Sammel-PDF obendrauf (Doppeldruck).
   if (meldung) return { text: `${teile.join(' — ')}. ${meldung}` }
   return { text: teile.join(' — ') + '.', link: `/api/label/sammel?ids=${shipmentIds.join(',')}` }
+}
+
+/**
+ * Nachholen (2026-10-01): Lieferungen mit Label, die nicht ausgebucht sind —
+ * jede wird gebucht wie direkt nach dem Label (Warenausgang, Kartonage,
+ * Shop-Rückmeldung mit der Sendungsnummer des Labels).
+ */
+export async function gelabelteAusbuchen(p: { ids?: string[] }): Promise<AktionsErgebnis> {
+  const offen = await gelabeltNichtAusgebucht(p.ids)
+  if (offen.length === 0) throw new Error('Keine Lieferung mit Label, die noch nicht ausgebucht ist.')
+  let ausgebucht = 0
+  const fehler: string[] = []
+  for (const r of offen) {
+    const buchung = await nachLabelAusbuchen(r.picking_id, r.shipment_id, false)
+    if (buchung.ausgebucht) ausgebucht++
+    else fehler.push(`${r.picking_number}: ${buchung.hinweis}`)
+  }
+  const teile = [
+    `${ausgebucht} Lieferung${ausgebucht === 1 ? '' : 'en'} ausgebucht, Shop-Rückmeldung eingereiht`,
+    fehler.length ? `${fehler.length} nicht: ${fehler.slice(0, 3).join(' | ')}` : null,
+  ].filter(Boolean)
+  if (ausgebucht === 0) throw new Error(teile.join(' — '))
+  return { text: `${teile.join(' — ')}.`, daten: { ausgebucht, fehler: fehler.length } }
 }
 
 /**

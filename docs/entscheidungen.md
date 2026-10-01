@@ -9,6 +9,38 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Label bucht aus
+
+**Anlass:** Betreiber: „Sobald das Label rausgeht, sollte immer ausgebucht
+werden — der Haken sollte negativ funktionieren." Das Einzel-Label buchte
+gar nicht aus, der Massendruck nur mit Haken; ohne ihn blieb die Ware im
+Lager und Shopify erfuhr nichts vom Versand.
+
+**Entschieden:**
+- `versand.label_erstellen` und `versand.massendruck` buchen nach dem Label
+  aus (Warenausgang, Kartonage, Shop-Rückmeldung) — wie der Packtisch. Der
+  Haken ist die Ausnahme: „nur Label" bzw. „nicht ausbuchen".
+- Ausgebucht wird nur eine reservierte Lieferung; scheitert die Buchung,
+  bleibt das Label gültig und der Grund steht am Beleg — kein Rollback
+  eines bei DHL schon erzeugten Labels.
+- Neue Aktion `versand.gelabelte_ausbuchen` holt Lieferungen mit Label ohne
+  Ausbuchung nach (Altbestand aus der Haken-Zeit, bewusst „nur Label").
+- Ersatz-Label nach Storno auch für ausgebuchte Lieferungen; die neue
+  Nummer geht als Tracking-Nachtrag an das bestehende Fulfillment. Sonst
+  hätte das automatische Ausbuchen den Weg „falsches Label → stornieren →
+  neu" verbaut.
+- Prozess: neue Version von `shopify_bestellung_versand`, die Kante
+  Label → Buchen heißt „bucht automatisch mit" (Muster Packtisch); die
+  Aktion erklärt den Übergang `assigned → done`.
+- Der DHL-Fake vergibt je Label eine neue Nummer (vorher stabil je
+  Referenz — ein Ersatz-Label kollidierte).
+
+Umgesetzt in Migration 0103, `versand-ausfuehren.ts` (`nachLabelAusbuchen`,
+`gelabelteAusbuchen`), `registry/versand.ts`, `versand/gelabelt.ts`,
+`versand/service.ts`, `versand/dhl-fake.ts`, Versandseite; dokumentiert in
+[module/versand.md](module/versand.md); Test
+`tests/prozesse/label-ausbuchen.test.ts`, Fixture `shopify-versand.ts`.
+
 ## 2026-10-01 — Shopify-Probelauf mit Debug-Box
 
 **Anlass:** Betreiber will vor dem Scharfschalten im laufenden Betrieb
