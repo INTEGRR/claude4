@@ -104,9 +104,11 @@ Sitzungen — Seiten und API-Routen brauchen dafür nichts zu wissen.
   totp_letzter_schritt = null where email = '…';` (dann bei Pflicht
   Neu-Einrichtung beim nächsten Login).
 - **Geheimnisse** liegen AES-256-GCM-verschlüsselt in `users.totp_secret`;
-  Schlüssel ist `ZWEIFAKTOR_SCHLUESSEL`, ersatzweise `SESSION_SECRET`. Wer
-  den Schlüssel rotiert, macht alle Einrichtungen unlesbar — dann richten
-  alle neu ein (Admin-Reset je Konto). `backup_codes` und
+  Schlüssel ist `ZWEIFAKTOR_SCHLUESSEL`, ersatzweise `SESSION_SECRET`.
+  Schlüsselwechsel ohne Neueinrichtung: gelesen wird auch mit den alten
+  Schlüsseln (`SESSION_SECRET` nach dem nachträglichen Setzen,
+  `ZWEIFAKTOR_SCHLUESSEL_ALT` nach einer Rotation); beim nächsten gültigen
+  Code wird mit dem aktuellen neu verschlüsselt. `backup_codes` und
   `vertraute_geraete` stehen auf der KI-Sperrliste und überleben
   „Betriebsdaten löschen".
 - **Verlauf**: Anmeldungen (Methode, vertrautes Gerät), Backup-Code-Nutzung,

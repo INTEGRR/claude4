@@ -118,7 +118,8 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
     variablen: [
       { name: 'CRON_SECRET', pflicht: true, zweck: 'ohne Wert läuft auf Vercel kein einziger Cron' },
       { name: 'SESSION_SECRET', pflicht: true, zweck: 'Salz für Drossel und Backup-Codes' },
-      { name: 'ZWEIFAKTOR_SCHLUESSEL', pflicht: false, zweck: 'Schlüssel der TOTP-Geheimnisse (sonst SESSION_SECRET)' },
+      { name: 'ZWEIFAKTOR_SCHLUESSEL', pflicht: false, zweck: 'Schlüssel der TOTP-Geheimnisse (sonst SESSION_SECRET) — nachträglich setzen ist gefahrlos' },
+      { name: 'ZWEIFAKTOR_SCHLUESSEL_ALT', pflicht: false, zweck: 'nur nach einer Rotation: der vorige Schlüssel, bis alle sich einmal angemeldet haben' },
       { name: 'ERP_PUBLIC_URL', pflicht: false, zweck: 'öffentliche Adresse, vorbelegt für die Webhook-Registrierung' },
     ],
   },

@@ -30,6 +30,7 @@ import {
   zweifaktorZuruecksetzen,
 } from '../src/modules/auth/zweifaktor.ts'
 import { geheimnisErzeugen, totp, totpSchritt } from '../src/modules/auth/totp.ts'
+import { entschluesseln, schluesselAusUmgebung } from '../src/modules/auth/geheimnis.ts'
 
 before(() => {
   // Die Verschlüsselung verlangt einen Schlüssel — ohne .env ist keiner gesetzt.
@@ -114,6 +115,31 @@ describe('Zweiter Faktor', () => {
       assert.equal(status.aktiv, true)
       assert.equal(status.backup_offen, 0)
     })
+  })
+
+  test('ZWEIFAKTOR_SCHLUESSEL nachträglich gesetzt: Code geht weiter, Geheimnis wird umgeschlüsselt', async () => {
+    const vorher = process.env.ZWEIFAKTOR_SCHLUESSEL
+    delete process.env.ZWEIFAKTOR_SCHLUESSEL
+    try {
+      await withRollback(async (t) => {
+        const user = await makeUser(t, 'Schlüsselwechsel')
+        const secret = geheimnisErzeugen()
+        const jetzt = Date.now()
+        await totpAktivieren(t, user.id, secret) // verschlüsselt mit SESSION_SECRET
+        process.env.ZWEIFAKTOR_SCHLUESSEL = 'nachtraeglich-gesetzt'
+        assert.equal(await codePruefenUndMerken(t, user.id, totp(secret, jetzt), jetzt), true, 'kein Aussperren')
+        const [u] = await t<{ blob: string }[]>`select totp_secret as blob from users where id = ${user.id}`
+        assert.equal(
+          entschluesseln(u.blob, schluesselAusUmgebung({ ZWEIFAKTOR_SCHLUESSEL: 'nachtraeglich-gesetzt' })),
+          secret,
+          'jetzt mit dem neuen Schlüssel verschlüsselt',
+        )
+        assert.equal(await codePruefenUndMerken(t, user.id, totp(secret, jetzt + 30_000), jetzt), true)
+      })
+    } finally {
+      if (vorher === undefined) delete process.env.ZWEIFAKTOR_SCHLUESSEL
+      else process.env.ZWEIFAKTOR_SCHLUESSEL = vorher
+    }
   })
 
   test('Backup-Codes: zehn Stück, jeder genau einmal, nur Hashes in der Datenbank', async () => {

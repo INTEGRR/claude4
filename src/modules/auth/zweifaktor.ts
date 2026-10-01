@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { Sql, TransactionSql } from 'postgres'
-import { entschluesseln, verschluesseln } from './geheimnis.ts'
+import { entschluesselnMitRueckfall, verschluesseln } from './geheimnis.ts'
 import { backupCodesErzeugen, codeNormalisieren, geheimnisErzeugen, totpPruefen } from './totp.ts'
 
 /**
@@ -120,7 +120,7 @@ export async function wartendeSitzung(db: Db, hash: string): Promise<WartendeSit
     from sessions s join users u on u.id = s.user_id
     where s.token = ${hash} and s.expires_at > now() and not s.zweiter_faktor_ok and u.active`
   if (!row) return null
-  return { ...row, entwurf: row.entwurf ? entschluesseln(row.entwurf) : null }
+  return { ...row, entwurf: row.entwurf ? entschluesselnMitRueckfall(row.entwurf).klartext : null }
 }
 
 /** Code war richtig: die Sitzung wird voll (30 Tage), der Entwurf fällt weg. */
@@ -142,7 +142,7 @@ export async function sitzungBestaetigen(db: Db, hash: string): Promise<boolean>
 export async function entwurfSicherstellen(db: Db, hash: string): Promise<string> {
   const [row] = await db<{ entwurf: string | null }[]>`
     select entwurf from sessions where token = ${hash}`
-  if (row?.entwurf) return entschluesseln(row.entwurf)
+  if (row?.entwurf) return entschluesselnMitRueckfall(row.entwurf).klartext
   const secret = geheimnisErzeugen()
   await db`update sessions set entwurf = ${verschluesseln(secret)} where token = ${hash}`
   return secret
@@ -165,7 +165,7 @@ export async function einmalAbholen<T>(db: Db, hash: string): Promise<T | null> 
     with alt as (select token, einmal from sessions where token = ${hash} and einmal is not null)
     update sessions s set einmal = null from alt where s.token = alt.token
     returning alt.einmal`
-  return row ? (JSON.parse(entschluesseln(row.einmal)) as T) : null
+  return row ? (JSON.parse(entschluesselnMitRueckfall(row.einmal).klartext) as T) : null
 }
 
 // --- TOTP am Konto ----------------------------------------------------------
@@ -196,13 +196,18 @@ export async function codePruefenUndMerken(
   const [row] = await db<{ totp_secret: string | null; totp_letzter_schritt: string | null }[]>`
     select totp_secret, totp_letzter_schritt from users where id = ${userId}`
   if (!row?.totp_secret) return false
-  const schritt = totpPruefen(entschluesseln(row.totp_secret), code, {
+  const { klartext, veraltet } = entschluesselnMitRueckfall(row.totp_secret)
+  const schritt = totpPruefen(klartext, code, {
     zeitMs,
     letzterSchritt: row.totp_letzter_schritt == null ? null : Number(row.totp_letzter_schritt),
   })
   if (schritt === null) return false
+  // Mit einem alten Schlüssel gelesen (ZWEIFAKTOR_SCHLUESSEL neu gesetzt
+  // oder rotiert): gleich mit dem aktuellen neu verschlüsseln — der Code war
+  // gültig, das Geheimnis also echt.
   const rows = await db`
     update users set totp_letzter_schritt = ${schritt}
+                     ${veraltet ? db`, totp_secret = ${verschluesseln(klartext)}` : db``}
      where id = ${userId} and coalesce(totp_letzter_schritt, -1) < ${schritt}
     returning id`
   return rows.length > 0

@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Zweiter Faktor: Schlüsselwechsel ohne Neueinrichtung
+
+**Anlass:** Beim Zusammenstellen der Betreiber-Aufgaben: In Prod hat ein
+Admin den zweiten Faktor eingerichtet, `ZWEIFAKTOR_SCHLUESSEL` ist (laut
+go-live) noch nicht gesetzt. Hätte der Betreiber die Variable wie empfohlen
+nachgezogen, wäre sein TOTP-Geheimnis (mit `SESSION_SECRET` verschlüsselt)
+unlesbar geworden — Aussperren durch Befolgen der Checkliste.
+
+**Entschieden:** Entschlüsselt wird mit dem aktuellen Schlüssel und, wenn das
+scheitert, mit den alten: `SESSION_SECRET` (sobald `ZWEIFAKTOR_SCHLUESSEL`
+gesetzt ist) und optional `ZWEIFAKTOR_SCHLUESSEL_ALT` (für spätere
+Rotationen). Wer mit einem alten Schlüssel gelesen wurde, wird beim nächsten
+gültigen Code mit dem aktuellen neu verschlüsselt — der gültige Code beweist,
+dass das Geheimnis echt ist. Kein Standardwert, ohne passenden Schlüssel
+scheitert es weiter laut.
+
+Umgesetzt in `auth/geheimnis.ts` (`alteSchluessel`,
+`entschluesselnMitRueckfall`) und `auth/zweifaktor.ts`; dokumentiert in
+[vercel-supabase.md](vercel-supabase.md) und [go-live.md](go-live.md); Tests
+`tests/geheimnis.test.ts`, `tests/zweifaktor.test.ts`.
+
 ## 2026-10-01 — Querverweise überall
 
 **Anlass:** Betreiber in der Verkaufsliste: „Mir fehlen Links, überall —

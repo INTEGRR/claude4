@@ -45,8 +45,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       die beiden Werte werden Meldungen als „übersprungen" abgehakt.
 - [ ] `ZWEIFAKTOR_SCHLUESSEL` setzen (eigener Zufallswert, `openssl rand -hex 32`):
       verschlüsselt die TOTP-Geheimnisse des zweiten Faktors. Fehlt er, nimmt
-      KRNL `SESSION_SECRET` — dann darf DER sich nie mehr ändern, sonst
-      müssen alle Benutzer die Authenticator-App neu einrichten.
+      KRNL `SESSION_SECRET`. Nachträglich setzen ist seit 2026-10-01
+      gefahrlos: bestehende Einrichtungen werden weiter gelesen und beim
+      nächsten Code umgeschlüsselt — niemand richtet neu ein.
 - [x] **DHL** (alle aus der Produktions-App im DHL Developer Portal bzw.
       dem Geschäftskundenportal, Sandbox-Werte raus):
   - `DHL_API_BASE=https://api-eu.dhl.com`

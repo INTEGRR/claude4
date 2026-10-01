@@ -1,7 +1,13 @@
 /** Verschlüsselung ruhender Geheimnisse (AES-256-GCM) — auth/geheimnis.ts. */
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { entschluesseln, schluesselAusUmgebung, verschluesseln } from '../src/modules/auth/geheimnis.ts'
+import {
+  alteSchluessel,
+  entschluesseln,
+  entschluesselnMitRueckfall,
+  schluesselAusUmgebung,
+  verschluesseln,
+} from '../src/modules/auth/geheimnis.ts'
 
 describe('Geheimnis', () => {
   const schluessel = schluesselAusUmgebung({ SESSION_SECRET: 'test-geheimnis' })
@@ -31,5 +37,26 @@ describe('Geheimnis', () => {
     assert.notDeepEqual(eigen, nurSitzung)
     assert.deepEqual(schluesselAusUmgebung({ ZWEIFAKTOR_SCHLUESSEL: 'a' }), eigen)
     assert.throws(() => schluesselAusUmgebung({}), /SESSION_SECRET fehlt/)
+  })
+
+  test('Schlüsselwechsel ohne Neueinrichtung: alte Schlüssel lesen noch, melden „veraltet"', () => {
+    const alt = verschluesseln('JBSWY3DPEHPK3PXP', schluesselAusUmgebung({ SESSION_SECRET: 'sitzung' }))
+    // ZWEIFAKTOR_SCHLUESSEL kam später dazu — SESSION_SECRET gilt beim Lesen weiter.
+    const env = { ZWEIFAKTOR_SCHLUESSEL: 'eigen', SESSION_SECRET: 'sitzung' }
+    assert.deepEqual(entschluesselnMitRueckfall(alt, env), { klartext: 'JBSWY3DPEHPK3PXP', veraltet: true })
+    const neu = verschluesseln('JBSWY3DPEHPK3PXP', schluesselAusUmgebung(env))
+    assert.deepEqual(entschluesselnMitRueckfall(neu, env), { klartext: 'JBSWY3DPEHPK3PXP', veraltet: false })
+    // Rotation des eigenen Schlüssels über ZWEIFAKTOR_SCHLUESSEL_ALT.
+    const rotiert = { ZWEIFAKTOR_SCHLUESSEL: 'eigen-2', ZWEIFAKTOR_SCHLUESSEL_ALT: 'eigen' }
+    assert.equal(entschluesselnMitRueckfall(neu, rotiert).veraltet, true)
+    // Ohne passenden Schlüssel bleibt es laut.
+    assert.throws(() => entschluesselnMitRueckfall(alt, { ZWEIFAKTOR_SCHLUESSEL: 'fremd' }))
+  })
+
+  test('alte Schlüssel: nur wenn sie vom aktuellen abweichen', () => {
+    assert.equal(alteSchluessel({ SESSION_SECRET: 's' }).length, 0, 'nur SESSION_SECRET: keiner')
+    assert.equal(alteSchluessel({ ZWEIFAKTOR_SCHLUESSEL: 'z', SESSION_SECRET: 's' }).length, 1)
+    assert.equal(alteSchluessel({ ZWEIFAKTOR_SCHLUESSEL: 's', SESSION_SECRET: 's' }).length, 0, 'gleicher Wert')
+    assert.equal(alteSchluessel({ ZWEIFAKTOR_SCHLUESSEL: 'z', ZWEIFAKTOR_SCHLUESSEL_ALT: 'a', SESSION_SECRET: 's' }).length, 2)
   })
 })

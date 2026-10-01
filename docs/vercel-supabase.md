@@ -72,13 +72,18 @@ Supabase-Zertifikat).
 
 `SESSION_SECRET` salzt die Login-Drossel und die Backup-Codes des zweiten
 Faktors — und dient als Rückfall-Schlüssel für die verschlüsselten TOTP-
-Geheimnisse, wenn `ZWEIFAKTOR_SCHLUESSEL` fehlt. **Deshalb nicht leichtfertig
-rotieren:** ohne eigenen `ZWEIFAKTOR_SCHLUESSEL` macht eine Änderung alle
-Einrichtungen der Authenticator-App unlesbar, und jeder Benutzer muss (nach
-Admin-Reset) neu einrichten. Empfohlen:
+Geheimnisse, wenn `ZWEIFAKTOR_SCHLUESSEL` fehlt. Empfohlen ist der eigene
+Schlüssel — **nachträglich setzen ist gefahrlos** (seit 2026-10-01): KRNL
+liest ältere Einrichtungen weiter mit `SESSION_SECRET` und verschlüsselt sie
+beim nächsten gültigen Code mit dem neuen Schlüssel. Danach darf sich
+`SESSION_SECRET` ändern, ohne dass jemand die Authenticator-App neu
+einrichtet. Den eigenen Schlüssel rotieren: neuen Wert setzen, den alten als
+`ZWEIFAKTOR_SCHLUESSEL_ALT` stehen lassen, bis sich alle einmal angemeldet
+haben.
 
 ```
-ZWEIFAKTOR_SCHLUESSEL   <32 Byte Zufall, eigener Wert>
+ZWEIFAKTOR_SCHLUESSEL       <32 Byte Zufall, eigener Wert>
+ZWEIFAKTOR_SCHLUESSEL_ALT   <nur nach einer Rotation: der vorige Wert>
 ```
 
 **Pflicht auf Vercel:**
