@@ -603,9 +603,18 @@ export async function createReturnLabel(
   } | null
 
   if (!res.ok || !json?.shipmentNo) {
+    const grund = json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'
+    // „recipient is not available" heißt: diese receiverId kennt DHL für das
+    // Konto nicht — dann genau sagen, welche gesendet wurde und wo sie herkommt.
+    const empfaengerFehlt = /recipient|receiver|empf/i.test(grund)
     const message =
-      `Retourenlabel abgelehnt (${res.status}): ${json?.status?.detail ?? json?.status?.title ?? json?.detail ?? json?.title ?? 'unbekannter Fehler'}. ` +
-      `Voraussetzung ist ein Retouren-Vertrag mit im GKP angelegtem Retourenempfänger.`
+      `Retourenlabel abgelehnt (${res.status}): ${grund}. ` +
+      (empfaengerFehlt
+        ? `Gesendet wurde der Retourenempfänger „${c.returnReceiverId}" (DHL_RETURN_RECEIVER_ID` +
+          `${process.env.DHL_RETURN_RECEIVER_ID ? '' : ', nicht gesetzt — Standard'}). Im Geschäftskundenportal ` +
+          `unter Retouren einen Retourenempfänger mit Retouren-Abrechnungsnummer (Verfahren 07) anlegen ` +
+          `und dessen Empfänger-ID als DHL_RETURN_RECEIVER_ID setzen.`
+        : `Voraussetzung ist ein Retouren-Vertrag mit im GKP angelegtem Retourenempfänger.`)
     await protokoll({
       kind: 'return_label', reference, ok: false, statusCode: res.status,
       error: message, response: json?.status, durationMs: Date.now() - start,
