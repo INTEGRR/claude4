@@ -11,3 +11,6 @@ next-env.d.ts
 storage/
 ca-bundle.crt
 prozess-harness.log
+
+# Temporäre Arbeitskopien von Hintergrund-Agenten (git worktree)
+.claude/worktrees/
