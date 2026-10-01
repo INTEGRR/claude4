@@ -56,16 +56,20 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
       picking_id: string | null
       mo_number: string | null
       mo_id: string | null
+      repair_number: string | null
+      repair_id: string | null
     }[]
   >`
     select m.id, m.qty_done, src.full_path as src, dst.full_path as dest, m.date_done, m.reference,
            p.number as picking_number, p.id as picking_id,
-           mo.number as mo_number, mo.id as mo_id
+           mo.number as mo_number, mo.id as mo_id,
+           r.number as repair_number, r.id as repair_id
     from stock_moves m
     join stock_locations src on src.id = m.src_location_id
     join stock_locations dst on dst.id = m.dest_location_id
     left join stock_pickings p on p.id = m.picking_id
     left join manufacturing_orders mo on mo.id = m.production_id
+    left join repair_orders r on r.id = m.repair_id
     where m.variant_id = ${id} and m.state = 'done'
     order by m.date_done desc limit 60`
 
@@ -181,6 +185,8 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
                         <Link href={`/lager/${m.picking_id}`}>{m.picking_number}</Link>
                       ) : m.mo_id ? (
                         <Link href={`/fertigung/${m.mo_id}`}>{m.mo_number}</Link>
+                      ) : m.repair_id ? (
+                        <Link href={`/reparatur/${m.repair_id}`}>{m.repair_number}</Link>
                       ) : (
                         <span className="muted">{m.reference ?? '—'}</span>
                       )}

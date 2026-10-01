@@ -108,6 +108,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     {
       id: string
       vendor: string
+      vendor_id: string
       min_qty: number
       price: number
       discount: number
@@ -117,7 +118,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       date_end: string | null
     }[]
   >`
-    select vp.id, p.name as vendor, vp.min_qty, vp.price, vp.discount,
+    select vp.id, p.name as vendor, vp.vendor_id, vp.min_qty, vp.price, vp.discount,
            vendor_price_net(vp.price, vp.discount) as netto,
            vp.lead_time_days, vp.date_start::text, vp.date_end::text
     from vendor_prices vp
@@ -378,7 +379,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 <tbody>
                   {lieferantenpreise.map((z) => (
                     <tr key={z.id}>
-                      <td>{z.vendor}</td>
+                      <td><Link href={`/kontakte/${z.vendor_id}`}>{z.vendor}</Link></td>
                       <td className="num mono">{qty(z.min_qty)}</td>
                       <td className="num mono">{Number(z.price).toFixed(2)} €</td>
                       <td className="num">{Number(z.discount) > 0 ? `${qty(z.discount)} %` : '—'}</td>

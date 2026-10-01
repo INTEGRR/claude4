@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { TagEditor } from '@/components/tag-editor'
 import { date } from '@/modules/shared/format'
+import { herkunftHref } from '@/app/(erp)/lager/herkunft'
 import { createChildContact, updatePartner } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -66,12 +67,80 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
   const terms = await sql<{ id: string; name: string }[]>`
     select id, name from payment_terms where active order by sequence, nb_days`
 
-  const orders = await sql<{ id: string; number: string; state: string; order_date: string }[]>`
-    select id, number, state, order_date from sales_orders
-    where partner_id = ${id} order by order_date desc limit 10`
+  // Die Belege des Partners — jede Nummer und jeder Status ist ein Weg zum
+  // Beleg dahinter (Betreiber 2026-10-01: „Status sind Wege").
+  const orders = await sql<
+    {
+      id: string
+      number: string
+      state: string
+      delivery_status: string
+      order_date: string
+      lieferungen: number
+      lieferungen_offen: number
+      lieferung_id: string | null
+    }[]
+  >`
+    select so.id, so.number, so.state, so.delivery_status, so.order_date,
+           coalesce(lf.anzahl, 0) as lieferungen,
+           coalesce(lf.offen, 0) as lieferungen_offen,
+           lf.ziel as lieferung_id
+    from sales_orders so
+    left join lateral (
+      select count(*)::int as anzahl,
+             (count(*) filter (where sp.state not in ('done', 'cancel')))::int as offen,
+             (array_agg(sp.id order by (sp.state in ('done', 'cancel')), sp.scheduled_date desc))[1] as ziel
+      from stock_pickings sp
+      join operation_types ot on ot.id = sp.operation_type_id and ot.kind = 'delivery'
+      where sp.origin_model = 'sales_order' and sp.origin_id = so.id
+    ) lf on true
+    where so.partner_id = ${id} order by so.order_date desc limit 10`
   const purchases = await sql<{ id: string; number: string; state: string; order_date: string }[]>`
     select id, number, state, created_at as order_date from purchase_orders
     where vendor_id = ${id} order by created_at desc limit 10`
+  const transfers = await sql<
+    {
+      id: string
+      number: string
+      state: string
+      type_name: string
+      origin_model: string | null
+      origin_id: string | null
+      origin_label: string | null
+      scheduled_date: string
+    }[]
+  >`
+    select p.id, p.number, p.state, ot.name as type_name,
+           p.origin_model, p.origin_id, p.origin_label, p.scheduled_date
+    from stock_pickings p
+    join operation_types ot on ot.id = p.operation_type_id
+    where p.partner_id = ${id}
+    order by p.scheduled_date desc limit 10`
+  const reparaturen = await sql<
+    { id: string; number: string; state: string; product: string; scheduled_date: string }[]
+  >`
+    select r.id, r.number, r.state, variant_display_name(r.variant_id) as product, r.scheduled_date
+    from repair_orders r
+    where r.partner_id = ${id}
+    order by r.created_at desc limit 10`
+  const vorgaenge = await sql<
+    { id: string; number: string; state: string; titel: string | null; prozess_name: string; prozess_code: string }[]
+  >`
+    select v.id, v.number, v.state, v.titel, pz.name as prozess_name, v.prozess_code
+    from vorgaenge v
+    join prozesse pz on pz.code = v.prozess_code
+    where v.partner_id = ${id}
+    order by v.created_at desc limit 10`
+
+  // Lieferstatus-Schild: eine (offene) Lieferung → direkt, sonst die
+  // Transfers des Auftrags — dieselbe Regel wie in der Auftragsliste.
+  const lieferungHref = (o: (typeof orders)[number]) => {
+    if (o.lieferungen === 0) return undefined
+    if (o.lieferung_id && (o.lieferungen_offen === 1 || o.lieferungen === 1)) {
+      return `/lager/${o.lieferung_id}`
+    }
+    return `/lager?auftrag=${o.id}${o.lieferungen_offen > 0 ? '' : '&offen=0'}`
+  }
 
   return (
     <>
@@ -276,7 +345,17 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
       </Card>
 
       <div className="grid-2">
-        <Card title={`Verkaufsaufträge (${orders.length})`} tight>
+        <Card
+          title={`Verkaufsaufträge (${orders.length}${orders.length === 10 ? '+' : ''})`}
+          actions={
+            orders.length === 10 ? (
+              <Link className="small" href={`/verkauf?q=${encodeURIComponent(partner.name)}`}>
+                alle im Verkauf
+              </Link>
+            ) : null
+          }
+          tight
+        >
           {orders.length === 0 ? (
             <Empty>Keine Aufträge.</Empty>
           ) : (
@@ -286,7 +365,12 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
                   {orders.map((o) => (
                     <tr key={o.id}>
                       <td className="mono"><Link href={`/verkauf/${o.id}`}>{o.number}</Link></td>
-                      <td><Badge state={o.state} kind="sale" /></td>
+                      <td><Badge state={o.state} kind="sale" href={`/verkauf/${o.id}`} /></td>
+                      <td>
+                        {o.state === 'sale' && (
+                          <Badge state={o.delivery_status} kind="delivery" href={lieferungHref(o)} />
+                        )}
+                      </td>
                       <td className="mono nowrap small muted">{date(o.order_date)}</td>
                     </tr>
                   ))}
@@ -306,7 +390,7 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
                   {purchases.map((p) => (
                     <tr key={p.id}>
                       <td className="mono"><Link href={`/einkauf/${p.id}`}>{p.number}</Link></td>
-                      <td><Badge state={p.state} kind="purchase" /></td>
+                      <td><Badge state={p.state} kind="purchase" href={`/einkauf/${p.id}`} /></td>
                       <td className="mono nowrap small muted">{date(p.order_date)}</td>
                     </tr>
                   ))}
@@ -316,6 +400,91 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
           )}
         </Card>
       </div>
+
+      <div className="grid-2">
+        <Card title={`Lieferungen & Transfers (${transfers.length}${transfers.length === 10 ? '+' : ''})`} tight>
+          {transfers.length === 0 ? (
+            <Empty>Keine Transfers.</Empty>
+          ) : (
+            <TableWrap>
+              <table>
+                <tbody>
+                  {transfers.map((t) => {
+                    const quelle = herkunftHref(t.origin_model, t.origin_id)
+                    return (
+                      <tr key={t.id}>
+                        <td className="mono">
+                          <Link href={`/lager/${t.id}`}>{t.number}</Link>
+                          <div className="small muted">{t.type_name}</div>
+                        </td>
+                        <td className="mono small">
+                          {t.origin_label && quelle ? (
+                            <Link href={quelle}>{t.origin_label}</Link>
+                          ) : (
+                            (t.origin_label ?? <span className="muted">—</span>)
+                          )}
+                        </td>
+                        <td><Badge state={t.state} kind="picking" href={`/lager/${t.id}`} /></td>
+                        <td className="mono nowrap small muted">{date(t.scheduled_date)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+        </Card>
+
+        <Card title={`Reparaturen (${reparaturen.length}${reparaturen.length === 10 ? '+' : ''})`} tight>
+          {reparaturen.length === 0 ? (
+            <Empty>Keine Reparaturen.</Empty>
+          ) : (
+            <TableWrap>
+              <table>
+                <tbody>
+                  {reparaturen.map((r) => (
+                    <tr key={r.id}>
+                      <td className="mono"><Link href={`/reparatur/${r.id}`}>{r.number}</Link></td>
+                      <td className="small">{r.product}</td>
+                      <td><Badge state={r.state} kind="repair" href={`/reparatur/${r.id}`} /></td>
+                      <td className="mono nowrap small muted">{date(r.scheduled_date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+        </Card>
+      </div>
+
+      {vorgaenge.length > 0 && (
+        <Card title={`Vorgänge (${vorgaenge.length}${vorgaenge.length === 10 ? '+' : ''})`} tight>
+          <TableWrap>
+            <table>
+              <tbody>
+                {vorgaenge.map((v) => (
+                  <tr key={v.id}>
+                    <td className="mono"><Link href={`/vorgaenge/${v.id}`}>{v.number}</Link></td>
+                    <td className="small">
+                      <Link href={`/vorgaenge/prozess/${v.prozess_code}`}>{v.prozess_name}</Link>
+                    </td>
+                    <td>{v.titel ?? <span className="muted">—</span>}</td>
+                    <td>
+                      <Link
+                        className="badge neutral mono"
+                        href={`/vorgaenge/prozess/${v.prozess_code}?zustand=${encodeURIComponent(v.state)}`}
+                        title="Alle Vorgänge dieses Ablaufs in diesem Zustand"
+                      >
+                        {v.state}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
 
       <RecordComments model="partner" recordId={id} path={`/kontakte/${id}`} />
     </>

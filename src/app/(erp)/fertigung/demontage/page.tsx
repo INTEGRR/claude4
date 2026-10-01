@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -14,15 +15,21 @@ export default async function DemontagePage() {
       id: string
       number: string
       product: string
+      variant_id: string
+      mo_id: string | null
+      mo_number: string | null
       qty: number
       state: string
       created_at: string
       on_hand: number
     }[]
   >`
-    select u.id, u.number, variant_display_name(u.variant_id) as product, u.qty, u.state,
+    select u.id, u.number, variant_display_name(u.variant_id) as product, u.variant_id,
+           u.mo_id, mo.number as mo_number, u.qty, u.state,
            u.created_at, on_hand_qty(u.variant_id, u.src_location_id) as on_hand
-    from unbuild_orders u order by u.created_at desc limit 60`
+    from unbuild_orders u
+    left join manufacturing_orders mo on mo.id = u.mo_id
+    order by u.created_at desc limit 60`
 
   const products = await sql<{ id: string; label: string; on_hand: number }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) as label, on_hand_qty(pv.id) as on_hand
@@ -85,8 +92,15 @@ export default async function DemontagePage() {
                   const short = Number(o.on_hand) < Number(o.qty)
                   return (
                     <tr key={o.id}>
-                      <td className="mono">{o.number}</td>
-                      <td>{o.product}</td>
+                      <td className="mono">
+                        {o.number}
+                        {o.mo_id && (
+                          <div className="small">
+                            aus <Link href={`/fertigung/${o.mo_id}`}>{o.mo_number}</Link>
+                          </div>
+                        )}
+                      </td>
+                      <td><Link href={`/produkte/variante/${o.variant_id}`}>{o.product}</Link></td>
                       <td className="num">{qty(o.qty)}</td>
                       {/* Deckung als LED plus Wort — die Zahl bleibt ausgerichtet. */}
                       <td className="num">

@@ -47,6 +47,7 @@ Je Vorgangsart: Reservierungsmethode (`at_confirm` Default, `manual` möglich), 
 - **Bestandsliste** je Variante: On Hand, Reserviert, Frei verfügbar, Eingehend, Ausgehend, Prognostiziert (Formeln siehe Datenmodell); Drill-down auf Orte.
 - **Bewegungsprotokoll** je Variante (alle `done`-Moves chronologisch mit Beleg-Link) — beantwortet „warum ist der Bestand so?".
 - **Nachschub-Hinweis** (einfach): Liste aller Varianten mit `forecasted < 0` als Einkaufs-Vorschlag (volle Meldebestandsregeln = Erweiterung).
+- **Querverweise (2026-10-01)**: In Transferliste und -formular sind Partner (→ Kontakt), Quellbeleg (`origin_model` → Verkauf/Einkauf/Reparatur/Fertigung/Vorgang, eine Zuordnung in `lager/herkunft.ts`), Status-Schild, Rückstand/Retoure in beide Richtungen, die Reparatur, deren Rückversand der Transfer ist, und die Produkte der Positionen verlinkt. Filter **`/lager?auftrag=<Verkaufsauftrag>`** zeigt alle Transfers eines Auftrags (Hinweisleiste mit Auftrag und „Filter aufheben"; Art- und Zustandsfilter bleiben kombinierbar) — Ziel des Lieferstatus-Schilds im Verkauf.
 
 ## Inventur & Ausschuss
 

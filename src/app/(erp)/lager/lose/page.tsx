@@ -20,12 +20,13 @@ export default async function LosePage({
       id: string
       name: string
       product: string
+      variant_id: string
       tracking: string
       on_hand: number
       created_at: string
     }[]
   >`
-    select sl.id, sl.name, variant_display_name(sl.variant_id) as product,
+    select sl.id, sl.name, variant_display_name(sl.variant_id) as product, sl.variant_id,
            pt.tracking,
            coalesce((select sum(lq.on_hand) from stock_lot_quants lq
                      join stock_locations loc on loc.id = lq.location_id
@@ -84,7 +85,7 @@ export default async function LosePage({
                     <td className="mono">
                       <Link href={`/lager/lose/${l.id}`}>{l.name}</Link>
                     </td>
-                    <td>{l.product}</td>
+                    <td><Link href={`/produkte/variante/${l.variant_id}`}>{l.product}</Link></td>
                     <td>
                       <span className="badge neutral">
                         {l.tracking === 'serial' ? 'Seriennummer' : 'Los'}

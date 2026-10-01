@@ -70,11 +70,12 @@ export default async function ProzessListe({
       titel: string | null
       state: string
       partner: string | null
+      partner_id: string | null
       zusatz: Record<string, unknown>
       created_at: string
     }[]
   >`
-    select v.id, v.number, v.titel, v.state, pa.name as partner, v.zusatz, v.created_at
+    select v.id, v.number, v.titel, v.state, pa.name as partner, v.partner_id, v.zusatz, v.created_at
     from vorgaenge v
     left join partners pa on pa.id = v.partner_id
     where v.prozess_code = ${code}
@@ -161,8 +162,22 @@ export default async function ProzessListe({
                       <Link href={`/vorgaenge/${v.id}`}>{v.number}</Link>
                     </td>
                     <td>{v.titel ?? <span className="muted">—</span>}</td>
-                    <td>{v.partner ?? <span className="muted">—</span>}</td>
-                    <td><span className="badge neutral">{v.state}</span></td>
+                    <td>
+                      {v.partner && v.partner_id ? (
+                        <Link href={`/kontakte/${v.partner_id}`}>{v.partner}</Link>
+                      ) : (
+                        (v.partner ?? <span className="muted">—</span>)
+                      )}
+                    </td>
+                    <td>
+                      <Link
+                        className="badge neutral"
+                        href={`/vorgaenge/prozess/${prozess.code}?zustand=${encodeURIComponent(v.state)}`}
+                        title="Nur diesen Zustand zeigen"
+                      >
+                        {v.state}
+                      </Link>
+                    </td>
                     {felder.map((f) => (
                       <td key={f.name}>
                         {v.zusatz?.[f.name] == null ? (

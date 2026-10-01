@@ -41,6 +41,7 @@ Status-Maschine (Odoo 18): `draft → confirmed → progress → to_close → do
   - Teilmenge ⇒ Backorder-Dialog: Rest-MO (`backorder_of_id`) oder Rest verwerfen.
   - Danach `done`; wenn `sales_order_id` gesetzt und alle MOs des Auftrags `done` ⇒ zugehörige Lieferung reservieren — der Auftrag erscheint damit in der „Versandbereit"-Liste des Versand-Moduls (DHL-Label + Shopify-Fulfillment, siehe [versand.md](versand.md)).
 - **Stornieren**: offene Komponenten-Moves → `cancel`, Reservierungen freigeben.
+- **Querverweise (2026-10-01)**: Liste und Formular verlinken Produkt (→ Produktvorlage), Komponenten, Stückliste, Verkaufsauftrag samt Kunde und dessen Lieferung, Rückstand in beide Richtungen; das Material-Schild „N fehlt" springt zu den Komponenten des Auftrags. Filter **`/fertigung?auftrag=<Verkaufsauftrag>`** (Ziel von „N offen" im Verkauf) zeigt die Aufträge eines Verkaufsauftrags mit Hinweisleiste und „Filter aufheben"; Status-, Produkt- und Materialfilter bleiben kombinierbar.
 
 ## Phantom-Baugruppen (Ausbau 3, Migration 0021)
 

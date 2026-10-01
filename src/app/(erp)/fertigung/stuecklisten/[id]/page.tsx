@@ -54,6 +54,7 @@ export default async function BomPage({
     {
       id: string
       component: string
+      template_id: string
       sku: string | null
       qty: number
       uom: string
@@ -62,7 +63,7 @@ export default async function BomPage({
       is_phantom: boolean
     }[]
   >`
-    select l.id, variant_display_name(l.component_variant_id) as component, pv.sku, l.qty,
+    select l.id, variant_display_name(l.component_variant_id) as component, pv.template_id, pv.sku, l.qty,
            u.name as uom, l.issue_method,
            resolve_kit(l.component_variant_id) is not null as is_phantom,
            coalesce(array_agg(a.name || ': ' || av.name order by a.name)
@@ -76,7 +77,7 @@ export default async function BomPage({
     left join product_template_attribute_lines al on al.id = ptav.line_id
     left join product_attributes a on a.id = al.attribute_id
     where l.bom_id = ${id}
-    group by l.id, pv.sku, u.name, l.sequence, l.issue_method, l.component_variant_id
+    group by l.id, pv.sku, pv.template_id, u.name, l.sequence, l.issue_method, l.component_variant_id
     order by l.sequence`
 
   // Attributwerte des Endprodukts - die Auswahl für "Auf Varianten anwenden".
@@ -99,6 +100,7 @@ export default async function BomPage({
     ? await sql<
         {
           component: string
+          variant_id: string
           qty: number
           uom: string
           available: number
@@ -106,7 +108,8 @@ export default async function BomPage({
           phantom_path: string | null
         }[]
       >`
-        select variant_display_name(c.component_variant_id) as component, c.qty,
+        select variant_display_name(c.component_variant_id) as component,
+               c.component_variant_id as variant_id, c.qty,
                u.name as uom, free_to_use(c.component_variant_id) as available,
                c.issue_method, c.phantom_path
         from bom_explode(${id}, ${variante}, ${1}) c
@@ -150,7 +153,7 @@ export default async function BomPage({
         title={`Stückliste ${bom.product}`}
         subtitle={
           <>
-            Referenzmenge {qty(bom.qty)} {bom.uom}
+            <Link href={`/produkte/${bom.template_id}`}>zum Produkt {bom.product}</Link> · Referenzmenge {qty(bom.qty)} {bom.uom}
             {bom.variant && <> · gilt nur für {bom.variant}</>}
             {!bom.variant && <> · gilt für alle Varianten</>}
             {bom.bom_type === 'kit' && <> · Baugruppe (wird beim Verwenden aufgelöst)</>}
@@ -218,7 +221,7 @@ export default async function BomPage({
               <tbody>
                 {lines.map((l) => (
                   <tr key={l.id}>
-                    <td>{l.component}</td>
+                    <td><Link href={`/produkte/${l.template_id}`}>{l.component}</Link></td>
                     <td className="mono small">{l.sku ?? '—'}</td>
                     <td className="num">{qty(l.qty)}</td>
                     <td>{l.uom}</td>
@@ -357,7 +360,9 @@ export default async function BomPage({
                       const covered = Number(p.available) >= Number(p.qty)
                       return (
                         <tr key={i}>
-                          <td>{p.component}</td>
+                          <td>
+                            <Link href={`/produkte/variante/${p.variant_id}`}>{p.component}</Link>
+                          </td>
                           <td className="small muted">{p.phantom_path ?? '—'}</td>
                           <td className="num">{qty(p.qty)}</td>
                           <td>{p.uom}</td>

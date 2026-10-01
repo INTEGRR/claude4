@@ -168,7 +168,7 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
               {a.varianten.map((v) => (
                 <tr key={v.id}>
                   <td className="small">
-                    {v.name}
+                    <Link href={`/produkte/variante/${v.id}`}>{v.name}</Link>
                     {v.sku && <span className="muted mono"> · {v.sku}</span>}
                   </td>
                   <td className="num mono">{qty(v.baubar)}</td>
@@ -306,7 +306,7 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
               {daten.teile.map((t) => (
                 <tr key={t.id}>
                   <td className="small">
-                    {t.name}
+                    <Link href={`/produkte/variante/${t.id}`}>{t.name}</Link>
                     {t.sku && <span className="muted mono"> · {t.sku}</span>}
                   </td>
                   <td className="num mono">{qty(t.frei)}</td>
@@ -366,7 +366,7 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                 {daten.weitere.map((w) => (
                   <tr key={w.id}>
                     <td className="small">
-                      {w.name}
+                      <Link href={`/produkte/variante/${w.id}`}>{w.name}</Link>
                       {w.sku && <span className="muted mono"> · {w.sku}</span>}
                     </td>
                     <td className="num mono">{qty(w.frei)}</td>

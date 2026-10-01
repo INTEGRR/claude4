@@ -30,14 +30,30 @@ export default async function VorgaengePage() {
       titel: string | null
       state: string
       partner: string | null
+      partner_id: string | null
       created_at: string
+      reparatur_id: string | null
+      reparatur_number: string | null
+      auftrag_id: string | null
+      auftrag_number: string | null
     }[]
   >`
     select v.id, v.number, v.prozess_code, p.name as prozess_name,
-           v.titel, v.state, pa.name as partner, v.created_at
+           v.titel, v.state, pa.name as partner, v.partner_id, v.created_at,
+           ro.id as reparatur_id, ro.number as reparatur_number,
+           so.id as auftrag_id, so.number as auftrag_number
     from vorgaenge v
     join prozesse p on p.code = v.prozess_code
     left join partners pa on pa.id = v.partner_id
+    -- Folgebelege über origin am KIND (0072/0081) — höchstens einer je Art.
+    left join lateral (
+      select r.id, r.number from repair_orders r
+      where r.origin_model = 'vorgang' and r.origin_id = v.id limit 1
+    ) ro on true
+    left join lateral (
+      select s.id, s.number from sales_orders s
+      where s.origin_model = 'vorgang' and s.origin_id = v.id limit 1
+    ) so on true
     order by v.created_at desc
     limit 200`
 
@@ -101,6 +117,7 @@ export default async function VorgaengePage() {
                   <th>Titel</th>
                   <th>Zustand</th>
                   <th>Kontakt</th>
+                  <th>Folgebeleg</th>
                   <th>Angelegt</th>
                 </tr>
               </thead>
@@ -110,12 +127,34 @@ export default async function VorgaengePage() {
                     <td>
                       <Link className="mono" href={`/vorgaenge/${v.id}`}>{v.number}</Link>
                     </td>
-                    <td className="small">{v.prozess_name}</td>
+                    <td className="small">
+                      <Link href={`/vorgaenge/prozess/${v.prozess_code}`}>{v.prozess_name}</Link>
+                    </td>
                     <td>{v.titel ?? <span className="muted">—</span>}</td>
                     <td>
-                      <span className="badge neutral mono">{v.state}</span>
+                      <Link
+                        className="badge neutral mono"
+                        href={`/vorgaenge/prozess/${v.prozess_code}?zustand=${encodeURIComponent(v.state)}`}
+                        title="Alle Vorgänge dieses Ablaufs in diesem Zustand"
+                      >
+                        {v.state}
+                      </Link>
                     </td>
-                    <td className="small">{v.partner ?? '—'}</td>
+                    <td className="small">
+                      {v.partner && v.partner_id ? (
+                        <Link href={`/kontakte/${v.partner_id}`}>{v.partner}</Link>
+                      ) : (
+                        (v.partner ?? '—')
+                      )}
+                    </td>
+                    <td className="mono small">
+                      {v.reparatur_id && (
+                        <Link href={`/reparatur/${v.reparatur_id}`}>{v.reparatur_number}</Link>
+                      )}
+                      {v.reparatur_id && v.auftrag_id && ' · '}
+                      {v.auftrag_id && <Link href={`/verkauf/${v.auftrag_id}`}>{v.auftrag_number}</Link>}
+                      {!v.reparatur_id && !v.auftrag_id && <span className="muted">—</span>}
+                    </td>
                     <td className="mono small">{dateTime(v.created_at)}</td>
                   </tr>
                 ))}

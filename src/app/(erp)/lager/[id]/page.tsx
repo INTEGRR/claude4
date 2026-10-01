@@ -10,6 +10,7 @@ import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { date, qty } from '@/modules/shared/format'
 import { cancelPicking, checkAvailability, confirmPicking, returnPicking, updatePickingDetails, validatePicking } from '../actions'
+import { herkunftHref } from '../herkunft'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,21 +26,24 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       type_name: string
       state: string
       partner: string | null
+      partner_id: string | null
       origin_model: string | null
       origin_id: string | null
       origin_label: string | null
       scheduled_date: string
       date_done: string | null
       backorder_of: string | null
+      backorder_of_id: string | null
       return_of: string | null
+      return_of_id: string | null
       note: string | null
       user_id: string | null
       priority: string
     }[]
   >`
     select p.id, p.number, ot.kind, ot.name as type_name, p.state, part.name as partner,
-           p.origin_model, p.origin_id, p.origin_label, p.scheduled_date, p.date_done,
-           bo.number as backorder_of, ro.number as return_of, p.note,
+           p.partner_id, p.origin_model, p.origin_id, p.origin_label, p.scheduled_date, p.date_done,
+           bo.number as backorder_of, p.backorder_of_id, ro.number as return_of, p.return_of_id, p.note,
            p.user_id, p.priority
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
@@ -57,6 +61,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
   const moves = await sql<
     {
       id: string
+      variant_id: string
       product: string
       sku: string | null
       qty: number
@@ -70,7 +75,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       lots: string | null
     }[]
   >`
-    select m.id, variant_display_name(m.variant_id) as product, pv.sku, m.qty, m.qty_done,
+    select m.id, m.variant_id, variant_display_name(m.variant_id) as product, pv.sku, m.qty, m.qty_done,
            m.reserved_qty, u.name as uom, m.state, src.full_path as src, dst.full_path as dest,
            pt.tracking,
            (select string_agg(sl.name || ' × ' || round(a.qty, 2), ', ' order by sl.name)
@@ -89,16 +94,19 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
     { id: string; shipment_number: string; state: string; tracking_url: string }[]
   >`select id, shipment_number, state, tracking_url from shipments where picking_id = ${id}`
 
+  // Folgebelege in beide Richtungen: Rückstände und Retouren zu diesem
+  // Transfer sowie die Reparatur, deren Rückversand er ist — Querverweise
+  // statt Sackgassen (Betreiber 2026-10-01).
+  const folgebelege = await sql<{ id: string; number: string; art: string }[]>`
+    select id, number, case when backorder_of_id = ${id} then 'Rückstand' else 'Retoure' end as art
+    from stock_pickings
+    where backorder_of_id = ${id} or return_of_id = ${id}
+    order by created_at`
+  const reparaturen = await sql<{ id: string; number: string }[]>`
+    select id, number from repair_orders where return_picking_id = ${id} order by created_at`
 
   const open = picking.state !== 'done' && picking.state !== 'cancel'
-  const originHref =
-    picking.origin_model === 'sales_order'
-      ? `/verkauf/${picking.origin_id}`
-      : picking.origin_model === 'purchase_order'
-        ? `/einkauf/${picking.origin_id}`
-        : picking.origin_model === 'repair_order'
-          ? `/reparatur/${picking.origin_id}`
-          : null
+  const originHref = herkunftHref(picking.origin_model, picking.origin_id)
 
   // Zulauf-Infos der Herkunfts-Bestellung: Termin (bestätigt vor geschätzt),
   // Carrier und Tracking — gepflegt am Einkauf, hier nur angezeigt.
@@ -124,7 +132,16 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         subtitle={
           <>
             {picking.type_name}
-            {picking.partner && <> · {picking.partner}</>}
+            {picking.partner && (
+              <>
+                {' '}·{' '}
+                {picking.partner_id ? (
+                  <Link href={`/kontakte/${picking.partner_id}`}>{picking.partner}</Link>
+                ) : (
+                  picking.partner
+                )}
+              </>
+            )}
             {picking.origin_label && (
               <>
                 {' '}· Quellbeleg{' '}
@@ -135,8 +152,30 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                 )}
               </>
             )}
-            {picking.backorder_of && <> · Rückstand zu <span className="mono">{picking.backorder_of}</span></>}
-            {picking.return_of && <> · Retoure zu <span className="mono">{picking.return_of}</span></>}
+            {picking.backorder_of && picking.backorder_of_id && (
+              <>
+                {' '}· Rückstand zu{' '}
+                <Link className="mono" href={`/lager/${picking.backorder_of_id}`}>{picking.backorder_of}</Link>
+              </>
+            )}
+            {picking.return_of && picking.return_of_id && (
+              <>
+                {' '}· Retoure zu{' '}
+                <Link className="mono" href={`/lager/${picking.return_of_id}`}>{picking.return_of}</Link>
+              </>
+            )}
+            {folgebelege.map((f) => (
+              <span key={f.id}>
+                {' '}· {f.art}{' '}
+                <Link className="mono" href={`/lager/${f.id}`}>{f.number}</Link>
+              </span>
+            ))}
+            {reparaturen.map((r) => (
+              <span key={r.id}>
+                {' '}· Rückversand zu Reparatur{' '}
+                <Link className="mono" href={`/reparatur/${r.id}`}>{r.number}</Link>
+              </span>
+            ))}
           </>
         }
         actions={
@@ -231,7 +270,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
                   {moves.map((m) => (
                     <tr key={m.id}>
                       <td>
-                        {m.product}
+                        <Link href={`/produkte/variante/${m.variant_id}`}>{m.product}</Link>
                         {m.sku && <span className="muted small mono"> · {m.sku}</span>}
                       </td>
                       <td className="small muted nowrap mono">{m.src} → {m.dest}</td>
@@ -304,7 +343,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
               <tbody>
                 {moves.map((m) => (
                   <tr key={m.id}>
-                    <td>{m.product}</td>
+                    <td><Link href={`/produkte/variante/${m.variant_id}`}>{m.product}</Link></td>
                     <td className="small muted nowrap mono">{m.src} → {m.dest}</td>
                     <td className="num">{qty(m.qty)}</td>
                     <td className="num">{qty(m.qty_done)}</td>

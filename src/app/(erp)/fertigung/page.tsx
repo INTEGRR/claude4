@@ -8,16 +8,25 @@ import { FertigungBulk } from './bulk'
 
 export const dynamic = 'force-dynamic'
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default async function FertigungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; produkt?: string; material?: string }>
+  searchParams: Promise<{ status?: string; produkt?: string; material?: string; auftrag?: string }>
 }) {
   await requireArea('fertigung')
-  const { status, produkt: produktRoh, material } = await searchParams
+  const { status, produkt: produktRoh, material, auftrag: auftragRoh } = await searchParams
   // Das GET-Formular schickt produkt= auch leer mit — ''::uuid wäre ein 500.
   const produkt = produktRoh || undefined
   const nurStartbare = material === 'bereit'
+  // Filter „Fertigung zum Auftrag" (Querverweis vom Verkauf, „N offen"):
+  // nur gültige UUIDs, sonst wäre Unsinn in der Adresszeile ein 500.
+  const auftrag = auftragRoh && UUID.test(auftragRoh) ? auftragRoh : undefined
+  const [auftragKopf] = auftrag
+    ? await sql<{ id: string; number: string; shopify_order_name: string | null }[]>`
+        select id, number, shopify_order_name from sales_orders where id = ${auftrag}`
+    : []
 
   const rows = await sql<
     {
@@ -30,19 +39,35 @@ export default async function FertigungPage({
       scheduled_date: string
       sales_order_number: string | null
       sales_order_id: string | null
+      template_id: string
+      lieferung_id: string | null
+      lieferung_number: string | null
       missing: number
     }[]
   >`
     select mo.id, mo.number, variant_display_name(mo.variant_id) as product,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date,
            so.number as sales_order_number, so.id as sales_order_id,
+           pv.template_id, lf.id as lieferung_id, lf.number as lieferung_number,
            (select count(*) from stock_moves m
              where m.production_id = mo.id and m.state not in ('done','cancel')
                and m.reserved_qty < m.qty)::int as missing
     from manufacturing_orders mo
+    join product_variants pv on pv.id = mo.variant_id
     left join sales_orders so on so.id = mo.sales_order_id
+    -- Die Lieferung, auf die der Auftrag wartet: die offene zuerst, sonst
+    -- die jüngste (Index origin_model/origin_id).
+    left join lateral (
+      select sp.id, sp.number
+      from stock_pickings sp
+      join operation_types ot on ot.id = sp.operation_type_id and ot.kind = 'delivery'
+      where sp.origin_model = 'sales_order' and sp.origin_id = so.id
+      order by (sp.state in ('done', 'cancel')), sp.scheduled_date desc
+      limit 1
+    ) lf on true
     where (${status ?? null}::text is null or mo.state = ${status ?? null}::mo_state)
       and (${produkt ?? null}::uuid is null or mo.variant_id = ${produkt ?? null}::uuid)
+      and (${auftrag ?? null}::uuid is null or mo.sales_order_id = ${auftrag ?? null}::uuid)
     order by
       case mo.state when 'progress' then 0 when 'confirmed' then 1 when 'draft' then 2 else 3 end,
       mo.scheduled_date
@@ -60,6 +85,18 @@ export default async function FertigungPage({
     join product_templates pt on pt.id = pv.template_id
     where pv.active and pt.active and resolve_bom(pv.id) is not null
     order by label limit 300`
+
+  // Adresse mit den übrigen Filtern — Produkt, Material und Auftrag bleiben
+  // beim Umschalten des Status erhalten.
+  const filterHref = (f: { status?: string; auftrag?: string }) => {
+    const params = new URLSearchParams()
+    if (f.status) params.set('status', f.status)
+    if (produkt) params.set('produkt', produkt)
+    if (nurStartbare) params.set('material', 'bereit')
+    if (f.auftrag) params.set('auftrag', f.auftrag)
+    const query = params.toString()
+    return query ? `/fertigung?${query}` : '/fertigung'
+  }
 
   const filters = [
     { key: undefined, label: 'Alle' },
@@ -105,21 +142,32 @@ export default async function FertigungPage({
         )}
       </Card>
 
+      {auftrag && (
+        <div className="notice info">
+          <span className="led" style={{ background: 'var(--info)' }} /> Gefiltert auf Auftrag{' '}
+          {auftragKopf ? (
+            <Link className="mono" href={`/verkauf/${auftragKopf.id}`}>
+              {auftragKopf.number}
+              {auftragKopf.shopify_order_name ? ` · ${auftragKopf.shopify_order_name}` : ''}
+            </Link>
+          ) : (
+            <span className="muted">(nicht gefunden)</span>
+          )}
+          {' '}·{' '}
+          <Link href={filterHref({ status })}>Filter aufheben</Link>
+        </div>
+      )}
+
       <Card tight>
         {/* Filter: der aktive Zustand wird von der LED getragen, nicht von einer
             orangen Fläche — der Akzent bleibt der Primärtaste vorbehalten.
             Produkt/Material bleiben in den Status-Links erhalten. */}
         <div className="actions" style={{ padding: 12, flexWrap: 'wrap' }}>
           {filters.map((f) => {
-            const params = new URLSearchParams()
-            if (f.key) params.set('status', f.key)
-            if (produkt) params.set('produkt', produkt)
-            if (nurStartbare) params.set('material', 'bereit')
-            const query = params.toString()
             return (
               <Link
                 key={f.label}
-                href={query ? `/fertigung?${query}` : '/fertigung'}
+                href={filterHref({ status: f.key, auftrag })}
                 className="btn small"
                 aria-current={status === f.key ? 'page' : undefined}
               >
@@ -130,6 +178,7 @@ export default async function FertigungPage({
           })}
           <form method="get" className="actions" style={{ gap: 8 }}>
             {status && <input type="hidden" name="status" value={status} />}
+            {auftrag && <input type="hidden" name="auftrag" value={auftrag} />}
             <select name="produkt" defaultValue={produkt ?? ''} aria-label="Nach Produkt filtern">
               <option value="">Alle Produkte</option>
               {products.map((p) => (
@@ -145,7 +194,10 @@ export default async function FertigungPage({
         </div>
 
         {gefiltert.length === 0 ? (
-          <Empty>Keine Fertigungsaufträge{nurStartbare ? ' mit vollständigem Material' : ''}.</Empty>
+          <Empty>
+            Keine Fertigungsaufträge{nurStartbare ? ' mit vollständigem Material' : ''}
+            {auftrag ? ' zu diesem Auftrag' : ''}.
+          </Empty>
         ) : (
           <TableWrap>
             <FertigungBulk rows={gefiltert} />

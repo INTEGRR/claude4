@@ -27,6 +27,7 @@ export default async function BeschaffungPage() {
   const vorschlaege = await sql<
     {
       orderpoint_id: string
+      variant_id: string
       product: string
       location: string
       qty_on_hand: number
@@ -35,6 +36,7 @@ export default async function BeschaffungPage() {
       max_qty: number
       qty_to_order: number
       route: string | null
+      vendor_id: string | null
       vendor_name: string | null
       moq: number | null
       qty_empfohlen: number
@@ -129,7 +131,7 @@ export default async function BeschaffungPage() {
               <tbody>
                 {vorschlaege.map((v) => (
                   <tr key={v.orderpoint_id}>
-                    <td>{v.product}</td>
+                    <td><Link href={`/produkte/variante/${v.variant_id}`}>{v.product}</Link></td>
                     <td className="num">{qty(v.qty_on_hand)}</td>
                     <td className="num">
                       {qty(v.qty_forecast)}
@@ -156,7 +158,11 @@ export default async function BeschaffungPage() {
                       </span>
                     </td>
                     <td className="small">
-                      {v.vendor_name ?? '—'}
+                      {v.vendor_name && v.vendor_id ? (
+                        <Link href={`/kontakte/${v.vendor_id}`}>{v.vendor_name}</Link>
+                      ) : (
+                        (v.vendor_name ?? '—')
+                      )}
                       {v.unit_price != null && (
                         <> · <span className="mono nowrap">{money(v.unit_price)}</span></>
                       )}

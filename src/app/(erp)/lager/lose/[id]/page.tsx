@@ -13,9 +13,17 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
   const { id } = await params
 
   const [los] = await sql<
-    { id: string; name: string; product: string; ref: string | null; note: string | null; created_at: string }[]
+    {
+      id: string
+      name: string
+      product: string
+      variant_id: string
+      ref: string | null
+      note: string | null
+      created_at: string
+    }[]
   >`
-    select sl.id, sl.name, variant_display_name(sl.variant_id) as product,
+    select sl.id, sl.name, variant_display_name(sl.variant_id) as product, sl.variant_id,
            sl.ref, sl.note, sl.created_at
     from stock_lots sl where sl.id = ${id}`
   if (!los) notFound()
@@ -42,10 +50,11 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
   >`
     select m.id as move_id, a.qty, src.full_path as src, dst.full_path as dest,
            m.state, m.reference, m.date_done,
-           coalesce(p.number, mo.number) as beleg,
+           coalesce(p.number, mo.number, r.number) as beleg,
            case
              when p.id is not null then '/lager/' || p.id
              when mo.id is not null then '/fertigung/' || mo.id
+             when r.id is not null then '/reparatur/' || r.id
            end as beleg_link
     from move_lot_assignments a
     join stock_moves m on m.id = a.move_id
@@ -53,6 +62,7 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
     join stock_locations dst on dst.id = m.dest_location_id
     left join stock_pickings p on p.id = m.picking_id
     left join manufacturing_orders mo on mo.id = m.production_id
+    left join repair_orders r on r.id = m.repair_id
     where a.lot_id = ${id}
     order by coalesce(m.date_done, m.created_at)`
 
@@ -62,7 +72,7 @@ export default async function LosPage({ params }: { params: Promise<{ id: string
         title={<span className="mono">{los.name}</span>}
         subtitle={
           <>
-            {los.product} · angelegt <span className="mono">{dateTime(los.created_at)}</span>
+            <Link href={`/produkte/variante/${los.variant_id}`}>{los.product}</Link> · angelegt <span className="mono">{dateTime(los.created_at)}</span>
             {los.ref && <> · Referenz <span className="mono">{los.ref}</span></>}
           </>
         }

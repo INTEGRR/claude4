@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { TagEditor } from '@/components/tag-editor'
+import { herkunftHref } from '@/app/(erp)/lager/herkunft'
 import {
   addLine,
   cancelOrder,
@@ -49,6 +50,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       gross: number
       historisch: boolean
       versandkosten: number
+      origin_model: string | null
+      origin_id: string | null
+      origin_label: string | null
     }[]
   >`
     select so.*, p.name as partner_name,
@@ -100,17 +104,34 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     order by l.sequence`
 
   const pickings = await sql<
-    { id: string; number: string; state: string; date_done: string | null }[]
+    { id: string; number: string; state: string; kind: string; type_name: string; date_done: string | null }[]
   >`
-    select id, number, state, date_done from stock_pickings
-    where origin_model = 'sales_order' and origin_id = ${id} order by created_at`
+    select p.id, p.number, p.state, ot.kind, ot.name as type_name, p.date_done
+    from stock_pickings p
+    join operation_types ot on ot.id = p.operation_type_id
+    where p.origin_model = 'sales_order' and p.origin_id = ${id} order by p.created_at`
 
   const mos = await sql<
-    { id: string; number: string; state: string; qty_to_produce: number; product: string }[]
+    {
+      id: string
+      number: string
+      state: string
+      qty_to_produce: number
+      product: string
+      template_id: string
+    }[]
   >`
     select mo.id, mo.number, mo.state, mo.qty_to_produce,
-           variant_display_name(mo.variant_id) as product
-    from manufacturing_orders mo where mo.sales_order_id = ${id} order by mo.created_at`
+           variant_display_name(mo.variant_id) as product, pv.template_id
+    from manufacturing_orders mo
+    join product_variants pv on pv.id = mo.variant_id
+    where mo.sales_order_id = ${id} order by mo.created_at`
+
+  // Herkunft in beide Richtungen: die Reparatur, aus der dieses Angebot
+  // entstand (repair_orders.sales_order_id), und ein Quellbeleg über origin
+  // (z. B. ein Vorgang) — beides als Weg zurück (Betreiber 2026-10-01).
+  const reparaturen = await sql<{ id: string; number: string }[]>`
+    select id, number from repair_orders where sales_order_id = ${id} order by created_at`
 
   // BUG/00014: „Keine Fertigung nötig" war eine Behauptung — auch dann, wenn
   // eine Position sehr wohl eine Stückliste hat und nur die Route fehlt.
@@ -121,10 +142,20 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     where grund is not null`
 
   const shipments = await sql<
-    { id: string; shipment_number: string; state: string; tracking_url: string }[]
+    {
+      id: string
+      shipment_number: string
+      state: string
+      tracking_url: string
+      picking_id: string | null
+      picking_number: string | null
+    }[]
   >`
-    select s.id, s.shipment_number, s.state, s.tracking_url
-    from shipments s where s.sales_order_id = ${id} order by s.created_at`
+    select s.id, s.shipment_number, s.state, s.tracking_url,
+           p.id as picking_id, p.number as picking_number
+    from shipments s
+    left join stock_pickings p on p.id = s.picking_id
+    where s.sales_order_id = ${id} order by s.created_at`
 
   const products = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) ||
@@ -134,6 +165,20 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     order by label limit 500`
 
   const editable = order.state !== 'cancel' && !order.locked
+
+  // Lieferstatus-Schild als Weg: genau eine offene (oder überhaupt nur eine)
+  // Lieferung → direkt dorthin, sonst die Transfers des Auftrags.
+  const lieferungen = pickings.filter((p) => p.kind === 'delivery')
+  const offeneLieferungen = lieferungen.filter((p) => p.state !== 'done' && p.state !== 'cancel')
+  const lieferstatusHref =
+    offeneLieferungen.length === 1
+      ? `/lager/${offeneLieferungen[0].id}`
+      : lieferungen.length === 1
+        ? `/lager/${lieferungen[0].id}`
+        : lieferungen.length > 1
+          ? `/lager?auftrag=${id}${offeneLieferungen.length > 0 ? '' : '&offen=0'}`
+          : undefined
+  const quelleHref = herkunftHref(order.origin_model, order.origin_id)
 
   return (
     <>
@@ -148,8 +193,25 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         }
         subtitle={
           <>
-            {order.partner_name} · <span className="mono">{date(order.order_date)}</span>
+            <Link href={`/kontakte/${order.partner_id}`}>{order.partner_name}</Link> ·{' '}
+            <span className="mono">{date(order.order_date)}</span>
             {order.source === 'shopify' && <> · aus Shopify importiert</>}
+            {order.origin_label && (
+              <>
+                {' '}· entstanden aus{' '}
+                {quelleHref ? (
+                  <Link className="mono" href={quelleHref}>{order.origin_label}</Link>
+                ) : (
+                  <span className="mono">{order.origin_label}</span>
+                )}
+              </>
+            )}
+            {reparaturen.map((r) => (
+              <span key={r.id}>
+                {' '}· Angebot zu Reparatur{' '}
+                <Link className="mono" href={`/reparatur/${r.id}`}>{r.number}</Link>
+              </span>
+            ))}
             {order.historisch && <> · Historie (ohne Lieferung/Fertigung)</>}
           </>
         }
@@ -206,7 +268,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <div className="stat">
             <div className="label">Lieferstatus</div>
             <div style={{ marginTop: 6 }}>
-              <Badge state={order.delivery_status} kind="delivery" />
+              <Badge
+                state={order.delivery_status}
+                kind="delivery"
+                href={lieferstatusHref}
+                title={
+                  lieferungen.length > 1
+                    ? `${lieferungen.length} Lieferungen, davon ${offeneLieferungen.length} offen`
+                    : undefined
+                }
+              />
             </div>
           </div>
         </div>
@@ -218,7 +289,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <div className="stat">
             <div className="label">Lieferadresse</div>
             <div className="small" style={{ marginTop: 6 }}>
-              {order.ship_name ?? order.partner_name}
+              {order.ship_name ?? (
+                <Link href={`/kontakte/${order.partner_id}`}>{order.partner_name}</Link>
+              )}
               <br />
               {order.ship_street} {order.ship_house_number}
               <br />
@@ -328,7 +401,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <tbody>
                 {lines.map((l) => (
                   <tr key={l.id}>
-                    <td>{l.name}</td>
+                    <td>
+                      {l.variant_id ? (
+                        <Link href={`/produkte/variante/${l.variant_id}`}>{l.name}</Link>
+                      ) : (
+                        l.name
+                      )}
+                    </td>
                     <td className="num">{qty(l.qty)}</td>
                     <td>{l.uom}</td>
                     <td className="num">
@@ -419,7 +498,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       </Card>
 
       <div className="grid-2">
-        <Card title={`Lieferungen (${pickings.length})`} tight>
+        <Card
+          title={`Lieferungen (${pickings.length})`}
+          actions={
+            pickings.length > 1 ? (
+              <Link className="small" href={`/lager?auftrag=${id}&offen=0`}>als Transferliste</Link>
+            ) : null
+          }
+          tight
+        >
           {pickings.length === 0 ? (
             <Empty>Noch keine Lieferung. Sie entsteht beim Bestätigen.</Empty>
           ) : (
@@ -428,6 +515,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <thead>
                   <tr>
                     <th>Nummer</th>
+                    <th>Art</th>
                     <th>Status</th>
                     <th>Datum</th>
                   </tr>
@@ -436,7 +524,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   {pickings.map((p) => (
                     <tr key={p.id}>
                       <td className="mono"><Link href={`/lager/${p.id}`}>{p.number}</Link></td>
-                      <td><Badge state={p.state} kind="picking" /></td>
+                      <td className="small">{p.type_name}</td>
+                      <td><Badge state={p.state} kind="picking" href={`/lager/${p.id}`} /></td>
                       <td className="mono nowrap">{date(p.date_done)}</td>
                     </tr>
                   ))}
@@ -446,7 +535,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           )}
         </Card>
 
-        <Card title={`Fertigungsaufträge (${mos.length})`} tight>
+        <Card
+          title={`Fertigungsaufträge (${mos.length})`}
+          actions={
+            mos.length > 1 ? (
+              <Link className="small" href={`/fertigung?auftrag=${id}`}>in der Fertigung</Link>
+            ) : null
+          }
+          tight
+        >
           {mos.length === 0 ? (
             fertigungslage.length === 0 ? (
               <Empty>Keine Fertigung nötig.</Empty>
@@ -487,9 +584,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   {mos.map((m) => (
                     <tr key={m.id}>
                       <td className="mono"><Link href={`/fertigung/${m.id}`}>{m.number}</Link></td>
-                      <td>{m.product}</td>
+                      <td><Link href={`/produkte/${m.template_id}`}>{m.product}</Link></td>
                       <td className="num">{qty(m.qty_to_produce)}</td>
-                      <td><Badge state={m.state} kind="mo" /></td>
+                      <td><Badge state={m.state} kind="mo" href={`/fertigung/${m.id}`} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -506,6 +603,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <thead>
                 <tr>
                   <th>Sendungsnummer</th>
+                  <th>Lieferung</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -514,6 +612,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <tr key={s.id}>
                     <td className="mono">
                       <a href={s.tracking_url} target="_blank" rel="noreferrer">{s.shipment_number}</a>
+                    </td>
+                    <td className="mono small">
+                      {s.picking_id ? (
+                        <Link href={`/lager/${s.picking_id}`}>{s.picking_number}</Link>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td><Badge state={s.state} kind="shipment" /></td>
                   </tr>

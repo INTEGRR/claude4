@@ -11,7 +11,7 @@ import { RecordComments } from '@/components/record-comments'
 import { Card, PageHeader } from '@/components/ui'
 import { naechsteAngebote } from '@/modules/prozesse/angebote'
 import type { FormularFeld } from '@/modules/prozesse/schema-felder'
-import { dateTime } from '@/modules/shared/format'
+import { LABELS, dateTime } from '@/modules/shared/format'
 import { vorgangKopfAendern } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -133,8 +133,14 @@ export default async function VorgangDetail({
         title={<span className="mono">{v.number}</span>}
         subtitle={
           <>
-            {v.prozess_name}
+            <Link href={`/vorgaenge/prozess/${v.prozess_code}`}>{v.prozess_name}</Link>
             {v.titel && <> · {v.titel}</>}
+            {v.partner && (
+              <>
+                {' '}·{' '}
+                {v.partner_id ? <Link href={`/kontakte/${v.partner_id}`}>{v.partner}</Link> : v.partner}
+              </>
+            )}
             {v.origin_label && (
               <>
                 {' '}· entstanden aus{' '}
@@ -150,7 +156,13 @@ export default async function VorgangDetail({
         }
         actions={
           <>
-            <span className="badge info">{zustandsSchritt?.name ?? v.state}</span>
+            <Link
+              className="badge info"
+              href={`/vorgaenge/prozess/${v.prozess_code}?zustand=${encodeURIComponent(v.state)}`}
+              title="Alle Vorgänge dieses Ablaufs in diesem Zustand"
+            >
+              {zustandsSchritt?.name ?? v.state}
+            </Link>
             {v.quelle === 'kundenformular' && (
               <span className="badge neutral" title="Über die öffentliche Seite /service/reparatur eingegangen">
                 Kundenformular
@@ -168,7 +180,10 @@ export default async function VorgangDetail({
             )}
             {reparatur && (
               <Link className="btn" href={`/reparatur/${reparatur.id}`}>
-                Reparatur {reparatur.number}
+                Reparatur <span className="mono">{reparatur.number}</span>
+                {/* Der Stand der Reparatur gleich mit — ein Klick führt hin. */}
+                {' '}
+                <span className="muted small">· {LABELS.repair[reparatur.state as keyof typeof LABELS.repair] ?? reparatur.state}</span>
               </Link>
             )}
             <Link className="btn" href={`/vorgaenge/prozess/${v.prozess_code}`}>

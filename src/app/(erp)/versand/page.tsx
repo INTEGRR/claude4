@@ -45,6 +45,17 @@ export default async function VersandPage({
   const ready = await versandbereitMitVorschlag(filter)
   // Kommissionier-Marken (0091): Zettel gedruckt, wird gesammelt, kommissioniert.
   const marken = await sammelMarken(ready.map((r) => r.picking_id))
+  // Kunde als Weg zum Kontakt (Betreiber 2026-10-01): die Sicht
+  // shipping_ready trägt nur den Namen — die Partner-IDs kommen in EINER
+  // Abfrage über alle Zeilen dazu, nicht je Zeile.
+  const partnerJeLieferung = new Map(
+    (ready.length === 0
+      ? []
+      : await sql<{ id: string; partner_id: string | null }[]>`
+          select id, partner_id from stock_pickings
+          where id = any(${ready.map((r) => r.picking_id)}::uuid[])`
+    ).map((p) => [p.id, p.partner_id]),
+  )
   // Live gezählt: was noch auf Ware wartet, erscheint von selbst, sobald
   // Bestand gebucht ist (Live-Reservierung, Migration 0086).
   const [{ wartend }] = await sql<{ wartend: number }[]>`
@@ -85,6 +96,7 @@ export default async function VersandPage({
       repair_id: string | null
       repair_number: string | null
       customer: string | null
+      customer_id: string | null
       shopify_fulfillment_id: string | null
       last_event: { description?: string } | null
       ersatz_moeglich: boolean
@@ -94,7 +106,8 @@ export default async function VersandPage({
            (s.label_pdf is not null or s.label_path is not null) as hat_label,
            s.created_at, p.number as picking_number, p.id as picking_id,
            r.id as repair_id, r.number as repair_number,
-           coalesce(part.name, rpart.name) as customer, s.shopify_fulfillment_id,
+           coalesce(part.name, rpart.name) as customer, coalesce(part.id, rpart.id) as customer_id,
+           s.shopify_fulfillment_id,
            s.last_tracking_event as last_event,
            -- Ersatz-Label (2026-10-01): jüngste stornierte Sendung einer
            -- ausgebuchten Lieferung, die keine gültige Sendung mehr hat.
@@ -148,7 +161,13 @@ export default async function VersandPage({
             <div className="row" style={{ alignItems: 'center', gap: 12 }}>
               <div>
                 {gelabelt.length} Lieferung(en) haben ein Label, sind aber noch nicht ausgebucht — Lager
-                und Shopify wissen nichts vom Versand ({gelabelt.slice(0, 5).map((g) => g.picking_number).join(', ')}
+                und Shopify wissen nichts vom Versand (
+                {gelabelt.slice(0, 5).map((g, i) => (
+                  <span key={g.picking_id}>
+                    {i > 0 && ', '}
+                    <Link className="mono" href={`/lager/${g.picking_id}`}>{g.picking_number}</Link>
+                  </span>
+                ))}
                 {gelabelt.length > 5 ? ' …' : ''}).
               </div>
               <div className="shrink">
@@ -184,7 +203,7 @@ export default async function VersandPage({
               <tbody>
                 {ohneGewicht.map((a) => (
                   <tr key={a.variant_id}>
-                    <td>{a.artikel}</td>
+                    <td><Link href={`/produkte/variante/${a.variant_id}`}>{a.artikel}</Link></td>
                     <td className="mono small">{a.sku ?? '—'}</td>
                     <td className="num">{a.lieferungen}</td>
                     <td>
@@ -324,7 +343,15 @@ export default async function VersandPage({
                         '—'
                       )}
                     </td>
-                    <td>{r.customer_name ?? '—'}</td>
+                    <td>
+                      {r.customer_name && partnerJeLieferung.get(r.picking_id) ? (
+                        <Link href={`/kontakte/${partnerJeLieferung.get(r.picking_id)}`}>
+                          {r.customer_name}
+                        </Link>
+                      ) : (
+                        (r.customer_name ?? '—')
+                      )}
+                    </td>
                     <td className="small">
                       {/* PLZ und Ländercode sind Codes, der Ort bleibt Fließtext. */}
                       <span className="mono">{r.ship_zip}</span> {r.ship_city}{' '}
@@ -508,7 +535,13 @@ export default async function VersandPage({
                         '—'
                       )}
                     </td>
-                    <td>{s.customer ?? '—'}</td>
+                    <td>
+                      {s.customer && s.customer_id ? (
+                        <Link href={`/kontakte/${s.customer_id}`}>{s.customer}</Link>
+                      ) : (
+                        (s.customer ?? '—')
+                      )}
+                    </td>
                     <td><Badge state={s.state} kind="shipment" /></td>
                     <td>
                       {/* Beide Zustände sind beschriftet — „nicht gemeldet" ist auch ein Zustand. */}

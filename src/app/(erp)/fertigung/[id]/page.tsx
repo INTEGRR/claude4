@@ -31,6 +31,10 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       number: string
       product: string
       variant_id: string
+      template_id: string
+      bom_id: string | null
+      partner_id: string | null
+      partner_name: string | null
       qty_to_produce: number
       qty_produced: number
       state: string
@@ -39,6 +43,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       sales_order_id: string | null
       sales_order_number: string | null
       backorder_of_number: string | null
+      backorder_of_id: string | null
       uom: string
       consumption: string
       user_id: string | null
@@ -52,16 +57,19 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
     }[]
   >`
     select mo.id, mo.number, variant_display_name(mo.variant_id) as product, mo.variant_id,
+           pv.template_id, mo.bom_id, so.partner_id, pa.name as partner_name,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date, mo.date_done,
            mo.user_id, mo.priority, mo.origin,
            mo.material_cost, mo.labor_cost, mo.unit_cost,
            product_tracking(mo.variant_id) as tracking,
            mo.sales_order_id, so.number as sales_order_number,
-           bo.number as backorder_of_number, u.name as uom, b.consumption,
+           bo.number as backorder_of_number, mo.backorder_of_id, u.name as uom, b.consumption,
            exists(select 1 from odoo_verweise v
                   where v.krnl_tabelle = 'manufacturing_orders' and v.krnl_id = mo.id) as aus_odoo
     from manufacturing_orders mo
+    join product_variants pv on pv.id = mo.variant_id
     left join sales_orders so on so.id = mo.sales_order_id
+    left join partners pa on pa.id = so.partner_id
     left join manufacturing_orders bo on bo.id = mo.backorder_of_id
     left join uoms u on u.id = mo.uom_id
     left join boms b on b.id = mo.bom_id
@@ -73,6 +81,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
     {
       id: string
       product: string
+      template_id: string
       qty: number
       qty_done: number
       reserved_qty: number
@@ -83,12 +92,13 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       phantom_path: string | null
     }[]
   >`
-    select m.id, variant_display_name(m.variant_id) as product, m.qty, m.qty_done,
+    select m.id, variant_display_name(m.variant_id) as product, pv.template_id, m.qty, m.qty_done,
            m.reserved_qty, u.name as uom, m.state,
            free_to_use(m.variant_id) + m.reserved_qty as available,
            m.issue_method, m.phantom_path
     from stock_moves m
     join uoms u on u.id = m.uom_id
+    join product_variants pv on pv.id = m.variant_id
     where m.production_id = ${id} and m.reference = 'Komponentenverbrauch'
     order by m.created_at`
 
@@ -138,6 +148,19 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
     where o.mo_id = ${id} and t.ended_at is null`
 
 
+  // Querverweise (Betreiber 2026-10-01): die Lieferung(en) des Auftrags,
+  // auf die diese Fertigung zuarbeitet, und Rückstände dieses Auftrags.
+  const lieferungen = mo.sales_order_id
+    ? await sql<{ id: string; number: string; state: string }[]>`
+        select sp.id, sp.number, sp.state
+        from stock_pickings sp
+        join operation_types ot on ot.id = sp.operation_type_id and ot.kind = 'delivery'
+        where sp.origin_model = 'sales_order' and sp.origin_id = ${mo.sales_order_id}
+        order by sp.created_at`
+    : []
+  const rueckstaende = await sql<{ id: string; number: string }[]>`
+    select id, number from manufacturing_orders where backorder_of_id = ${id} order by created_at`
+
   const open = mo.state !== 'done' && mo.state !== 'cancel'
   const remaining = Number(mo.qty_to_produce) - Number(mo.qty_produced)
   // Statusleuchte der Werkstattanzeige: erledigt = grün, storniert = aus,
@@ -150,17 +173,42 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         title={<span className="mono">{mo.number}</span>}
         subtitle={
           <>
-            {mo.product} · {qty(mo.qty_to_produce)} {mo.uom} · Termin{' '}
-            <span className="mono">{date(mo.scheduled_date)}</span>
+            <Link href={`/produkte/${mo.template_id}`}>{mo.product}</Link> · {qty(mo.qty_to_produce)}{' '}
+            {mo.uom} · Termin <span className="mono">{date(mo.scheduled_date)}</span>
+            {mo.bom_id && (
+              <>
+                {' '}· <Link href={`/fertigung/stuecklisten/${mo.bom_id}`}>Stückliste</Link>
+              </>
+            )}
             {mo.sales_order_id && (
               <>
                 {' '}· Auftrag{' '}
                 <Link className="mono" href={`/verkauf/${mo.sales_order_id}`}>{mo.sales_order_number}</Link>
+                {mo.partner_id && mo.partner_name && (
+                  <>
+                    {' '}für <Link href={`/kontakte/${mo.partner_id}`}>{mo.partner_name}</Link>
+                  </>
+                )}
               </>
             )}
-            {mo.backorder_of_number && (
-              <> · Rückstand zu <span className="mono">{mo.backorder_of_number}</span></>
+            {lieferungen.map((l) => (
+              <span key={l.id}>
+                {' '}· Lieferung{' '}
+                <Link className="mono" href={`/lager/${l.id}`}>{l.number}</Link>
+              </span>
+            ))}
+            {mo.backorder_of_number && mo.backorder_of_id && (
+              <>
+                {' '}· Rückstand zu{' '}
+                <Link className="mono" href={`/fertigung/${mo.backorder_of_id}`}>{mo.backorder_of_number}</Link>
+              </>
             )}
+            {rueckstaende.map((r) => (
+              <span key={r.id}>
+                {' '}· Rückstand{' '}
+                <Link className="mono" href={`/fertigung/${r.id}`}>{r.number}</Link>
+              </span>
+            ))}
           </>
         }
         actions={
@@ -241,6 +289,8 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         </div>
       </div>
 
+      {/* Sprungziel für das „N fehlt"-Schild der Auftragsliste. */}
+      <div id="komponenten" />
       <Card
         title="Komponenten"
         actions={
@@ -287,7 +337,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                 const short = Number(c.reserved_qty) < Number(c.qty) && c.state !== 'done'
                 return (
                   <tr key={c.id}>
-                    <td>{c.product}</td>
+                    <td><Link href={`/produkte/${c.template_id}`}>{c.product}</Link></td>
                     <td className="small muted">{c.phantom_path ?? '—'}</td>
                     <td className="num">{qty(c.qty)}</td>
                     <td>{c.uom}</td>

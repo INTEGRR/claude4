@@ -27,6 +27,9 @@ export interface BulkZeile {
   scheduled_date: string
   sales_order_number: string | null
   sales_order_id: string | null
+  template_id: string
+  lieferung_id: string | null
+  lieferung_number: string | null
   missing: number
 }
 
@@ -218,16 +221,22 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
                 </td>
               )}
               <td className="mono"><Link href={`/fertigung/${r.id}`}>{r.number}</Link></td>
-              <td>{r.product}</td>
+              <td><Link href={`/produkte/${r.template_id}`}>{r.product}</Link></td>
               <td className="num mono">
                 {qty(r.qty_produced)} / {qty(r.qty_to_produce)}
               </td>
-              <td><Badge state={r.state} kind="mo" /></td>
+              <td><Badge state={r.state} kind="mo" href={`/fertigung/${r.id}`} /></td>
               <td>
                 {r.state === 'done' || r.state === 'cancel' ? (
                   <span className="muted small">—</span>
                 ) : r.missing > 0 ? (
-                  <span className="badge warn">{r.missing} fehlt</span>
+                  <Link
+                    className="badge warn"
+                    href={`/fertigung/${r.id}#komponenten`}
+                    title="Fehlende Komponenten am Auftrag ansehen"
+                  >
+                    {r.missing} fehlt
+                  </Link>
                 ) : (
                   <span className="badge success">vollständig</span>
                 )}
@@ -237,6 +246,13 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
                   <Link href={`/verkauf/${r.sales_order_id}`}>{r.sales_order_number}</Link>
                 ) : (
                   <span className="muted">—</span>
+                )}
+                {r.lieferung_id && (
+                  <div className="small">
+                    <Link href={`/lager/${r.lieferung_id}`} title="Lieferung zum Auftrag">
+                      {r.lieferung_number}
+                    </Link>
+                  </div>
                 )}
               </td>
               <td className="mono nowrap">{date(r.scheduled_date)}</td>

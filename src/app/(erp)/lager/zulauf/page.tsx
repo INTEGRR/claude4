@@ -18,6 +18,7 @@ interface Eingang {
   number: string
   state: string
   vendor: string | null
+  vendor_id: string | null
   bestellung: string | null
   bestellung_id: string | null
   eta_bestaetigt: string | null
@@ -42,7 +43,12 @@ function EingangsKarte({ e, heute }: { e: Eingang; heute: string }) {
       <div className="small">
         <span className={`led ${ueberfaellig ? 'warn' : bestaetigt ? 'ok' : 'off'}`} />{' '}
         <Link className="mono" href={`/lager/${e.id}`}>{e.number}</Link>
-        {e.vendor && <> · {e.vendor}</>}
+        {e.vendor && (
+          <>
+            {' '}·{' '}
+            {e.vendor_id ? <Link href={`/kontakte/${e.vendor_id}`}>{e.vendor}</Link> : e.vendor}
+          </>
+        )}
       </div>
       <div className="small muted">
         {e.bestellung && e.bestellung_id && (
@@ -85,7 +91,7 @@ export default async function ZulaufPage({
 
   const eingaenge = await sql<Eingang[]>`
     select p.id, p.number, p.state,
-           part.name as vendor,
+           part.name as vendor, p.partner_id as vendor_id,
            po.number as bestellung, po.id as bestellung_id,
            po.eta_confirmed::text as eta_bestaetigt,
            po.carrier, po.tracking_number, po.tracking_url,
@@ -121,12 +127,13 @@ export default async function ZulaufPage({
       id: string
       number: string
       kunde: string
+      kunde_id: string
       shipment_number: string | null
       emailed_at: string | null
       label_am: string | null
     }[]
   >`
-    select r.id, r.number, p.name as kunde,
+    select r.id, r.number, p.name as kunde, p.id as kunde_id,
            rl.shipment_number, rl.emailed_at, rl.created_at as label_am
     from repair_orders r
     join partners p on p.id = r.partner_id
@@ -229,7 +236,7 @@ export default async function ZulaufPage({
                 <div className="small">
                   <span className={`led ${r.emailed_at ? 'ok' : 'warn'}`} />{' '}
                   <Link className="mono" href={`/reparatur/${r.id}?schritt=eingang`}>{r.number}</Link>
-                  {' '}· {r.kunde}
+                  {' '}· <Link href={`/kontakte/${r.kunde_id}`}>{r.kunde}</Link>
                 </div>
                 <div className="small muted">
                   {r.shipment_number ? (

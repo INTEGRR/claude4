@@ -14,10 +14,27 @@ interface Row {
   delivery_status: string
   source: string
   shopify_order_name: string | null
+  partner_id: string
   partner_name: string
   order_date: string
   gross: number
   open_mos: number
+  lieferungen: number
+  lieferungen_offen: number
+  lieferung_id: string | null
+}
+
+/**
+ * Wohin das Lieferstatus-Schild führt (Betreiber 2026-10-01: Status sind
+ * Wege): genau eine offene Lieferung → direkt dorthin; keine offene, aber
+ * genau eine überhaupt → zu ihr; sonst die Transfers des Auftrags.
+ */
+function lieferungHref(r: Row): string | undefined {
+  if (r.lieferungen === 0) return undefined
+  if (r.lieferung_id && (r.lieferungen_offen === 1 || r.lieferungen === 1)) {
+    return `/lager/${r.lieferung_id}`
+  }
+  return `/lager?auftrag=${r.id}${r.lieferungen_offen > 0 ? '' : '&offen=0'}`
 }
 
 export default async function VerkaufPage({
@@ -30,12 +47,25 @@ export default async function VerkaufPage({
 
   const rows = await sql<Row[]>`
     select so.id, so.number, so.state, so.locked, so.delivery_status,
-           so.source, so.shopify_order_name, p.name as partner_name, so.order_date,
+           so.source, so.shopify_order_name, so.partner_id, p.name as partner_name, so.order_date,
            (select gross from sales_order_total(so.id)) as gross,
            (select count(*) from manufacturing_orders mo
-             where mo.sales_order_id = so.id and mo.state not in ('done','cancel'))::int as open_mos
+             where mo.sales_order_id = so.id and mo.state not in ('done','cancel'))::int as open_mos,
+           coalesce(lf.anzahl, 0) as lieferungen,
+           coalesce(lf.offen, 0) as lieferungen_offen,
+           lf.ziel as lieferung_id
     from sales_orders so
     join partners p on p.id = so.partner_id
+    -- Warenausgänge des Auftrags (Index origin_model/origin_id): Anzahl,
+    -- davon offen, und das Sprungziel — die offene zuerst, sonst die jüngste.
+    left join lateral (
+      select count(*)::int as anzahl,
+             (count(*) filter (where sp.state not in ('done', 'cancel')))::int as offen,
+             (array_agg(sp.id order by (sp.state in ('done', 'cancel')), sp.scheduled_date desc))[1] as ziel
+      from stock_pickings sp
+      join operation_types ot on ot.id = sp.operation_type_id and ot.kind = 'delivery'
+      where sp.origin_model = 'sales_order' and sp.origin_id = so.id
+    ) lf on true
     where (${status ?? null}::text is null or so.state = ${status ?? null}::sale_state)
       and (${q ?? null}::text is null
            or so.number ilike ${'%' + (q ?? '') + '%'}
@@ -131,13 +161,30 @@ export default async function VerkaufPage({
                         </span>
                       )}
                     </td>
-                    <td>{r.partner_name}</td>
+                    <td><Link href={`/kontakte/${r.partner_id}`}>{r.partner_name}</Link></td>
                     <td className="mono nowrap">{date(r.order_date)}</td>
-                    <td><Badge state={r.state} kind="sale" /></td>
-                    <td><Badge state={r.delivery_status} kind="delivery" /></td>
+                    <td><Badge state={r.state} kind="sale" href={`/verkauf/${r.id}`} /></td>
+                    <td>
+                      <Badge
+                        state={r.delivery_status}
+                        kind="delivery"
+                        href={lieferungHref(r)}
+                        title={
+                          r.lieferungen > 1
+                            ? `${r.lieferungen} Lieferungen, davon ${r.lieferungen_offen} offen`
+                            : undefined
+                        }
+                      />
+                    </td>
                     <td>
                       {r.open_mos > 0 ? (
-                        <span className="badge warn">{r.open_mos} offen</span>
+                        <Link
+                          className="badge warn"
+                          href={`/fertigung?auftrag=${r.id}`}
+                          title="Fertigungsaufträge dieses Auftrags"
+                        >
+                          {r.open_mos} offen
+                        </Link>
                       ) : (
                         <span className="muted small">—</span>
                       )}

@@ -466,6 +466,7 @@ Fehlermeldung nennt die gesendete ID.
 - **Versandbereit-Liste**: alle reservierten, unversandten Lieferungen (Auftrag, Kunde, Shopify-Name, Fertigungsstatus) — die Packstation-Arbeitsliste, mit Auswahl für den Packzettel-Druck und den Kommissionier-Marken. Darüber steht live, wie viele Lieferungen noch auf Ware warten; sie rücken von selbst nach, sobald Bestand gebucht ist (Live-Reservierung, [lager.md](lager.md)).
 - **Lieferungs-Formular**: Abschnitt „Versand" mit Paketgewicht, DHL-Produkt, Buttons „Label erstellen"/„Label drucken"/„Sendung stornieren", Tracking-Status-Badge + Link, Shopify-Rückmeldestatus.
 - **Sendungsliste**: alle Sendungen mit Status-Filter; Fehler-Feed (fehlgeschlagene Fulfillment-Jobs, DHL-Warnings).
+- **Querverweise (2026-10-01)**: Kunde → Kontakt in Versandbereit-, Sendungs-, Retouren- und Kommissionierliste; Auftrag → Verkauf, Lieferung → Transfer, Reparatur → Reparaturauftrag; die Hinweisleiste „gelabelt, nicht ausgebucht" verlinkt die Lieferungen, „Gewichte fehlen" die Varianten. Wartet eine Lieferung beim Kommissionieren auf die Fertigung, führen die MO-Nummern zu `/fertigung?auftrag=<id>`.
 - **Einstellungen**: DHL-Zugangsdaten-Check (Test-Call), Abrechnungsnummern je Produkt, Default-Produkt/-Format, Absenderadresse (`shipperRef`), Status-Tag an/aus.
 
 ## Abnahmekriterien

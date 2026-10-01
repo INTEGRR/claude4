@@ -16,6 +16,7 @@ export default async function RetourenPage() {
       id: string
       shipment_number: string
       partner: string
+      partner_id: string
       qr_link: string | null
       emailed_at: string | null
       created_at: string
@@ -23,7 +24,7 @@ export default async function RetourenPage() {
       repair_id: string | null
     }[]
   >`
-    select rl.id, rl.shipment_number, p.name as partner, rl.qr_link, rl.emailed_at,
+    select rl.id, rl.shipment_number, p.name as partner, p.id as partner_id, rl.qr_link, rl.emailed_at,
            rl.created_at, r.number as repair_number, r.id as repair_id
     from return_labels rl
     join partners p on p.id = rl.partner_id
@@ -120,7 +121,7 @@ export default async function RetourenPage() {
                 {labels.map((l) => (
                   <tr key={l.id}>
                     <td className="mono">{l.shipment_number}</td>
-                    <td>{l.partner}</td>
+                    <td><Link href={`/kontakte/${l.partner_id}`}>{l.partner}</Link></td>
                     <td className="mono small">
                       {l.repair_id ? <Link href={`/reparatur/${l.repair_id}`}>{l.repair_number}</Link> : '—'}
                     </td>

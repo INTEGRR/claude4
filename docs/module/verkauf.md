@@ -43,6 +43,7 @@ Produkt-Auswahl auf **Varianten-Ebene** (Suche über SKU/Name inkl. Attributwert
 
 - **Liste**: Nummer, Shopify-Name, Kunde, Datum, Status-Badges (Status/Liefer-/Abrechnungsstatus), Summe; Filter nach Status/Quelle; Volltextsuche.
 - **Formular**: Kopf (Kunde, Datum, Quelle), Positionstabelle, Buttons je Status (Bestätigen, Per E-Mail senden, Stornieren, Sperren), Smart-Buttons **Lieferungen (n)** und **Fertigungsaufträge (n)** mit Verknüpfung, Aktivitäten-/Notiz-Verlauf (einfacher Chatter: Statuswechsel + Notizen protokolliert in `audit_log`).
+- **Querverweise (2026-10-01, „Status sind Wege")**: Kunde → Kontakt (`/kontakte/<id>`), Status-Schild → Auftrag. Das **Lieferstatus-Schild** führt bei genau einer offenen (oder überhaupt nur einer) Lieferung direkt zu ihr, sonst zur Transferliste des Auftrags (`/lager?auftrag=<id>`, bei nur erledigten mit `&offen=0`). „**N offen**" (Fertigung) führt zu `/fertigung?auftrag=<id>`. Im Formular sind zusätzlich Positionen → Variante, MO-Produkt → Produkt, Sendungen → Lieferung sowie die Herkunft (Reparatur, aus der das Angebot entstand; Vorgang über `origin`) verlinkt.
 
 ## Abnahmekriterien
 

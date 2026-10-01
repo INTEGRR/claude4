@@ -25,6 +25,18 @@ export default async function KommissionierenPage() {
     'kommissionieren',
   )
   const naechste = naechsteFuer(vorrat, user.name)
+  // Auftrag und Kunde als Wege (Betreiber 2026-10-01): der Vorrat trägt nur
+  // Nummern und Namen — die IDs kommen in EINER Abfrage über alle Zeilen.
+  const verweise = new Map(
+    (vorrat.length === 0
+      ? []
+      : await sql<{ id: string; auftrag_id: string | null; kunde_id: string | null }[]>`
+          select p.id, so.id as auftrag_id, coalesce(so.partner_id, p.partner_id) as kunde_id
+          from stock_pickings p
+          left join sales_orders so on so.id = p.origin_id and p.origin_model = 'sales_order'
+          where p.id = any(${vorrat.map((z) => z.pickingId)}::uuid[])`
+    ).map((v) => [v.id, v]),
+  )
   const offen = vorrat.filter((z) => !z.kommissioniertAm)
   const gesammelt = vorrat.filter((z) => z.kommissioniertAm)
 
@@ -77,7 +89,7 @@ export default async function KommissionierenPage() {
         ) : (
           <ul className="kommi-liste">
             {offen.map((z) => (
-              <VorratEintrag key={z.pickingId} z={z} ich={user.name} />
+              <VorratEintrag key={z.pickingId} z={z} ich={user.name} verweis={verweise.get(z.pickingId)} />
             ))}
           </ul>
         )}
@@ -87,7 +99,7 @@ export default async function KommissionierenPage() {
         <Card title={`Gesammelt — wartet am Packtisch (${gesammelt.length})`} tight>
           <ul className="kommi-liste">
             {gesammelt.map((z) => (
-              <VorratEintrag key={z.pickingId} z={z} ich={user.name} />
+              <VorratEintrag key={z.pickingId} z={z} ich={user.name} verweis={verweise.get(z.pickingId)} />
             ))}
           </ul>
         </Card>
@@ -96,8 +108,17 @@ export default async function KommissionierenPage() {
   )
 }
 
-function VorratEintrag({ z, ich }: { z: VorratZeile; ich: string }) {
+function VorratEintrag({
+  z,
+  ich,
+  verweis,
+}: {
+  z: VorratZeile
+  ich: string
+  verweis?: { auftrag_id: string | null; kunde_id: string | null }
+}) {
   const fremd = z.sammler && z.sammler !== ich
+  const auftrag = z.shopify ?? z.auftrag
   return (
     <li className="kommi-eintrag">
       <div className="kommi-eintrag-text">
@@ -105,9 +126,19 @@ function VorratEintrag({ z, ich }: { z: VorratZeile; ich: string }) {
           <Link className="mono" href={`/kommissionieren/${z.pickingId}`}>
             {z.number}
           </Link>{' '}
-          <span className="mono small muted">{z.shopify ?? z.auftrag ?? ''}</span>
+          {auftrag && verweis?.auftrag_id ? (
+            <Link className="mono small" href={`/verkauf/${verweis.auftrag_id}`}>{auftrag}</Link>
+          ) : (
+            <span className="mono small muted">{auftrag ?? ''}</span>
+          )}
         </div>
-        <div className="small">{z.kunde ?? '—'}</div>
+        <div className="small">
+          {z.kunde && verweis?.kunde_id ? (
+            <Link href={`/kontakte/${verweis.kunde_id}`}>{z.kunde}</Link>
+          ) : (
+            (z.kunde ?? '—')
+          )}
+        </div>
         <div className="actions" style={{ gap: 8, marginTop: 4 }}>
           <span className="mono-label">
             {z.positionen} Artikel · {qty(z.stueck)} Stück
