@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { packtischFertig } from './actions'
 import { isActionError } from '@/modules/shared/action'
 import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
+import { type AnsageSchluessel, ansageFuerFehler } from '@/modules/scanner-ansagen'
 import { scanGleich } from '@/modules/shared/scan'
 
 /**
@@ -84,11 +85,14 @@ function fokusBleibtFrei(el: EventTarget | null): boolean {
 export function Packtisch({
   startDoc,
   onEnde,
+  ansagen,
 }: {
   /** Vom Scanfeld übergeben: die gescannte Lieferung, geladen. */
   startDoc?: PacktischDoc
   /** Zurück ans Scanfeld — mit dem nächsten Scan, falls einer kam. */
   onEnde?: (naechsterCode?: string) => void
+  /** Sprachansage (Stimme wie „Sprechen"); false = keine Stimme → Piepton. */
+  ansagen?: (schluessel: AnsageSchluessel) => boolean
 } = {}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const gestartet = useRef(false)
@@ -118,14 +122,17 @@ export function Packtisch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDoc])
 
-  const say = useCallback((text: ReactNode, tone: Feedback['tone']) => {
-    setFeedback({ text, tone })
-    if (tone === 'ok') playBeep('ok')
-    if (tone === 'warn') playBeep('warn')
-    if (tone === 'error') playBeep('error')
-    setFlash(tone === 'ok' ? 'ok' : tone === 'error' ? 'error' : null)
-    setTimeout(() => setFlash(null), 350)
-  }, [])
+  const say = useCallback(
+    (text: ReactNode, tone: Feedback['tone'], ansage?: AnsageSchluessel) => {
+      setFeedback({ text, tone })
+      // Gesprochen ersetzt den Piepton; ohne Stimme piept es wie bisher.
+      const gesprochen = ansage ? (ansagen?.(ansage) ?? false) : false
+      if (!gesprochen && tone !== 'info') playBeep(tone)
+      setFlash(tone === 'ok' ? 'ok' : tone === 'error' ? 'error' : null)
+      setTimeout(() => setFlash(null), 350)
+    },
+    [ansagen],
+  )
 
   const reset = useCallback(() => {
     // Im Scanfeld gibt es keinen eigenen Ruhezustand: zurück an den Dispatcher.
@@ -154,7 +161,7 @@ export function Packtisch({
     const res = await fetch(`/api/packtisch/lookup?code=${encodeURIComponent(code)}`)
     const data = await res.json()
     if (!res.ok) {
-      say(data.error ?? 'Lieferung nicht gefunden', 'error')
+      say(data.error ?? 'Lieferung nicht gefunden', 'error', ansageFuerFehler(data.error))
       return
     }
     uebernehmen(data as PacktischDoc)
@@ -172,6 +179,7 @@ export function Packtisch({
         {loaded.labelVorhanden ? ' (Label existiert schon und wird wiederverwendet)' : ''}
       </>,
       loaded.labelVorhanden ? 'warn' : 'ok',
+      'lieferung',
     )
   }
 
@@ -185,6 +193,7 @@ export function Packtisch({
           &quot;<span className="mono">{code}</span>&quot; gehört nicht in dieses Paket
         </>,
         'error',
+        'falscher_artikel',
       )
       return
     }
@@ -195,10 +204,16 @@ export function Packtisch({
           {line.product}: Sollmenge (<span className="mono">{line.qty}</span>) bereits erreicht
         </>,
         'warn',
+        'schon_voll',
       )
       return
     }
     setCounts((c) => ({ ...c, [line.variantId]: current + 1 }))
+    // Was gesagt wird, hängt am Stand NACH diesem Scan.
+    const zeileVoll = current + 1 >= Number(line.qty)
+    const allesVoll =
+      zeileVoll &&
+      doc.lines.every((l) => l.variantId === line.variantId || (counts[l.variantId] ?? 0) >= Number(l.qty))
     say(
       <>
         {line.product}:{' '}
@@ -207,6 +222,7 @@ export function Packtisch({
         </span>
       </>,
       'ok',
+      allesVoll ? 'label_bestaetigen' : zeileVoll ? 'zeile_voll' : 'passt',
     )
   }
 
@@ -228,7 +244,7 @@ export function Packtisch({
       const result = await packtischFertig(doc.pickingId, fd)
       if (isActionError(result)) {
         setPhase('confirm')
-        say(result.error, 'error')
+        say(result.error, 'error', ansageFuerFehler(result.error))
         return
       }
       const link = result && 'link' in result ? (result.link ?? null) : null
@@ -245,10 +261,11 @@ export function Packtisch({
           {druckText ?? 'Label bereit'}
         </>,
         'ok',
+        'versandfertig',
       )
     } catch (err) {
       setPhase('confirm')
-      say(err instanceof Error ? err.message : 'Abschluss fehlgeschlagen', 'error')
+      say(err instanceof Error ? err.message : 'Abschluss fehlgeschlagen', 'error', 'fehler')
     }
   }
 
@@ -264,11 +281,11 @@ export function Packtisch({
     if (phase === 'work') {
       if (isDocCode) {
         if (!complete) {
-          say('Noch nicht alles im Paket — erst alle Positionen scannen', 'warn')
+          say('Noch nicht alles im Paket — erst alle Positionen scannen', 'warn', 'nicht_komplett')
           return
         }
         setPhase('confirm')
-        say('Alles im Paket — Versand-Code erneut scannen erstellt das Label', 'ok')
+        say('Alles im Paket — Versand-Code erneut scannen erstellt das Label', 'ok', 'label_bestaetigen')
       } else {
         scanProduct(code)
       }
@@ -276,7 +293,7 @@ export function Packtisch({
     }
     if (phase === 'confirm') {
       if (isDocCode) void book()
-      else say('Zum Abschließen bitte den Versand-Code scannen', 'warn')
+      else say('Zum Abschließen bitte den Versand-Code scannen', 'warn', 'label_bestaetigen')
       return
     }
     if (phase === 'done') {

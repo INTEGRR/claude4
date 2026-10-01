@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useAnsage } from '@/components/use-ansage'
 import { Packtisch } from '../packtisch/packtisch'
 import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
 import { Scanner } from './scanner'
@@ -25,24 +26,46 @@ export function ScanArbeitsplatz({
     versand: null,
     n: 0,
   })
+  // Sprachansagen (Stimme wie „Sprechen") — gilt für beide Abläufe.
+  const stimme = useAnsage()
 
-  if (lauf.versand) {
-    return (
-      <Packtisch
-        key={lauf.n}
-        startDoc={lauf.versand}
-        onEnde={(code) => setLauf((l) => ({ versand: null, startCode: code, n: l.n + 1 }))}
-      />
-    )
-  }
   return (
-    <Scanner
-      key={lauf.n}
-      canPickings={canPickings}
-      canMos={canMos}
-      canVersand={canVersand}
-      startCode={lauf.startCode}
-      onVersand={(doc) => setLauf((l) => ({ versand: doc, n: l.n + 1 }))}
-    />
+    <>
+      <div className="actions" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
+        {/* Schalter je Gerät; ohne konfigurierte Stimme piept das Scanfeld wie bisher. */}
+        <button
+          type="button"
+          className="small"
+          onClick={stimme.umschalten}
+          aria-pressed={stimme.an}
+          title={
+            stimme.verfuegbar === false
+              ? 'Keine Stimme konfiguriert — das Scanfeld piept'
+              : 'Ansagen wie „Gebucht", „Falscher Artikel", „Nicht gefunden"'
+          }
+        >
+          <span className={`led ${stimme.an && stimme.verfuegbar !== false ? 'ok' : 'off'}`} />{' '}
+          Stimme {stimme.an ? (stimme.verfuegbar === false ? 'nicht verfügbar' : 'an') : 'aus'}
+        </button>
+      </div>
+      {lauf.versand ? (
+        <Packtisch
+          key={lauf.n}
+          startDoc={lauf.versand}
+          ansagen={stimme.ansagen}
+          onEnde={(code) => setLauf((l) => ({ versand: null, startCode: code, n: l.n + 1 }))}
+        />
+      ) : (
+        <Scanner
+          key={lauf.n}
+          canPickings={canPickings}
+          canMos={canMos}
+          canVersand={canVersand}
+          startCode={lauf.startCode}
+          ansagen={stimme.ansagen}
+          onVersand={(doc) => setLauf((l) => ({ versand: doc, n: l.n + 1 }))}
+        />
+      )}
+    </>
   )
 }

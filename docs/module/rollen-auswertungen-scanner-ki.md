@@ -161,6 +161,21 @@ Lieferung als bloßen Transfer — ohne Label, ohne Shop-Meldung. Nach einem
 Paket ordnet das Scanfeld den nächsten Scan wieder zu. Lieferungen
 brauchen Schreibrechte im Versand (sonst Klartext-Fehler).
 
+**Sprachansagen** (seit 2026-10-01): Zu jedem Ereignis spricht das
+Scanfeld einen kurzen Satz mit derselben Stimme wie „Sprechen" —
+„Lieferung geladen", „Passt", „Position vollständig", „Falscher Artikel",
+„Menge schon erreicht", „Noch nicht alles im Paket", „Gebucht",
+„Versandfertig. Das Label kommt.", „Nicht gefunden", „Wartet noch auf die
+Fertigung", „Schon erledigt" … Der Katalog ist fest
+(`src/modules/scanner-ansagen.ts`), Serverfehler werden einem Satz
+zugeordnet (der Klartext bleibt am Bildschirm). Die Sätze erzeugt die
+OpenAI-Sprachausgabe (`gpt-4o-mini-tts`, Stimme `SPRECHEN_STIMME`, Standard
+`marin`) einmal je Server-Instanz; der Browser lädt sie beim Öffnen des
+Scanfelds vor und speichert sie (`/api/scanner/ansage/<satz>`, nur
+Katalogsätze, nur mit Scanner-Zugang). Eine neue Ansage unterbricht die
+laufende. Schalter „Stimme an/aus" oben rechts, je Gerät gemerkt. Ohne
+`OPENAI_API_KEY` (oder mit `KI_FAKE=1`) piept das Scanfeld wie bisher.
+
 Für Barcodescanner im Tastatur-Modus (Keyboard-Wedge): ein unsichtbares,
 dauerfokussiertes Eingabefeld nimmt Scans entgegen; Rückmeldung über
 Signaltöne (WebAudio) und Farbblitze. Ohne Scanner gibt es im

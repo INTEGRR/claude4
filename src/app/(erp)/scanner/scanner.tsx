@@ -6,6 +6,7 @@ import { isActionError } from '@/modules/shared/action'
 import { Badge } from '@/components/ui'
 import type { ScannerAntwort, ScannerDoc } from '@/app/api/scanner/lookup/route'
 import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
+import { type AnsageSchluessel, ansageFuerFehler } from '@/modules/scanner-ansagen'
 import { scanGleich } from '@/modules/shared/scan'
 
 /**
@@ -82,6 +83,7 @@ export function Scanner({
   canVersand = false,
   startCode,
   onVersand,
+  ansagen,
 }: {
   canPickings: boolean
   canMos: boolean
@@ -90,6 +92,8 @@ export function Scanner({
   startCode?: string
   /** Eine Lieferung wurde gescannt → das Scanfeld übergibt an den Packablauf. */
   onVersand?: (doc: PacktischDoc) => void
+  /** Sprachansage (Stimme wie „Sprechen"); false = keine Stimme → Piepton. */
+  ansagen?: (schluessel: AnsageSchluessel) => boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const gestartet = useRef(false)
@@ -121,14 +125,17 @@ export function Scanner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startCode])
 
-  const say = useCallback((text: ReactNode, tone: Feedback['tone']) => {
-    setFeedback({ text, tone })
-    if (tone === 'ok') playBeep('ok')
-    if (tone === 'warn') playBeep('warn')
-    if (tone === 'error') playBeep('error')
-    setFlash(tone === 'ok' ? 'ok' : tone === 'error' ? 'error' : null)
-    setTimeout(() => setFlash(null), 350)
-  }, [])
+  const say = useCallback(
+    (text: ReactNode, tone: Feedback['tone'], ansage?: AnsageSchluessel) => {
+      setFeedback({ text, tone })
+      // Gesprochen ersetzt den Piepton; ohne Stimme piept es wie bisher.
+      const gesprochen = ansage ? (ansagen?.(ansage) ?? false) : false
+      if (!gesprochen && tone !== 'info') playBeep(tone)
+      setFlash(tone === 'ok' ? 'ok' : tone === 'error' ? 'error' : null)
+      setTimeout(() => setFlash(null), 350)
+    },
+    [ansagen],
+  )
 
   const reset = useCallback(() => {
     setPhase('idle')
@@ -151,7 +158,7 @@ export function Scanner({
     const res = await fetch(`/api/scanner/lookup?code=${encodeURIComponent(code)}`)
     const data = await res.json()
     if (!res.ok) {
-      say(data.error ?? 'Beleg nicht gefunden', 'error')
+      say(data.error ?? 'Beleg nicht gefunden', 'error', ansageFuerFehler(data.error))
       return
     }
     const antwort = data as ScannerAntwort
@@ -159,7 +166,7 @@ export function Scanner({
     // gegenscannen, dann Label + Warenausgang + Shop-Rückmeldung.
     if ('versand' in antwort) {
       if (onVersand) onVersand(antwort.versand)
-      else say('Lieferungen werden im Packablauf versendet', 'error')
+      else say('Lieferungen werden im Packablauf versendet', 'error', 'fehler')
       return
     }
     const loaded = antwort as ScannerDoc
@@ -173,6 +180,7 @@ export function Scanner({
         scannen
       </>,
       'ok',
+      loaded.type === 'mo' ? 'fertigung' : loaded.label === 'Wareneingang' ? 'eingang' : 'transfer',
     )
   }
 
@@ -186,6 +194,7 @@ export function Scanner({
           &quot;<span className="mono">{code}</span>&quot; gehört nicht zu diesem Beleg
         </>,
         'error',
+        'falscher_artikel',
       )
       return
     }
@@ -196,10 +205,16 @@ export function Scanner({
           {line.product}: Sollmenge (<span className="mono">{line.qty}</span>) bereits erreicht
         </>,
         'warn',
+        'schon_voll',
       )
       return
     }
     setCounts((c) => ({ ...c, [line.moveId]: current + 1 }))
+    // Was gesagt wird, hängt am Stand NACH diesem Scan.
+    const zeileVoll = current + 1 >= Number(line.qty)
+    const allesVoll =
+      zeileVoll &&
+      doc.lines.every((l) => l.moveId === line.moveId || (counts[l.moveId] ?? 0) >= Number(l.qty))
     say(
       <>
         {line.product}:{' '}
@@ -208,6 +223,7 @@ export function Scanner({
         </span>
       </>,
       'ok',
+      allesVoll ? 'alles_voll' : zeileVoll ? 'zeile_voll' : 'passt',
     )
   }
 
@@ -237,7 +253,7 @@ export function Scanner({
         doc.type === 'picking' ? await validatePicking(doc.id, fd) : await produceMo(doc.id, fd)
       if (isActionError(result)) {
         setPhase('confirm')
-        say(result.error, 'error')
+        say(result.error, 'error', ansageFuerFehler(result.error))
         return
       }
       setPhase('done')
@@ -246,11 +262,12 @@ export function Scanner({
           <span className="mono">{doc.number}</span> gebucht
         </>,
         'ok',
+        'gebucht',
       )
       setTimeout(reset, 4000)
     } catch (err) {
       setPhase('confirm')
-      say(err instanceof Error ? err.message : 'Buchung fehlgeschlagen', 'error')
+      say(err instanceof Error ? err.message : 'Buchung fehlgeschlagen', 'error', 'fehler')
     }
   }
 
@@ -271,7 +288,7 @@ export function Scanner({
           // werden die Sollmengen — niemand klickt 85 Positionen hoch.
           setCounts(Object.fromEntries(doc.lines.map((l) => [l.moveId, Number(l.qty)])))
           setPhase('confirm')
-          say('Alle Positionen mit Sollmengen übernommen — zum Buchen Beleg erneut scannen', 'ok')
+          say('Alle Positionen mit Sollmengen übernommen — zum Buchen Beleg erneut scannen', 'ok', 'soll_uebernommen')
           return
         }
         setPhase('confirm')
@@ -280,6 +297,7 @@ export function Scanner({
             ? 'Alle Positionen vollständig — zum Buchen Beleg erneut scannen'
             : 'Achtung: nicht alle Positionen vollständig — Rest geht in den Rückstand',
           complete ? 'ok' : 'warn',
+          complete ? 'bestaetigen' : 'rueckstand',
         )
       } else {
         scanProduct(code)
@@ -288,7 +306,7 @@ export function Scanner({
     }
     if (phase === 'confirm') {
       if (isDocCode) void book()
-      else say('Zum Buchen bitte den Beleg-Barcode scannen', 'warn')
+      else say('Zum Buchen bitte den Beleg-Barcode scannen', 'warn', 'bestaetigen')
     }
   }
 

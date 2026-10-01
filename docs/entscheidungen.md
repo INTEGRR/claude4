@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Sprachansagen im Scanfeld
+
+**Anlass:** Betreiber: „Wir brauchen Feedback-Sounds, Stimme, wenn Dinge
+im Scanprozess stattfinden — bestätigt, gebucht, nicht gefunden. Stimme
+haben wir ja in Sprechen, dann kann die genauso sein."
+
+**Entschieden:**
+- Feste Sätze je Ereignis statt frei erzeugter Texte: sofort abspielbar
+  (vorgeladen), keine Wartezeit beim schnellen Scannen, und die Route kann
+  nichts Beliebiges sprechen (kein missbrauchbarer Sprachausgabe-Endpunkt).
+- Gleiche Stimme wie der Sprachmodus über die OpenAI-Sprachausgabe
+  (`gpt-4o-mini-tts`, `SPRECHEN_STIMME`); die Realtime-Sitzung von
+  „Sprechen" wäre für Einzelsätze zu schwer.
+- Gesprochen ersetzt den Piepton; ohne Stimme bleibt der Piepton. Eine neue
+  Ansage unterbricht die laufende. Schalter je Gerät.
+
+Umgesetzt in `scanner-ansagen.ts`, `ki/ansage.ts`,
+`/api/scanner/ansage/[schluessel]`, `components/use-ansage.ts`,
+`scanner.tsx`, `packtisch.tsx`, `scanner/arbeitsplatz.tsx`; dokumentiert
+in [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md);
+Test `tests/scanner-ansagen.test.ts`.
+
 ## 2026-10-01 — App Proxy: keine Schrägstrich-Umleitung
 
 **Anlass:** Erster Test im Shop: `/apps/reparatur` endete in einer 404 auf
