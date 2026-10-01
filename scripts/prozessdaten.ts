@@ -16,6 +16,7 @@
  */
 import './env.ts'
 import { wartungsUrl } from './db-url.ts'
+import { datenbankSsl } from '../src/db/ssl.ts'
 import postgres from 'postgres'
 import {
   FIXTURES,
@@ -34,6 +35,7 @@ async function main() {
   }
 
   const sql = postgres(wartungsUrl(), {
+    ...datenbankSsl(wartungsUrl()),
     max: 1,
     prepare: false,
     types: {

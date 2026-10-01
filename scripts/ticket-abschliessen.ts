@@ -12,6 +12,7 @@
  */
 import './env.ts'
 import { wartungsUrl } from './db-url.ts'
+import { datenbankSsl } from '../src/db/ssl.ts'
 import postgres from 'postgres'
 
 async function main() {
@@ -31,7 +32,7 @@ async function main() {
     process.exit(1)
   }
 
-  const sql = postgres(wartungsUrl(), { max: 1, prepare: false })
+  const sql = postgres(wartungsUrl(), { ...datenbankSsl(wartungsUrl()), max: 1, prepare: false })
   try {
     const treffer = await sql<{ id: string; number: string; titel: string }[]>`
       update bug_reports set

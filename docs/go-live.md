@@ -76,7 +76,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 
 - [ ] Data API abschalten (Project Settings → Data API). Nichts in KRNL
       nutzt PostgREST; Migration 0074 hat die Rechte ohnehin entzogen.
-- [ ] „Enforce SSL" einschalten (Database → Settings).
+- [ ] „Enforce SSL" einschalten (Database → Settings). Kein Zusatz in
+  `DATABASE_URL`/`DIRECT_URL` nötig — KRNL verbindet seit 2026-10-01 von
+  sich aus mit TLS (`src/db/ssl.ts`); erst deployen, dann einschalten.
 - [ ] Point-in-Time-Recovery buchen — der Rollback-Pfad des Cutovers.
 - [ ] Auftragsverarbeitungsvertrag (DPA) im Dashboard abschließen.
 - [ ] Bekannt und akzeptiert: btree_gist liegt in public (einzige

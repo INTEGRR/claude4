@@ -12,6 +12,7 @@
  */
 import './env.ts'
 import { wartungsUrl } from './db-url.ts'
+import { datenbankSsl } from '../src/db/ssl.ts'
 import { randomBytes, scrypt as scryptCb } from 'node:crypto'
 import { promisify } from 'node:util'
 import postgres from 'postgres'
@@ -30,7 +31,7 @@ const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'erp-admin'
 
 async function main() {
   const url = wartungsUrl()
-  const sql = postgres(url, { max: 1 })
+  const sql = postgres(url, { ...datenbankSsl(url), max: 1 })
   const demo = process.argv.includes('--demo')
 
   try {

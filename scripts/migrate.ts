@@ -7,6 +7,7 @@
  */
 import './env.ts'
 import { wartungsUrl } from './db-url.ts'
+import { datenbankSsl } from '../src/db/ssl.ts'
 import { readdir, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
@@ -16,7 +17,7 @@ const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'src', 'db', 'migrat
 
 async function main() {
   const url = wartungsUrl()
-  const sql = postgres(url, { max: 1 })
+  const sql = postgres(url, { ...datenbankSsl(url), max: 1 })
 
   try {
     await sql`

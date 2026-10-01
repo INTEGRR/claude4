@@ -1,4 +1,5 @@
 import postgres from 'postgres'
+import { datenbankSsl } from './ssl.ts'
 
 /**
  * Datenbankzugriff.
@@ -17,6 +18,8 @@ function createClient(): postgres.Sql {
   if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
 
   return postgres(url, {
+    // TLS für entfernte Datenbanken (Supabase), lokal ohne — src/db/ssl.ts.
+    ...datenbankSsl(url),
     max: 10,
     // Ohne Prepared Statements, aus zwei Gründen:
     //  - Supabase/Supavisor im Transaction-Mode unterstützt sie nicht.

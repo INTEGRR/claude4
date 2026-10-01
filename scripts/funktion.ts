@@ -3,6 +3,7 @@ import postgres from 'postgres'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { wartungsUrl } from './db-url.ts'
+import { datenbankSsl } from '../src/db/ssl.ts'
 
 /**
  * Wo steht die AKTUELLE Fassung einer SQL-Funktion?
@@ -57,7 +58,7 @@ async function zeigeDefinition(name: string): Promise<void> {
   }
 
   // Der Beweis kommt aus der Datenbank, nicht aus dem Dateisystem.
-  const sql = postgres(wartungsUrl(), { max: 1 })
+  const sql = postgres(wartungsUrl(), { ...datenbankSsl(wartungsUrl()), max: 1 })
   try {
     const [zeile] = await sql<{ def: string }[]>`
       select pg_get_functiondef(p.oid) as def

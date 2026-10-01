@@ -14,6 +14,7 @@ import './env.ts'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
 import { wartungsUrl } from './db-url.ts'
+import { datenbankSsl } from '../src/db/ssl.ts'
 import { datenTuev } from '../src/modules/lager/daten-tuev.ts'
 import {
   type Lauf,
@@ -56,6 +57,7 @@ function argument(name: string): string | null {
 // keine Prepared Statements wegen Supavisor).
 function verbinden(url: string): Sql {
   return postgres(url, {
+    ...datenbankSsl(url),
     max: 1,
     prepare: false,
     types: { numeric: { to: 1700, from: [1700], parse: Number, serialize: String } },

@@ -7,6 +7,7 @@
 import './env.ts'
 import { execFileSync } from 'node:child_process'
 import postgres from 'postgres'
+import { datenbankSsl } from '../src/db/ssl.ts'
 
 async function main() {
   const url = process.env.DATABASE_URL
@@ -18,7 +19,7 @@ async function main() {
     )
   }
 
-  const sql = postgres(url, { max: 1 })
+  const sql = postgres(url, { ...datenbankSsl(url), max: 1 })
   try {
     await sql.unsafe('drop schema if exists public cascade; create schema public;')
     console.log('Schema zurückgesetzt.')

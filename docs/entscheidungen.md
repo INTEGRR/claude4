@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Datenbank-TLS im Code statt in der URL
+
+**Anlass:** Vor dem Go-Live soll in Supabase „Enforce SSL" an. Frage des
+Betreibers: `?sslmode=require` in die Umgebungsvariablen oder in den Code?
+KRNL setzte bisher keine TLS-Option — postgres.js verschlüsselt nur, wenn
+die URL es verlangt.
+
+**Entschieden:** Im Code. `datenbankSsl(url)` gibt für jede entfernte
+Datenbank `ssl: 'require'` und lokal/im Docker-Netz (localhost, 127.0.0.1,
+::1, Dienstname ohne Punkt) kein TLS — für die App (`src/db/client.ts`) und
+alle Wartungsskripte, auch Migration und Seed im Vercel-Build. Eine
+ausdrückliche Angabe gewinnt: `sslmode`/`ssl` in der URL, `PGSSL`, und
+`PGSSLMODE` (den postgres.js selbst nicht kennt, darum übersetzt). Damit
+ist „Enforce SSL" ein Schalter in Supabase ohne Änderung an Vercel, und
+niemand kann den Zusatz beim Rotieren des Passworts vergessen. `require`
+verschlüsselt ohne Zertifikatsprüfung (wie libpq); `verify-full` mit dem
+Supabase-Zertifikat bleibt über die URL möglich.
+
+Umgesetzt in `src/db/ssl.ts`, `src/db/client.ts`, `scripts/*`; dokumentiert
+in [vercel-supabase.md](vercel-supabase.md) und [go-live.md](go-live.md);
+Test `tests/db-ssl.test.ts`.
+
 ## 2026-10-01 — Label bucht aus
 
 **Anlass:** Betreiber: „Sobald das Label rausgeht, sollte immer ausgebucht
