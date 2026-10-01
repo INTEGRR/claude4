@@ -9,6 +9,22 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — App Proxy: keine Schrägstrich-Umleitung
+
+**Anlass:** Erster Test im Shop: `/apps/reparatur` endete in einer 404 auf
+der Shop-Domain. Shopify ruft den Proxy als `/api/shopify/proxy/?…` auf,
+Next.js leitete mit 308 auf die Fassung ohne Schrägstrich um — mit
+relativem `Location`. Shopify reicht Umleitungen an den Browser durch, der
+sie gegen die Shop-Domain auflöst.
+
+**Entschieden:** `skipTrailingSlashRedirect: true` in `next.config.ts`.
+Alle Routen passen ohnehin mit und ohne Schrägstrich (geprüft: Seiten
+leiten wie bisher zum Login, APIs antworten gleich); es entfällt nur die
+kosmetische Umleitung. Eine Middleware nur für den Proxy wäre aufwendiger
+und liefe vor jeder Anfrage.
+
+Umgesetzt in `next.config.ts`; dokumentiert in [website.md](website.md).
+
 ## 2026-10-01 — Eigene Shopify-App für den App Proxy
 
 **Anlass:** Der Betreiber legt für das Reparaturformular eine eigene App

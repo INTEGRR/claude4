@@ -25,6 +25,13 @@ const nextConfig: NextConfig = {
   output: process.env.VERCEL ? undefined : 'standalone',
   // Der Framework-Name gehört nicht in jede Antwort.
   poweredByHeader: false,
+  // Shopify ruft den App Proxy mit Schrägstrich am Ende auf
+  // (/api/shopify/proxy/?…). Der eingebaute 308 auf die Fassung ohne
+  // Schrägstrich hat einen relativen Location-Header — Shopify reicht ihn an
+  // den Browser durch, und der landet auf der Shop-Domain (404). Ohne die
+  // Umleitung passen alle Routen ohnehin mit und ohne Schrägstrich
+  // (Entscheidungslog 2026-10-01, „App Proxy: keine Schrägstrich-Umleitung").
+  skipTrailingSlashRedirect: true,
   // @react-pdf/renderer: als externes Paket laden — gebündelt stolpert
   // sein Yoga-Layout (WASM) im Serverless-Build.
   serverExternalPackages: ['postgres', 'bwip-js', '@react-pdf/renderer'],

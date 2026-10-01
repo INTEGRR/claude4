@@ -175,6 +175,10 @@ KRNL    ──200, Content-Type: application/liquid──▶ Shopify rendert im 
   (lokal, Tests); übersprungen wird die Prüfung nie. Der Test rechnet die
   drei in der Shopify-Doku abgedruckten Beispielsignaturen (Secret „hush")
   exakt nach — angemeldet, Gast mit leerer und ganz ohne Kunden-ID.
+- **Schrägstrich am Ende.** Shopify ruft `/api/shopify/proxy/?…` auf. Die
+  eingebaute Next-Umleitung auf die Fassung ohne Schrägstrich ist
+  abgeschaltet (`skipTrailingSlashRedirect`) — ihr relativer `Location`
+  landete über Shopify im Browser auf der Shop-Domain (404).
 - **Liquid im Theme.** `application/liquid` lässt Shopify die Antwort im
   Theme rendern (Kopf, Navigation, Fuß des Shops). Die Seite ist
   selbsttragend ([`shop-seiten.ts`](../src/modules/reparatur/shop-seiten.ts)):
