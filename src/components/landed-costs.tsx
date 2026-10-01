@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, TableWrap } from '@/components/ui'
@@ -37,11 +38,12 @@ export async function LandedCosts({ pickingId }: { pickingId: string }) {
       state: string
       posted_at: string | null
       vendor: string | null
+      vendor_id: string | null
       verteilt: number
     }[]
   >`
     select lc.id, lc.number, lc.cost_type, lc.basis, lc.amount, lc.currency,
-           lc.exchange_rate, lc.is_estimate, lc.state, lc.posted_at, p.name as vendor,
+           lc.exchange_rate, lc.is_estimate, lc.state, lc.posted_at, p.name as vendor, lc.vendor_id,
            coalesce((select sum(a.amount) from landed_cost_allocations a
                      where a.landed_cost_id = lc.id), 0) as verteilt
     from landed_costs lc
@@ -123,7 +125,9 @@ export async function LandedCosts({ pickingId }: { pickingId: string }) {
                       <div className="small muted nowrap mono">{dateTime(k.posted_at)}</div>
                     )}
                   </td>
-                  <td className="small">{k.vendor ?? '—'}</td>
+                  <td className="small">
+                    {k.vendor_id ? <Link href={`/einkauf/lieferanten/${k.vendor_id}`}>{k.vendor}</Link> : '—'}
+                  </td>
                   <td className="num">
                     <div className="actions">
                       {k.state === 'draft' && (

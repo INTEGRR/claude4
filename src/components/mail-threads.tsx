@@ -44,11 +44,13 @@ export async function MailThreadsKarte({
       letzte_am: string | null
       anzahl: number
       bestellung: string | null
+      purchase_order_id: string | null
       lieferant: string | null
+      partner_id: string | null
     }[]
   >`
     select t.id, t.betreff, t.status::text as status, t.kanal::text as kanal, t.letzte_richtung::text as letzte_richtung,
-           t.letzte_am::text as letzte_am, t.anzahl, po.number as bestellung, pa.name as lieferant
+           t.letzte_am::text as letzte_am, t.anzahl, po.number as bestellung, t.purchase_order_id, pa.name as lieferant, t.partner_id
     from mail_threads t
     left join purchase_orders po on po.id = t.purchase_order_id
     left join partners pa on pa.id = t.partner_id
@@ -89,8 +91,18 @@ export async function MailThreadsKarte({
                   {t.letzte_richtung === 'ausgang' ? '→ wartet auf Lieferant' : '← wartet auf uns'} · {dateTime(t.letzte_am)} ·{' '}
                   {t.anzahl} Nachricht{t.anzahl === 1 ? '' : 'en'}
                   {t.kanal !== 'email' ? ` · ${KANAL_NAMEN[t.kanal]}` : ''}
-                  {t.bestellung && !purchaseOrderId ? ` · ${t.bestellung}` : ''}
-                  {t.lieferant && !partnerId ? ` · ${t.lieferant}` : ''}
+                  {t.bestellung && t.purchase_order_id && !purchaseOrderId && (
+                    <>
+                      {' · '}
+                      <Link href={`/einkauf/${t.purchase_order_id}`}>{t.bestellung}</Link>
+                    </>
+                  )}
+                  {t.lieferant && t.partner_id && !partnerId && (
+                    <>
+                      {' · '}
+                      <Link href={`/einkauf/lieferanten/${t.partner_id}`}>{t.lieferant}</Link>
+                    </>
+                  )}
                 </div>
               </div>
               <Badge state={t.status} kind="mail_thread" />
