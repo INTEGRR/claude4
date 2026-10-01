@@ -1414,6 +1414,56 @@ dem Eingang) und der Lauf „Musterpflicht" in `fixtures/einkaufsprojekt.ts`
 entsteht). Paket: überall, wo das Einkaufsprojekt aktiv ist. Details:
 [module/einkaufstool.md](module/einkaufstool.md) (Stufe 4).
 
+## Eingangssendung: Prozess `eingangs_sendung` (Migration 0108, umgesetzt)
+
+Beleg `eingangs_sendung` (`eingangs_sendungen`, ES/…, Enum-Status
+geplant/verschifft/verzollt/angekommen/abgerechnet/storniert), Route
+`/einkauf/sendungen/:id` — Sammelfracht mit einer oder mehreren
+Bestellungen (n:m über `eingangs_sendung_bestellungen`).
+
+| Schritt | Art | Aktion / Teilprozess | Zustand |
+|---|---|---|---|
+| Ware ist bestellt | start | | |
+| Sendung anlegen | aktion | `einkauf.sendung_anlegen` | `geplant` |
+| Verschifft (Raten fällig) | aktion | `einkauf.sendung_verschiffen` | `verschifft` |
+| Verzollt | aktion | `einkauf.sendung_verzollen` | `verzollt` |
+| Angekommen | aktion | `einkauf.sendung_ankommen` | `angekommen` |
+| Wareneingänge buchen | prozess | `wareneingang`, `teilprozess_link {"spalte": "eingangs_sendung_id"}` | |
+| Abrechnen (Kosten verteilen) | aktion | `einkauf.sendung_abrechnen` | `abgerechnet` |
+| Stornieren | aktion | `einkauf.sendung_stornieren` (aus geplant/verschifft) | `storniert` |
+| Erledigt | ende | | |
+
+- Kanten: verschifft → verzollt („See/Luft: Spediteur verzollt") oder
+  direkt → angekommen („Kurier verzollt selbst", Express).
+- **Teilprozess Wareneingang:** die Eingänge der Bestellungen hängen über
+  `stock_pickings.eingangs_sendung_id` an der Sendung; „abrechnen" bietet
+  der Prozess erst an, wenn alle am Ende ihres Prozesses sind. Damit ist
+  `wareneingang` jetzt Teilprozess von zwei Prozessen (auch
+  `einkauf_wareneingang_rechnung`) — der Konsistenz-Wächter lässt ihn nur
+  abschalten, wenn beide Eltern aus sind.
+- **Kein zweites Token-Modell:** „Verschifft" schreibt den Tag als
+  `purchase_orders.verschifft_am` an die Bestellungen — die Zahlplan-Raten
+  „bei Verschiffung" rechnet `zahlplan_faelligkeit` daraus wie bisher; der
+  Bestellprozess selbst läuft unverändert.
+- Prozessfrei (Arbeit an der Sendung): bearbeiten, Bestellungen zuordnen
+  und herausnehmen, Kosten erfassen/stornieren, schätzen, verteilen,
+  Zollbescheid erfassen; dazu `einkauf.pflichtdokumente_nachfragen` (nur
+  ein Mail-Entwurf, gesendet im Prozess `mail_versand`) und
+  `einkauf.einstand_vorschlag_uebernehmen`.
+- Job `einkauf_digest` (Fähigkeit `einkauf:zusammenfassung`): die tägliche
+  Cockpit-Zusammenfassung in den Telegram-Kanal — kein Prozessschritt,
+  Cron `?task=einkauf`.
+- `prozess_beleg_daten` liefert neu für Bestellungen `drittland`,
+  `hat_anzahlung`, `ware_eingegangen`, `eingang_am` und für Sendungen
+  `zoll_noetig` — die Bedingungen der Pflichtdokument-Regeln
+  (`pflichtdokument_regeln`) lesen sie mit derselben Bedingungssprache wie
+  die Weichen.
+
+Fixture: `fixtures/eingangs-sendung.ts` (See mit Verzollung, Wareneingang
+und Abrechnung; Express ohne Verzollung; Storno vor dem Verschiffen).
+Paket: überall, wo das Einkaufsprojekt aktiv ist. Details:
+[module/einkaufstool.md](module/einkaufstool.md) (Stufe 5).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

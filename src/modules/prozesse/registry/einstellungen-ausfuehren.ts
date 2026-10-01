@@ -1024,13 +1024,13 @@ export async function benutzerZweifaktorZuruecksetzen(
 }
 
 export async function benachrichtigungenSetzen(
-  p: { logins: boolean; fehlversuche: boolean; jobs: boolean; dienste: boolean },
+  p: { logins: boolean; fehlversuche: boolean; jobs: boolean; dienste: boolean; einkauf: boolean },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   await sql`
     insert into settings (key, value) values ('benachrichtigungen', ${sql.json(p)})
     on conflict (key) do update set value = excluded.value`
-  const an = (['logins', 'fehlversuche', 'jobs', 'dienste'] as const).filter((k) => p[k])
+  const an = (['logins', 'fehlversuche', 'jobs', 'dienste', 'einkauf'] as const).filter((k) => p[k])
   return { text: an.length ? `Telegram meldet: ${an.join(', ')}.` : 'Telegram meldet nichts mehr.' }
 }
 

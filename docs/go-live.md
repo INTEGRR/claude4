@@ -282,7 +282,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 ## 7b. Einkaufstool (Betreiber, vor dem echten Postfach-Betrieb)
 
 Stufen 1–3 sind in Prod (Ablage, Postfach, Mails, Projekte); ohne Google
-laufen sie nicht an. Anleitung: [module/einkaufstool.md](module/einkaufstool.md).
+laufen sie nicht an. Stufe 4 (Muster, Werkzeuge, Verträge) und Stufe 5
+(Sendungen, Zoll, Pflichtdokumente, Cockpit, DATEV-Vorbereitung) brauchen
+kein Google. Anleitung: [module/einkaufstool.md](module/einkaufstool.md).
 
 - [ ] Google Workspace: Postfach `einkauf@…` anlegen und delegieren,
       Dienstkonto mit domänenweiter Delegation (nur `gmail.modify`, nur
@@ -294,8 +296,20 @@ laufen sie nicht an. Anleitung: [module/einkaufstool.md](module/einkaufstool.md)
 - [ ] Lieferanten pflegen: Sprache, Maildomain(s), Einkäufer, Standard-
       Incoterm und -Währung — damit ordnet das Postfach selbst zu.
 - [ ] Steuerberater: DATEV-Beleg-Mail klären (Upload-Adresse, Absender-
-      Freigabe, ein Beleg je Mail, Größengrenze) — Voraussetzung für die
-      DATEV-Übergabe in Stufe 5.
+      Freigabe, ein Beleg je Mail, Größengrenze) — Voraussetzung für den
+      Versand. **Stufe 5 hat DATEV nur vorbereitet** (Betreiber
+      2026-10-01): `/einkauf/datev` zeigt, welche gebuchten Rechnungen mit
+      Beleg bereitstünden; gesendet wird nichts. `DATEV_BELEG_MAIL` erst
+      setzen, wenn der Versand gebaut ist (Entscheidungslog 2026-10-01).
+- [ ] Spediteur (K+N) und Kuriere als Lieferanten anlegen (Mailadresse,
+      Sprache) — sie sind Rechnungssteller der Sendungskosten und Empfänger
+      der Nachfrage fehlender Fracht-/Zollbelege.
+- [ ] Frachtsätze und Zolltarife prüfen (Einkauf → Einstand); nach den
+      ersten abgerechneten Sendungen die Vorschläge übernehmen.
+- [ ] Einkäufer an Bestellungen bzw. in der Lieferantenakte eintragen — das
+      Cockpit und die tägliche Telegram-Zusammenfassung gliedern danach;
+      `ERP_PUBLIC_URL` setzen, damit die Zusammenfassung verlinkt. Cron
+      `/api/cron?task=einkauf` steht in `vercel.json`.
 
 ## 7c. Entscheidungen, die der Betreiber treffen muss
 

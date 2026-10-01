@@ -35,7 +35,12 @@ export default async function BillsPage() {
       <PageHeader
         title="Lieferantenrechnungen"
         subtitle="Rechnungen entstehen aus der Bestellung"
-        actions={<Link className="btn" href="/einkauf">Bestellungen</Link>}
+        actions={
+          <>
+            <Link className="btn" href="/einkauf/datev">DATEV-Vorbereitung</Link>
+            <Link className="btn" href="/einkauf">Bestellungen</Link>
+          </>
+        }
       />
 
       <Card tight>

@@ -9,6 +9,7 @@ import { EINKAUF_PROJEKTE } from './einkauf-projekte.ts'
 import { EINKAUF_BEMUSTERUNG } from './einkauf-bemusterung.ts'
 import { EINKAUF_WERKZEUGE } from './einkauf-werkzeuge.ts'
 import { EINKAUF_VERTRAEGE } from './einkauf-vertraege.ts'
+import { EINKAUF_SENDUNGEN } from './einkauf-sendungen.ts'
 import { EINSTELLUNGEN } from './einstellungen.ts'
 import { FEHLER } from './fehler.ts'
 import { FERTIGUNG } from './fertigung.ts'
@@ -44,6 +45,7 @@ export const REGISTRY = {
   ...EINKAUF_BEMUSTERUNG,
   ...EINKAUF_WERKZEUGE,
   ...EINKAUF_VERTRAEGE,
+  ...EINKAUF_SENDUNGEN,
   ...EINSTELLUNGEN,
   ...FEHLER,
   ...FERTIGUNG,

@@ -22,6 +22,7 @@ const PFADE: Record<DokumentModell, (id: string) => string> = {
   bemusterung: (id) => `/einkauf/muster/${id}`,
   werkzeug: (id) => `/einkauf/werkzeuge/${id}`,
   lieferantenvertrag: (id) => `/einkauf/vertraege/${id}`,
+  eingangs_sendung: (id) => `/einkauf/sendungen/${id}`,
 }
 
 function neuLaden(modell: DokumentModell, recordId: string) {

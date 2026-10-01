@@ -23,6 +23,7 @@ export const WIEDERVORLAGE_MODELLE = [
   'bemusterung',
   'werkzeug',
   'lieferantenvertrag',
+  'eingangs_sendung',
 ] as const
 export type WiedervorlageModell = (typeof WIEDERVORLAGE_MODELLE)[number]
 

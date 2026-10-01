@@ -6,6 +6,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { FRACHT_MODI } from '@/modules/einkauf/einkaufsprojekt'
 import { dateTime } from '@/modules/shared/format'
 import { frachtsatzSetzen, zolltarifLoeschen, zolltarifSetzen } from '../projekte/actions'
+import { einstandVorschlagUebernehmen } from '../sendungen/actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,19 +16,24 @@ const zahl = (n: string | number, stellen = 2) =>
 /**
  * Einstand (0097): die Sätze hinter dem Angebotsvergleich — Fracht je kg
  * und Modus (mit Mindestbetrag je Sendung) und Zollsätze je HS-Präfix.
- * Startwerte der Fracht sind Schätzungen; ab Stufe 5 verfeinern sie sich
- * aus K+N-Rechnungen und Zollbescheiden.
+ * Startwerte der Fracht sind Schätzungen; seit Stufe 5 (0108) schlägt KRNL
+ * aus abgerechneten Sendungen (K+N-Rechnungen, Zollbescheide) bessere Sätze
+ * vor — übernommen wird per Knopf, nie still.
  */
 export default async function EinstandPage() {
   const user = await requireArea('einkauf')
   const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
 
-  const [fracht, zoll] = await Promise.all([
+  const [fracht, zoll, vorschlaege] = await Promise.all([
     sql<{ modus: keyof typeof FRACHT_MODI; eur_je_kg: string; mindestbetrag_eur: string; notiz: string | null; geaendert_von: string | null; updated_at: string | null }[]>`
       select modus, eur_je_kg::text, mindestbetrag_eur::text, notiz, geaendert_von, updated_at::text as updated_at
       from frachtsaetze order by array_position(array['see', 'luft', 'express'], modus)`,
     sql<{ hs_praefix: string; satz_pct: string; bezeichnung: string | null; geaendert_von: string | null }[]>`
       select hs_praefix, satz_pct::text, bezeichnung, geaendert_von from zolltarife order by hs_praefix`,
+    sql<{ art: 'fracht' | 'zoll'; schluessel: string; sendungen: number; ist_wert: number; soll_wert: number | null; eur_je_cbm: number | null; grundlage: string }[]>`
+      select art, schluessel, sendungen, ist_wert::float as ist_wert, soll_wert::float as soll_wert,
+             eur_je_cbm::float as eur_je_cbm, grundlage
+      from einkauf_einstand_vorschlaege order by art, schluessel`,
   ])
 
   return (
@@ -36,6 +42,55 @@ export default async function EinstandPage() {
         title="Einstand"
         subtitle="Fracht- und Zollsätze für den Angebotsvergleich — Einstand = Ware × Kurs + Werkzeug/Muster + Fracht + Zoll (ohne EUSt)"
       />
+
+      {vorschlaege.length > 0 && (
+        <Card title={`Gelernt aus abgerechneten Sendungen (${vorschlaege.length})`} tight>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Satz</th>
+                  <th className="num">Bisher</th>
+                  <th className="num">Aus Sendungen</th>
+                  <th>Grundlage</th>
+                  {darf && <th />}
+                </tr>
+              </thead>
+              <tbody>
+                {vorschlaege.map((v) => (
+                  <tr key={`${v.art}:${v.schluessel}`}>
+                    <td>
+                      {v.art === 'fracht' ? `Fracht ${FRACHT_MODI[v.schluessel as keyof typeof FRACHT_MODI] ?? v.schluessel}` : 'Zoll'}{' '}
+                      {v.art === 'zoll' && <span className="mono">{v.schluessel}</span>}
+                    </td>
+                    <td className="num mono">
+                      {v.soll_wert === null ? '—' : `${zahl(v.soll_wert, v.art === 'zoll' ? 1 : 2)}${v.art === 'zoll' ? ' %' : ' €/kg'}`}
+                    </td>
+                    <td className="num mono">
+                      {zahl(v.ist_wert, v.art === 'zoll' ? 1 : 2)}
+                      {v.art === 'zoll' ? ' %' : ' €/kg'}
+                      {v.eur_je_cbm !== null && <div className="muted small">{zahl(v.eur_je_cbm)} €/cbm</div>}
+                    </td>
+                    <td className="small">{v.grundlage}</td>
+                    {darf && (
+                      <td>
+                        <ActionButton className="small" action={einstandVorschlagUebernehmen.bind(null, v.art, v.schluessel)}>
+                          Übernehmen
+                        </ActionButton>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+          <p className="small muted" style={{ margin: 0, padding: '8px 12px' }}>
+            Fracht: echte Frachtkosten ÷ Bruttogewicht je Modus (€/cbm nur zur Info — die Positionen kennen kein Volumen);
+            Zoll: Zoll ÷ Zollwert aus den Zollbescheiden je HS-Präfix. Vorgeschlagen wird ab 5 % bzw. 0,1 Prozentpunkten
+            Abweichung.
+          </p>
+        </Card>
+      )}
 
       <Card title="Frachtsätze" tight>
         <TableWrap>

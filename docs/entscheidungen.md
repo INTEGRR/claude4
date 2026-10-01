@@ -9,6 +9,119 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Einkauf Stufe 5: Eingangssendungen, Zoll, Pflichtdokumente, Cockpit, DATEV nur vorbereitet
+
+Stufe 5 des Einkaufstools (Migration 0108). Betreiber-Vorgaben (Interview
+2026-09-29): Sammelsendungen mit mehreren Bestellungen sind häufig (K+N See
+und Luft, Express vom Lieferanten), Zollunterlagen je Sendung, Fracht und
+Zoll als Einstand, **EUSt getrennt**, Pflichtdokumente je Bestellung,
+Wiedervorlagen im Cockpit plus tägliche Telegram-Zusammenfassung nach
+Einkäufer, lernende Schätzwerte. Entschieden:
+
+- **Die Eingangssendung ist ein Beleg mit eigenem Prozess**
+  `eingangs_sendung` (ES/…, Enum geplant → verschifft → verzollt →
+  angekommen → abgerechnet | storniert). Bestellungen hängen n:m
+  (`eingangs_sendung_bestellungen`), Wareneingänge über
+  `stock_pickings.eingangs_sendung_id`; der Prozess führt sie als
+  Teilprozess „Wareneingang" (`teilprozess_link {"spalte":
+  "eingangs_sendung_id"}`) — abgerechnet wird erst, wenn alle gebucht sind.
+  Express-Sendungen gehen von „verschifft" direkt nach „angekommen" (der
+  Kurier verzollt selbst). Der Belegstatus bleibt die einzige Wahrheit;
+  Daten pflegen, Bestellungen zuordnen, Kosten/Zoll erfassen, schätzen und
+  verteilen sind prozessfreie Arbeit an der Sendung.
+  - **Zuordnen hängt alle noch freien Wareneingänge der Bestellung an**
+    (auch schon gebuchte — die Sendung wird oft erst mit der K+N-Rechnung
+    angelegt). Backorders erben die Sendung bewusst nicht: der Rest kommt
+    mit einer späteren Sendung.
+- **Sendung → Bestellungen** (`eingangs_sendung_synchronisieren`): der
+  früheste Verschiffungstag aller nicht stornierten Sendungen wird
+  `purchase_orders.verschifft_am` — genau der Fakt, aus dem
+  `zahlplan_faelligkeit` (0058) die Raten „bei Verschiffung" fällig rechnet
+  (derselbe Mechanismus wie „Verschiffung erfassen", kein zweiter). Dazu
+  das späteste ETA der noch reisenden Sendungen als `eta_confirmed` (wandert
+  an die offenen Eingänge), Träger/Spediteur und HBL/AWB als Tracking.
+  Die Storno einer verschifften Sendung nimmt einen nur von ihr gesetzten
+  Verschiffungstag zurück.
+- **Verteilung** (`eingangs_sendung_verteilen`): je Kostenposition und
+  gebuchtem Wareneingang ein `landed_costs`-Satz (`sendung_kosten_id`),
+  gebucht über das **unveränderte** `landed_cost_post`.
+  - **Schlüssel:** Fracht nach Gewicht, wenn jede gebuchte Position ein
+    Gewicht hat (Spediteure rechnen nach Gewicht/Raum, nicht nach Wert),
+    sonst nach Warenwert; Zoll (Wertzoll), Versicherung und Sonstiges nach
+    Warenwert; ohne Basis gleichmäßig. Innerhalb des Eingangs nutzt
+    `landed_cost_post` dieselbe Basis. Volumen (cbm) bleibt Information:
+    die Positionen kennen kein Volumen.
+  - Beträge auf den Cent, **Rundungsrest auf den letzten Eingang** (Summe
+    exakt; im Grenzfall winziger Anteile kumulativ, damit nichts negativ
+    wird).
+  - **Schätzung → Rechnung:** `landed_cost_post` nimmt keine negativen
+    Beträge an — deshalb storniert die Verteilung der echten Rechnung die
+    Landed Costs der ersetzten Schätzung (`landed_cost_cancel`) und bucht
+    neu (`corrects_id`); netto steht genau die Differenz in den
+    Wertschichten. Eine Rechnung ersetzt alle offenen Schätzungen derselben
+    Art (`sendung_kosten.ersetzt_durch_id`).
+  - **EUSt wird nie verteilt** (Vorsteuer, kein Einstand) — sie ist eine
+    eigene Kostenart, auch aus dem Zollbescheid (`sendung_zoll`: HS-Code,
+    Zollwert, Zoll, EUSt je Zeile; ein neuer Bescheid ersetzt den alten).
+  - **Abrechnen** verlangt alle Eingänge gebucht und keine offene Schätzung
+    mehr; danach gehen spätere Kosten (z. B. Standgeld) per „Kosten
+    verteilen" nach.
+- **Lernende Schätzwerte als Vorschlag** (Sicht
+  `einkauf_einstand_vorschlaege`): echte Fracht €/kg je Modus und echte
+  Zollsätze je HS-Präfix aus abgerechneten Sendungen, ab 5 % bzw. 0,1
+  Prozentpunkten Abweichung; übernommen wird per Knopf
+  (`einkauf.einstand_vorschlag_uebernehmen`, der Wert kommt aus der Sicht,
+  nicht aus der Eingabe) — nie still überschrieben. Die Schätzung einer
+  Sendung (`eingangs_sendung_schaetzung`) nutzt dieselben Sätze.
+- **Pflichtdokumente sind Daten** (`pflichtdokument_regeln`, Bedingung über
+  `prozess_beleg_daten` mit `bedingung_pruefen`, Stichtag-Feld + Frist): PI
+  vor der Anzahlung (Zahlplan-Rate „bei Bestellung"), CI + Packing List ab
+  Verschiffung **nur bei Drittland** (außerhalb der EU-27 —
+  `land_drittland`), Endrechnung 7 Tage nach Wareneingang,
+  Spediteursrechnung 14 und Zollbescheid 7 Tage nach Ankunft. Eine Regel
+  prüft nur Belege ab ihrem `gilt_ab` (sonst fehlte nach dem Einspielen an
+  jeder Altbestellung alles). Ein Dokument zählt an der Bestellung, an
+  ihrer Rechnung oder an ihrer Sendung (dann nur vom selben Lieferanten).
+  „Nachfragen" legt einen Mail-Entwurf aus der neuen Vorlage „Fehlende
+  Dokumente nachfragen" (de/en/zh) in der Sprache des Lieferanten bzw.
+  Spediteurs an — gesendet wird wie immer erst nach Freigabe.
+  - Bewusst **nicht** in `einkauf_regel_wiedervorlagen`: die Sicht rechnet
+    `prozess_beleg_daten` je Beleg und wäre für den Menüzähler auf jeder
+    Seite zu teuer. Fehlende Dokumente stehen im Cockpit und an Bestellung
+    und Sendung. Die überfällige ETA (aus Stufe 2a angekündigt) ist billig
+    und kommt als dritte Regel in `einkauf_regel_wiedervorlagen`.
+- **Cockpit** `/einkauf/cockpit` aus der Sicht `einkauf_cockpit` (je
+  Kategorie, Beleg-Link und Zuständigem; Meine/Alle). **Fällige Raten
+  stehen nicht in der Sicht**, sondern kommen mit Finanzrecht aus einer
+  eigenen Abfrage — die KI-Finanzsperre greift auf Tabellennamen, eine Sicht
+  über `zahlplan_raten` hätte sie umgangen.
+- **Tägliche Zusammenfassung:** Job `einkauf_digest`, Cron
+  `/api/cron?task=einkauf` täglich 5:15 UTC (nach dem Finanz-Tageslauf),
+  Benachrichtigungsart `einkauf` (Check-Constraint wie 0084 erweitert,
+  Schalter unter Einstellungen → Benachrichtigungen). Gegliedert nach
+  Einkäufer, nur Handlungsbedarf (laufende Sendungen und Muster sind Lage);
+  nichts offen → keine Nachricht; ein Schlüssel je Tag verhindert Doppel.
+  Der Kanal gehört dem Betreiber, deshalb mit Raten.
+- **DATEV nur vorbereitet** (Betreiber 2026-10-01: „DATEV erstmal nur
+  vorbereiten"): kein Job, keine Aktion, kein Cron sendet an DATEV, auch
+  nicht mit gesetzter Adresse — der Versand folgt nach Klärung mit dem
+  Steuerberater. Vorbereitet sind die Sicht `einkauf_datev_vorbereitung`
+  (gebuchte Rechnungen: bereit / Beleg fehlt / übergeben über
+  `dokumente.datev_uebergeben_am`), die Seite `/einkauf/datev` und der reine
+  Baustein `datevBelegMail` (ein Beleg je Mail, Unit-Test). Die geplante
+  Variable `DATEV_BELEG_MAIL` gibt es deshalb noch nicht (keine
+  Umgebungs-Karte). Abweichung vom Plan.
+- Weitere Abweichungen: Die Sendung bekommt keinen Mail-Abgleich über
+  `ES/`-Nummern im Betreff (Plan Leitlinie 4) — die Nachfrage an den
+  Spediteur läuft über seinen Lieferanten-Thread; das folgt bei Bedarf. Der
+  Drive-Ordner „Sendungen" entsteht beim ersten Gebrauch, „Ablage
+  einrichten" legt weiter die vier Hauptordner an.
+
+Umgesetzt in `src/db/migrations/0108_einkauf_sendungen_zoll_cockpit.sql`,
+`registry/einkauf-sendungen.ts`, `einkauf/{sendungen,cockpit,pflichtdokumente,datev,digest}.ts`;
+Doku: [module/einkaufstool.md](module/einkaufstool.md) (Stufe 5),
+[prozesse.md](prozesse.md).
+
 ## 2026-10-01 — Einkauf Stufe 4: Bemusterung mit Golden Sample, Werkzeuge, Lieferantenverträge
 
 Stufe 4 des Einkaufstools (Migration 0107). Der Betreiber wollte Muster mit

@@ -11,20 +11,23 @@ import { telegramSicher } from './telegram.ts'
 
 type Db = Sql | TransactionSql
 
-export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test'
+export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf'
 
 export interface Schalter {
   logins: boolean
   fehlversuche: boolean
   jobs: boolean
   dienste: boolean
+  /** Tägliche Einkaufs-Zusammenfassung je Einkäufer (0108). */
+  einkauf: boolean
 }
-export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true }
+export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true }
 export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   logins: 'Jede erfolgreiche Anmeldung (wer, wann, IP, Gerät, Methode)',
   fehlversuche: 'Fehlversuche und Kontosperren (gebündelt je Konto und Viertelstunde)',
   jobs: 'Endgültig fehlgeschlagene Jobs der Outbox',
   dienste: 'Störungen und Entstörungen externer Dienste (Dienste-Wächter)',
+  einkauf: 'Tägliche Einkaufs-Zusammenfassung je Einkäufer (Überfälliges, fehlende Dokumente und Rechnungen, Raten, ETA)',
 }
 
 /** Fehlversuche desselben Kontos werden je Viertelstunde zu einer Nachricht. */
@@ -47,6 +50,7 @@ export async function schalter(db: Db): Promise<Schalter> {
     fehlversuche: v.fehlversuche !== false,
     jobs: v.jobs !== false,
     dienste: v.dienste !== false,
+    einkauf: v.einkauf !== false,
   }
 }
 
@@ -61,6 +65,8 @@ export function artErlaubt(art: BenachrichtigungsArt, s: Schalter): boolean {
       return s.jobs
     case 'dienst':
       return s.dienste
+    case 'einkauf':
+      return s.einkauf
     default:
       return true
   }

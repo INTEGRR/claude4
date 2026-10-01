@@ -116,6 +116,16 @@ export async function zielOrdner(modell: DokumentModell, recordId: string): Prom
       if (!v) throw new Error('Lieferantenvertrag nicht gefunden')
       return ordnerSichern(`vertraege:${v.partner_id}`, 'Verträge', await lieferantenOrdner(v.partner_id))
     }
+    case 'eingangs_sendung': {
+      // Sendungen/ES-00001 … — Frachtpapiere, Zollbescheid, Spediteursrechnung.
+      // Der Bereichsordner „Sendungen" entsteht beim ersten Gebrauch (die
+      // Einrichtung legt weiter nur die vier Hauptordner an).
+      const [s] = await sql<{ nummer: string; bezeichnung: string | null }[]>`
+        select nummer, bezeichnung from eingangs_sendungen where id = ${recordId}`
+      if (!s) throw new Error('Eingangssendung nicht gefunden')
+      const sendungen = await ordnerSichern('wurzel:sendungen', 'Sendungen', ablageWurzel())
+      return ordnerSichern(`eingangs_sendung:${recordId}`, ordnerName(`${s.nummer}${s.bezeichnung ? ` ${s.bezeichnung}` : ''}`), sendungen)
+    }
     default: {
       const _nie: never = modell
       throw new Error(`Unbekannter Beleg ${String(_nie)} — erlaubt: ${Object.keys(DOKUMENT_MODELLE).join(', ')}`)

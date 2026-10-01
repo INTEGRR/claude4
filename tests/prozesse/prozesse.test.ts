@@ -145,6 +145,12 @@ describe('Chamäleon: Konsistenz-Wächter für Teilprozesse', () => {
       { parameter: { prozess_code: 'einkauf_wareneingang_rechnung', aktiv: false } },
       admin,
     )
+    // Seit 0108 ist der Wareneingang auch Teilprozess der Eingangssendung.
+    await aktionAusfuehrenGeprueft(
+      'einstellungen.prozess_schalten',
+      { parameter: { prozess_code: 'eingangs_sendung', aktiv: false } },
+      admin,
+    )
     await aktionAusfuehrenGeprueft(
       'einstellungen.prozess_schalten',
       { parameter: { prozess_code: 'wareneingang', aktiv: false } },

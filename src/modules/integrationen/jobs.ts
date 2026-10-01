@@ -309,6 +309,12 @@ const handlers = {
     return ezbKurseAbrufen()
   },
 
+  /** Tägliche Einkaufs-Zusammenfassung in den Telegram-Kanal (einkauf/digest.ts, 0108). */
+  async einkauf_digest(payload) {
+    const { einkaufDigestEinreihen } = await import('@/modules/einkauf/digest')
+    return einkaufDigestEinreihen(typeof payload.datum === 'string' ? payload.datum : undefined)
+  },
+
   /** Mail-Anhang aus dem Einkaufspostfach in die Drive-Ablage (einkauf/anhang-ablage.ts). */
   async gmail_anhang_ablegen(payload) {
     const { anhangAblegen } = await import('@/modules/einkauf/anhang-ablage')

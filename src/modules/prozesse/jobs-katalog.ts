@@ -111,6 +111,13 @@ export const JOB_KATALOG = {
       'von Hand erfasste Kurse bleiben stehen. Grundlage des Angebotsvergleichs in EUR.',
     faehigkeit: 'finanzen:wechselkurse',
   },
+  einkauf_digest: {
+    label: 'Einkaufs-Zusammenfassung',
+    beschreibung:
+      'Reiht morgens die Zusammenfassung des Einkaufs-Cockpits je Einkäufer in den Telegram-Kanal ein (Überfälliges, ' +
+      'heute Fälliges, fehlende Dokumente und Rechnungen, fällige Raten, überfällige ETA); nichts offen → keine Nachricht.',
+    faehigkeit: 'einkauf:zusammenfassung',
+  },
 } satisfies Record<string, JobEintrag>
 
 export type JobKind = keyof typeof JOB_KATALOG

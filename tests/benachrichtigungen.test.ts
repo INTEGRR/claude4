@@ -154,8 +154,8 @@ describe('Benachrichtigungen (Outbox)', () => {
     assert.match(textJob({ kind: 'daten_tuev', versuche: 1, max: 1, fehler: null }), /ohne Fehlertext/)
     assert.equal(zeitBucket(15 * 60_000 * 7 + 1000), '7')
     assert.equal(zeitBucket(15 * 60_000 * 8), '8')
-    assert.equal(artErlaubt('test', { logins: false, fehlversuche: false, jobs: false, dienste: false }), true)
-    assert.equal(artErlaubt('sperre', { logins: true, fehlversuche: false, jobs: true, dienste: true }), false)
+    assert.equal(artErlaubt('test', { logins: false, fehlversuche: false, jobs: false, dienste: false, einkauf: false }), true)
+    assert.equal(artErlaubt('sperre', { logins: true, fehlversuche: false, jobs: true, dienste: true, einkauf: true }), false)
 
     await withRollback(async (t) => {
       await einreihen(t, 'test', 'test:alt', 'alt')

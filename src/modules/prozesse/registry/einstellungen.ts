@@ -982,7 +982,7 @@ export const EINSTELLUNGEN = {
     prozessfrei: true,
     beschreibung:
       'Schalter je Ereignisart (settings.benachrichtigungen): Anmeldungen, Fehlversuche/Sperren, ' +
-      'endgültig fehlgeschlagene Jobs, Dienststörungen. Gilt beim Senden — auch für schon ' +
+      'endgültig fehlgeschlagene Jobs, Dienststörungen, tägliche Einkaufs-Zusammenfassung. Gilt beim Senden — auch für schon ' +
       'eingereihte Meldungen. Zugangsdaten (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) sind Umgebungsvariablen.',
     bindung: 'frei',
     schema: z.object({
@@ -990,9 +990,10 @@ export const EINSTELLUNGEN = {
       fehlversuche: z.boolean().default(true),
       jobs: z.boolean().default(true),
       dienste: z.boolean().default(true),
+      einkauf: z.boolean().default(true),
     }),
     zusammenfassung: (p) =>
-      `Telegram: ${(['logins', 'fehlversuche', 'jobs', 'dienste'] as const)
+      `Telegram: ${(['logins', 'fehlversuche', 'jobs', 'dienste', 'einkauf'] as const)
         .filter((k) => p[k])
         .join(', ') || 'alles aus'}`,
     formdata: (fd) => ({
@@ -1000,6 +1001,7 @@ export const EINSTELLUNGEN = {
       fehlversuche: fd.get('fehlversuche') === 'on',
       jobs: fd.get('jobs') === 'on',
       dienste: fd.get('dienste') === 'on',
+      einkauf: fd.get('einkauf') === 'on',
     }),
     revalidate: ['/einstellungen/benachrichtigungen'],
   },

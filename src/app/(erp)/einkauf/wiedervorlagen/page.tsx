@@ -20,15 +20,17 @@ const ZIEL: Record<string, { art: string; pfad: (id: string) => string }> = {
   bemusterung: { art: 'Muster', pfad: (id) => `/einkauf/muster/${id}` },
   werkzeug: { art: 'Werkzeug', pfad: (id) => `/einkauf/werkzeuge/${id}` },
   lieferantenvertrag: { art: 'Vertrag', pfad: (id) => `/einkauf/vertraege/${id}` },
+  eingangs_sendung: { art: 'Sendung', pfad: (id) => `/einkauf/sendungen/${id}` },
 }
 
 /**
  * Wiedervorlagen des Einkaufs (0093): „Antwort erwartet bis",
  * „Liefertermin prüfen" — von Hand gesetzt an Thread, Lieferant,
  * Bestellung, Rechnung, Projekt, Muster, Werkzeug oder Vertrag.
- * Überfälliges oben. Darunter die regelbasierten (0107, Sicht
+ * Überfälliges oben. Darunter die regelbasierten (0107/0108, Sicht
  * einkauf_regel_wiedervorlagen): ablaufende Verträge, Werkzeuge am Ende der
- * Lebensdauer; fehlende PI und überfällige ETA kommen mit dem Cockpit.
+ * Lebensdauer, überfällige ETA. Fehlende Pflichtdokumente stehen im
+ * Cockpit (/einkauf/cockpit).
  */
 export default async function WiedervorlagenPage({ searchParams }: { searchParams: Promise<{ alle?: string }> }) {
   const user = await requireArea('einkauf')
@@ -68,6 +70,8 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
                when 'werkzeug' then (select wz.nummer || ' · ' || wz.bezeichnung from werkzeuge wz where wz.id = w.record_id)
                when 'lieferantenvertrag' then (select v.titel || ' · ' || p.name from lieferantenvertraege v
                                                join partners p on p.id = v.partner_id where v.id = w.record_id)
+               when 'eingangs_sendung' then (select s.nummer || coalesce(' · ' || s.bezeichnung, '')
+                                             from eingangs_sendungen s where s.id = w.record_id)
              end as bezeichnung
       from wiedervorlagen w
       left join users u on u.id = w.zustaendig_id
@@ -212,9 +216,11 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
             </table>
           </TableWrap>
           <p className="small muted" style={{ margin: 0, padding: '8px 12px' }}>
-            Regelbasiert: ablaufende Lieferantenverträge (ab Kündigungsstichtag minus Erinnerung) und Werkzeuge ab 90 % der
-            Lebensdauer. Sie verschwinden von selbst, sobald der Vertrag verlängert, gekündigt oder beendet bzw. das
-            Werkzeug ersetzt ist.
+            Regelbasiert: ablaufende Lieferantenverträge (ab Kündigungsstichtag minus Erinnerung), Werkzeuge ab 90 % der
+            Lebensdauer und Bestellungen mit überschrittenem Liefertermin bei offenem Wareneingang. Sie verschwinden von
+            selbst, sobald der Vertrag verlängert, gekündigt oder beendet, das Werkzeug ersetzt bzw. die Ware eingegangen
+            oder ein neuer Termin eingetragen ist. Fehlende Pflichtdokumente zeigt das{' '}
+            <Link href="/einkauf/cockpit">Cockpit</Link>.
           </p>
         </Card>
       )}

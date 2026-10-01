@@ -125,6 +125,7 @@ des `db`-Dienstes.
 | Dienste-Wächter (Störungen → Telegram) | alle 5 Min | `/api/cron?task=wache` |
 | Aufräumen (Sitzungen, Geräte, Trackingdaten, Benachrichtigungen) | täglich | `/api/cron?task=housekeeping` |
 | Finanz-Tageslauf (Verträge, USt-Vorschlag) | täglich | `/api/cron?task=finanzen` |
+| Einkaufs-Zusammenfassung (Cockpit je Einkäufer → Telegram) | täglich | `/api/cron?task=einkauf` |
 
 Weitere Punkte:
 - **Label-Dateien** liegen unter `STORAGE_DIR` (Standard: `./storage`). Bei

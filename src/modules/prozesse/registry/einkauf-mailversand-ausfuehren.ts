@@ -35,6 +35,8 @@ export interface EntwurfEingabe {
 export interface EntwurfZusatz {
   /** Den aus der Vorlage gefüllten Text je Sprache nachbearbeiten (z. B. Positionsblock einsetzen). */
   textAnpassen?: (text: string, sprache: Sprache) => string
+  /** Weitere bzw. übersteuerte Platzhalter je Sprache (z. B. {{dokumente}} der Pflichtdokument-Nachfrage, 0108). */
+  werte?: (sprache: Sprache) => Record<string, string | undefined>
 }
 
 export async function entwurfAnlegen(
@@ -107,6 +109,7 @@ export async function entwurfAnlegen(
       liefertermin: po?.eta,
       einkaeufer: ctx.actor,
       firma: firma?.name ?? undefined,
+      ...(zusatz.werte?.(s) ?? {}),
     })
     const anpassen = zusatz.textAnpassen ?? ((t: string) => t)
     if (!p.text_de) textDe = anpassen(vorlageFuellen(de.text, werte('de')), 'de')

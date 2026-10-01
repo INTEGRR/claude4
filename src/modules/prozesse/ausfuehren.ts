@@ -9,6 +9,7 @@ import * as einkaufProjekte from './registry/einkauf-projekte-ausfuehren.ts'
 import * as einkaufBemusterung from './registry/einkauf-bemusterung-ausfuehren.ts'
 import * as einkaufWerkzeuge from './registry/einkauf-werkzeuge-ausfuehren.ts'
 import * as einkaufVertraege from './registry/einkauf-vertraege-ausfuehren.ts'
+import * as einkaufSendungen from './registry/einkauf-sendungen-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -81,6 +82,22 @@ export const AUSFUEHRUNG = {
   'einkauf.werkzeug_aendern': einkaufWerkzeuge.werkzeugAendern,
   'einkauf.werkzeug_status_setzen': einkaufWerkzeuge.werkzeugStatusSetzen,
   'einkauf.werkzeug_schuss_buchen': einkaufWerkzeuge.werkzeugSchussBuchen,
+  'einkauf.sendung_anlegen': einkaufSendungen.sendungAnlegen,
+  'einkauf.sendung_aendern': einkaufSendungen.sendungAendern,
+  'einkauf.sendung_bestellung_zuordnen': einkaufSendungen.sendungBestellungZuordnen,
+  'einkauf.sendung_bestellung_loesen': einkaufSendungen.sendungBestellungLoesen,
+  'einkauf.sendung_verschiffen': einkaufSendungen.sendungVerschiffen,
+  'einkauf.sendung_verzollen': einkaufSendungen.sendungVerzollen,
+  'einkauf.sendung_ankommen': einkaufSendungen.sendungAnkommen,
+  'einkauf.sendung_abrechnen': einkaufSendungen.sendungAbrechnen,
+  'einkauf.sendung_stornieren': einkaufSendungen.sendungStornieren,
+  'einkauf.sendung_kosten_erfassen': einkaufSendungen.sendungKostenErfassen,
+  'einkauf.sendung_kosten_entfernen': einkaufSendungen.sendungKostenEntfernen,
+  'einkauf.sendung_verteilen': einkaufSendungen.sendungVerteilen,
+  'einkauf.sendung_schaetzen': einkaufSendungen.sendungSchaetzen,
+  'einkauf.sendung_zoll_erfassen': einkaufSendungen.sendungZollErfassen,
+  'einkauf.pflichtdokumente_nachfragen': einkaufSendungen.pflichtdokumenteNachfragen,
+  'einkauf.einstand_vorschlag_uebernehmen': einkaufSendungen.einstandVorschlagUebernehmen,
   'einkauf.lieferantenvertrag_anlegen': einkaufVertraege.vertragAnlegen,
   'einkauf.lieferantenvertrag_aendern': einkaufVertraege.vertragAendern,
   'einkauf.lieferantenvertrag_status_setzen': einkaufVertraege.vertragStatusSetzen,

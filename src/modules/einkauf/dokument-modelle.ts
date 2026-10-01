@@ -16,6 +16,7 @@ export const DOKUMENT_MODELLE = {
   bemusterung: { tabelle: 'bemusterungen', bereich: 'einkauf', label: 'Muster-Runde' },
   werkzeug: { tabelle: 'werkzeuge', bereich: 'einkauf', label: 'Werkzeug' },
   lieferantenvertrag: { tabelle: 'lieferantenvertraege', bereich: 'einkauf', label: 'Lieferantenvertrag' },
+  eingangs_sendung: { tabelle: 'eingangs_sendungen', bereich: 'einkauf', label: 'Eingangssendung' },
 } satisfies Record<string, { tabelle: string; bereich: Area; label: string }>
 
 export type DokumentModell = keyof typeof DOKUMENT_MODELLE

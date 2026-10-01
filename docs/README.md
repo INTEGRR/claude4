@@ -73,8 +73,9 @@ der [AGENTS.md](../AGENTS.md).
 - [module/einkauf.md](module/einkauf.md) — Bestellungen, Wareneingang,
   Rechnungen mit 3-Wege-Abgleich.
 - [module/einkaufstool.md](module/einkaufstool.md) — Einkaufstool (Sourcing):
-  Dokumente in Google Drive, Lieferantenakte, später Postfach, Projekte,
-  Sendungen/Zoll und Agent — Ausbaustufen und Stand.
+  Dokumente in Google Drive, Lieferantenakte, Postfach, Projekte, Muster,
+  Werkzeuge, Sendungen/Zoll, Cockpit, DATEV-Vorbereitung, später Agent —
+  Ausbaustufen und Stand.
 - [module/lager.md](module/lager.md) — Bewegungs-Ledger, Transfers,
   Inventur, Meldebestände.
 - [module/fertigung.md](module/fertigung.md) — Stücklisten, Varianten,

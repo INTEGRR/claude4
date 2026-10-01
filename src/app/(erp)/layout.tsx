@@ -54,6 +54,7 @@ async function badges() {
       entwuerfe: number
       einkaufsprojekte: number
       muster: number
+      sendungen: number
     }[]
   >`
     select
@@ -86,7 +87,9 @@ async function badges() {
       (select count(*) from mail_entwuerfe where status = 'entwurf')::int as entwuerfe,
       (select count(*) from einkaufsprojekte where status in ('bedarf', 'angefragt', 'entschieden'))::int as einkaufsprojekte,
       -- Muster, die da sind und auf unsere Bewertung warten (0107).
-      (select count(*) from bemusterungen where status = 'offen' and erhalten_am is not null)::int as muster`
+      (select count(*) from bemusterungen where status = 'offen' and erhalten_am is not null)::int as muster,
+      -- Angekommene Sendungen, die auf Wareneingang und Abrechnung warten (0108).
+      (select count(*) from eingangs_sendungen where status = 'angekommen')::int as sendungen`
   return row
 }
 
@@ -234,8 +237,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       label: 'Einkauf',
       items: sees('einkauf') && prozessAktiv('einkauf')
         ? [
+            { href: '/einkauf/cockpit', label: 'Einkaufs-Cockpit' },
             { href: '/einkauf', label: 'Bestellungen' },
             { href: '/einkauf/projekte', label: 'Einkaufsprojekte', count: counts.einkaufsprojekte },
+            { href: '/einkauf/sendungen', label: 'Sendungen & Zoll', count: counts.sendungen },
             { href: '/einkauf/muster', label: 'Muster', count: counts.muster },
             { href: '/einkauf/posteingang', label: 'Posteingang', count: counts.posteingang },
             { href: '/einkauf/entwuerfe', label: 'Mail-Entwürfe', count: counts.entwuerfe },

@@ -13,6 +13,7 @@ export const VORLAGEN_ANLAESSE = {
   liefertermin: 'Liefertermin & Tracking',
   muster_feedback: 'Muster-Feedback',
   bestellung: 'Bestellung senden',
+  dokumente_nachfragen: 'Fehlende Dokumente nachfragen',
 } as const
 export type VorlagenAnlass = keyof typeof VORLAGEN_ANLAESSE
 export const VORLAGEN_ANLASS_NAMEN = Object.keys(VORLAGEN_ANLAESSE) as [VorlagenAnlass, ...VorlagenAnlass[]]
@@ -20,7 +21,7 @@ export const VORLAGEN_ANLASS_NAMEN = Object.keys(VORLAGEN_ANLAESSE) as [Vorlagen
 export const SPRACHEN = { de: 'Deutsch', en: 'Englisch', zh: 'Chinesisch' } as const
 export type Sprache = keyof typeof SPRACHEN
 
-export const PLATZHALTER = ['lieferant', 'ansprechpartner', 'bestellnummer', 'liefertermin', 'einkaeufer', 'firma'] as const
+export const PLATZHALTER = ['lieferant', 'ansprechpartner', 'bestellnummer', 'liefertermin', 'einkaeufer', 'firma', 'dokumente'] as const
 
 /** {{name}} ersetzen; unbekannte oder leere bleiben als [name] stehen. */
 export function vorlageFuellen(text: string, werte: Partial<Record<string, string | null | undefined>>): string {

@@ -219,6 +219,20 @@ export const LABELS = {
     gesperrt: 'Gesperrt',
     ausgemustert: 'Ausgemustert',
   },
+  eingangs_sendung: {
+    geplant: 'Geplant',
+    verschifft: 'Verschifft',
+    verzollt: 'Verzollt',
+    angekommen: 'Angekommen',
+    abgerechnet: 'Abgerechnet',
+    storniert: 'Storniert',
+  },
+  // DATEV-Vorbereitung (0108): was an DATEV ginge — nur Übersicht.
+  datev: {
+    bereit: 'Bereit',
+    fehlt_beleg: 'Beleg fehlt',
+    uebergeben: 'Übergeben',
+  },
   // Lage aus Status und Laufzeit (einkauf/lieferantenvertraege.ts vertragsLage).
   lieferantenvertrag: {
     aktiv: 'Aktiv',
@@ -247,6 +261,8 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'abgeschlossen':
     case 'angebot':
     case 'aktiv':
+    case 'abgerechnet':
+    case 'uebergeben':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -261,6 +277,10 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'angefragt':
     case 'entschieden':
     case 'bestellt':
+    case 'verschifft':
+    case 'verzollt':
+    case 'angekommen':
+    case 'bereit':
       return 'info'
     case 'cancel':
     case 'cancelled':
@@ -270,6 +290,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'abgelehnt':
     case 'gesperrt':
     case 'abgelaufen':
+    case 'storniert':
       return 'danger'
     case 'waiting':
     case 'started':
@@ -285,6 +306,8 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'in_auftrag':
     case 'faellig':
     case 'gekuendigt':
+    case 'geplant':
+    case 'fehlt_beleg':
       return 'warn'
     default:
       return 'neutral'

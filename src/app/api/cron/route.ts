@@ -29,6 +29,7 @@ export const maxDuration = 60
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
+ *   /api/cron?task=einkauf       täglich       - Einkaufs-Zusammenfassung (Telegram)
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -134,6 +135,13 @@ export async function GET(request: Request) {
         // EZB-Kurse (0097) als Job: ein Ausfall der EZB bricht den Tageslauf nicht.
         await sql`select enqueue_job('ezb_kurse_abrufen', '{}'::jsonb, ${`ezb-kurse:${new Date().toISOString().slice(0, 10)}`})`
         return NextResponse.json({ task, ...row.finanz_tageslauf, ezb: 'eingereiht' })
+      }
+      case 'einkauf': {
+        // Tägliche Einkaufs-Zusammenfassung (0108) als Job — Dedupe je Tag,
+        // gesendet wird sie vom Cron „jobs" über die Benachrichtigungs-Outbox.
+        const tag = new Date().toISOString().slice(0, 10)
+        await sql`select enqueue_job('einkauf_digest', ${sql.json({ datum: tag })}, ${`einkauf-digest:${tag}`})`
+        return NextResponse.json({ task, digest: 'eingereiht' })
       }
       default:
         return NextResponse.json({ error: `Unbekannte Aufgabe: ${task}` }, { status: 400 })

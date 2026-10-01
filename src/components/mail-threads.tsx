@@ -161,10 +161,12 @@ export async function MailThreadsKarte({
   )
 }
 
-/** Wohin eine regelbasierte Wiedervorlage führt (Sicht einkauf_regel_wiedervorlagen, 0107). */
+/** Wohin eine regelbasierte Wiedervorlage führt (Sicht einkauf_regel_wiedervorlagen, 0107/0108). */
 export const REGEL_ZIEL: Record<string, (id: string) => string> = {
   lieferantenvertrag: (id) => `/einkauf/vertraege/${id}`,
   werkzeug: (id) => `/einkauf/werkzeuge/${id}`,
+  // Überfällige ETA (0108).
+  purchase_order: (id) => `/einkauf/${id}`,
 }
 
 /** In 7 Tagen, als JJJJ-MM-TT — Vorgabe für neue Wiedervorlagen. */
