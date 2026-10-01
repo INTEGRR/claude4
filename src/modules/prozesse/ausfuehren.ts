@@ -1,5 +1,6 @@
 import type { AktionsFn } from './registry/typen.ts'
 import type { AktionsName } from './registry/index.ts'
+import * as aufgaben from './registry/aufgaben-ausfuehren.ts'
 import * as einkauf from './registry/einkauf-ausfuehren.ts'
 import * as einkaufDokumente from './registry/einkauf-dokumente-ausfuehren.ts'
 import * as einkaufPostfach from './registry/einkauf-postfach-ausfuehren.ts'
@@ -29,6 +30,9 @@ import * as vorgang from './registry/vorgang-ausfuehren.ts'
  * den Typecheck — nicht erst den Klick.
  */
 export const AUSFUEHRUNG = {
+  'aufgaben.anlegen': aufgaben.aufgabeAnlegen,
+  'aufgaben.erledigen': aufgaben.aufgabeErledigen,
+  'aufgaben.verwerfen': aufgaben.aufgabeVerwerfen,
 
   'einkauf.ablage_einrichten': einkaufDokumente.ablageEinrichtenAusfuehren,
   'einkauf.upload_vorbereiten': einkaufDokumente.uploadVorbereiten,

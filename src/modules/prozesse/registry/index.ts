@@ -1,4 +1,5 @@
 import type { RegistrierteAktion } from './typen.ts'
+import { AUFGABEN } from './aufgaben.ts'
 import { AUSWERTUNGEN } from './auswertungen.ts'
 import { EINKAUF } from './einkauf.ts'
 import { EINKAUF_DOKUMENTE } from './einkauf-dokumente.ts'
@@ -30,6 +31,7 @@ import { VORGANG } from './vorgang.ts'
  * einkauf/fertigung → einstellungen/integrationen).
  */
 export const REGISTRY = {
+  ...AUFGABEN,
   ...AUSWERTUNGEN,
   ...EINKAUF,
   ...EINKAUF_DOKUMENTE,

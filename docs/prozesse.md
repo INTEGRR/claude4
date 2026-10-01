@@ -703,6 +703,9 @@ machen:
   und fällige Wiedervorlagen. „Offen" leitet `offeneVorgaenge()` aus dem
   Prozessgraphen ab (der Zustand bietet noch eine Aktion an) — dieselbe Zahl
   steht als Zähler am Prozess-Menüpunkt und an „Vorgänge".
+- **„Deine Aufgaben" (0104)** steht über den Systemsignalen: was ein Mensch
+  dir oder deinem Team aufgetragen hat, mit Termin und Knopf „Erledigt"
+  (Details: [module/personal.md](module/personal.md#aufgaben-für-mitarbeiter-aufgaben-0104)).
 - **Strg/Cmd+K überall**: dasselbe Befehlsfeld als Overlay auf jeder
   Seite (Knopf ⌘K in der Kopfleiste), gemeinsamer Katalog in
   `modules/befehle.ts`.

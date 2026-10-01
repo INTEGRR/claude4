@@ -20,6 +20,7 @@ import { DIENST_LABELS, gestoerteDienste } from '@/modules/integrationen/wache'
 import { kiConfigured } from '@/modules/ki/agent'
 import { sprechenKonfiguriert } from '@/modules/ki/sprechen'
 import { offeneVorgaenge } from '@/modules/prozesse/offene-vorgaenge'
+import { meineFaelligenAufgaben } from '@/modules/aufgaben/liste'
 import { ArbeitsplatzWaehler } from '@/components/arbeitsplatz-waehler'
 import { arbeitsplaetzeZurAuswahl, arbeitsplatzIdDesGeraets } from '@/modules/druck/arbeitsplatz'
 import { arbeitsplatzWaehlen } from './arbeitsplatz-action'
@@ -110,6 +111,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   if (einrichtung?.offen) redirect('/einrichtung')
 
   const counts = await badges()
+  const aufgabenFaellig = await meineFaelligenAufgaben(user)
   // Offene Vorgänge je Prozess (Reparaturanfragen, Anfragen …) — Zähler an
   // den Prozess-Menüpunkten und an „Vorgänge".
   const offen = await offeneVorgaenge()
@@ -190,6 +192,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           ? [{ href: '/sprechen', label: 'Sprechen', kern: 'orange' as const }]
           : []),
         ...(sees('scanner') ? [{ href: '/scanner', label: 'Scannen', kern: 'lila' as const }] : []),
+        // Aufgaben (0104): Zähler = meine offenen, heute oder früher fälligen.
+        ...(sees('aufgaben') ? [{ href: '/aufgaben', label: 'Aufgaben', count: aufgabenFaellig }] : []),
       ],
     },
     {

@@ -75,3 +75,42 @@ An der Stempeluhr darf jeder stehen; die Personalkosten sieht nur das Büro.
 4. Ein abgelehnter Urlaubsantrag gibt den Zeitraum für einen neuen Antrag frei.
 5. Wird ein Arbeitsgang mit Mitarbeiter gestartet, läuft die Zeiterfassung mit; die Lohnkosten des Auftrags rechnen dann mit dem Personalkostensatz, nicht mit dem des Arbeitsplatzes.
 6. Ein Lagermitarbeiter sieht die Zeiterfassung, wird bei `/personal` aber auf die Übersicht zurückgeschickt.
+
+## Aufgaben für Mitarbeiter (`aufgaben`, 0104)
+
+Was nicht aus einem Beleg kommt, sondern aus dem Kopf: „feg mal hinten das
+Lager durch", „bereite die Gehäuse für Montag vor". Bewusst klein und
+**prozessfrei** wie die Wiedervorlagen — eine Aufgabe ist ein Zettel mit
+Haken, kein Ablauf; `status` (`offen` | `erledigt` | `verworfen`) ist die
+einzige Wahrheit (Entscheidungslog 2026-10-01, „Aufgaben für Mitarbeiter").
+
+- **Felder:** Titel, Details, **Zuständig** = eine Person (`zustaendig_id`)
+  *oder* ein Team (`rolle`: Lager, Fertigung, Büro — jeder mit dieser Haupt-
+  oder Zusatzrolle), **Termin** = Tag plus optionale Uhrzeit (ohne Uhrzeit
+  gilt das Tagesende; `faellig_um` rechnet in Berliner Ortszeit), geschätzte
+  Dauer in Minuten, beim Abhaken eine Rückmeldung (`notiz`).
+- **Wo sie erscheinen:** in der Übersicht als „Deine Aufgaben" (über den
+  Systemsignalen, Überfälliges gelb), als Zähler am Menüpunkt „Aufgaben"
+  (meine, heute oder früher fällig) und auf `/aufgaben` (Meine · Alle offenen ·
+  Erledigt der letzten 14 Tage) mit dem Formular „Neue Aufgabe".
+- **Aktionen** (Registry `aufgaben.*`, Bereich `aufgaben`, den jede Rolle hat):
+  `aufgaben.anlegen` (KI/Sprechen), `aufgaben.erledigen` (KI/Sprechen, per ID
+  oder Stichwort aus dem Titel der eigenen offenen Aufgaben),
+  `aufgaben.verwerfen`.
+- **Rechte** (`modules/aufgaben/rechte.ts`, dieselbe Regel für Knöpfe und
+  Ausführung): abhaken dürfen der Zuständige, jedes Teammitglied, wer sie
+  angelegt hat, und das Büro (Admin, Büro-Rolle); verwerfen nur Anleger und
+  Büro. Anlegen darf jeder — auch ein Lagerist für den Kollegen.
+- **Sprechen:** Zuständig und Termin kommen als gesprochener Text und werden
+  in der Ausführung aufgelöst (`modules/aufgaben/termin.ts`): „Tino",
+  „Tino Lagerfeld", Benutzername, Nachname; „das Lager", „Lagerteam",
+  „Produktion"; „mich". Termin „heute", „morgen", „übermorgen", Wochentag
+  (heute eingeschlossen), „24.12.", ISO-Datum; Uhrzeit „15", „15 Uhr",
+  „15:30". Mehrdeutige Namen werden abgewiesen statt geraten; ein
+  Mitarbeiter ohne Benutzerkonto bekommt einen Klartext-Hinweis (ohne
+  Anmeldung keine Übersicht). Wie jeder Schreibwunsch wird die Aufgabe im
+  Gespräch nur notiert und nach der Sichtprüfung auf `/sprechen` angelegt.
+- **Bewusst noch nicht:** wiederkehrende Aufgaben, Verschieben/Umhängen
+  (verwerfen und neu anlegen), Bezug zu einem Beleg, Benachrichtigung per
+  Telegram.
+

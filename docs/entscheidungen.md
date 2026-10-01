@@ -9,6 +9,41 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Aufgaben für Mitarbeiter
+
+**Anlass:** Betreiber: „Aufgaben für meine Mitarbeiter anlegen — feg mal
+hinten das Lager durch, bereite dies und das vor — mit Zeiten, die bei denen
+in der Übersicht aufploppen, auch über Sprechen. Klein, aber es soll
+funktionieren."
+
+**Entschieden:**
+- Eigene Tabelle `aufgaben` (0104), **prozessfrei** wie die Wiedervorlagen:
+  eine Aufgabe ist ein Zettel mit Haken, kein Ablauf — `status` ist die
+  einzige Zustandswahrheit, ein Prozessgraph mit zwei Zuständen brächte nur
+  Verwaltung. Schreiben nur über die Registry (`aufgaben.anlegen`,
+  `aufgaben.erledigen`, `aufgaben.verwerfen`).
+- **Zuständig ist eine Person oder ein Team** (Rolle Lager/Fertigung/Büro,
+  inkl. Zusatzrollen) — „ans Lager" ohne einen Namen festzulegen; erledigt
+  einer aus dem Team, ist sie für alle weg.
+- **Neuer Bereich `aufgaben`, den jede Rolle schreibt** (wie `fehler`):
+  abhaken muss jeder können, und ein Lagerist darf dem Kollegen etwas
+  auftragen. Wer welche Aufgabe abhaken/verwerfen darf, entscheidet eine
+  reine Regel (`modules/aufgaben/rechte.ts`) in Ausführung UND Oberfläche.
+- **Zuständig und Termin als Text** im Schema (nicht als ID/Datum): so wird
+  gesprochen („Tino", „das Lager", „morgen 15 Uhr"); aufgelöst wird in der
+  Ausführung, mehrdeutig wird abgewiesen statt geraten. Termin in Berliner
+  Ortszeit (`faellig_um` als generierte Spalte), weil der Server in UTC läuft.
+- Sichtbar als „Deine Aufgaben" **über** den Systemsignalen der Übersicht
+  (dort wartet ein Mensch), als Zähler am Menüpunkt (heute oder früher
+  fällig) und auf `/aufgaben`.
+- Bewusst später: Wiederholung, Verschieben, Belegbezug, Telegram-Hinweis.
+
+Umgesetzt in `0104_aufgaben.sql`, `registry/aufgaben(-ausfuehren).ts`,
+`modules/aufgaben/`, `(erp)/aufgaben/`, `components/aufgaben-liste.tsx`,
+Übersicht und Navigation; dokumentiert in
+[module/personal.md](module/personal.md); Tests `tests/aufgaben.test.ts`,
+`tests/prozesse/aufgaben.test.ts`.
+
 ## 2026-10-01 — Heute und Zähler: Anfragen, Reparaturen, Fertigung
 
 **Anlass:** Betreiber: Die Reparaturanfrage aus dem Shop kam an, aber ohne

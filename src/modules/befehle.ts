@@ -69,6 +69,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/produkte', label: 'Produkte', area: 'produkte' },
   { href: '/kontakte', label: 'Kontakte', area: 'kontakte' },
   { href: '/scanner', label: 'Scannen (Packzettel, Wareneingang, Fertigung)', area: 'scanner' },
+  { href: '/aufgaben', label: 'Aufgaben (für Mitarbeiter anlegen, abhaken)', area: 'aufgaben' },
   { href: '/integrationen', label: 'Integrationen', area: 'integrationen' },
   { href: '/prozesse', label: 'Prozesse', area: 'einstellungen' },
   { href: '/prozesse/werkstatt', label: 'Prozess-Werkstatt', area: 'einstellungen' },
