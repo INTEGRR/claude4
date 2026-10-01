@@ -45,6 +45,14 @@ export async function scrapProduct(formData: FormData) {
   return serverAktion('lager.ausschuss_buchen', { formData })
 }
 
+/**
+ * Artikel-Etiketten (Wareneingang, Variante): je Zeile variant_id + anzahl —
+ * am Etikettendrucker des Arbeitsplatzes, sonst PDF im Browser.
+ */
+export async function artikeletikettenDrucken(formData: FormData) {
+  return serverAktion('lager.artikeletikett_drucken', { formData })
+}
+
 export async function updatePickingDetails(pickingId: string, formData: FormData) {
   return serverAktion('lager.transfer_details', { recordId: pickingId, formData })
 }

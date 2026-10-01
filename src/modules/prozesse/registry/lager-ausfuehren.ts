@@ -2,6 +2,12 @@ import { SPERRE_MINUTEN, sammelAbgleich } from '../../versand/kommissionier-logi
 import { sql, tx } from '@/db/client'
 import { parseLotSpec } from '@/modules/shared/form'
 import { consumePackagingForPicking, queueFulfillmentForPicking } from '@/modules/versand/service'
+import { drucken, zielDrucker } from '@/modules/druck/auftrag'
+import {
+  MAX_ANZAHL_JE_VARIANTE,
+  MAX_ETIKETTEN_JE_DRUCK,
+  positionenAlsParameter,
+} from '../../druck/etikett-layout.ts'
 import { varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
@@ -121,6 +127,72 @@ export async function ausschussBuchen(
   const loc = await HAUPTLAGER()
   await sql`select scrap(${p.variant_id}, ${p.qty}, ${loc}, ${p.reason ?? null})`
   return {}
+}
+
+// --- Artikel-Etiketten --------------------------------------------------------
+
+/**
+ * Artikel-Etiketten (Variante, Wareneingang, KI): Kennungen auflösen (UUID
+ * aus der Maske, SKU/Barcode/Name von der KI), gleiche Varianten
+ * zusammenfassen, dann je Variante EIN Druckauftrag mit der Anzahl am
+ * Etikettendrucker des Arbeitsplatzes bzw. Ersatz (0087). Ohne Drucker das
+ * PDF im Browser — alle Positionen in einem Dokument.
+ */
+export async function artikeletikettDrucken(
+  p: { positionen: { variant_id: string; anzahl: number }[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const summe = new Map<string, number>()
+  for (const pos of p.positionen) {
+    const v = await varianteAufloesen(sql, pos.variant_id)
+    summe.set(v.id, Math.min(MAX_ANZAHL_JE_VARIANTE, (summe.get(v.id) ?? 0) + pos.anzahl))
+  }
+  const positionen = [...summe].map(([variantId, anzahl]) => ({ variantId, anzahl }))
+  const gesamt = positionen.reduce((a, x) => a + x.anzahl, 0)
+  if (gesamt > MAX_ETIKETTEN_JE_DRUCK) {
+    throw new Error(`Höchstens ${MAX_ETIKETTEN_JE_DRUCK} Etiketten je Druck — bitte aufteilen.`)
+  }
+
+  // Ohne Code kein Etikett: vorher abweisen statt an der Brücke scheitern.
+  const ohneCode = await sql<{ name: string }[]>`
+    select variant_display_name(id) as name from product_variants
+    where id = any(${positionen.map((x) => x.variantId)}::uuid[])
+      and coalesce(nullif(trim(barcode), ''), nullif(trim(sku), '')) is null`
+  if (ohneCode.length > 0) {
+    throw new Error(
+      `${ohneCode.map((v) => v.name).join(', ')}: weder Barcode noch SKU — bitte zuerst an der Variante hinterlegen.`,
+    )
+  }
+
+  const stueck = `${gesamt} Artikel-Etikett${gesamt === 1 ? '' : 'en'}`
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'artikeletikett')
+  if (!ziel) {
+    return {
+      text: `${stueck} — kein Etikettendrucker für Artikel-Etiketten, PDF im Browser geöffnet (einrichten: Einstellungen → Arbeitsplätze & Drucker).`,
+      link: `/api/etikett/artikel?pos=${positionenAlsParameter(positionen)}`,
+    }
+  }
+  let meldung = ''
+  let wartete = 0
+  for (const x of positionen) {
+    const druck = await drucken(
+      'artikeletikett',
+      { art: 'artikeletikett', variantId: x.variantId, anzahl: x.anzahl },
+      { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+      ziel,
+    )
+    if (druck.gedruckt) {
+      meldung = druck.meldung
+      if (druck.wartete) wartete++
+    }
+  }
+  // Ein noch offener Auftrag derselben Variante am selben Drucker wird nicht
+  // verdoppelt (Doppelklick) — das sagt die Meldung, statt still zu schlucken.
+  const doppelt =
+    wartete > 0
+      ? ` ${wartete} Variante${wartete === 1 ? '' : 'n'} lag${wartete === 1 ? '' : 'en'} schon in der Warteschlange — nach dem Druck erneut drucken.`
+      : ''
+  return { text: `${stueck}: ${meldung}${doppelt}` }
 }
 
 // --- Meldebestände ----------------------------------------------------------

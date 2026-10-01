@@ -48,6 +48,7 @@ export function ActionButton({
   className,
   disabled,
   title,
+  linkOeffnen,
 }: {
   action: () => Promise<ActionResult>
   children: React.ReactNode
@@ -55,6 +56,8 @@ export function ActionButton({
   className?: string
   disabled?: boolean
   title?: string
+  /** Liefert die Aktion einen Link (Druck ohne Drucker: PDF im Browser), ihn sofort im neuen Tab öffnen. */
+  linkOeffnen?: boolean
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +73,11 @@ export function ActionButton({
         // Fehler im Produktionsbau), technische weiterhin als Ausnahme.
         const result = await action()
         if (isActionError(result)) setError(result.error)
-        else if (isActionInfo(result)) setInfo({ text: result.info, link: result.link })
+        else if (isActionInfo(result)) {
+          // Der Link in der Meldung bleibt stehen — er fängt Popup-Blocker ab.
+          if (linkOeffnen && result.link) window.open(result.link, '_blank', 'noopener')
+          setInfo({ text: result.info, link: result.link })
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')
       }
@@ -101,11 +108,17 @@ export function ActionForm({
   children,
   className,
   style,
+  linkOeffnen,
+  behalten,
 }: {
   action: (formData: FormData) => Promise<ActionResult>
   children: React.ReactNode
   className?: string
   style?: React.CSSProperties
+  /** Liefert die Aktion einen Link (Druck ohne Drucker: PDF im Browser), ihn sofort im neuen Tab öffnen. */
+  linkOeffnen?: boolean
+  /** Eingaben nach Erfolg stehen lassen (z. B. Etiketten-Anzahlen für einen zweiten Druck). */
+  behalten?: boolean
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -126,8 +139,11 @@ export function ActionForm({
           setError(result.error)
           return                    // Eingaben stehen lassen, damit nichts verloren geht
         }
-        if (isActionInfo(result)) setInfo({ text: result.info, link: result.link })
-        form.reset()
+        if (isActionInfo(result)) {
+          if (linkOeffnen && result.link) window.open(result.link, '_blank', 'noopener')
+          setInfo({ text: result.info, link: result.link })
+        }
+        if (!behalten) form.reset()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')
       }

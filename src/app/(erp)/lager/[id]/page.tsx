@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import { canWrite } from '@/modules/auth/permissions'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -9,10 +10,29 @@ import { LandedCosts } from '@/components/landed-costs'
 import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { date, qty } from '@/modules/shared/format'
-import { cancelPicking, checkAvailability, confirmPicking, returnPicking, updatePickingDetails, validatePicking } from '../actions'
+import {
+  artikeletikettenDrucken,
+  cancelPicking,
+  checkAvailability,
+  confirmPicking,
+  returnPicking,
+  updatePickingDetails,
+  validatePicking,
+} from '../actions'
 import { herkunftHref } from '../herkunft'
 
 export const dynamic = 'force-dynamic'
+
+/** Eine Zeile der Karte „Artikel-Etiketten" (je Variante summiert). */
+interface EtikettZeile {
+  variant_id: string
+  product: string
+  sku: string | null
+  uom: string
+  /** Barcode oder SKU vorhanden — sonst gibt es kein Etikett. */
+  code: boolean
+  qty: number
+}
 
 export default async function PickingPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireArea('lager')
@@ -64,6 +84,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       variant_id: string
       product: string
       sku: string | null
+      barcode: string | null
       qty: number
       qty_done: number
       reserved_qty: number
@@ -75,7 +96,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       lots: string | null
     }[]
   >`
-    select m.id, m.variant_id, variant_display_name(m.variant_id) as product, pv.sku, m.qty, m.qty_done,
+    select m.id, m.variant_id, variant_display_name(m.variant_id) as product, pv.sku, pv.barcode, m.qty, m.qty_done,
            m.reserved_qty, u.name as uom, m.state, src.full_path as src, dst.full_path as dest,
            pt.tracking,
            (select string_agg(sl.name || ' × ' || round(a.qty, 2), ', ' order by sl.name)
@@ -107,6 +128,30 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
 
   const open = picking.state !== 'done' && picking.state !== 'cancel'
   const originHref = herkunftHref(picking.origin_model, picking.origin_id)
+
+  // Nach dem Wareneingang: Artikel-Etiketten je Variante, vorbelegt mit der
+  // gebuchten Menge (ganze Stück; sonst 1) — gedruckt wird über
+  // lager.artikeletikett_drucken am Etikettendrucker des Arbeitsplatzes.
+  const etikettZeilen =
+    picking.kind === 'receipt' && picking.state === 'done' && canWrite(user.rollen, 'lager', user.befugnisse)
+      ? [
+          ...moves
+            .filter((m) => m.state === 'done' && Number(m.qty_done) > 0)
+            .reduce((summe, m) => {
+              const bisher = summe.get(m.variant_id)
+              summe.set(m.variant_id, {
+                variant_id: m.variant_id,
+                product: m.product,
+                sku: m.sku,
+                uom: m.uom,
+                code: Boolean(m.barcode?.trim() || m.sku?.trim()),
+                qty: (bisher?.qty ?? 0) + Number(m.qty_done),
+              })
+              return summe
+            }, new Map<string, EtikettZeile>())
+            .values(),
+        ].map((z) => ({ ...z, anzahl: Number.isInteger(z.qty) ? Math.min(500, z.qty) : 1 }))
+      : []
 
   // Zulauf-Infos der Herkunfts-Bestellung: Termin (bestätigt vor geschätzt),
   // Carrier und Tracking — gepflegt am Einkauf, hier nur angezeigt.
@@ -373,6 +418,63 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
               </tbody>
             </table>
           </TableWrap>
+        </Card>
+      )}
+
+      {etikettZeilen.length > 0 && (
+        <Card title="Artikel-Etiketten" tight actions={<span className="mono-label">je gebuchtem Stück eins</span>}>
+          <ActionForm action={artikeletikettenDrucken} linkOeffnen behalten>
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Produkt</th>
+                    <th className="num">Gebucht</th>
+                    <th className="num" style={{ width: 130 }}>Etiketten</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {etikettZeilen.map((z) => (
+                    <tr key={z.variant_id}>
+                      <td>
+                        <Link href={`/produkte/variante/${z.variant_id}`}>{z.product}</Link>
+                        {z.sku && <span className="muted small mono"> · {z.sku}</span>}
+                      </td>
+                      <td className="num">
+                        {qty(z.qty)} <span className="mono small">{z.uom}</span>
+                      </td>
+                      <td className="num">
+                        {z.code ? (
+                          <>
+                            <input type="hidden" name="variant_id" value={z.variant_id} />
+                            <input
+                              type="number"
+                              name="anzahl"
+                              aria-label={`Etiketten für ${z.product}`}
+                              min="0"
+                              max="500"
+                              step="1"
+                              defaultValue={z.anzahl}
+                            />
+                          </>
+                        ) : (
+                          <span className="small muted" title="An der Variante Barcode oder SKU hinterlegen">
+                            kein Code
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+            <div className="row" style={{ padding: 12, borderTop: '1px solid var(--border)', alignItems: 'center' }}>
+              <div className="shrink">
+                <button type="submit">Artikel-Etiketten drucken</button>
+              </div>
+              <span className="small muted">0 = Zeile auslassen</span>
+            </div>
+          </ActionForm>
         </Card>
       )}
 

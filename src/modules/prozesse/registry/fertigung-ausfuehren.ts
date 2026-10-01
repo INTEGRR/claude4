@@ -64,6 +64,48 @@ export async function zettelDrucken(
 }
 
 /**
+ * Fertigungsetiketten (Knopf am Auftrag und Bulk): je Auftrag ein Etikett
+ * am Etikettendrucker des Arbeitsplatzes, sonst am Ersatz (0087) — im
+ * Format dieses Druckers. Ohne Drucker gibt es den Link aufs PDF im
+ * Browser (Standardformat 100 × 50 mm), wie beim Zettel.
+ */
+export async function etikettDrucken(
+  p: { ids: string[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const gewuenscht = [...new Set(p.ids)]
+  const vorhanden = await sql<{ id: string }[]>`
+    select id from manufacturing_orders where id = any(${gewuenscht}::uuid[])`
+  const ids = gewuenscht.filter((id) => vorhanden.some((v) => v.id === id))
+  if (ids.length === 0) throw new Error('Keiner der Fertigungsaufträge wurde gefunden.')
+  const stueck = `${ids.length} Fertigungsetikett${ids.length === 1 ? '' : 'en'}`
+
+  const ziel = await zielDrucker(ctx.arbeitsplatzId, 'fertigungsetikett')
+  if (!ziel) {
+    return {
+      text: `${stueck} — kein Etikettendrucker für Fertigungsetiketten, PDF im Browser geöffnet (einrichten: Einstellungen → Arbeitsplätze & Drucker).`,
+      link: `/api/etikett/fertigung?ids=${ids.join(',')}`,
+    }
+  }
+  let meldung = ''
+  let wartete = 0
+  for (const moId of ids) {
+    const druck = await drucken(
+      'fertigungsetikett',
+      { art: 'fertigungsetikett', moId },
+      { arbeitsplatzId: ctx.arbeitsplatzId, von: ctx.actor },
+      ziel,
+    )
+    if (druck.gedruckt) {
+      meldung = druck.meldung
+      if (druck.wartete) wartete++
+    }
+  }
+  const doppelt = wartete > 0 ? ` ${wartete} davon lag${wartete === 1 ? '' : 'en'} schon in der Warteschlange.` : ''
+  return { text: `${stueck}: ${meldung}${doppelt}` }
+}
+
+/**
  * Bulk-Start (BUG/00003): jeden Auftrag einzeln starten — startbar ist,
  * was bestätigt ist und dessen Material vollständig reserviert wurde.
  * Wer zwischen Druck und Start herausgefallen ist, wird übersprungen und

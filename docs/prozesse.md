@@ -1442,6 +1442,19 @@ Angebot/Rückversand, Abholung ohne Label, Storno). `tests/reparatur.test.ts`
 prüft die SQL-Statusfunktionen, `tests/reparatur-anfrage.test.ts` die
 Eingangsregeln, Felder und Registry-Statik.
 
+## Etiketten: Fertigungs- und Artikel-Etikett (umgesetzt, ohne Migration)
+
+Die Druckarten `fertigungsetikett`/`artikeletikett` aus 0087 haben jetzt
+ihre Aktionen: `fertigung.etikett_drucken` (ids; Knopf am Auftrag, Auswahl
+der Auftragsliste) und `lager.artikeletikett_drucken` (Positionen Variante ×
+Anzahl; Variante, erledigter Wareneingang, `ki: true`). Beide
+**prozessfrei** — Drucken ändert keinen Belegstatus — und mit demselben
+Druckweg wie Zettel und Packzettel (Platz → Ersatz → PDF im Browser).
+**Kein Autodruck beim Bestätigen**: ein automatischer Druck würde, wenn
+gewünscht, ein Schritt im Fertigungsprozess, keine Nebenwirkung von
+`fertigung.bestaetigen` (Entscheidungslog 2026-10-01). Aufbau der Etiketten:
+[module/versand.md](module/versand.md) „Etiketten".
+
 ## Noch offen (Kurzfassung)
 
 - **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:

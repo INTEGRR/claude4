@@ -36,6 +36,16 @@ export async function zettelDrucken(moId: string): Promise<ActionResult> {
   return serverAktion('fertigung.zettel_drucken', { parameter: { ids: [moId] } })
 }
 
+/** Fertigungsetikett am Auftrag: Etikettendrucker des Arbeitsplatzes, sonst PDF im Browser. */
+export async function etikettDrucken(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.etikett_drucken', { parameter: { ids: [moId] } })
+}
+
+/** Etiketten für die Auswahl der Auftragsliste — derselbe Druckweg. */
+export async function bulkEtiketten(formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.etikett_drucken', { formData })
+}
+
 export async function bulkStart(formData: FormData): Promise<ActionResult> {
   return serverAktion('fertigung.massenstart', { formData })
 }

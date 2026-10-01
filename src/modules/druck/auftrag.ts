@@ -112,13 +112,13 @@ export function druckMeldung(z: ZielDrucker): string {
  * Reiht einen Druckauftrag für den Zieldrucker ein — idempotent, solange für
  * denselben Beleg am selben Drucker noch ein offener Auftrag wartet
  * (Doppelklick druckt nicht doppelt; nach dem Druck darf erneut gedruckt
- * werden).
+ * werden). Liefert false, wenn der Auftrag schon wartete.
  */
 export async function druckEinreihen(
   ziel: ZielDrucker,
   beleg: Beleg,
   von: string,
-): Promise<void> {
+): Promise<boolean> {
   const shipmentId = beleg.art === 'label' ? beleg.shipmentId : null
   const moId = beleg.art === 'zettel' || beleg.art === 'fertigungsetikett' ? beleg.moId : null
   const pickingId = beleg.art === 'packzettel' ? beleg.pickingId : null
@@ -126,7 +126,7 @@ export async function druckEinreihen(
   const anzahl = beleg.art === 'artikeletikett' ? Math.max(1, Math.min(500, beleg.anzahl ?? 1)) : 1
   const altesZiel = beleg.art === 'label' ? 'labeldrucker' : beleg.art === 'zettel' ? 'zetteldrucker' : beleg.art
 
-  await sql`
+  const eingefuegt = await sql`
     insert into druckauftraege (
       art, shipment_id, mo_id, picking_id, variant_id, anzahl, ziel,
       drucker_id, arbeitsplatz_id, angefordert_von)
@@ -139,11 +139,15 @@ export async function druckEinreihen(
         and mo_id is not distinct from ${moId}
         and picking_id is not distinct from ${pickingId}
         and variant_id is not distinct from ${variantId})`
+  return eingefuegt.count > 0
 }
 
-/** Ergebnis eines Druckwunschs: gedruckt (mit Meldung) oder PDF im Browser. */
+/**
+ * Ergebnis eines Druckwunschs: gedruckt (mit Meldung) oder PDF im Browser.
+ * `wartete` = derselbe Auftrag lag schon offen am Drucker (nicht doppelt eingereiht).
+ */
 export type DruckErgebnis =
-  | { gedruckt: true; meldung: string }
+  | { gedruckt: true; meldung: string; wartete?: true }
   | { gedruckt: false }
 
 /**
@@ -160,8 +164,9 @@ export async function drucken(
 ): Promise<DruckErgebnis> {
   const z = ziel === undefined ? await zielDrucker(kontext.arbeitsplatzId, druckart) : ziel
   if (z) {
-    await druckEinreihen(z, beleg, kontext.von)
-    return { gedruckt: true, meldung: druckMeldung(z) }
+    const neu = await druckEinreihen(z, beleg, kontext.von)
+    const meldung = druckMeldung(z)
+    return neu ? { gedruckt: true, meldung } : { gedruckt: true, meldung, wartete: true }
   }
 
   if ((beleg.art === 'label' || beleg.art === 'zettel') && (await druckbrueckeAktiv())) {

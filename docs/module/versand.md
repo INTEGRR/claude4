@@ -321,6 +321,43 @@ HP Werkstatt (Montagetisch 1) — Ersatzdrucker, Packtisch 1 hat keinen
 Drucker für Fertigungszettel." Ein abgeschalteter Drucker oder
 Arbeitsplatz zählt wie keiner.
 
+### Etiketten: Fertigungs- und Artikel-Etikett
+
+Die Druckarten `fertigungsetikett` und `artikeletikett` drucken auf
+Etikettendruckern (Label-Ident in der Fertigung, Brother QL am Packtisch).
+Das PDF hat **genau die Größe des Etiketts am Zieldrucker**
+(`drucker.breite_mm × hoehe_mm`, in dieser Lage); ohne Maße — und im
+Browser — gilt **100 × 50 mm**. Je Etikett bzw. Kopie eine Seite; die
+Fläche wird je Größe aufgeteilt (wird der Code flacher als 8 mm, fallen
+erst zweite Zeilen, dann Nebenzeilen weg). Barcodes gehen als Vektor ins
+PDF (kein Bild, das beim Einpassen verschwimmt), kodiert mit bwip-js.
+Code: `src/modules/druck/etikett-layout.ts` (rechnet, DB-frei),
+`etikett-pdf.ts` (react-pdf ohne JSX), `etiketten.ts` (Daten + PDF).
+
+- **Fertigungsetikett** — `fertigung.etikett_drucken` (Knopf „Etikett
+  drucken" am Fertigungsauftrag, „Etiketten drucken" in der Auswahl der
+  Auftragsliste): MO-Nummer als großer Code 128 (das eine Scanfeld liest
+  sie, auch vom Scanner mit US-Belegung), darunter Nummer und Menge groß,
+  Produkt/Variante, „SKU · Termin · N Komponenten", Verkaufsauftrag
+  (Shopify-Name) und Kunde. Ein Etikett je Auftrag.
+- **Artikel-Etikett** — `lager.artikeletikett_drucken` (Bereich Lager; an
+  der Variante mit Anzahlfeld, nach dem Wareneingang je Zeile vorbelegt mit
+  der gebuchten Menge, im KI-Chat „20 Etiketten für KC-001"): Name,
+  Merkmale der Variante, Code mit Klartext, SKU. Code = gültige EAN-13 als
+  EAN, sonst der Barcode bzw. die SKU als Code 128 (dieselbe Wahl wie auf
+  Fertigungs- und Packzettel). **Ein Druckauftrag je Variante** mit
+  `anzahl` (1–500); gleiche Varianten werden zusammengefasst, höchstens
+  2000 Etiketten je Druck. Varianten ohne Barcode und SKU werden
+  abgewiesen.
+- Ohne Drucker liefert die Aktion den Link aufs PDF im Browser
+  (`/api/etikett/fertigung?ids=…`, `/api/etikett/artikel?pos=<id>:<n>,…`),
+  der Knopf öffnet ihn sofort im neuen Tab.
+- Ein noch offener Auftrag desselben Belegs am selben Drucker wird nicht
+  verdoppelt; die Meldung sagt dann „lag schon in der Warteschlange".
+- **Kein Autodruck beim Bestätigen** eines Fertigungsauftrags
+  (Entscheidungslog 2026-10-01) — gedruckt wird per Knopf, wenn die
+  Arbeit beginnt.
+
 **Übergang:** Solange **kein** Drucker angelegt ist, läuft die Brücke wie
 vor 0087 über die festen Ziele `labeldrucker`/`zetteldrucker` (Alt-Agenten
 mit `DRUCK_ZIELE` drucken weiter). Sobald der erste Drucker existiert,
@@ -389,7 +426,8 @@ Pause weiter (Fließband). Ein Label-Auftrag ohne gespeichertes PDF wird
 serverseitig sofort als Fehler quittiert, ein Zettel-Auftrag ebenso, wenn
 sein Rendern scheitert. Diagnose: Druckerzeile (Agent, offene Aufträge,
 Fehler der letzten 7 Tage) und die Karte „Druckbrücke" auf der
-Integrationen-Seite.
+Integrationen-Seite. Etiketten-Aufträge rendert der Server beim Abholen im
+Format des abholenden Druckers; Kopien stecken als Seiten im PDF.
 
 ## Massendruck (Fließband am Packtisch)
 

@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { bulkStart, bulkZettel } from './actions'
+import { bulkEtiketten, bulkStart, bulkZettel } from './actions'
 import { isActionError } from '@/modules/shared/action'
 import { Badge } from '@/components/ui'
 import { date, qty } from '@/modules/shared/format'
@@ -42,7 +42,7 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
   const router = useRouter()
   const [gewaehlt, setGewaehlt] = useState<Set<string>>(new Set())
   const [stufe, setStufe] = useState<Stufe>('auswahl')
-  const [meldung, setMeldung] = useState<{ text: string; fehler: boolean } | null>(null)
+  const [meldung, setMeldung] = useState<{ text: string; fehler: boolean; link?: string } | null>(null)
   const geladen = useRef(false)
 
   const startbar = (r: BulkZeile) => r.state === 'confirmed' && r.missing === 0
@@ -132,6 +132,23 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
     }
   }
 
+  // Etiketten sind unabhängig von der Druckstufe: sie ändern nichts am
+  // Ablauf Zettel → Start, deshalb ohne Stufenwechsel.
+  async function etiketten() {
+    setMeldung(null)
+    const result = await bulkEtiketten(formdaten())
+    if (isActionError(result)) {
+      setMeldung({ text: result.error, fehler: true })
+      return
+    }
+    if (result && 'info' in result) {
+      // Ohne Drucker: PDF sofort im Tab; der Link in der Meldung fängt
+      // Popup-Blocker ab.
+      if (result.link) window.open(result.link, '_blank', 'noopener')
+      setMeldung({ text: result.info, fehler: false, link: result.link })
+    }
+  }
+
   async function starten() {
     setStufe('startet')
     setMeldung(null)
@@ -174,6 +191,15 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
           </button>
           <button
             type="button"
+            className="small"
+            disabled={auswahl.length === 0}
+            onClick={() => void etiketten()}
+            title="Fertigungsetiketten der Auswahl am Etikettendrucker des Arbeitsplatzes"
+          >
+            Etiketten drucken
+          </button>
+          <button
+            type="button"
             className="primary small"
             disabled={stufe !== 'gedruckt' || auswahl.length === 0}
             onClick={() => void starten()}
@@ -190,6 +216,14 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
       {meldung && (
         <div className={`notice ${meldung.fehler ? 'danger' : 'ok'}`} style={{ margin: '0 12px 12px' }}>
           {meldung.text}
+          {meldung.link && (
+            <>
+              {' '}
+              <a href={meldung.link} target="_blank" rel="noopener">
+                PDF öffnen
+              </a>
+            </>
+          )}
         </div>
       )}
 

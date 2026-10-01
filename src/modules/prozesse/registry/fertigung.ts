@@ -74,6 +74,25 @@ export const FERTIGUNG = {
     revalidate: ['/fertigung', '/integrationen'],
   },
 
+  // Prozessfrei wie der Zettel: Drucken ändert keinen Belegstatus. Bewusst
+  // NICHT automatisch beim Bestätigen (Entscheidungslog 2026-10-01).
+  'fertigung.etikett_drucken': {
+    label: 'Fertigungsetikett drucken',
+    bereich: 'fertigung',
+    beschreibung:
+      'Druckt je Auftrag ein Fertigungsetikett (MO-Nummer als Code 128, Produkt, Menge, ' +
+      'Termin, Auftrag/Kunde) über die Druckbrücke — auf dem Etikettendrucker des ' +
+      'Arbeitsplatzes im Format dieses Druckers, sonst auf dem Ersatzdrucker. Ohne Drucker ' +
+      'öffnet das PDF im Browser.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      ids: z.array(z.string().uuid()).min(1).max(100).describe('Fertigungsauftrags-IDs'),
+    }),
+    formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
+    revalidate: ['/integrationen'],
+  },
+
   'fertigung.massenstart': {
     label: 'Produktion starten (Auswahl)',
     bereich: 'fertigung',

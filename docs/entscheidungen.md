@@ -9,6 +9,71 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Fertigungs- und Artikel-Etiketten drucken (kein Autodruck beim Bestätigen)
+
+**Anlass:** Seit 0087 gibt es die Druckarten `fertigungsetikett` und
+`artikeletikett` (Druckwege, Spalten in `druckauftraege`), aber nichts
+erzeugte die Aufträge, und der Agent bekam für beide „kann diese Version
+noch nicht drucken". ANVIL hat den Label-Ident-Drucker in der Fertigung
+genau dafür und Brother QL an den Packtischen.
+
+**Entschieden:**
+- **Zwei prozessfreie Registry-Aktionen** durch den Torwächter (Drucken
+  ändert keinen Belegstatus, Muster `fertigung.zettel_drucken`):
+  `fertigung.etikett_drucken` (ids, Knopf „Etikett drucken" am Auftrag und
+  „Etiketten drucken" in der Auswahl der Auftragsliste) und
+  `lager.artikeletikett_drucken` (Positionen Variante × Anzahl 1–500, an der
+  Variante mit Anzahlfeld und nach dem Wareneingang mit der gebuchten Menge
+  je Zeile; `ki: true` — „20 Etiketten für KC-001", Varianten über
+  SKU/Barcode/Name aufgelöst). Druckweg wie überall seit 0087: Platz →
+  Ersatz → PDF im Browser (`/api/etikett/fertigung`, `/api/etikett/artikel`,
+  Standardformat 100 × 50 mm).
+- **Artikel-Etiketten gehören dem Bereich Lager**, nicht Produkte: geklebt
+  wird an der Ware, und die Lager-Rolle soll Stammdaten weiter nur lesen.
+  Fertigungsleute, die auch Artikel-Etiketten brauchen, bekommen die
+  Zusatzrolle Lager (0096).
+- **Seitengröße = Etikett des Zieldruckers** (`breite_mm × hoehe_mm`; ohne
+  Maße 100 × 50 mm), die Fläche wird je Größe aufgeteilt: wird der Code
+  flacher als 8 mm, fallen erst zweite Zeilen, dann Nebenzeilen weg. Je
+  Kopie eine Seite im PDF — die Agenten drucken jedes PDF genau einmal,
+  `anzahl` braucht dort keine Sonderbehandlung. Ein Inhaltskasten ohne
+  Umbruch hält es bei einer Seite je Etikett, auch wenn ein Name länger
+  ist als geschätzt.
+- **Barcodes als Vektor** (Balken als ein Pfad) statt PNG: der
+  Etikettendrucker rastert selbst, beim Einpassen (`fit`) verschwimmt
+  nichts. Kodiert wird mit dem vorhandenen bwip-js (Rohmuster); kein neues
+  Paket. MO-Nummer als Code 128 (das Scanfeld liest sie auch mit
+  US-Belegung, `-` statt `/`); Artikel: gültige EAN-13 als EAN, sonst der
+  Barcode bzw. die SKU als Code 128 — dieselbe Wahl wie auf Zettel und
+  Packzettel, damit der Gegenscan am Packtisch jedes Etikett erkennt.
+- **Kein automatischer Etikettendruck beim Bestätigen.** Bestätigt wird auf
+  vielen Wegen (Knopf, KI, Verkaufsauftrag mit Auftragsfertigung,
+  Shopify-Import) — ein Druck nur am Knopf wäre ein Sonderweg, der mal
+  druckt und mal nicht; und das Etikett gehört zum Arbeitsbeginn (mit dem
+  Zettel), nicht zur Bestätigung Tage vorher, sonst stapeln sich Etiketten
+  am Drucker. Soll es später automatisch gehen, wird es ein Schritt im
+  Fertigungsprozess (Prozess First), keine versteckte Nebenwirkung im
+  Executor.
+- Ein noch offener Auftrag derselben Variante bzw. desselben Fertigungs-
+  auftrags am selben Drucker wird weiter nicht verdoppelt (Doppelklick) —
+  neu sagt die Meldung das („lag schon in der Warteschlange"), statt still
+  zu schlucken (`druckEinreihen` liefert, ob eingereiht wurde).
+- PDF-Aufbau ohne JSX (`createElement`) und ohne Datenbank
+  (`modules/druck/etikett-pdf.ts`, Rechnen in `etikett-layout.ts`, Daten in
+  `etiketten.ts`) — Unit- und Prozesstests rendern denselben Code wie die
+  App. Keine Migration (0107 bleibt frei).
+
+Nachweis: `tests/etiketten.test.ts` (Code-128-Decoder mit Prüfsummen-
+Testvektoren gegen die Balken des Etiketts, EAN-13-Prüfziffern,
+Flächenaufteilung je Etikettengröße, Seiten und Seitengröße des PDF,
+Formular-Adapter), `tests/prozesse/etiketten.test.ts` (Auftrag mit Art,
+Drucker und Anzahl am Etikettendrucker des Platzes, PDF im Format des
+Druckers beim Abholen, Doppelklick, Ersatz, Browser-Link ohne Drucker und
+im Modus „PDF im Browser", Rechte). Doku:
+[module/versand.md](module/versand.md) „Etiketten",
+[module/fertigung.md](module/fertigung.md) „Drucken",
+[module/lager.md](module/lager.md), [prozesse.md](prozesse.md).
+
 ## 2026-10-01 — Zweiter Faktor: Schlüsselwechsel ohne Neueinrichtung
 
 **Anlass:** Beim Zusammenstellen der Betreiber-Aufgaben: In Prod hat ein

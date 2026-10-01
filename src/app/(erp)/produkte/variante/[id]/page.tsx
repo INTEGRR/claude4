@@ -1,4 +1,5 @@
 import { requireArea } from '@/modules/auth'
+import { canWrite } from '@/modules/auth/permissions'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -7,12 +8,13 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { barcodeSvg } from '@/modules/shared/barcode'
 import { dateTime, qty } from '@/modules/shared/format'
 import { setVariantCodes } from '../../actions'
+import { artikeletikettenDrucken } from '../../../lager/actions'
 import { RecordComments } from '@/components/record-comments'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VariantPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('produkte')
+  const user = await requireArea('produkte')
   const { id } = await params
 
   const [variant] = await sql<
@@ -156,6 +158,22 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
             </div>
           ) : (
             <Empty>Hinterlege eine Artikelnummer oder einen Barcode, dann erscheint hier das Etikett.</Empty>
+          )}
+          {/* Drucken ist Lagerarbeit (lager.artikeletikett_drucken): am
+              Etikettendrucker des Arbeitsplatzes, sonst PDF im Browser. */}
+          {codeValue && canWrite(user.rollen, 'lager', user.befugnisse) && (
+            <ActionForm action={artikeletikettenDrucken} linkOeffnen behalten style={{ marginTop: 12 }}>
+              <input type="hidden" name="variant_id" value={id} />
+              <div className="row" style={{ alignItems: 'flex-end' }}>
+                <label className="field" style={{ maxWidth: 140, marginBottom: 0 }}>
+                  <span>Anzahl</span>
+                  <input type="number" name="anzahl" min="1" max="500" step="1" defaultValue={1} required />
+                </label>
+                <div className="shrink field" style={{ marginBottom: 0 }}>
+                  <button type="submit">Etiketten drucken</button>
+                </div>
+              </div>
+            </ActionForm>
           )}
         </Card>
       </div>

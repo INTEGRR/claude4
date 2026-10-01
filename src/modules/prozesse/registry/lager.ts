@@ -209,6 +209,61 @@ export const LAGER = {
     revalidate: ['/lager/bestand'],
   },
 
+  // --- Etiketten -------------------------------------------------------------
+
+  // Prozessfrei: Etiketten drucken ändert keinen Belegstatus — ein Werkzeug
+  // nach dem Wareneingang, an der Variante und für die KI („20 Etiketten
+  // für KC-001"). Bereich Lager: geklebt wird an der Ware; Stammdaten
+  // bleiben für die Lager-Rolle lesend (Entscheidungslog 2026-10-01).
+  'lager.artikeletikett_drucken': {
+    label: 'Artikel-Etiketten drucken',
+    bereich: 'lager',
+    ki: true,
+    beschreibung:
+      'Druckt Artikel-Etiketten (Name, Merkmale, Barcode — sonst SKU — als Code) je Variante ' +
+      'in der gewünschten Anzahl über die Druckbrücke: am Etikettendrucker des Arbeitsplatzes ' +
+      'im Format dieses Druckers, sonst am Ersatzdrucker; ohne Drucker öffnet das PDF im Browser.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      positionen: z
+        .array(
+          z.object({
+            variant_id: z
+              .string()
+              .min(1, 'Bitte ein Produkt auswählen')
+              .describe('Variante: ID, SKU, Barcode oder Name'),
+            anzahl: z
+              .number()
+              .int('Bitte ganze Etiketten angeben')
+              .min(1, 'Mindestens ein Etikett')
+              .max(500, 'Höchstens 500 Etiketten je Variante')
+              .describe('Anzahl Etiketten'),
+          }),
+        )
+        .min(1, 'Bitte mindestens eine Variante mit Anzahl angeben')
+        .max(100),
+    }),
+    zusammenfassung: (p: { positionen: { variant_id: string; anzahl: number }[] }) => {
+      const summe = p.positionen.reduce((a, x) => a + x.anzahl, 0)
+      return `${summe} Artikel-Etikett${summe === 1 ? '' : 'en'}: ${p.positionen
+        .map((x) => `${x.anzahl} × ${x.variant_id}`)
+        .join(', ')}`
+    },
+    // Formular: je Zeile ein verstecktes variant_id und ein Feld anzahl
+    // (gleiche Reihenfolge); Anzahl 0 oder leer = Zeile auslassen.
+    formdata: (fd) => {
+      const anzahlen = fd.getAll('anzahl').map((a) => Number(a))
+      return {
+        positionen: fd
+          .getAll('variant_id')
+          .map((id, i) => ({ variant_id: String(id), anzahl: anzahlen[i] ?? 1 }))
+          .filter((p) => p.variant_id && p.anzahl !== 0),
+      }
+    },
+    revalidate: ['/integrationen'],
+  },
+
   // --- Meldebestände -------------------------------------------------------
 
   'lager.meldebestand_anlegen': {

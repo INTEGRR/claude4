@@ -106,6 +106,20 @@ der Beleg entsteht bei jedem Aufruf frisch:
 - Für Lieferungen ohne Fertigung gibt es das Gegenstück **Packzettel**
   (`/lager/<id>/druck`, docs/module/versand.md).
 
+**Fertigungsetikett** (Entscheidungslog 2026-10-01): der Knopf **„Etikett
+drucken"** am Auftrag und **„Etiketten drucken"** in der Auswahl der
+Auftragsliste laufen über `fertigung.etikett_drucken` (prozessfrei) — auf
+dem Etikettendrucker des Arbeitsplatzes (Druckart `fertigungsetikett`, z. B.
+der Label-Ident), sonst auf dem Ersatzdrucker, sonst als PDF im Browser
+(`/api/etikett/fertigung?ids=…`, 100 × 50 mm). Das Etikett hat die Größe
+des Zieldruckers und trägt die **MO-Nummer als großen Code 128** (im
+Scanfeld scannbar, auch mit US-Tastaturbelegung), Nummer und Menge groß,
+Produkt/Variante, SKU · Termin · Zahl der Komponenten, Verkaufsauftrag und
+Kunde. **Kein Autodruck beim Bestätigen** — bestätigt wird auf vielen Wegen
+(Knopf, KI, Auftragsfertigung, Shopify), und das Etikett gehört zum
+Arbeitsbeginn; ein automatischer Druck käme später als Prozessschritt.
+Aufbau und Druckweg: docs/module/versand.md „Etiketten".
+
 ## Bulk: Zettel drucken → Produktion starten (BUG/00003)
 
 Serienfertigung ohne Einzelklicks: `/fertigung` filtert nach Status,

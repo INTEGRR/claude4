@@ -11,6 +11,7 @@ import {
   cancelMo,
   checkAvailability,
   confirmMo,
+  etikettDrucken,
   finishOperation,
   produceMo,
   startMo,
@@ -215,6 +216,13 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
           <>
             <Badge state={mo.state} kind="mo" />
             <ActionButton action={zettelDrucken.bind(null, id)}>Drucken</ActionButton>
+            <ActionButton
+              action={etikettDrucken.bind(null, id)}
+              linkOeffnen
+              title="Fertigungsetikett mit der Auftragsnummer als Barcode — am Etikettendrucker des Arbeitsplatzes"
+            >
+              Etikett drucken
+            </ActionButton>
             <Link className="btn" href={`/fertigung/${id}/druck`} target="_blank">
               Ansicht
             </Link>

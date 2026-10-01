@@ -61,7 +61,7 @@ Pragmatischer Ansatz statt vollständiger Odoo-Barcode-App: **USB-Scanner (Keybo
 
 - Globales Scan-Feld im Lagerbereich: Scan einer Belegnummer (`WH/IN/00001`, `MO/00001`) öffnet den Beleg; Scan eines Produkt-Barcodes öffnet die Variante.
 - In der Transfer-Validierung: Produkt-Scan zählt die Ist-Menge der passenden Zeile hoch (+1 je Scan, Odoo-Verhalten), unbekannter Barcode ⇒ Fehlerton/Meldung.
-- Etikettendruck: Produkt-Etiketten (Name, Variante, SKU, Barcode) und Lagerort-Etiketten als PDF.
+- Etikettendruck: **Artikel-Etiketten** (Name, Merkmale der Variante, Barcode bzw. SKU als Code, SKU) über `lager.artikeletikett_drucken` — an der Variante mit Anzahl und nach dem **Wareneingang** (Karte „Artikel-Etiketten" am erledigten Eingang, je Zeile vorbelegt mit der gebuchten Menge, 0 = auslassen); am Etikettendrucker des Arbeitsplatzes im Format dieses Druckers, sonst als PDF im Browser (docs/module/versand.md „Etiketten", seit 2026-10-01). Lagerort-Etiketten sind noch offen.
 - Mobile Scan-Ansicht fürs Sammeln: `/kommissionieren` (Handscanner per Bluetooth oder Handykamera, seit 0091). Lagerplätze je Artikel sind noch nicht modelliert — gesammelt wird nach Artikelname.
 
 ## Abnahmekriterien

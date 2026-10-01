@@ -28,6 +28,7 @@ export interface AbgeholterAuftrag {
   anzahl: number
   shipment_number: string | null
   mo_number: string | null
+  variant_sku: string | null
   label_pdf: Uint8Array | null
   drucker_typ: 'label' | 'a4' | null
   breite_mm: string | null
@@ -63,11 +64,12 @@ export async function auftraegeAbholen(wer: Abholer, limit = JE_ABRUF): Promise<
 
   return sql<AbgeholterAuftrag[]>`
     select d.id, d.art, d.ziel, d.shipment_id, d.mo_id, d.picking_id, d.variant_id, d.anzahl,
-           s.shipment_number, mo.number as mo_number, s.label_pdf,
+           s.shipment_number, mo.number as mo_number, pv.sku as variant_sku, s.label_pdf,
            dr.typ as drucker_typ, dr.breite_mm, dr.hoehe_mm
     from druckauftraege d
     left join shipments s on s.id = d.shipment_id
     left join manufacturing_orders mo on mo.id = d.mo_id
+    left join product_variants pv on pv.id = d.variant_id
     left join drucker dr on dr.id = d.drucker_id
     where d.id = any(${gesperrt.map((g) => g.id)}::uuid[])
     order by d.created_at`
@@ -97,6 +99,27 @@ export async function auftragsPdf(
       return {
         pdf: await packzettelPdf([job.picking_id!]),
         dateiname: `packzettel-${job.picking_id!.slice(0, 8)}.pdf`,
+      }
+    }
+    case 'fertigungsetikett': {
+      // Etiketten im Format des Zieldruckers (breite_mm × hoehe_mm), sonst 100 × 50 mm.
+      const { fertigungsetiketten } = await import('./etiketten')
+      const { etikettFormat } = await import('./etikett-layout')
+      return {
+        pdf: await fertigungsetiketten([job.mo_id!], etikettFormat(job.breite_mm, job.hoehe_mm)),
+        dateiname: `etikett-${(job.mo_number ?? 'fertigung').replaceAll('/', '-')}.pdf`,
+      }
+    }
+    case 'artikeletikett': {
+      // Die Kopien stecken als Seiten im PDF — die Agenten drucken jedes PDF einmal.
+      const { artikeletiketten } = await import('./etiketten')
+      const { etikettFormat } = await import('./etikett-layout')
+      return {
+        pdf: await artikeletiketten(
+          [{ variantId: job.variant_id!, anzahl: job.anzahl }],
+          etikettFormat(job.breite_mm, job.hoehe_mm),
+        ),
+        dateiname: `artikeletikett-${job.variant_sku ?? job.variant_id!.slice(0, 8)}-${job.anzahl}x.pdf`,
       }
     }
     default:
