@@ -112,8 +112,8 @@ Inhalts und die Kleinpaket-Tauglichkeit.
 
 Jede Lieferung hat eine Druckansicht `/lager/<id>/druck` (Knopf
 „Packzettel" an der Lieferung, 🖨 in der Versandbereit-Liste): oben der
-beschriftete **VERSAND-Barcode** (Lieferungsnummer — öffnet die Sendung
-am Packtisch), dazu Auftrag/Shopify-Nummer/Kunde, die Lieferadresse, die
+beschriftete **VERSAND-Barcode** (Lieferungsnummer — im Scanfeld startet
+er den Packablauf), dazu Auftrag/Shopify-Nummer/Kunde, die Lieferadresse, die
 **Kundennotiz** und die Positionsliste mit **Artikel-Code je Zeile** (EAN
 bzw. Code 128 der SKU) zum Gegenscannen, dem Belegtext „Lieferschein"
 des Artikels (`description_picking`) und einem Abhak-Kästchen. Die
@@ -147,7 +147,7 @@ Kontrolle; Kommissionieren bucht nichts.
   Menüpunkt und der Ablauf geht direkt zum Packtisch. Die Lieferung
   bleibt `assigned` — „kommissioniert" ist eine Tatsache am Beleg
   (`kommissioniert_am/_von`), kein zweiter Zustand.
-- **Arbeitsvorrat** (`/kommissionieren`, Menü neben „Packtisch"):
+- **Arbeitsvorrat** (`/kommissionieren`, Menü im Verkauf):
   versandbereite Lieferungen, Priorität und ältestes Datum zuerst, mit
   Marken „sammelt: Name", „teilweise 2/5", „Zettel gedruckt".
   **„Nächste Bestellung"** beansprucht die nächste freie (oder die eigene
@@ -190,11 +190,21 @@ Kontrolle; Kommissionieren bucht nichts.
   „sammelt: Name" und „Zettel gedruckt"; der Packtisch zeigt nach dem
   Scan „kommissioniert von … am …".
 
-## Packtisch-Arbeitsplatz (/packtisch)
+## Packen im Scanfeld (/scanner, früher /packtisch)
 
-Der Arbeitsplatz für den echten Ablauf am Tisch (Menüpunkt „Packtisch",
-Schreibrechte im Versand nötig) — dieselbe Scan-Maschine wie der
-Scanner-Arbeitsplatz (Dauerfokus-Feld, Beeps, Leuchten), aber ohne
+**Ein Scanfeld für alles** (Entscheidungslog 2026-10-01): Der eigene
+Packtisch-Menüpunkt ist im Menüpunkt **„Scannen"** aufgegangen — die
+gescannte Nummer entscheidet den Ablauf. Ein **Packzettel** (Lieferung
+`WH/OUT/…`, auch Auftrags- oder Shop-Nummer) startet den Packablauf unten;
+Wareneingang/Transfer und Fertigungsauftrag laufen als Checkliste
+(docs/module/rollen-auswertungen-scanner-ki.md). Vorher buchte ein am
+Scanner gescannter Packzettel die Lieferung als bloßen Transfer — ohne
+Label und ohne Shop-Rückmeldung. `/packtisch` leitet auf `/scanner` um;
+die Auflösung des Versand-Codes lebt in `versand/packtisch-beleg.ts`
+(genutzt von `/api/scanner/lookup`, Antwort `{ versand }`).
+
+Der Packablauf (Schreibrechte im Versand nötig) ist dieselbe Scan-Maschine
+wie die Checkliste (Dauerfokus-Feld, Beeps, Leuchten), aber ohne
 Teilmengen: ein Paket ist erst dann ein Paket, wenn alles drin ist.
 Scans werden in beiden Tastaturbelegungen gesucht: ein US-Scanner an
 deutschem Windows liefert „WH-OUT-00003" statt „WH/OUT/00003"
@@ -228,7 +238,8 @@ Meldung sagt, auf welchem Drucker. Nur ohne Drucker öffnet es sich als
 Tab und über den Knopf „Label öffnen". Im Kopf der Seite zeigt ein
 Typenschild, ob DHL konfiguriert ist (sonst mit den Namen der fehlenden
 Variablen). Der Scan des nächsten Zettels im „Versandfertig"-Zustand
-startet direkt das nächste Paket.
+geht zurück ans Scanfeld, das ihn wieder zuordnet — das nächste Paket,
+ein Wareneingang oder ein Fertigungsauftrag, ohne Seitenwechsel.
 
 ## Druckbrücke (stiller Druck am Arbeitsplatz)
 

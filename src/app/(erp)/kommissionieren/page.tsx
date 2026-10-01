@@ -41,8 +41,8 @@ export default async function KommissionierenPage() {
                 {manuell ? 'ohne Scan erlaubt' : 'Scan-Pflicht'}
               </Zustand>
             </Link>
-            <Link className="btn" href="/packtisch">
-              Packtisch
+            <Link className="btn" href="/scanner">
+              Packen (Scannen)
             </Link>
           </>
         }

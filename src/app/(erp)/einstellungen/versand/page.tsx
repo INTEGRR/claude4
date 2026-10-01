@@ -90,7 +90,7 @@ export default async function VersandPage() {
         </ActionForm>
         <p className="small muted" style={{ margin: '10px 0 0' }}>
           Aus: ohne Scan nur Artikel ohne SKU und Barcode (wird an der Lieferung vermerkt). Der{' '}
-          <Link href="/packtisch">Packtisch</Link> hakt Artikel unabhängig davon auch per +/− ab.
+          <Link href="/scanner">Scannen</Link> (Packzettel) hakt Artikel unabhängig davon auch per +/− ab.
         </p>
       </Card>
 

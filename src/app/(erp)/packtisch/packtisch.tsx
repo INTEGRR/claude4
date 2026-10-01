@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { packtischFertig } from './actions'
 import { isActionError } from '@/modules/shared/action'
-import type { PacktischDoc } from '@/app/api/packtisch/lookup/route'
+import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
 import { scanGleich } from '@/modules/shared/scan'
 
 /**
@@ -81,8 +81,17 @@ function fokusBleibtFrei(el: EventTarget | null): boolean {
   return el instanceof Element && Boolean(el.closest('input, button, select, textarea, a, label'))
 }
 
-export function Packtisch() {
+export function Packtisch({
+  startDoc,
+  onEnde,
+}: {
+  /** Vom Scanfeld übergeben: die gescannte Lieferung, geladen. */
+  startDoc?: PacktischDoc
+  /** Zurück ans Scanfeld — mit dem nächsten Scan, falls einer kam. */
+  onEnde?: (naechsterCode?: string) => void
+} = {}) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const gestartet = useRef(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [doc, setDoc] = useState<PacktischDoc | null>(null)
   const [counts, setCounts] = useState<Record<string, number>>({})
@@ -100,6 +109,15 @@ export function Packtisch() {
     refocus()
   }, [refocus, phase])
 
+  // Vom Scanfeld übergeben: direkt mit dem Packen beginnen — einmalig.
+  useEffect(() => {
+    if (startDoc && !gestartet.current) {
+      gestartet.current = true
+      uebernehmen(startDoc)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDoc])
+
   const say = useCallback((text: ReactNode, tone: Feedback['tone']) => {
     setFeedback({ text, tone })
     if (tone === 'ok') playBeep('ok')
@@ -110,6 +128,11 @@ export function Packtisch() {
   }, [])
 
   const reset = useCallback(() => {
+    // Im Scanfeld gibt es keinen eigenen Ruhezustand: zurück an den Dispatcher.
+    if (onEnde) {
+      onEnde()
+      return
+    }
     setPhase('idle')
     setDoc(null)
     setCounts({})
@@ -118,7 +141,7 @@ export function Packtisch() {
     setLabelLink(null)
     setFeedback(null)
     refocus()
-  }, [refocus])
+  }, [refocus, onEnde])
 
   const complete = doc
     ? doc.lines.every((l) => (counts[l.variantId] ?? 0) >= Number(l.qty))
@@ -134,7 +157,10 @@ export function Packtisch() {
       say(data.error ?? 'Lieferung nicht gefunden', 'error')
       return
     }
-    const loaded = data as PacktischDoc
+    uebernehmen(data as PacktischDoc)
+  }
+
+  function uebernehmen(loaded: PacktischDoc) {
     setDoc(loaded)
     setCounts(Object.fromEntries(loaded.lines.map((l) => [l.variantId, 0])))
     setWeightG(loaded.weightG != null && loaded.weightG > 0 ? String(loaded.weightG) : '')
@@ -254,7 +280,12 @@ export function Packtisch() {
       return
     }
     if (phase === 'done') {
-      // Der nächste Zettel startet direkt den nächsten Vorgang.
+      // Der nächste Zettel startet direkt den nächsten Vorgang — im
+      // Scanfeld entscheidet wieder dessen Nummer (Paket, Eingang, MO).
+      if (onEnde) {
+        onEnde(code)
+        return
+      }
       reset()
       void loadDoc(code)
     }

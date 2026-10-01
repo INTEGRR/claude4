@@ -4,7 +4,8 @@ import { validatePicking } from '../lager/actions'
 import { produceMo } from '../fertigung/actions'
 import { isActionError } from '@/modules/shared/action'
 import { Badge } from '@/components/ui'
-import type { ScannerDoc } from '@/app/api/scanner/lookup/route'
+import type { ScannerAntwort, ScannerDoc } from '@/app/api/scanner/lookup/route'
+import type { PacktischDoc } from '@/modules/versand/packtisch-beleg'
 import { scanGleich } from '@/modules/shared/scan'
 
 /**
@@ -75,8 +76,23 @@ function playBeep(kind: 'ok' | 'warn' | 'error') {
   }
 }
 
-export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos: boolean }) {
+export function Scanner({
+  canPickings,
+  canMos,
+  canVersand = false,
+  startCode,
+  onVersand,
+}: {
+  canPickings: boolean
+  canMos: boolean
+  canVersand?: boolean
+  /** Vom Packablauf weitergereicht: der nächste Scan nach „versandfertig". */
+  startCode?: string
+  /** Eine Lieferung wurde gescannt → das Scanfeld übergibt an den Packablauf. */
+  onVersand?: (doc: PacktischDoc) => void
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const gestartet = useRef(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [doc, setDoc] = useState<ScannerDoc | null>(null)
   const [counts, setCounts] = useState<Record<string, number>>({})
@@ -95,6 +111,15 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
   useEffect(() => {
     refocus()
   }, [refocus, phase])
+
+  // Weitergereichter Scan (nach einem Paket der nächste Zettel) — einmalig.
+  useEffect(() => {
+    if (startCode && !gestartet.current) {
+      gestartet.current = true
+      void loadDoc(startCode)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startCode])
 
   const say = useCallback((text: ReactNode, tone: Feedback['tone']) => {
     setFeedback({ text, tone })
@@ -129,7 +154,15 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
       say(data.error ?? 'Beleg nicht gefunden', 'error')
       return
     }
-    const loaded = data as ScannerDoc
+    const antwort = data as ScannerAntwort
+    // Lieferung (Packzettel): nicht bloß buchen, sondern packen — Artikel
+    // gegenscannen, dann Label + Warenausgang + Shop-Rückmeldung.
+    if ('versand' in antwort) {
+      if (onVersand) onVersand(antwort.versand)
+      else say('Lieferungen werden im Packablauf versendet', 'error')
+      return
+    }
+    const loaded = antwort as ScannerDoc
     setDoc(loaded)
     setCounts(Object.fromEntries(loaded.lines.map((l) => [l.moveId, 0])))
     setProduceQty(loaded.remaining ?? 0)
@@ -312,7 +345,7 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
           {/* Ruhezustand als Geräteanzeige: dunkle Fläche, Leuchte, Wort. */}
           <div className="display-panel">
             <div className="display-head">
-              <span>Scanner-Eingang</span>
+              <span>Scannen</span>
               <span>
                 <span className="led on" /> {PHASE_ANZEIGE.idle.wort}
               </span>
@@ -323,22 +356,27 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
             <div className="mono-label">Warte auf Scan</div>
           </div>
           <h2>Beleg scannen</h2>
-          <p className="muted">
-            {canPickings && canMos ? (
-              <>
-                Transfer (<span className="mono">WH/…</span>) oder Fertigungsauftrag (
-                <span className="mono">MO/…</span>) scannen, um zu starten.
-              </>
-            ) : canPickings ? (
-              <>
-                Transfer (<span className="mono">WH/…</span>) scannen, um zu starten.
-              </>
-            ) : (
-              <>
-                Fertigungsauftrag (<span className="mono">MO/…</span>) scannen, um zu starten.
-              </>
+          {/* Ein Scanfeld für alles (2026-10-01): die Nummer entscheidet. */}
+          <ul className="muted scanner-arten">
+            {canVersand && (
+              <li>
+                <strong>Packzettel</strong> (<span className="mono">WH/OUT/…</span>, Auftrags- oder
+                Shop-Nummer) → Artikel gegenscannen, dann Label, Warenausgang und Shop-Meldung
+              </li>
             )}
-          </p>
+            {canPickings && (
+              <li>
+                <strong>Wareneingang / Transfer</strong> (<span className="mono">WH/IN/…</span>,{' '}
+                <span className="mono">WH/INT/…</span>) → Positionen abhaken und buchen
+              </li>
+            )}
+            {canMos && (
+              <li>
+                <strong>Fertigungsauftrag</strong> (<span className="mono">WH/MO/…</span>) →
+                Komponenten abhaken und fertig melden
+              </li>
+            )}
+          </ul>
           {/* Tipp-Weg ohne Scanner: sichtbares Feld — nach dem Öffnen geht
               der Fokus zurück ans Scanfeld für die Positions-Scans. */}
           <form
@@ -358,7 +396,7 @@ export function Scanner({ canPickings, canMos }: { canPickings: boolean; canMos:
               name="code"
               type="text"
               className="mono"
-              placeholder="Belegnummer (WH/… oder MO/…)"
+              placeholder="Beleg- oder Bestellnummer"
               aria-label="Belegnummer eintippen"
               autoComplete="off"
               style={{ maxWidth: 260 }}

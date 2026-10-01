@@ -17,6 +17,8 @@ export interface NavItem {
   href: string
   label: string
   count?: number
+  /** Kernfunktion, dauerhaft farbig markiert: Scannen violett, Sprechen orange. */
+  kern?: 'lila' | 'orange'
 }
 
 export interface NavGroup {
@@ -27,7 +29,11 @@ export interface NavGroup {
 
 function NavEntry({ item, active }: { item: NavItem; active: boolean }) {
   return (
-    <Link className="nav" href={item.href} aria-current={active ? 'page' : undefined}>
+    <Link
+      className={`nav${item.kern ? ` kern-${item.kern}` : ''}`}
+      href={item.href}
+      aria-current={active ? 'page' : undefined}
+    >
       <span>{item.label}</span>
       {item.count !== undefined && item.count > 0 && <span className="badge neutral">{item.count}</span>}
     </Link>

@@ -92,7 +92,7 @@ der Beleg entsteht bei jedem Aufruf frisch:
 
 - Kopf: **zwei beschriftete Code-128-Barcodes** — `FERTIGUNG` (MO-Nummer,
   schließt am Scanner die Produktion ab) und `VERSAND` (Nummer der
-  Lieferung des Auftrags, öffnet am Packtisch die Sendung; entfällt bei
+  Lieferung des Auftrags, startet im Scanfeld das Packen; entfällt bei
   Lagerfertigung ohne Auftrag). Dazu Produkt + Variante, Menge, Termin,
   Quell-Verkaufsauftrag (inkl. Shopify-Ordername, Kunde).
 - **Artikel-Code** des Erzeugnisses (EAN falls gepflegt, sonst Code 128

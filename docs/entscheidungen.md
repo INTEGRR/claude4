@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Ein Scanfeld: die Nummer entscheidet den Ablauf
+
+**Anlass:** Betreiber: „Wir haben zwei redundante Scannerfunktionen, die
+was anderes tun. Es sollte nur ein Scanfeld geben und basierend auf der
+Belegnummer der entsprechende Task ausgeführt werden." Ein versehentlich
+am Scanner gescannter Packzettel lieferte kein Label — der Scanner kannte
+Lieferungen nur als Transfer zum Buchen.
+
+**Entschieden:**
+- `/scanner` („Scannen") ist das eine Scanfeld. Lieferung (Packzettel,
+  auch Auftrags-/Shop-Nummer) → Packablauf mit Label, Warenausgang und
+  Shop-Rückmeldung; Wareneingang/Transfer → Checkliste mit Buchung;
+  Fertigungsauftrag → Komponenten-Checkliste mit Fertigmeldung.
+- Lieferungen werden nie mehr bloß als Transfer gebucht — ohne Label wüssten
+  weder DHL noch der Shop vom Versand.
+- Der Packtisch-Menüpunkt entfällt, `/packtisch` leitet um. Die Auflösung
+  des Versand-Codes ist ein gemeinsames Modul (`versand/packtisch-beleg.ts`).
+- Navigation: die zwei Kernfunktionen stehen oben und sind dauerhaft farbig
+  markiert — Scannen violett, Sprechen orange. Ausdrücklicher Wunsch des
+  Betreibers; Violett bleibt sonst der Entscheidungsakzent.
+
+Umgesetzt in `scanner/arbeitsplatz.tsx`, `scanner.tsx`, `packtisch.tsx`,
+`/api/scanner/lookup`, `versand/packtisch-beleg.ts`, `layout.tsx`,
+`sidebar-nav.tsx`, `befehle.ts`, `globals.css`; dokumentiert in
+[module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)
+und [module/versand.md](module/versand.md); Test
+`tests/prozesse/scanfeld.test.ts`.
+
 ## 2026-10-01 — Datenbank-TLS im Code statt in der URL
 
 **Anlass:** Vor dem Go-Live soll in Supabase „Enforce SSL" an. Frage des

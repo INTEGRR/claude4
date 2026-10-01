@@ -178,10 +178,13 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       label: null,
       items: [
         { href: '/', label: 'Übersicht' },
-        // Das Sprechen ist der Kern-Einstieg ins ERP — ganz oben neben der
-        // Übersicht, nicht als Randnotiz unter den Auswertungen.
-        ...(sees('ki') && sprechenKonfiguriert() ? [{ href: '/sprechen', label: 'Sprechen' }] : []),
-        ...(sees('scanner') ? [{ href: '/scanner', label: 'Scanner' }] : []),
+        // Die zwei Kernfunktionen ganz oben, farbig markiert (2026-10-01):
+        // Sprechen orange, Scannen violett — EIN Scanfeld für Packzettel,
+        // Wareneingang und Fertigung (der Packtisch ist darin aufgegangen).
+        ...(sees('ki') && sprechenKonfiguriert()
+          ? [{ href: '/sprechen', label: 'Sprechen', kern: 'orange' as const }]
+          : []),
+        ...(sees('scanner') ? [{ href: '/scanner', label: 'Scannen', kern: 'lila' as const }] : []),
       ],
     },
     {
@@ -199,7 +202,6 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               { href: '/versand', label: 'Versand', count: counts.versandbereit },
               // Optionaler Prozessschritt (0091): abgeschaltet → kein Menüpunkt.
               ...(kommissionierenAktiv ? [{ href: '/kommissionieren', label: 'Kommissionieren' }] : []),
-              { href: '/packtisch', label: 'Packtisch' },
             ]
           : []),
       ],

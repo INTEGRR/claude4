@@ -124,7 +124,7 @@ export const LAGER = {
       unvollstaendig: z.boolean().default(false),
       vermerk: z.string().max(500).optional(),
     }),
-    revalidate: ['/kommissionieren', '/versand', '/lager/:id', '/packtisch'],
+    revalidate: ['/kommissionieren', '/versand', '/lager/:id', '/scanner'],
   },
 
   'lager.transfer_details': {

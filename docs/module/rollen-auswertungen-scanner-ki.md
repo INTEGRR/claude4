@@ -134,7 +134,24 @@ SQL-Aggregationen über das Bewegungs-Ledger, keine Chart-Bibliothek:
   verkauft ÷ (verkauft + Bestand) über bestätigte Aufträge im Zeitraum,
   mit Monatsverlauf.
 
-## Scanner-Arbeitsplatz (`/scanner`)
+## Scannen — das eine Scanfeld (`/scanner`)
+
+**Eine Nummer, der passende Ablauf** (Entscheidungslog 2026-10-01): Es gibt
+genau ein Scanfeld (Menüpunkt „Scannen", in der Navigation violett
+markiert — Kernfunktion wie das orange „Sprechen"). Die gescannte Nummer
+entscheidet:
+
+| Gescannt | Ablauf |
+|---|---|
+| Packzettel / Lieferung (`WH/OUT/…`, Auftrags- oder Shop-Nummer) | Packen: Artikel gegenscannen, dann Label, Warenausgang, Kartonage und Shop-Rückmeldung (`versand.packtisch_abschliessen`, docs/module/versand.md) |
+| Wareneingang, interner Transfer (`WH/IN/…`, `WH/INT/…`) | Checkliste, Doppelscan bucht (`picking_validate`) |
+| Fertigungsauftrag (`WH/MO/…`) | Komponenten-Checkliste, Doppelscan meldet fertig (`mo_produce`) |
+
+Der frühere eigene „Packtisch" ist darin aufgegangen (`/packtisch` leitet
+um): vorher buchte ein versehentlich am Scanner gescannter Packzettel die
+Lieferung als bloßen Transfer — ohne Label, ohne Shop-Meldung. Nach einem
+Paket ordnet das Scanfeld den nächsten Scan wieder zu. Lieferungen
+brauchen Schreibrechte im Versand (sonst Klartext-Fehler).
 
 Für Barcodescanner im Tastatur-Modus (Keyboard-Wedge): ein unsichtbares,
 dauerfokussiertes Eingabefeld nimmt Scans entgegen; Rückmeldung über
@@ -150,7 +167,7 @@ Tastatur. Steht er auf US-Belegung und Windows auf Deutsch, kommen andere
 Zeichen an als gedruckt: „WH/OUT/00003" wird „WH-OUT-00003", „KC-001"
 wird „KCß001", Y und Z tauschen, „#" wird „§". Deshalb sucht jeder
 Scan-Einstieg erst wie getippt und dann in der Rückübersetzung
-(`src/modules/shared/scan.ts`): Packtisch, Scanner-Arbeitsplatz, das
+(`src/modules/shared/scan.ts`): das Scanfeld samt Packablauf, das
 Scanfeld im Kopf (`/api/scan`), Kommissionieren, das Gegenscannen der
 Artikel und der Stempel-Ausweis. Die eigentliche Abhilfe ist trotzdem,
 den Scanner per Konfigurations-Barcode aus seinem Handbuch auf deutsche
@@ -159,8 +176,9 @@ andere Eingabe.
 
 Ablauf:
 
-1. **Beleg scannen** — Transfer (`WH/…`) oder Fertigungsauftrag (`MO/…`).
-   Rollenfilter: Lager nur Transfers, Fertigung nur MOs.
+1. **Beleg scannen** — Transfer (`WH/…`) oder Fertigungsauftrag (`MO/…`);
+   eine Lieferung geht in den Packablauf (siehe oben).
+   Rollenfilter: Lager Transfers und Lieferungen, Fertigung nur MOs.
 2. **Positionen abhaken** — jeder Scan eines Produkt-Barcodes/SKU zählt die
    passende Zeile hoch; volle Zeilen werden grün, Über-Scans warnen.
    Manuelle ±-Knöpfe als Ausweichweg.

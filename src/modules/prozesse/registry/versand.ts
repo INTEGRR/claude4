@@ -84,7 +84,7 @@ export const VERSAND = {
         dhl_product: String(fd.get('dhl_product') ?? '') || undefined,
       }
     },
-    revalidate: ['/versand', '/packtisch', '/lager/:id'],
+    revalidate: ['/versand', '/scanner', '/lager/:id'],
   },
 
   'versand.label_stornieren': {
