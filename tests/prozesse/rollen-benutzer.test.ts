@@ -116,4 +116,40 @@ describe('Mehrere Rollen, Benutzername statt E-Mail', () => {
       assert.ok(!(err instanceof RechteFehler), `unerwarteter Rechtefehler: ${String(err)}`)
     }
   })
+  test('Konto löschen: Zuständigkeiten leer, Verlauf bleibt; nie sich selbst, nie den letzten Admin', async () => {
+    const angelegt = await aktionAusfuehrenGeprueft(
+      'einstellungen.benutzer_anlegen',
+      { parameter: { email: 'seed@example.com', name: 'Seed', password: 'geheim-1234', role: 'mitarbeiter' } },
+      ADMIN,
+    )
+    const id = angelegt.recordId!
+    const [kunde] = await h.sql<{ id: string }[]>`
+      insert into partners (name, is_customer, user_id) values ('Löschtest Kunde', true, ${id}) returning id`
+    await h.sql`insert into sessions (token, user_id, expires_at) values (${'loeschtest-' + id}, ${id}, now() + interval '1 day')`
+
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('einstellungen.benutzer_loeschen', { recordId: id }, { ...ADMIN, id }),
+      /eigene Konto/,
+    )
+    const r = await aktionAusfuehrenGeprueft('einstellungen.benutzer_loeschen', { recordId: id }, ADMIN)
+    assert.match(r.text ?? '', /seed@example\.com gelöscht/)
+    const [{ n }] = await h.sql<{ n: number }[]>`select count(*)::int as n from users where id = ${id}`
+    assert.equal(n, 0)
+    const [{ s: sitzungen }] = await h.sql<{ s: number }[]>`select count(*)::int as s from sessions where user_id = ${id}`
+    assert.equal(sitzungen, 0, 'Sitzungen sind weg')
+    const [partner] = await h.sql<{ user_id: string | null }[]>`select user_id from partners where id = ${kunde.id}`
+    assert.equal(partner.user_id, null, 'Zuständigkeit geleert, der Kunde bleibt')
+    const [spur] = await h.sql<{ n: number }[]>`
+      select count(*)::int as n from audit_log where record_id = ${id} and message like 'Benutzer gelöscht%'`
+    assert.equal(spur.n, 1, 'der Verlauf behält den Namen')
+
+    // Der letzte aktive Administrator bleibt.
+    const admins = await h.sql<{ id: string }[]>`select id from users where role = 'admin' and active`
+    if (admins.length === 1) {
+      await assert.rejects(
+        aktionAusfuehrenGeprueft('einstellungen.benutzer_loeschen', { recordId: admins[0].id }, ADMIN),
+        /letzte aktive Administrator/,
+      )
+    }
+  })
 })

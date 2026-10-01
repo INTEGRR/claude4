@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Konten löschen
+
+**Anlass:** Betreiber: „Ich kann Konten nicht löschen" — das Seed-Konto
+`admin@example.com` soll vor dem Go-Live weg (go-live.md §4), es gab nur
+„Deaktivieren".
+
+**Entschieden:** Neue Aktion `einstellungen.benutzer_loeschen` (nur Admin,
+über den Torwächter): löscht das Konto endgültig. Alle Fremdschlüssel auf
+`users` sind bereits `set null` (Zuständigkeiten) oder `cascade`
+(Sitzungen, 2FA, Geräte, Nutzungszähler, Sprachprotokolle) — Belege
+bleiben unverändert, der Verlauf (audit_log mit Namen als Text) auch; vor
+dem Löschen schreibt die Aktion „Benutzer gelöscht: Name (Kennung)". Nie
+das eigene Konto, nie der letzte aktive Administrator. Für Personen, die
+im Betrieb gearbeitet haben, bleibt Deaktivieren der empfohlene Weg.
+
+Umgesetzt in `registry/einstellungen.ts`, `einstellungen-ausfuehren.ts`,
+Einstellungen → Benutzer; dokumentiert in
+[module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md);
+Test `tests/prozesse/rollen-benutzer.test.ts`.
+
 ## 2026-10-01 — Ein Scanfeld: die Nummer entscheidet den Ablauf
 
 **Anlass:** Betreiber: „Wir haben zwei redundante Scannerfunktionen, die

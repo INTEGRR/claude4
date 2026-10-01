@@ -959,6 +959,25 @@ export async function benutzerAktiv(
   return { recordId: userId }
 }
 
+/**
+ * Konto endgültig löschen (2026-10-01): alle Verweise auf users sind
+ * „set null" (Zuständigkeiten) oder „cascade" (Sitzungen, 2FA, Geräte,
+ * Nutzungszähler, Sprachprotokolle) — Belege bleiben, der Verlauf
+ * (audit_log, Name als Text) auch.
+ */
+export async function benutzerLoeschen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const userId = ctx.recordId!
+  if (ctx.userId && ctx.userId === userId) throw new Error('Das eigene Konto kann nicht gelöscht werden')
+  await guardLetzterAdmin(userId)
+  const [konto] = await sql<{ kennung: string; name: string }[]>`
+    select coalesce(email, benutzername) as kennung, name from users where id = ${userId}`
+  if (!konto) throw new Error('Konto nicht gefunden')
+  await sql`select log_event('user', ${userId}, 'state',
+    ${`Benutzer gelöscht: ${konto.name} (${konto.kennung})`}, ${ctx.actor})`
+  await sql`delete from users where id = ${userId}`
+  return { text: `Konto ${konto.kennung} gelöscht.` }
+}
+
 export async function benutzerBefugnisse(
   p: { befugnisse: string[] },
   ctx: AktionsKontext,

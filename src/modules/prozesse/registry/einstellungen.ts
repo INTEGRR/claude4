@@ -893,6 +893,21 @@ export const EINSTELLUNGEN = {
     revalidate: ['/einstellungen/benutzer'],
   },
 
+  'einstellungen.benutzer_loeschen': {
+    label: 'Benutzer löschen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Löscht ein Konto endgültig (z. B. das Seed-Konto oder ein Testkonto): Sitzungen, ' +
+      'zweiter Faktor und Geräte verschwinden, Zuständigkeiten an Belegen werden geleert — ' +
+      'der Verlauf behält den Namen. Wer im Betrieb gearbeitet hat, besser deaktivieren. ' +
+      'Nicht das eigene Konto, nie der letzte aktive Administrator.',
+    bindung: 'beleg',
+    schema: z.object({}),
+    revalidate: ['/einstellungen/benutzer'],
+  },
+
   'einstellungen.benutzer_befugnisse': {
     label: 'Befugnisse setzen',
     bereich: 'einstellungen',

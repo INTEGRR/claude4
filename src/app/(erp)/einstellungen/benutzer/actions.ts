@@ -19,6 +19,10 @@ export async function setActive(userId: string, active: boolean): Promise<Action
   return serverAktion('einstellungen.benutzer_aktiv', { recordId: userId, parameter: { active } })
 }
 
+export async function deleteUser(userId: string): Promise<ActionResult> {
+  return serverAktion('einstellungen.benutzer_loeschen', { recordId: userId, parameter: {} })
+}
+
 export async function resetPassword(userId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('einstellungen.benutzer_passwort', { recordId: userId, formData })
 }

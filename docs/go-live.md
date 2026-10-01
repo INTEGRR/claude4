@@ -12,22 +12,33 @@ Plan verweist dorthin, statt es zu wiederholen.
 und Shopify. „KRNL" sind Aufgaben im Code, die vor dem Stichtag fertig
 sein müssen.
 
-Stand: 2026-09-18. Erledigt seit Aufstellung: Region Frankfurt,
-Sicherheits-Header, Login-Drossel, Cron fail-closed, Tracking über
-Parcel DE Tracking, Shopify-Lesemodus als Staging-Schalter
-(Entscheidungslog 2026-09-18).
+Stand: 2026-10-01 — abgeglichen mit Prod (Dienste-Wächter, Datenbank,
+Supabase-Logs; Vercel-Variablen sieht KRNL nicht, die stehen offen, wenn
+sie sich nicht an einer Wirkung ablesen lassen). Erledigt seit Aufstellung
+(2026-09-18): Region Frankfurt, Sicherheits-Header, Login-Drossel, Cron
+fail-closed, Tracking über Parcel DE Tracking, Shopify-Lesemodus und
+Probelauf, Odoo-Stücklisten, Druckbrücke, Label bucht aus, ein Scanfeld,
+Datenbank-TLS im Code, Konten löschen.
+
+**Kurzlage 2026-10-01:** DHL, Shopify (Probelauf), KI, Sprache,
+Druckbrücke und Telegram melden grün; Mail und Google sind nicht
+eingerichtet. Offen vor dem Stichtag vor allem: Mail, Enforce SSL, PITR,
+Konten/2FA, Retouren-/Reparaturtest, Zweitangebote im Bestand, Adresse
+prüfen — dann Stichtag nach Runbook.
 
 ## 1. Geheimnisse und Zugänge (Betreiber, Vercel → Production)
 
 Nichts davon gehört ins Repository. Werte kommen aus den jeweiligen
 Portalen; hier stehen nur die Namen und woher sie kommen.
 
-- [ ] `CRON_SECRET` setzen — der Endpunkt antwortet auf Vercel ohne
+- [x] `CRON_SECRET` setzen — der Endpunkt antwortet auf Vercel ohne
       Secret mit 401, das heißt: **kein einziger Cron läuft, bis der Wert
       steht** (Outbox, Webhooks, Shopify-Abgleich, Tracking, Aufräumen).
       Vercel schickt ihn bei eigenen Aufrufen automatisch als Bearer mit.
+      *Stand 2026-10-01: gesetzt — Wächter und Shopify-Abgleich laufen im
+      Takt (fail-closed, sonst liefe nichts).*
 - [ ] `SESSION_SECRET` ist gesetzt und nicht der Wert aus einem Beispiel.
-- [ ] **Telegram** (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`): Bot beim
+- [x] **Telegram** (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`): Bot beim
       @BotFather anlegen, Token setzen, dem Bot schreiben, dann unter
       Einstellungen → Benachrichtigungen „Chat-IDs ermitteln" und die ID
       setzen; „Testnachricht senden" muss auf dem Telefon ankommen. Ohne
@@ -36,7 +47,7 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       verschlüsselt die TOTP-Geheimnisse des zweiten Faktors. Fehlt er, nimmt
       KRNL `SESSION_SECRET` — dann darf DER sich nie mehr ändern, sonst
       müssen alle Benutzer die Authenticator-App neu einrichten.
-- [ ] **DHL** (alle aus der Produktions-App im DHL Developer Portal bzw.
+- [x] **DHL** (alle aus der Produktions-App im DHL Developer Portal bzw.
       dem Geschäftskundenportal, Sandbox-Werte raus):
   - `DHL_API_BASE=https://api-eu.dhl.com`
   - `DHL_API_KEY`, `DHL_API_SECRET` — Key und Secret der Produktions-App
@@ -54,7 +65,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
   - Voraussetzung: „Parcel DE Tracking" in der Produktions-App steht auf
     aktiv, nicht mehr auf pending. Bis dahin meldet der Tracking-Lauf
     einen Anmeldefehler im Ergebnis und sonst nichts.
-- [ ] **Shopify**: App im Live-Shop anlegen (Dev Dashboard, Scopes laut
+  - *Stand 2026-10-01: Wächter grün, erstes echtes Label (WH/OUT/00003)
+    erstellt, storniert und neu erstellt. Tracking-Freigabe noch prüfen.*
+- [x] **Shopify**: App im Live-Shop anlegen (Dev Dashboard, Scopes laut
       [lokal-starten.md](lokal-starten.md)), dann `SHOPIFY_SHOP_DOMAIN`,
       `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`,
       `SHOPIFY_WEBHOOK_SECRET` — siehe
@@ -66,16 +79,28 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       herein, nichts geht hinaus, bis ein Admin unter Einstellungen →
       Schnittstellen auf „schreiben" stellt
       ([module/integrationen.md](module/integrationen.md)).
+      *Stand 2026-10-01: App per Client-Credentials verbunden, Modus
+      „Probelauf" (würde senden, sendet nichts — Debug-Box).*
 - [ ] **Mail**: `RESEND_API_KEY`, `MAIL_FROM` mit verifizierter Domain,
-      `REGISTRIERUNG_MAIL`.
-- [ ] **KI** (optional): `ANTHROPIC_API_KEY`; `OPENAI_API_KEY` nur, wenn
-      das Diktat gebraucht wird.
+      `REGISTRIERUNG_MAIL`. *Stand 2026-10-01: Wächter „unbekannt" — nicht
+      eingerichtet.* `MAIL_FROM` auf eine anvil.gg-Adresse (Resend-Domain
+      verifizieren), sonst sehen Kunden — auch beim Reparaturformular im
+      Shop — einen fremden Absender.
+- [x] **KI** (optional): `ANTHROPIC_API_KEY`; `OPENAI_API_KEY` nur, wenn
+      das Diktat gebraucht wird. *Stand 2026-10-01: KI und Sprache grün.*
 - [ ] `INSTANZ_REGION="EU-Central · Frankfurt"` für die Anzeige.
 
 ## 2. Supabase (Betreiber)
 
-- [ ] Data API abschalten (Project Settings → Data API). Nichts in KRNL
+- [x] Data API abschalten (Project Settings → Data API). Nichts in KRNL
       nutzt PostgREST; Migration 0074 hat die Rechte ohnehin entzogen.
+      *Stand 2026-10-01: abgeschaltet.* Bekannte Supabase-Eigenheit: der
+      abgeschaltete PostgREST läuft weiter und schreibt alle ~32 s
+      „schema pg_pgrst_no_exposed_schemas does not exist" ins Log (rund
+      220 Zeilen je Stunde) — harmlos, KRNL selbst hat dort keine Fehler.
+      Abstellen laut Supabase-Troubleshooting mit einem leeren Schema:
+      `create schema pgrst_no_exposed_schemas; alter role authenticator set
+      pgrst.db_schemas = 'pgrst_no_exposed_schemas'; notify pgrst;`
 - [ ] „Enforce SSL" einschalten (Database → Settings). Kein Zusatz in
   `DATABASE_URL`/`DIRECT_URL` nötig — KRNL verbindet seit 2026-10-01 von
   sich aus mit TLS (`src/db/ssl.ts`); erst deployen, dann einschalten.
@@ -86,8 +111,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 
 ## 3. Vercel (Betreiber)
 
-- [ ] Pro-Tarif — `vercel.json` hat sechs Cron-Einträge, zwei davon
-      minütlich; der Hobby-Tarif erlaubt zwei tägliche.
+- [x] Pro-Tarif — `vercel.json` hat sechs Cron-Einträge, zwei davon
+      minütlich; der Hobby-Tarif erlaubt zwei tägliche. *Stand 2026-10-01:
+      die Crons laufen im Minuten-/Fünfminutentakt.*
 - [ ] Auftragsverarbeitungsvertrag (DPA) abschließen.
 - [ ] Entscheidung Deployment Protection: **Vercel Authentication** vor
       die App (Ausnahmen `/api/webhooks/shopify` und `/api/cron`, siehe
@@ -103,15 +129,21 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 - [ ] Seed-Konto `admin@example.com` ersetzen: eigenes Admin-Konto
       anlegen, Seed-Konto löschen. Das Passwort des Seed-Kontos wurde am
       26.08.2026 geändert — bestätigen, dass das der Betreiber war.
+      *Stand 2026-10-01: eigene Admin-Konten da, Seed-Konto deaktiviert.
+      Löschen geht seit 2026-10-01 unter Einstellungen → Benutzer →
+      „Löschen" (nach dem Deploy).*
 - [ ] Benutzerkonten je Rolle anlegen (Odoo-Konten werden nicht
       migriert); Rollenmodell in
       [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md).
+      *Stand 2026-10-01: drei aktive Konten (zwei Admin, ein Lager).*
 - [ ] **Zweiter Faktor ist Pflicht für alle** (Standard): jeder Benutzer
       braucht beim ersten Login nach dem Deploy eine Authenticator-App auf
       dem Telefon und richtet sie direkt ein — vorher ankündigen, Backup-
       Codes sichern lassen. Der Admin, der den Deploy macht, richtet als
       Erster ein (Seed-Konto eingeschlossen). Lockern geht unter
       Einstellungen → Sicherheit (`admins` / `freiwillig`).
+      *Stand 2026-10-01: ein von drei aktiven Konten hat den zweiten Faktor
+      eingerichtet.*
 
 ## 5. Versand fachlich (KRNL + Betreiber)
 
@@ -121,55 +153,76 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       Warengewicht + Kartonage, [module/versand.md](module/versand.md)).
 - [ ] Betreiber: Versandregeln und Abrechnungsnummern je Produkt
       (national, Kleinpaket, Europaket, International) hinterlegen.
+      *Stand 2026-10-01: drei Versandregeln, noch keine Kartonagen.*
 - [ ] Gemeinsam, erster echter Test mit Produktions-Keys: ein Label für
       eine reale Sendung erstellen, stornieren, im Geschäftskundenportal
       prüfen, dass der Storno ankommt. Danach ein Label, das wirklich
       verschickt wird, und nach ein bis zwei Stunden den Tracking-Lauf
-      beobachten (Aktion „Tracking aktualisieren").
+      beobachten (Aktion „Tracking aktualisieren"). *Stand 2026-10-01:
+      Label erstellt und storniert (WH/OUT/00003), Ersatz-Label erstellt
+      und ausgebucht — Storno im Geschäftskundenportal und Tracking noch
+      prüfen.*
 - [ ] Ein Retourenlabel erzeugen und die Mail beim Kunden-Testkonto
       prüfen.
 - [ ] Reparaturanfrage: Link im Shop und auf der Website auf
       `https://<erp>/service/reparatur` setzen (Link, kein iframe —
       X-Frame-Options DENY); `REPARATUR_MAIL` auf den Service-Posteingang;
+      *Stand 2026-10-01: in Arbeit — das Formular kommt in den Shop
+      (Shopify App Proxy unter anvil.gg/apps/reparatur, ohne Spur zum ERP);
+      dann entfällt der Link auf die ERP-Domain.*
       Testanfrage abschicken, im ERP annehmen, Retourenlabel mit RMA-Nummer
       im Geschäftskundenportal sichtbar; Rückversand-Label aus einer
       Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
-- [ ] Druckbrücke einrichten
+- [x] Druckbrücke einrichten
       ([module/versand.md „Druckbrücke"](module/versand.md)): unter
       Einstellungen → Arbeitsplätze & Drucker Packtische, Montagetische,
       Drucker (Etikettenmaße messen) und Druckwege anlegen, je Drucker das
       Paket laden und am PC starten, an jedem PC oben im Kopf einmal den
-      Arbeitsplatz wählen.
+      Arbeitsplatz wählen. *Stand 2026-10-01: zwei Drucker, Wächter grün.*
 
 ## 5b. Odoo-Stücklisten (selektiv, per API)
 
-- [ ] In Vercel `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_API_KEY` setzen
+- [x] In Vercel `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_API_KEY` setzen
       (API-Schlüssel: Odoo → Einstellungen → Benutzer → Kontosicherheit),
       neu deployen; Einstellungen → Schnittstellen zeigt „Odoo" vollständig.
-- [ ] Einstellungen → Odoo-Übernahme → **Vorschau** gemeinsam durchgehen:
+- [x] Einstellungen → Odoo-Übernahme → **Vorschau** gemeinsam durchgehen:
       fehlende SKUs, blockierte Stücklisten, Routen-Warnung (ab dann
       erzeugt jede Shopify-Bestellung einen Fertigungsauftrag).
-- [ ] **Übernehmen**, dann an zwei, drei Tastaturen die Stückliste prüfen
-      (Karte „Vorschau je Variante").
+- [x] **Übernehmen**, dann an zwei, drei Tastaturen die Stückliste prüfen
+      (Karte „Vorschau je Variante"). *Stand 2026-10-01: übernommen, neun
+      aktive Stücklisten; Fertigprodukt-Bestände zurückgenommen und
+      Fertigungsaufträge für offene Aufträge nachgezogen (2026-09-30).*
+- [ ] Doppelte Artikel (Shop ↔ Odoo) unter Einstellungen → Odoo-Übernahme
+      zusammenführen (Vorschlagsliste prüfen, je Paar „Zusammenführen").
 
 ## 6. Shopify (im Runbook, Schritt 7)
 
-- [ ] Staging: Produkt-Import gegen Prod im Lesemodus (SKU-Match setzt
+- [x] Staging: Produkt-Import gegen Prod im Lesemodus (SKU-Match setzt
       `shopify_variant_id`), Bestellungen per 15-Minuten-Abgleich
-      mitlesen und mit Odoo vergleichen.
+      mitlesen und mit Odoo vergleichen. *Stand 2026-10-01: 267 Varianten
+      verknüpft, 2.250 Kunden und 110 Bestellungen übernommen, Abgleich
+      läuft (letzter 09:00 UTC).*
+- [ ] Shop-Verfügbarkeit einstellen (Verkauf → Shop-Verfügbarkeit):
+      Projekte/Farb-Pills, Schwellen je Teil (z. B. Blue Cases unter 2),
+      zurückgehaltene Teile (Yellow Cases), Artikel aus (Black Week
+      Editions), immer verfügbar (Switch-Tester); Made-to-Order-Puffer und
+      -Deckel unter Einstellungen → Anbindungen. Im **Probelauf** in der
+      Debug-Box gegenprüfen, was an Shopify ginge.
 - [ ] KRNL, vor dem Schreibmodus: Bestand auch an **Zweitangebote** melden
       (Bundle-Bestandteile mit derselben SKU, z. B. „Black Week Editions").
       Heute bekommt nur das verknüpfte Angebot den Bestand; die Bundles-App
       rechnet die Bundle-Verfügbarkeit aber aus den Bestandteilen.
-- [ ] Stichtag: Shopify-Modus auf **schreiben** stellen, dann Webhooks
+- [ ] Stichtag: Shopify-Modus von „Probelauf" auf **schreiben** stellen, dann Webhooks
       registrieren, einmal „Mit Shopify abgleichen" (Bestand), Order-
       Backfill nur ab Stichtag.
 
 ## 7. Probelauf und Stichtag
 
-- [ ] Nach dem Deploy einmal `/integrationen` → „Jetzt prüfen": alle
+- [x] Nach dem Deploy einmal `/integrationen` → „Jetzt prüfen": alle
       konfigurierten Dienste grün; danach meldet der Wächter alle fünf
       Minuten nur noch Änderungen (Störung/Entstörung) an Telegram.
+      *Stand 2026-10-01: alle konfigurierten Dienste grün; Mail und Google
+      „unbekannt" (nicht eingerichtet).*
 
 - [ ] Probelauf-Choreografie lokal mit **frischem** Odoo-Dump grün,
       inklusive No-Op-Beweis

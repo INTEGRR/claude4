@@ -108,6 +108,7 @@ export const AUSFUEHRUNG = {
   'einstellungen.betriebsdaten_loeschen': einstellungen.betriebsdatenLoeschen,
   'einstellungen.werkszustand': einstellungen.werkszustand,
   'einstellungen.benutzer_aktiv': einstellungen.benutzerAktiv,
+  'einstellungen.benutzer_loeschen': einstellungen.benutzerLoeschen,
   'einstellungen.benutzer_befugnisse': einstellungen.benutzerBefugnisse,
   'einstellungen.benutzer_passwort': einstellungen.benutzerPasswort,
   'einstellungen.benutzer_zweifaktor_zuruecksetzen': einstellungen.benutzerZweifaktorZuruecksetzen,

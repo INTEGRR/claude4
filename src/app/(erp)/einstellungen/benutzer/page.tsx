@@ -5,7 +5,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, TableWrap } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { date as datum, dateTime } from '@/modules/shared/format'
-import { createUser, resetPassword, resetZweiFaktor, setActive, setBefugnisse, setRole } from './actions'
+import { createUser, deleteUser, resetPassword, resetZweiFaktor, setActive, setBefugnisse, setRole } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -175,6 +175,16 @@ export default async function BenutzerPage() {
                         {!u.active && (
                           <ActionButton className="small" action={setActive.bind(null, u.id, true)}>
                             Aktivieren
+                          </ActionButton>
+                        )}
+                        {!lastAdmin && u.id !== admin.id && (
+                          <ActionButton
+                            className="small danger"
+                            action={deleteUser.bind(null, u.id)}
+                            title="Endgültig löschen — für Seed- und Testkonten. Wer im Betrieb gearbeitet hat, besser deaktivieren."
+                            confirm={`Konto ${u.name} (${u.email ?? u.benutzername}) endgültig löschen? Zuständigkeiten an Belegen werden geleert, der Verlauf behält den Namen. Das lässt sich nicht rückgängig machen.`}
+                          >
+                            Löschen
                           </ActionButton>
                         )}
                         <ActionButton

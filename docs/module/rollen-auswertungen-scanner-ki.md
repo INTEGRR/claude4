@@ -22,8 +22,16 @@ Durchsetzung an drei Stellen:
 
 Benutzerverwaltung unter **Einstellungen → Benutzer** (nur Admin): anlegen,
 Rollen ändern, deaktivieren (beendet laufende Sitzungen), Passwort
-zurücksetzen. Der letzte aktive Administrator lässt sich weder herabstufen
-noch deaktivieren.
+zurücksetzen, **löschen** (seit 2026-10-01, `einstellungen.benutzer_loeschen`).
+Der letzte aktive Administrator lässt sich weder herabstufen noch
+deaktivieren noch löschen; das eigene Konto ist nicht löschbar.
+
+Löschen ist für Seed- und Testkonten gedacht: Sitzungen, zweiter Faktor,
+vertraute Geräte, Nutzungszähler und Sprachprotokolle gehen mit
+(`cascade`), Zuständigkeiten an Belegen (Auftrag, Bestellung, Lieferung,
+Fertigung, Kontakt …) werden geleert (`set null`), der Verlauf behält den
+Namen als Text. Wer im Betrieb gearbeitet hat, wird besser deaktiviert —
+dann bleibt die Zuständigkeit sichtbar.
 
 ### Mehrere Rollen und Anmeldung ohne E-Mail (seit 0096)
 
