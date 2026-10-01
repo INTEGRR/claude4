@@ -184,7 +184,8 @@ Produkt-Push —, sendet aber **nichts**:
   sind.
 - **Debug-Box** unten rechts auf jeder Seite (nur Admins, nur im
   Probelauf): live alle drei Sekunden, was an Shopify gegangen wäre, je
-  Eintrag aufklappbar; „Jetzt abgleichen" rechnet sofort, „Leeren" blendet
+  Eintrag aufklappbar; „Jetzt neu berechnen" rechnet sofort in KRNL neu, was
+  gemeldet würde (sendet nichts), „Leeren" blendet
   Älteres aus. Quelle: `/api/shopify/probe`, Anzeige `probe-anzeige.ts`.
 
 ### Shop-Verfügbarkeit: Regeln und Ansicht (0101)

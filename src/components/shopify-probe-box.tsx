@@ -68,10 +68,18 @@ export function ShopifyProbeBox() {
       {offen && (
         <div className="probe-inhalt">
           <div className="probe-leiste small">
-            <span className="muted">{ansteht ? 'Abgleich steht an …' : 'nichts offen'} · nichts geht wirklich raus</span>
+            <span className="muted">
+              {ansteht ? 'KRNL rechnet gleich neu …' : 'alles berechnet'} · an Shopify geht nichts raus
+            </span>
             <span className="actions">
-              <button type="button" className="small" onClick={jetzt} disabled={laeuft}>
-                {laeuft ? 'rechnet …' : 'Jetzt abgleichen'}
+              <button
+                type="button"
+                className="small"
+                onClick={jetzt}
+                disabled={laeuft}
+                title="Rechnet sofort in KRNL neu, was an Shopify gemeldet würde — sendet nichts"
+              >
+                {laeuft ? 'rechnet …' : 'Jetzt neu berechnen'}
               </button>
               <button
                 type="button"
