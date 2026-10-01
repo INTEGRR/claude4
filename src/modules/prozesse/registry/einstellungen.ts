@@ -413,8 +413,9 @@ export const EINSTELLUNGEN = {
     prozessfrei: true,
     beschreibung:
       'Legt fest, welches Sprachmodell jede KI-Ebene nutzt (Auswertungen, Prozess-Entwurf, ' +
-      'Onboarding-Interview, schnelle Datenfrage, Übersetzung im Einkauf) — eine Kosten-/Qualitätsentscheidung des ' +
-      'Betreibers (settings.ki_modelle). Nur Modelle aus dem geprüften Katalog sind wählbar.',
+      'Onboarding-Interview, schnelle Datenfrage, Übersetzung im Einkauf, Einkaufs-Agent) — eine ' +
+      'Kosten-/Qualitätsentscheidung des Betreibers (settings.ki_modelle). Nur Modelle aus dem geprüften ' +
+      'Katalog sind wählbar.',
     bindung: 'frei',
     schema: z.object({
       auswertung: kiModellEnum,
@@ -423,17 +424,52 @@ export const EINSTELLUNGEN = {
       datenfrage: kiModellEnum,
       // Seit 0094; optional, damit ältere Aufrufe ohne diese Ebene gültig bleiben.
       uebersetzung: kiModellEnum.optional(),
+      // Seit 0109 (Einkaufs-Agent); ebenso optional.
+      einkauf: kiModellEnum.optional(),
     }),
     zusammenfassung: (p) =>
       `Auswertung ${p.auswertung} · Prozess ${p.prozess} · Interview ${p.interview} · Datenfrage ${p.datenfrage}` +
-      (p.uebersetzung ? ` · Übersetzung ${p.uebersetzung}` : ''),
+      (p.uebersetzung ? ` · Übersetzung ${p.uebersetzung}` : '') +
+      (p.einkauf ? ` · Einkaufs-Agent ${p.einkauf}` : ''),
     formdata: (fd) => ({
       auswertung: String(fd.get('auswertung') ?? ''),
       prozess: String(fd.get('prozess') ?? ''),
       interview: String(fd.get('interview') ?? ''),
       datenfrage: String(fd.get('datenfrage') ?? ''),
       uebersetzung: fd.has('uebersetzung') ? String(fd.get('uebersetzung') ?? '') : undefined,
+      einkauf: fd.has('einkauf') ? String(fd.get('einkauf') ?? '') : undefined,
     }),
+    revalidate: ['/einstellungen/ki'],
+  },
+
+  'einstellungen.ki_einkauf_setzen': {
+    label: 'Einkaufs-Agent ein- oder ausschalten',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Schaltet die KI-Ebene „Einkauf" (0109): ist sie an und ANTHROPIC_API_KEY gesetzt, sichtet der Agent jede ' +
+      'eingehende Lieferanten-Mail und liest PDFs und Bilder — er legt nur Vorschläge und Mail-Entwürfe an, ' +
+      'gesendet und entschieden wird von Menschen. Optional eine Obergrenze in Token je Kalendermonat ' +
+      '(settings.ki_einkauf); ist sie erreicht, überspringt der Agent bis zum Monatsersten.',
+    bindung: 'frei',
+    schema: z.object({
+      aktiv: z.boolean(),
+      monats_tokens: z
+        .number({ invalid_type_error: 'Bitte eine ganze Zahl angeben' })
+        .int('Bitte eine ganze Zahl angeben')
+        .positive('Die Obergrenze muss größer als 0 sein')
+        .nullable()
+        .default(null),
+    }),
+    zusammenfassung: (p) =>
+      `Einkaufs-Agent ${p.aktiv ? 'an' : 'aus'}` +
+      (p.monats_tokens ? ` · höchstens ${p.monats_tokens} Token je Monat` : ''),
+    formdata: (fd) => {
+      // Tausenderpunkte und Leerzeichen erlaubt („2.000.000").
+      const roh = String(fd.get('monats_tokens') ?? '').replace(/[.\s']/g, '').trim()
+      return { aktiv: fd.get('aktiv') === 'on', monats_tokens: roh ? Number(roh) : null }
+    },
     revalidate: ['/einstellungen/ki'],
   },
 

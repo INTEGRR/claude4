@@ -277,6 +277,13 @@ export async function nachrichtUebernehmen(n: GmailNachricht, postfach: string):
                                  ${`mail-uebersetzen:${nachricht.id}`})`
     }
 
+    // Einkaufs-Agent (0109): jede eingehende Nachricht wird gesichtet — der
+    // Job prüft selbst, ob die KI-Ebene „Einkauf" an ist (sonst übersprungen).
+    if (richtung === 'eingang') {
+      await t`select enqueue_job('ki_mail_triage', ${t.json({ nachricht_id: nachricht.id })},
+                                 ${`ki-triage:${nachricht.id}`})`
+    }
+
     const [z] = await t<{ zugeordnet: boolean }[]>`select mail_thread_zuordnen(${thread.id}) as zugeordnet`
     return { anhaenge, zugeordnet: z.zugeordnet, threadId: thread.id }
   })

@@ -284,7 +284,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 Stufen 1–3 sind in Prod (Ablage, Postfach, Mails, Projekte); ohne Google
 laufen sie nicht an. Stufe 4 (Muster, Werkzeuge, Verträge) und Stufe 5
 (Sendungen, Zoll, Pflichtdokumente, Cockpit, DATEV-Vorbereitung) brauchen
-kein Google. Anleitung: [module/einkaufstool.md](module/einkaufstool.md).
+kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
+`ANTHROPIC_API_KEY` und ist bis zum Einschalten aus. Anleitung:
+[module/einkaufstool.md](module/einkaufstool.md).
 
 - [ ] Google Workspace: Postfach `einkauf@…` anlegen und delegieren,
       Dienstkonto mit domänenweiter Delegation (nur `gmail.modify`, nur
@@ -310,6 +312,15 @@ kein Google. Anleitung: [module/einkaufstool.md](module/einkaufstool.md).
       Cockpit und die tägliche Telegram-Zusammenfassung gliedern danach;
       `ERP_PUBLIC_URL` setzen, damit die Zusammenfassung verlinkt. Cron
       `/api/cron?task=einkauf` steht in `vercel.json`.
+- [ ] **Einkaufs-Agent einschalten, sobald das Postfach läuft** (Stufe 6):
+      Einstellungen → KI-Modelle → Karte „Einkaufs-Agent" → „Agent
+      einschalten" (standardmäßig aus), optional eine Obergrenze in Token je
+      Monat; Modell der Ebene „Einkaufs-Agent" wählen. Braucht
+      `ANTHROPIC_API_KEY`; der Cron `/api/cron?task=ki` steht in
+      `vercel.json`. Der Agent legt nur Vorschläge und Entwürfe an — in der
+      ersten Woche die KI-Entwürfe (`/einkauf/entwuerfe?ansicht=ki`) und
+      den Verbrauch unter Einstellungen → KI-Modelle im Blick behalten.
+      Excel-Angebote liest er nicht (kein Parser).
 
 ## 7c. Entscheidungen, die der Betreiber treffen muss
 

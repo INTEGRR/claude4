@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic'
 
 const ANSICHTEN = [
   { key: 'offen', label: 'Offen', filter: ['entwurf', 'freigegeben'] },
+  // Vom Einkaufs-Agenten (0109) — offene KI-Entwürfe zum Gegenlesen.
+  { key: 'ki', label: 'KI-Entwürfe', filter: ['entwurf', 'freigegeben'], quelle: 'agent' },
   { key: 'gesendet', label: 'Gesendet', filter: ['gesendet'] },
   { key: 'verworfen', label: 'Verworfen', filter: ['verworfen'] },
   { key: 'alle', label: 'Alle', filter: ['entwurf', 'freigegeben', 'gesendet', 'verworfen'] },
@@ -23,6 +25,7 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
   await requireArea('einkauf')
   const { ansicht: roh } = await searchParams
   const ansicht = ANSICHTEN.find((a) => a.key === roh) ?? ANSICHTEN[0]
+  const quelle = 'quelle' in ansicht ? ansicht.quelle : null
 
   const rows = await sql<
     {
@@ -54,6 +57,7 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
     left join purchase_orders po on po.id = e.purchase_order_id
     left join einkaufsprojekte ep on ep.id = e.einkaufsprojekt_id
     where e.status = any(${ansicht.filter as unknown as string[]}::mail_entwurf_status[])
+      and (${quelle}::text is null or e.quelle = ${quelle})
     order by coalesce(e.gesendet_am, e.created_at) desc
     limit 200`
 
@@ -102,8 +106,15 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
                   <tr key={r.id}>
                     <td>
                       <Link href={`/einkauf/entwuerfe/${r.id}`}>{r.betreff || '(ohne Betreff)'}</Link>
+                      {r.quelle === 'agent' && (
+                        <>
+                          {' '}
+                          <span className="badge info" title="Vom Einkaufs-Agenten entworfen — gesendet wird erst nach Freigabe">
+                            KI-Entwurf
+                          </span>
+                        </>
+                      )}
                       <div className="muted small">
-                        {r.quelle === 'agent' ? 'vom Agenten · ' : ''}
                         {r.erstellt_von ?? ''}
                         {r.purchase_order_id && (
                           <>

@@ -361,6 +361,15 @@ describe('Registry-Abdeckung (statisch)', () => {
  * Verbrauchsprotokoll ki_verbrauch (Tokens je Aufruf, kein Fachdatum — das
  * Ergebnis der Übersetzung speichert die aufrufende Registry-Aktion bzw.
  * der Outbox-Job, 0094).
+ *
+ * Der Einkaufs-Agent (0109) schreibt NUR Entwürfe: einkauf-werkzeuge.ts
+ * legt Vorschläge (ki_vorschlaege — ausgeführt erst durch einen Menschen
+ * über einkauf.vorschlag_annehmen) und Mail-Entwürfe (mail_entwuerfe mit
+ * quelle 'agent', Status 'entwurf' — gesendet erst nach Freigabe) an;
+ * einkauf-agent.ts protokolliert Verbrauch und die Sichtungsmarke der
+ * Nachricht, dokument-lesen.ts den Verbrauch und den gelesenen Text am
+ * Dokument. Was davon senden oder ausführen könnte, prüft zusätzlich
+ * tests/einkauf-agent-waechter.test.ts.
  */
 describe('KI-Modul: kein Schreib-SQL am Torwächter vorbei', () => {
   const KI_WURZEL = new URL('../src/modules/ki', import.meta.url).pathname
@@ -368,6 +377,9 @@ describe('KI-Modul: kein Schreib-SQL am Torwächter vorbei', () => {
     'produkt-anlegen.ts': [/^product_/],
     'sprechen-werkzeuge.ts': [/^sprachprotokoll/, /^sprach_vorgaenge$/],
     'uebersetzen.ts': [/^ki_verbrauch$/],
+    'einkauf-werkzeuge.ts': [/^ki_vorschlaege$/, /^mail_entwuerfe$/],
+    'einkauf-agent.ts': [/^ki_verbrauch$/, /^mail_nachrichten$/],
+    'dokument-lesen.ts': [/^ki_verbrauch$/, /^dokumente$/],
   }
 
   test('insert/update/delete nur auf der geschlossenen Allowlist', () => {

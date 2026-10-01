@@ -1464,6 +1464,33 @@ und Abrechnung; Express ohne Verzollung; Storno vor dem Verschiffen).
 Paket: überall, wo das Einkaufsprojekt aktiv ist. Details:
 [module/einkaufstool.md](module/einkaufstool.md) (Stufe 5).
 
+## Einkaufs-Agent: Vorschläge als Beleg ohne Prozess, eigene KI-Spur (Migration 0109, umgesetzt)
+
+Der Agent ist **kein Prozessschritt** und schaltet keinen Belegstatus. Er
+bereitet vor; was daraus wird, entscheidet ein Mensch über bestehende
+Aktionen — der Belegstatus bleibt die einzige Wahrheit:
+
+- `ki_vorschlag` steht in `prozess_modelle` (Tabelle `ki_vorschlaege`,
+  Statusspalte `status` offen/angenommen/verworfen/fehler, ohne Route — die
+  Karte hängt an Thread, Projekt, Bestellung, Lieferant), damit
+  `einkauf.vorschlag_annehmen`/`_verwerfen`/`_aendern` den Existenz-Check
+  des Torwächters nutzen. Einen Prozess hat der Vorschlag bewusst nicht
+  (Arbeitsvorrat am Beleg, wie Mail-Threads); alle drei Aktionen sind
+  `prozessfrei` und **nicht `ki`**.
+- **Annehmen ruft die vorgeschlagene Registry-Aktion über den Torwächter
+  auf — als der annehmende Mensch.** Gehört sie zu einem Prozessschritt
+  (heute keine der vorschlagbaren: alle `prozessfrei`), gelten dessen
+  Schritt-Rechte wie bei jedem Klick.
+- KI-Entwürfe sind gewöhnliche Belege im Prozess `mail_versand` (Zustand
+  `entwurf`); Freigabe und Senden laufen unverändert.
+- Jobs `ki_mail_triage` (Fähigkeit `ki:mail_sichten`) und
+  `ki_dokument_lesen` (`ki:dokument_lesen`) laufen in der **Spur „ki"**
+  (`JobEintrag.spur`, `runDueJobs(…, 'ki')`, Cron `?task=ki`) — kein
+  Dienstschritt eines Prozesses, sondern Begleitung jeder eingehenden
+  Nachricht bzw. jedes neuen Dokuments.
+
+Details: [module/einkaufstool.md](module/einkaufstool.md) (Stufe 6).
+
 ## Kommissionieren: optionaler Sammelschritt vor dem Packtisch (Migration 0091, umgesetzt)
 
 Zwischen „Verfügbarkeit" und „Packtisch" liegt im Versandprozess der

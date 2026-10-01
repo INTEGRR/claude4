@@ -11,7 +11,7 @@ import {
   updateTrackingInfo,
 } from './shopify'
 import { htmlSicher, sendMail } from './mail'
-import type { JobKind } from '@/modules/prozesse/jobs-katalog'
+import { type JobKind, KI_SPUR_JOBS } from '@/modules/prozesse/jobs-katalog'
 
 /** Nachschlag über den (aus der DB stammenden) Job-Typ als String. */
 function handlerFuer(kind: string): Handler | undefined {
@@ -315,6 +315,18 @@ const handlers = {
     return einkaufDigestEinreihen(typeof payload.datum === 'string' ? payload.datum : undefined)
   },
 
+  /** Einkaufs-Agent sichtet eine eingehende Nachricht (ki/einkauf-agent.ts, 0109, Spur „ki"). */
+  async ki_mail_triage(payload) {
+    const { mailTriage } = await import('@/modules/ki/einkauf-agent')
+    return mailTriage(String(payload.nachricht_id))
+  },
+
+  /** PDF/Bild an die KI, Text ans Dokument (ki/dokument-lesen.ts, 0109, Spur „ki"). */
+  async ki_dokument_lesen(payload) {
+    const { dokumentKiLesen } = await import('@/modules/ki/dokument-lesen')
+    return dokumentKiLesen(String(payload.dokument_id))
+  },
+
   /** Mail-Anhang aus dem Einkaufspostfach in die Drive-Ablage (einkauf/anhang-ablage.ts). */
   async gmail_anhang_ablegen(payload) {
     const { anhangAblegen } = await import('@/modules/einkauf/anhang-ablage')
@@ -450,7 +462,7 @@ async function originForJob(
   if (kind === 'gmail_senden' && payload.entwurf_id) {
     return { model: 'mail_entwurf', id: String(payload.entwurf_id) }
   }
-  if (kind === 'mail_uebersetzen' && payload.nachricht_id) {
+  if ((kind === 'mail_uebersetzen' || kind === 'ki_mail_triage') && payload.nachricht_id) {
     const [row] = await sql<{ thread_id: string }[]>`
       select thread_id from mail_nachrichten where id = ${String(payload.nachricht_id)}`
     if (row) return { model: 'mail_thread', id: row.thread_id }
@@ -467,7 +479,21 @@ async function originForJob(
  */
 export const JOB_BUDGET_MS = 40_000
 
-export async function runDueJobs(limit = 20, budgetMs = JOB_BUDGET_MS): Promise<RunResult> {
+/**
+ * Spuren (0109): „standard" arbeitet alles außer den KI-Jobs ab, „ki" nur
+ * diese (Cron `?task=ki`). So hält ein Agentenlauf von einer halben Minute
+ * weder Shopify-Meldungen noch den Mail-Versand auf — und umgekehrt.
+ */
+export type JobSpur = 'standard' | 'ki'
+
+/**
+ * Die KI-Spur beginnt Jobs nur in den ersten 15 s eines Laufs: ein
+ * Agentenlauf darf danach noch bis zu ~45 s brauchen (ki/einkauf-agent.ts),
+ * bevor Vercel die Funktion nach 60 s beendet.
+ */
+export const KI_SPUR_BUDGET_MS = 15_000
+
+export async function runDueJobs(limit = 20, budgetMs = JOB_BUDGET_MS, spur: JobSpur = 'standard'): Promise<RunResult> {
   const beginn = Date.now()
   // Hängengebliebene Läufe (Prozessabbruch mitten im Handler) zurückholen.
   await sql`select reap_stuck_jobs()`
@@ -481,6 +507,7 @@ export async function runDueJobs(limit = 20, budgetMs = JOB_BUDGET_MS): Promise<
     where id in (
       select id from integration_jobs
       where status = 'pending' and next_run_at <= now()
+        and (kind = any(${KI_SPUR_JOBS}::text[])) = ${spur === 'ki'}
       order by next_run_at
       limit ${limit}
       for update skip locked

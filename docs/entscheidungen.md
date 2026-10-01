@@ -9,6 +9,121 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-01 — Einkauf Stufe 6: Agent nur mit Entwürfen — Vorschläge, eigene KI-Spur, Dokument-Leser
+
+Stufe 6 des Einkaufstools (Migration 0109). Betreiber-Vorgabe (Interview
+2026-09-29): „Agent zuletzt: nur Entwürfe, läuft sofort bei jeder
+eingehenden Mail." Entschieden:
+
+- **Der Agent schreibt genau zwei Dinge:** Vorschläge (`ki_vorschlaege`)
+  und Mail-Entwürfe (`mail_entwuerfe`, `quelle 'agent'`, Status `entwurf`).
+  Er sendet nicht, bucht nicht, gibt nicht frei und ruft keine
+  Registry-Aktion auf. Erzwungen statt erinnert:
+  `tests/einkauf-agent-waechter.test.ts` vergleicht den Werkzeugkatalog mit
+  einer geschlossenen Liste (5 lesende, 2 schreibende Werkzeuge), prüft, dass
+  die schreibenden weder Empfänger noch Thread noch Status kennen, und
+  verfolgt die Importe der Agentenmodule transitiv — kein Weg zu
+  Torwächter, Ausführung, Server-Action-Transport, Gmail-Senden oder
+  Job-Runner; im Quelltext kein `aktionAusfuehrenGeprueft`, `serverAktion`
+  oder `enqueue_job`. Die Allowlist „KI-Modul schreibt nicht am Torwächter
+  vorbei" (`tests/prozess-registry.test.ts`) nennt die drei Agentendateien
+  mit genau ihren Tabellen.
+- **Vorschläge sind eine generische Tabelle mit der Semantik von
+  `sprach_vorgaenge`** (Aktion, Parameter, Beleg-ID, Begründung, Belege,
+  Status offen/angenommen/verworfen/fehler, Quelle). Sie sind ein Beleg
+  ohne Prozess (`prozess_modelle` 'ki_vorschlag', wie Mail-Threads):
+  Arbeitsvorrat am Thread, Projekt, an Bestellung und Lieferant, alle drei
+  Aktionen `prozessfrei`.
+  - **Annehmen** (`einkauf.vorschlag_annehmen`) führt die vorgeschlagene
+    Aktion über `aktionAusfuehrenGeprueft` **als der annehmende Mensch** aus
+    — Rechte, Schema, Schritt-Rechte und Audit wie bei jedem Klick. Dafür
+    trägt `AktionsKontext` jetzt die Befugnisse des Ausführenden
+    (`befugnisse`). Erst beanspruchen, dann ausführen (ein Doppelklick führt
+    nicht zweimal aus); scheitert die Aktion, steht der Fehler am Vorschlag
+    (`fehler`), fehlt nur das Recht dieses Menschen, bleibt er offen. Ein
+    angenommenes Angebot trägt `lieferantenangebote.quelle 'agent'`.
+  - **Ändern** prüft die Parameter gegen das Schema der vorgeschlagenen
+    Aktion (generisches Formular: Zahlen, Ja/Nein, Text, Verschachteltes als
+    JSON); **Verwerfen** führt nichts aus. Keine der drei Aktionen ist `ki`:
+    der Agent nimmt nie selbst an.
+- **Vorschlagbar ist eine geschlossene Liste** von `ki`-Aktionen ohne
+  Statusübergang: `einkauf.mail_zuordnen`, `einkauf.angebot_erfassen`,
+  `einkauf.wiedervorlage_anlegen`, `einkauf.projekt_position_setzen`,
+  `einkauf.dokument_aendern`. Die **Entscheidungsvorlage** ist deshalb ein
+  Zielpreis je Projektposition mit Begründung aus Preishistorie, Vergleich
+  (`einstand_schaetzen`) und Staffeln — „Angebot wählen" bleibt ein
+  bewusster menschlicher Schritt (nicht `ki`, 0097). Abweichung vom Plan,
+  der die Entscheidungsvorlage offen ließ.
+- **Entwürfe:** Empfänger (Gesprächspartner des Threads), Thread, Betreff
+  „Re: …", Status und Quelle setzt KRNL, nie das Modell — eine
+  untergeschobene Anweisung in einer Mail kann den Entwurf nicht umlenken.
+  Höchstens ein Entwurf je Lauf und keiner doppelt auf dieselbe Nachricht;
+  höchstens acht Vorschläge je Lauf, gleiche offene werden nicht doppelt
+  angelegt. Mail- und Dokumentinhalte sind laut Systemprompt Daten, keine
+  Anweisungen; Tags im Mailtext werden entschärft.
+- **Lesen:** SQL über das bestehende Werkzeug (Read-only, Sperrliste) und
+  **immer mit Finanzsperre** — der Agent läuft ohne Benutzer, seine
+  Vorschläge sieht jeder im Einkauf. Dazu Thread, Lieferantenakte, Projekt
+  (mit Einstand je Angebot und Preishistorie) und Dokumenttext.
+- **KI-Ebene „Einkauf":** Modellwahl wie jede Ebene (`KI_EBENEN`, Standard
+  aus dem geprüften Katalog), dazu ein **Schalter** `settings.ki_einkauf`
+  (`aktiv`, standardmäßig **aus**; `monats_tokens` als optionale
+  Obergrenze). Eine Obergrenze in Token statt Euro, weil KRNL keine
+  Preistabelle der Modelle führt — die Kosten stehen in der Abrechnung von
+  Anthropic; `ki_verbrauch` trägt dafür jetzt auch die Cache-Token.
+  Ebene aus, kein Schlüssel oder Grenze erreicht → der Job ist erledigt mit
+  „Übersprungen — …", keine Fehlerschleife.
+- **Eigene Spur im Job-Runner:** `JobEintrag.spur 'ki'`,
+  `runDueJobs(…, spur)`; die allgemeine Spur (Cron `jobs`, nach jedem
+  Klick) läuft nie KI-Jobs, der neue Cron `/api/cron?task=ki` (minütlich,
+  höchstens drei Jobs) nur diese. Ein Agentenlauf von einer halben Minute
+  hält so weder Shopify-Meldungen noch Mail-Versand auf. Zeitrahmen unter
+  Vercels 60 s: neue KI-Jobs nur in den ersten 15 s eines Laufs, nach 20 s
+  keine neue Modellrunde, je Anfrage höchstens 25 s (Dokument-Leser 40 s);
+  wiederholt wird über die Outbox, nicht im SDK — die Monatsgrenze deckelt
+  auch Wiederholungen.
+  `mail_uebersetzen` bleibt in der allgemeinen Spur (kurz, bestehende
+  Abläufe unverändert).
+- **Jede eingehende Nachricht** reiht `ki_mail_triage` ein — aus dem
+  Postfach-Abgleich und aus „Nachricht erfassen" (Alibaba, Telefon).
+  Dedupe je Nachricht plus Sichtungsmarke `mail_nachrichten.ki_gesichtet_am`;
+  ignorierte Threads werden übersprungen. Dauerhafte API-Fehler (400, 401,
+  403, 404, 413, 422) werden nicht wiederholt, Netz/Überlast/Ratenlimit mit
+  dem Backoff der Outbox. Höchstens sechs Modellrunden, danach Schluss.
+- **Dokument-Leser** `ki_dokument_lesen`: PDF und Bilder gehen als
+  Dokument- bzw. Bild-Block direkt an Claude (derselbe Aufrufweg wie
+  `agent.ts`/`uebersetzen.ts`), der Text steht in `dokumente.text_auszug`
+  (neu: `text_status`, Suchvektor `dokumente.suche`). Ausgelöst beim Ablegen
+  eines Mail-Anhangs und beim Upload. Erkennt der Leser ein Angebot und
+  passen die Staffeln eindeutig auf die Projektpositionen, schlägt er
+  „Angebot erfassen" vor — die Sichtung der Mail wartet deshalb nicht auf
+  die Anhänge. **Excel ist „nicht lesbar":** KRNL hat keinen Tabellen-Parser,
+  und für Stufe 6 kommt keine neue Abhängigkeit hinein (der Plan ließ den
+  Parser offen); Dateien über 20 MB werden nicht gelesen.
+- **`KI_FAKE=1`** liefert deterministische Werkzeugaufrufe (Thread lesen,
+  aus „Price for 1000 pcs is 0.85 USD, MOQ 500" einen Angebotsvorschlag
+  mit Staffel, Antwort-Entwurf in der Lieferantensprache) und liest
+  Testdateien als Klartext — Prozesstest und Browsertest ohne Schlüssel.
+- **Oberfläche:** Karte „KI-Vorschläge" an Thread, Projekt, Bestellung und
+  Lieferantenakte (Begründung, Quellen als Links, Annehmen/Ändern/
+  Verwerfen); Schild „KI-Entwurf" und Ansicht „KI-Entwürfe" in der
+  Entwurfsliste; Kategorie „KI-Vorschläge offen" im Cockpit (nicht in der
+  Telegram-Zusammenfassung — Arbeitsvorrat, kein Termin); unter
+  Einstellungen → KI-Modelle Schalter, Monatsgrenze und Verbrauch je Ebene
+  und Modell; Lesestatus in der Dokumentenkarte.
+- Weitere Abweichungen: Migration 0109 statt 0098 (die Nummern des Plans
+  waren vergeben). Eine angenommene Zuordnung steht als `zugeordnet_durch
+  'mensch'` am Thread — angenommen hat ein Mensch. `docker/cron.sh` ruft
+  weder `mail` noch `ki` auf (wie schon die übrigen Einkaufs-Crons) — im
+  Docker-Betrieb läuft das Einkaufstool damit noch nicht von selbst.
+
+Umgesetzt in `src/db/migrations/0109_einkauf_ki_agent.sql`,
+`src/modules/ki/einkauf-*.ts`, `src/modules/ki/dokument-lesen.ts`,
+`src/modules/prozesse/registry/einkauf-ki*.ts`,
+`src/components/ki-vorschlaege.tsx`; beschrieben in
+[module/einkaufstool.md](module/einkaufstool.md) (Stufe 6) und
+[prozesse.md](prozesse.md).
+
 ## 2026-10-01 — Einkauf Stufe 5: Eingangssendungen, Zoll, Pflichtdokumente, Cockpit, DATEV nur vorbereitet
 
 Stufe 5 des Einkaufstools (Migration 0108). Betreiber-Vorgaben (Interview

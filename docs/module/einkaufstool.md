@@ -22,7 +22,7 @@ Begründung und Betreiber-Entscheidungen: Entscheidungslog
 | 3 | Einkaufsprojekt: Anfragen, Angebote, Vergleich auf Einstand, Entscheidung, Bestellung, EZB-Kurse (0097) | umgesetzt |
 | 4 | Bemusterung (Golden Sample) mit Musterpflicht, Werkzeuge/Molds, Lieferantenverträge und Preislisten, regelbasierte Wiedervorlagen (0107) | umgesetzt |
 | 5 | Eingangssendungen (Sammelfracht) mit Landed Costs, Zoll (EUSt getrennt), lernende Fracht- und Zollsätze, Pflichtdokumente, Einkaufs-Cockpit, tägliche Telegram-Zusammenfassung, DATEV-Vorbereitung (0108) | umgesetzt (DATEV nur vorbereitet) |
-| 6 | Agent — nur Entwürfe, bei jeder eingehenden Mail | geplant |
+| 6 | Agent — nur Entwürfe: sichtet jede eingehende Mail, liest PDFs/Bilder, legt Vorschläge und Antwort-Entwürfe an (0109) | umgesetzt (Excel nicht lesbar) |
 
 ## Stufe 1 — Ablage, Dokumente, Lieferantenakte (0092)
 
@@ -790,3 +790,109 @@ kein Job, keine Aktion, kein Cron.
     Digest-Job: eine Nachricht je Tag, gegliedert nach Einkäufer.
 - Fixture `fixtures/eingangs-sendung.ts` (See mit Verzollung bis zur
   Abrechnung, Express, Storno).
+
+## Stufe 6 — der Agent, nur Entwürfe (0109)
+
+Betreiber-Vorgabe (Interview 2026-09-29): „Agent zuletzt: nur Entwürfe,
+läuft sofort bei jeder eingehenden Mail." Begründungen: Entscheidungslog
+2026-10-01 „Einkauf Stufe 6".
+
+### Was der Agent darf — und was nicht
+
+- Er **liest** (Werkzeuge in `src/modules/ki/einkauf-prompt.ts`):
+  SQL nur lesend (dasselbe Werkzeug wie der Chat-Agent, immer mit
+  Finanzsperre), den Thread, die Lieferantenakte, das Einkaufsprojekt (mit
+  Einstand je Angebot und Preishistorie) und den gelesenen Text von
+  Dokumenten.
+- Er **legt an**, sonst nichts:
+  - **Vorschläge** (`ki_vorschlaege`) — Zuordnung des Threads, Angebot
+    erfassen (aus Mailtext oder Anhang, mit Staffeln je Projektposition),
+    Wiedervorlage, **Entscheidungsvorlage** (Zielpreis je Position mit
+    Begründung aus Preishistorie, Vergleich, Staffeln), Dokumentart setzen.
+    Die Liste ist geschlossen; Entscheiden, Bestellen und Freigeben sind
+    nicht dabei.
+  - **einen Antwort-Entwurf** je Lauf im Thread (`mail_entwuerfe`,
+    `quelle 'agent'`, Status `entwurf`) in der Sprache des Lieferanten plus
+    Deutsch. Empfänger, Thread, Betreff und Status setzt KRNL, nicht das
+    Modell.
+- Er **sendet nie, bucht nie, gibt nie frei** und ruft keine
+  Registry-Aktion auf — ein Wächter prüft das statisch
+  (`tests/einkauf-agent-waechter.test.ts`). Gesendet wird ein KI-Entwurf
+  wie jeder andere: ein Mensch liest gegen und gibt frei (Prozess
+  `mail_versand`).
+
+### Abläufe
+
+- **Jede eingehende Nachricht** (Postfach-Abgleich und „Nachricht
+  erfassen") reiht den Job `ki_mail_triage` ein. Er läuft in der **eigenen
+  KI-Spur** (Cron `/api/cron?task=ki`, minütlich, höchstens drei Jobs je
+  Lauf), nie im allgemeinen Job-Lauf (auch nicht über „Jobs ausführen"
+  unter Integrationen — dort erscheinen sie aber im Monitor). Der Agent bekommt den Vorgang
+  (Nachricht ohne Zitat, Zuordnung, Projektpositionen, offene Vorschläge)
+  und arbeitet höchstens sechs Runden. Danach trägt die Nachricht
+  „vom KI-Agenten gesichtet" — eine zweite Sichtung gibt es nicht.
+- **Dokument-Leser** `ki_dokument_lesen` (beim Ablegen eines Mail-Anhangs
+  und beim Upload): PDFs und Bilder gehen direkt an die KI, der Text steht
+  danach am Dokument (`text_auszug`, durchsuchbar über `dokumente.suche`;
+  Lesestatus in der Dokumentenkarte). Erkennt er ein Angebot und passen die
+  Staffeln eindeutig auf die Projektpositionen, schlägt er „Angebot
+  erfassen" vor. **Excel ist „nicht lesbar"** (kein Tabellen-Parser in
+  KRNL); Dateien über 20 MB liest er nicht.
+- **Übersprungen** (Job erledigt, kein Fehler): KI-Ebene „Einkauf" aus,
+  `ANTHROPIC_API_KEY` fehlt, Monatsgrenze erreicht, ausgehende Nachricht,
+  Thread auf „ignoriert".
+
+### Vorschläge annehmen, ändern, verwerfen
+
+- Karte **„KI-Vorschläge"** an Thread, Einkaufsprojekt, Bestellung und
+  Lieferantenakte: Art, Titel, Begründung mit Zahlen, Quellen als Links
+  (Nachricht → Thread, Dokument → Drive).
+- **Annehmen** (`einkauf.vorschlag_annehmen`) führt die vorgeschlagene
+  Aktion über den Torwächter aus — **als der, der klickt** (seine Rechte,
+  sein Name im Verlauf). Ergebnis bzw. Fehler stehen am Vorschlag; ein
+  gescheiterter lässt sich ändern und erneut annehmen. Ein so erfasstes
+  Angebot trägt `quelle 'agent'`.
+- **Ändern** (`einkauf.vorschlag_aendern`): die Parameter als Formular
+  (Staffeln als JSON), geprüft gegen die vorgeschlagene Aktion.
+  **Verwerfen** (`einkauf.vorschlag_verwerfen`) führt nichts aus.
+- **Cockpit:** Kategorie „KI-Vorschläge offen" (je Einkäufer, nicht in der
+  Telegram-Zusammenfassung) mit Link zu den KI-Entwürfen.
+- **Entwürfe:** Schild „KI-Entwurf" und Ansicht „KI-Entwürfe" unter
+  `/einkauf/entwuerfe`.
+
+### Einschalten und Kosten
+
+- Einstellungen → **KI-Modelle**: Modell der Ebene „Einkaufs-Agent" und
+  Karte „Einkaufs-Agent" mit Schalter (standardmäßig **aus**) und
+  optionaler **Obergrenze in Token je Monat**. Darunter der Verbrauch
+  dieses Monats je Ebene und Modell (Eingabe, Cache gelesen/geschrieben,
+  Ausgabe) aus `ki_verbrauch`; die Kosten selbst stehen in der Abrechnung
+  von Anthropic.
+- `KI_FAKE=1` (Tests, Staging, Browsertest): deterministische
+  Werkzeugaufrufe statt Claude — aus „Price for 1000 pcs is 0.85 USD,
+  MOQ 500" werden ein Angebotsvorschlag mit Staffel und ein Antwort-Entwurf.
+
+### Nachweis
+
+- `tests/einkauf-agent.test.ts` — Prompt-Bau (deterministisch, Mail als
+  markierte Daten, entschärfte Tags), Prüfung der Werkzeug-Eingaben gegen
+  die Registry, Preisangaben aus Text, Antwort des Dokument-Lesers,
+  Staffeln auf Positionen, Lesbarkeit, Fake, Schalter und Formular-Adapter.
+- `tests/einkauf-agent-waechter.test.ts` — geschlossener Werkzeugkatalog,
+  schreibende Werkzeuge ohne Empfänger/Thread/Status, vorschlagbare
+  Aktionen nur `ki` ohne Statusübergang, Annehmen nie `ki`, transitive
+  Importanalyse (kein Torwächter, keine Ausführung, kein Senden, kein
+  Job-Runner).
+- `tests/prozesse/einkauf-agent.test.ts` — Mail im Attrappen-Postfach →
+  Job in der KI-Spur: mit Ebene aus bzw. ohne Schlüssel übersprungen;
+  eingeschaltet Vorschlag „Angebot erfassen" mit Staffel und Entwurf,
+  nichts gesendet (Entwurf bleibt `entwurf`, kein `gmail_senden`); PDF
+  gelesen und durchsuchbar, Excel nicht lesbar; Annehmen als Mensch
+  (Audit-Akteur, `quelle 'agent'`, kein Doppel), Verwerfen, Fehler →
+  Ändern → Annehmen; Alibaba-Erfassung, ignorierter Thread, Monatsgrenze.
+
+### Nur mit echtem Schlüssel und Postfach prüfbar
+
+Die Qualität der Vorschläge und Entwürfe (Prompt), das Lesen echter PDFs
+und Fotos, Laufzeit und Tokenverbrauch je Mail sowie das Zusammenspiel mit
+dem echten Gmail-Postfach — der Fake ersetzt Claude vollständig.

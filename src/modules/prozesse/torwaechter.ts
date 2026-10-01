@@ -188,6 +188,7 @@ export async function aktionAusfuehrenGeprueft(
         rollen: nutzer.rollen ? [...nutzer.rollen] : [nutzer.role],
         recordId,
         userId: nutzer.id,
+        befugnisse: nutzer.befugnisse ? [...nutzer.befugnisse] : undefined,
         arbeitsplatzId:
           aufruf.arbeitsplatzId && UUID_MUSTER.test(aufruf.arbeitsplatzId)
             ? aufruf.arbeitsplatzId

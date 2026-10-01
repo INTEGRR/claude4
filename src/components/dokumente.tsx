@@ -14,6 +14,9 @@ import { DokumentUpload, DokumentZeilenKnoepfe } from './dokument-upload'
  * Ablegen. Gleiche Karte an Bestellung, Rechnung, Artikel und Lieferant.
  */
 
+/** Lesestatus des Einkaufs-Agenten (0109). */
+const TEXT_STATUS: Record<string, string> = { gelesen: 'von der KI gelesen', nicht_lesbar: 'für die KI nicht lesbar', fehler: 'KI-Lesen gescheitert' }
+
 export function groesseText(bytes: number | null): string {
   if (bytes == null) return '—'
   if (bytes < 1024) return `${bytes} B`
@@ -41,11 +44,12 @@ export async function DokumenteKarte({
       quelle: string
       notiz: string | null
       hochgeladen_von: string | null
+      text_status: string | null
       created_at: string
     }[]
   >`
     select d.id, d.drive_file_id, d.name, d.art::text as art, d.revision, d.groesse::float as groesse,
-           d.quelle::text as quelle, d.notiz, d.hochgeladen_von, d.created_at::text as created_at
+           d.quelle::text as quelle, d.notiz, d.hochgeladen_von, d.created_at::text as created_at, d.text_status
     from dokument_verweise v
     join dokumente d on d.id = v.dokument_id
     where v.modell = ${modell} and v.record_id = ${recordId}
@@ -78,6 +82,7 @@ export async function DokumenteKarte({
                   <span className="mono-label">{DOKUMENT_ARTEN[d.art] ?? d.art}</span>
                   {d.revision ? <> · Rev. {d.revision}</> : null} · {groesseText(d.groesse)} ·{' '}
                   {d.hochgeladen_von ?? d.quelle} · {dateTime(d.created_at)}
+                  {d.text_status ? ` · ${TEXT_STATUS[d.text_status] ?? d.text_status}` : ''}
                 </div>
                 {d.notiz && <div className="small">{d.notiz}</div>}
               </div>

@@ -17,6 +17,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron?task=ki",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron?task=reconcile",
       "schedule": "*/15 * * * *"
     },

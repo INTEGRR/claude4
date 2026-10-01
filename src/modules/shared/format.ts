@@ -187,6 +187,12 @@ export const LABELS = {
     erledigt: 'Erledigt',
     ignoriert: 'Ignoriert',
   },
+  ki_vorschlag: {
+    offen: 'Offen',
+    angenommen: 'Angenommen',
+    verworfen: 'Verworfen',
+    fehler: 'Fehler',
+  },
   mail_entwurf: {
     entwurf: 'Entwurf',
     freigegeben: 'Wird gesendet',
@@ -263,6 +269,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'aktiv':
     case 'abgerechnet':
     case 'uebergeben':
+    case 'angenommen':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -291,6 +298,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'gesperrt':
     case 'abgelaufen':
     case 'storniert':
+    case 'fehler':
       return 'danger'
     case 'waiting':
     case 'started':

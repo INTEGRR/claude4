@@ -4,6 +4,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { DokumenteKarte, groesseText } from '@/components/dokumente'
+import { KiVorschlaegeKarte } from '@/components/ki-vorschlaege'
 import { MailThreadsKarte, WiedervorlagenKarte } from '@/components/mail-threads'
 import { RecordComments } from '@/components/record-comments'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
@@ -266,6 +267,7 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
         </p>
       </Card>
 
+      <KiVorschlaegeKarte partnerId={id} pfad={`/einkauf/lieferanten/${id}`} />
       <MailThreadsKarte partnerId={id} />
       <WiedervorlagenKarte modell="partner" recordId={id} pfad={`/einkauf/lieferanten/${id}`} />
       <div id="dateien">

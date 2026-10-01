@@ -7,6 +7,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { DokumenteKarte, groesseText } from '@/components/dokumente'
 import { MailHtml } from '@/components/mail-html'
 import { KANAL_NAMEN, WiedervorlagenKarte } from '@/components/mail-threads'
+import { KiVorschlaegeKarte } from '@/components/ki-vorschlaege'
 import { RecordComments } from '@/components/record-comments'
 import { Badge, Card, PageHeader } from '@/components/ui'
 import { zitatTrennen } from '@/modules/einkauf/mail-zerlegen'
@@ -79,10 +80,12 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         hat_html: boolean
         quelle: string
         erfasst_von: string | null
+        ki_gesichtet_am: string | null
       }[]
     >`
       select id, richtung::text as richtung, kanal::text as kanal, von, von_name, an, cc, betreff,
-             datum::text as datum, text, text_de, sprache, html is not null as hat_html, quelle, erfasst_von
+             datum::text as datum, text, text_de, sprache, html is not null as hat_html, quelle, erfasst_von,
+             ki_gesichtet_am::text as ki_gesichtet_am
       from mail_nachrichten where thread_id = ${id}
       order by datum, created_at`,
     sql<
@@ -111,8 +114,8 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       order by (po.vendor_id = ${t.partner_id}) desc nulls last, po.created_at desc
       limit 300`,
     sql<{ id: string; name: string }[]>`select id, name from users where active order by name`,
-    sql<{ id: string; betreff: string; status: string; erstellt_von: string | null }[]>`
-      select id, betreff, status::text as status, erstellt_von from mail_entwuerfe
+    sql<{ id: string; betreff: string; status: string; erstellt_von: string | null; quelle: string }[]>`
+      select id, betreff, status::text as status, erstellt_von, quelle from mail_entwuerfe
       where thread_id = ${id} and status in ('entwurf', 'freigegeben') order by created_at`,
   ])
 
@@ -203,6 +206,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                   </div>
                 )}
                 {n.betreff && n.betreff !== t.betreff && <div>Betreff: {n.betreff}</div>}
+                {n.ki_gesichtet_am && <div>vom KI-Agenten gesichtet · {dateTime(n.ki_gesichtet_am)}</div>}
               </div>
               <div className="mail-text">{neu || <span className="muted">(kein Text)</span>}</div>
               {n.text_de && (
@@ -249,6 +253,8 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         })}
       </div>
 
+      <KiVorschlaegeKarte threadId={id} pfad={pfad} />
+
       {darf && (
         <Card title="Antworten">
           {entwuerfe.length > 0 && (
@@ -259,6 +265,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                     {d.betreff || '(ohne Betreff)'}
                   </Link>
                   <span className="muted small">
+                    {d.quelle === 'agent' && <span className="badge info">KI-Entwurf</span>}{' '}
                     <Badge state={d.status} kind="mail_entwurf" href={`/einkauf/entwuerfe/${d.id}`} /> {d.erstellt_von}
                   </span>
                 </li>

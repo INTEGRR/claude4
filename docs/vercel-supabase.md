@@ -117,7 +117,9 @@ Google-Admin-Konsole (Sicherheit → API-Steuerung → Domainweite Delegierung)
 der Client-ID des Dienstkontos nur den Scope
 `https://www.googleapis.com/auth/gmail.modify` geben. Der Cron
 `/api/cron?task=mail` (vercel.json) liest dann jede Minute; der erste Lauf
-holt die letzten 30 Tage.
+holt die letzten 30 Tage. Der Einkaufs-Agent (Stufe 6) läuft über den Cron
+`/api/cron?task=ki` und braucht `ANTHROPIC_API_KEY` plus den Schalter
+Einstellungen → KI-Modelle → „Einkaufs-Agent" (standardmäßig aus).
 
 Schützt `/api/cron/*` vor fremden Aufrufen. Vercel sendet ihn bei den eigenen
 Cron-Aufrufen automatisch als `Authorization: Bearer …` mit. Ist er auf Vercel
@@ -128,7 +130,7 @@ Wert steht.
 **Optional, je nach Anbindung** (leer lassen heißt: Modul ist aus):
 
 ```
-ANTHROPIC_API_KEY        schaltet die Seite /ki frei
+ANTHROPIC_API_KEY        schaltet die Seite /ki frei (und den Einkaufs-Agenten, wenn eingeschaltet)
 OPENAI_API_KEY           schaltet die Mikrofon-Knöpfe frei (Whisper-Diktat)
 SHOPIFY_SHOP_DOMAIN      meinshop.myshopify.com
 SHOPIFY_CLIENT_ID        Dev-Dashboard-App, Settings → Credentials

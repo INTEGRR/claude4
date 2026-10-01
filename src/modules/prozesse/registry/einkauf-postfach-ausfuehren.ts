@@ -203,12 +203,19 @@ export async function nachrichtErfassen(
     const [partner] = partnerId
       ? await t<{ name: string; email: string | null }[]>`select name, email from partners where id = ${partnerId}`
       : []
-    await t`
+    const [nachricht] = await t<{ id: string }[]>`
       insert into mail_nachrichten (thread_id, richtung, kanal, von, von_name, betreff, datum, text, quelle, erfasst_von)
       values (${id}, ${p.richtung}, ${p.kanal},
               ${p.richtung === 'eingang' ? (partner?.email ?? null) : null},
               ${p.richtung === 'eingang' ? (partner?.name ?? null) : ctx.actor},
-              ${p.betreff || null}, ${datum}, ${p.text}, 'manuell', ${ctx.actor})`
+              ${p.betreff || null}, ${datum}, ${p.text}, 'manuell', ${ctx.actor})
+      returning id`
+    // Auch ein von Hand erfasster Alibaba-Chat ist eine eingehende Nachricht:
+    // der Einkaufs-Agent sichtet sie (0109; ohne eingeschaltete Ebene übersprungen).
+    if (p.richtung === 'eingang') {
+      await t`select enqueue_job('ki_mail_triage', ${t.json({ nachricht_id: nachricht.id })},
+                                 ${`ki-triage:${nachricht.id}`})`
+    }
     await t`
       update mail_threads set
         anzahl = anzahl + 1,

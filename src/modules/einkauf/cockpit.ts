@@ -24,6 +24,12 @@ export const COCKPIT_KATEGORIEN = {
   wartet_uns: { label: 'Wartet auf uns', hinweis: 'Letzte Nachricht kam vom Lieferanten', digest: true },
   wartet_lieferant: { label: 'Wartet auf Lieferant', hinweis: 'Wir haben zuletzt geschrieben', digest: false },
   unzugeordnet: { label: 'Nicht zugeordnete Mails', hinweis: 'Posteingang ohne Lieferant, Bestellung oder Projekt', digest: true },
+  // Einkaufs-Agent (0109): Arbeitsvorrat, kein Termin — deshalb nicht im Digest.
+  ki_vorschlaege: {
+    label: 'KI-Vorschläge offen',
+    hinweis: 'Vom Einkaufs-Agenten vorbereitet: annehmen, ändern oder verwerfen (offene KI-Entwürfe unter Mail-Entwürfe)',
+    digest: false,
+  },
   sendungen: { label: 'Laufende Sendungen', hinweis: 'Geplant, unterwegs, verzollt oder angekommen', digest: false },
   muster: { label: 'Laufende Muster', hinweis: 'Angefordert oder eingegangen, noch nicht bewertet', digest: false },
   werkzeuge: { label: 'Werkzeuge am Lebensende', hinweis: 'Ab 90 % der Schuss-Lebensdauer', digest: true },
@@ -60,7 +66,34 @@ export async function cockpitLaden(
     from einkauf_cockpit c
     where ${nur}::uuid is null or c.zustaendig_id = ${nur}::uuid or c.kategorie = 'unzugeordnet'
     order by c.faellig_am nulls last, c.titel`
-  if (!opts.finanzen) return [...eintraege]
+
+  // Offene Vorschläge des Agenten (0109) — je Beleg, an dem sie erscheinen:
+  // Thread, sonst Projekt, Bestellung, Lieferant. Zuständig ist der des
+  // Threads bzw. der Einkäufer des Lieferanten.
+  const vorschlaege = await db<CockpitEintrag[]>`
+    select 'ki_vorschlaege' as kategorie,
+           case when v.thread_id is not null then 'mail_thread'
+                when v.einkaufsprojekt_id is not null then 'einkaufsprojekt'
+                when v.purchase_order_id is not null then 'purchase_order' else 'partner' end as modell,
+           coalesce(v.thread_id, v.einkaufsprojekt_id, v.purchase_order_id, v.partner_id) as record_id,
+           v.titel,
+           concat_ws(' · ', pa.name, case when v.status = 'fehler' then 'Annehmen gescheitert' end) as detail,
+           case when v.thread_id is not null then '/einkauf/posteingang/' || v.thread_id
+                when v.einkaufsprojekt_id is not null then '/einkauf/projekte/' || v.einkaufsprojekt_id
+                when v.purchase_order_id is not null then '/einkauf/' || v.purchase_order_id
+                else '/einkauf/lieferanten/' || v.partner_id end || '#ki-vorschlaege' as link,
+           to_char(v.erstellt_am at time zone 'Europe/Berlin', 'YYYY-MM-DD') as faellig_am,
+           coalesce(t.zustaendig_id, pa.einkaeufer_id) as zustaendig_id, v.partner_id
+    from ki_vorschlaege v
+    left join mail_threads t on t.id = v.thread_id
+    left join partners pa on pa.id = v.partner_id
+    where v.status in ('offen', 'fehler')
+      and coalesce(v.thread_id, v.einkaufsprojekt_id, v.purchase_order_id, v.partner_id) is not null
+      and (${nur}::uuid is null or coalesce(t.zustaendig_id, pa.einkaeufer_id) = ${nur}::uuid
+           or coalesce(t.zustaendig_id, pa.einkaeufer_id) is null)
+    order by v.erstellt_am desc
+    limit 200`
+  if (!opts.finanzen) return [...eintraege, ...vorschlaege]
 
   const raten = await db<CockpitEintrag[]>`
     select 'raten' as kategorie, 'purchase_order' as modell, po.id as record_id,
@@ -76,7 +109,7 @@ export async function cockpitLaden(
       and zahlplan_faelligkeit(r) <= current_date + 7
       and (${nur}::uuid is null or coalesce(po.user_id, pa.einkaeufer_id) = ${nur}::uuid)
     order by zahlplan_faelligkeit(r)`
-  return [...eintraege, ...raten]
+  return [...eintraege, ...vorschlaege, ...raten]
 }
 
 /** Je Kategorie in fester Reihenfolge, leere weggelassen. */

@@ -67,6 +67,21 @@ export function artAusDateiname(name: string): DokumentArt {
   return 'sonstiges'
 }
 
+/**
+ * Was der Dokument-Leser des Agenten (0109) an die KI gibt: PDF und Bilder
+ * direkt; Excel ist ohne Tabellen-Parser „nicht lesbar" (bewusst keine neue
+ * Abhängigkeit, Entscheidungslog 2026-10-01); alles andere (STEP, Gerber …)
+ * wird nicht gelesen.
+ */
+export function dokumentLesbarkeit(mime: string | null | undefined, name: string): 'pdf' | 'bild' | 'excel' | 'nicht_lesbar' {
+  const m = (mime ?? '').toLowerCase()
+  const n = name.toLowerCase()
+  if (m === 'application/pdf' || n.endsWith('.pdf')) return 'pdf'
+  if (['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(m)) return 'bild'
+  if (/\.(xlsx?|xlsm|ods)$/.test(n) || m.includes('spreadsheet') || m.includes('ms-excel')) return 'excel'
+  return 'nicht_lesbar'
+}
+
 /** Ordnername für Drive: ohne Schrägstriche, sinnvoll gekürzt. */
 export function ordnerName(roh: string): string {
   const s = roh.replace(/[\\/]+/g, '-').replace(/\s+/g, ' ').trim()

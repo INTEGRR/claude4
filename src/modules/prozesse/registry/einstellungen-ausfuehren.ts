@@ -35,13 +35,30 @@ export async function firmaSpeichern(
 }
 
 export async function kiModelleSetzen(
-  p: { auswertung: string; prozess: string; interview: string; datenfrage: string; uebersetzung?: string },
+  p: { auswertung: string; prozess: string; interview: string; datenfrage: string; uebersetzung?: string; einkauf?: string },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   await sql`
-    insert into settings (key, value) values ('ki_modelle', ${sql.json(p)})
+    insert into settings (key, value) values ('ki_modelle', ${sql.json(JSON.parse(JSON.stringify(p)))})
     on conflict (key) do update set value = excluded.value`
   return { text: 'KI-Modelle gespeichert — gilt ab der nächsten Anfrage.' }
+}
+
+/**
+ * KI-Ebene „Einkauf" (0109): Schalter und Monatsgrenze in Token. Der Agent
+ * liest beides vor jedem Lauf (ki/einkauf-ki.ts) — aus heißt „übersprungen",
+ * nie ein Fehler.
+ */
+export async function kiEinkaufSetzen(
+  p: { aktiv: boolean; monats_tokens: number | null },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await einstellungMergen('ki_einkauf', { aktiv: p.aktiv, monats_tokens: p.monats_tokens })
+  return {
+    text: p.aktiv
+      ? 'Einkaufs-Agent an — ab der nächsten eingehenden Mail entstehen Vorschläge und Entwürfe (gesendet wird nur nach Freigabe).'
+      : 'Einkaufs-Agent aus — eingehende Mails werden nicht mehr gesichtet.',
+  }
 }
 
 /**

@@ -10,6 +10,7 @@ import * as einkaufBemusterung from './registry/einkauf-bemusterung-ausfuehren.t
 import * as einkaufWerkzeuge from './registry/einkauf-werkzeuge-ausfuehren.ts'
 import * as einkaufVertraege from './registry/einkauf-vertraege-ausfuehren.ts'
 import * as einkaufSendungen from './registry/einkauf-sendungen-ausfuehren.ts'
+import * as einkaufKi from './registry/einkauf-ki-ausfuehren.ts'
 import * as einstellungen from './registry/einstellungen-ausfuehren.ts'
 import * as fehler from './registry/fehler-ausfuehren.ts'
 import * as fertigung from './registry/fertigung-ausfuehren.ts'
@@ -102,6 +103,9 @@ export const AUSFUEHRUNG = {
   'einkauf.lieferantenvertrag_aendern': einkaufVertraege.vertragAendern,
   'einkauf.lieferantenvertrag_status_setzen': einkaufVertraege.vertragStatusSetzen,
   'einkauf.preisliste_uebernehmen': einkaufVertraege.preislisteUebernehmen,
+  'einkauf.vorschlag_annehmen': einkaufKi.vorschlagAnnehmen,
+  'einkauf.vorschlag_verwerfen': einkaufKi.vorschlagVerwerfen,
+  'einkauf.vorschlag_aendern': einkaufKi.vorschlagAendern,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,
@@ -125,6 +129,7 @@ export const AUSFUEHRUNG = {
 
   'einstellungen.firma_speichern': einstellungen.firmaSpeichern,
   'einstellungen.ki_modelle_setzen': einstellungen.kiModelleSetzen,
+  'einstellungen.ki_einkauf_setzen': einstellungen.kiEinkaufSetzen,
   'einstellungen.druckbruecke_setzen': einstellungen.druckbrueckeSetzen,
   'einstellungen.shopify_modus_setzen': einstellungen.shopifyModusSetzen,
   'einstellungen.shopify_mto_setzen': einstellungen.shopifyMtoSetzen,

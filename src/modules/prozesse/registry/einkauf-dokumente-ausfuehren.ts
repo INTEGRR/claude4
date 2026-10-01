@@ -6,6 +6,7 @@ import {
   type DokumentModell,
   STUECK_BYTES,
   artAusDateiname,
+  dokumentLesbarkeit,
 } from '@/modules/einkauf/dokument-modelle'
 import { ablageEinrichten, zielOrdner } from '@/modules/google/ablage'
 import { driveKonfiguriert } from '@/modules/google/auth'
@@ -118,6 +119,11 @@ export async function dokumentRegistrieren(
     await t`update upload_sitzungen set drive_file_id = ${datei.id}, abgeschlossen_am = now()
             where id = ${s.id}`
     await t`select log_event(${s.modell}, ${s.record_id}, 'info', ${`Dokument „${datei.name}" hinzugefügt`}, ${ctx.actor})`
+    // Einkaufs-Agent (0109): PDFs, Bilder (und Excel → „nicht lesbar") liest
+    // die KI-Spur; ohne eingeschaltete Ebene „Einkauf" übersprungen.
+    if (dokumentLesbarkeit(datei.mimeType, datei.name) !== 'nicht_lesbar') {
+      await t`select enqueue_job('ki_dokument_lesen', ${t.json({ dokument_id: d.id })}, ${`ki-dokument:${d.id}`})`
+    }
     return d.id
   })
   return { text: `„${datei.name}" abgelegt.`, recordId: dokId }

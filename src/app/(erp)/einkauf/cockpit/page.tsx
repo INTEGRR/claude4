@@ -15,7 +15,7 @@ const PFAD = '/einkauf/cockpit'
 /** Was das Datum eines Eintrags bedeutet. */
 function datumWort(kategorie: CockpitEintrag['kategorie']): string {
   if (kategorie === 'sendungen') return 'ETA'
-  if (['wartet_uns', 'wartet_lieferant', 'unzugeordnet', 'rechnungen', 'muster'].includes(kategorie)) return 'seit'
+  if (['wartet_uns', 'wartet_lieferant', 'unzugeordnet', 'rechnungen', 'muster', 'ki_vorschlaege'].includes(kategorie)) return 'seit'
   return 'fällig'
 }
 
@@ -44,7 +44,7 @@ export default async function CockpitPage({ searchParams }: { searchParams: Prom
   const lage = gruppen.filter((g) => !COCKPIT_KATEGORIEN[g.kategorie].digest)
 
   const zeile = (e: CockpitEintrag) => {
-    const ueberfaellig = e.faellig_am !== null && e.faellig_am < heute && !['sendungen', 'muster', 'wartet_lieferant', 'wartet_uns', 'unzugeordnet'].includes(e.kategorie)
+    const ueberfaellig = e.faellig_am !== null && e.faellig_am < heute && !['sendungen', 'muster', 'wartet_lieferant', 'wartet_uns', 'unzugeordnet', 'ki_vorschlaege'].includes(e.kategorie)
     return (
       <li key={`${e.kategorie}:${e.modell}:${e.record_id}:${e.titel}`} className="dok-zeile">
         <div className="dok-text">
@@ -136,6 +136,12 @@ export default async function CockpitPage({ searchParams }: { searchParams: Prom
         <section key={g.kategorie} id={g.kategorie}>
           <Card title={`${COCKPIT_KATEGORIEN[g.kategorie].label} (${g.eintraege.length})`} tight>
             <ul className="dok-liste">{g.eintraege.slice(0, 50).map(zeile)}</ul>
+            {g.kategorie === 'ki_vorschlaege' && (
+              <p className="small muted" style={{ margin: 0, padding: '0 12px 8px' }}>
+                {COCKPIT_KATEGORIEN.ki_vorschlaege.hinweis} —{' '}
+                <Link href="/einkauf/entwuerfe?ansicht=ki">KI-Entwürfe gegenlesen</Link>
+              </p>
+            )}
           </Card>
         </section>
       ))}

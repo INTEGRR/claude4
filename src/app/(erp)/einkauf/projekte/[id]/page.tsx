@@ -5,6 +5,7 @@ import { requireArea } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { DokumenteKarte } from '@/components/dokumente'
+import { KiVorschlaegeKarte } from '@/components/ki-vorschlaege'
 import { MailThreadsKarte, WiedervorlagenKarte } from '@/components/mail-threads'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { RecordComments } from '@/components/record-comments'
@@ -1252,6 +1253,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
         </Card>
       )}
 
+      <KiVorschlaegeKarte einkaufsprojektId={id} pfad={pfad} />
       <MailThreadsKarte
         einkaufsprojektId={id}
         lieferanten={anfragen.map((a) => ({ id: a.partner_id, name: a.lieferant }))}

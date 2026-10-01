@@ -120,6 +120,7 @@ des `db`-Dienstes.
 | Shopify-Webhooks verarbeiten | minütlich (nur Variante B) | `/api/cron?task=webhooks` |
 | Outbox abarbeiten (Fulfillment, E-Mail, Mail-Anhänge) | minütlich | `/api/cron?task=jobs` |
 | Einkaufspostfach abgleichen (Gmail, nur wenn angebunden) | minütlich | `/api/cron?task=mail` |
+| KI-Spur: eingehende Mails sichten, Dokumente lesen (Einkaufs-Agent, nur Entwürfe; ohne eingeschaltete Ebene „Einkauf" übersprungen) | minütlich | `/api/cron?task=ki` |
 | Bestellabgleich mit Shopify | Variante A: minütlich · B: alle 15 Min | `/api/cron?task=reconcile` |
 | DHL-Sendungsverfolgung | stündlich | `/api/cron?task=tracking` |
 | Dienste-Wächter (Störungen → Telegram) | alle 5 Min | `/api/cron?task=wache` |

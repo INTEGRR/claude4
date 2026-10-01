@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { processPendingWebhooks, reconcileOrders } from '@/modules/integrationen/import'
-import { runDueJobs } from '@/modules/integrationen/jobs'
+import { KI_SPUR_BUDGET_MS, runDueJobs } from '@/modules/integrationen/jobs'
 import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
 import {
   benachrichtigungenAufraeumen,
@@ -26,6 +26,7 @@ export const maxDuration = 60
  *   /api/cron?task=webhooks      jede Minute   - Shopify-Events verarbeiten
  *   /api/cron?task=jobs          jede Minute   - Outbox abarbeiten, Telegram senden
  *   /api/cron?task=mail          jede Minute   - Einkaufspostfach abgleichen (Gmail)
+ *   /api/cron?task=ki            jede Minute   - KI-Spur: Mails sichten, Dokumente lesen (0109)
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
@@ -73,6 +74,13 @@ export async function GET(request: Request) {
       case 'mail': {
         if (!postfachKonfiguriert()) return NextResponse.json({ skipped: 'Einkaufspostfach nicht konfiguriert' })
         return NextResponse.json({ task, ...(await postfachAbgleichen()) })
+      }
+
+      case 'ki': {
+        // Eigene Spur der KI-Jobs (0109): Mail sichten, Dokumente lesen.
+        // Wenige je Lauf — ein Agentenlauf dauert Sekunden bis eine halbe
+        // Minute; nicht begonnene bleiben für den nächsten Lauf (15-s-Budget).
+        return NextResponse.json({ task, ...(await runDueJobs(3, KI_SPUR_BUDGET_MS, 'ki')) })
       }
 
       case 'reconcile': {

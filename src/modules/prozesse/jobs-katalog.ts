@@ -14,6 +14,12 @@ export interface JobEintrag {
   beschreibung: string
   /** Anbieterneutraler Zweck, z. B. 'shop:fulfillment_melden'. */
   faehigkeit: string
+  /**
+   * Eigene Spur (0109): Jobs der Spur „ki" laufen nur im Cron
+   * `/api/cron?task=ki`, nie im allgemeinen Lauf — ein Agentenlauf von 30 s
+   * hält weder Shopify-Meldungen noch Mail-Versand auf.
+   */
+  spur?: 'ki'
 }
 
 export const JOB_KATALOG = {
@@ -118,6 +124,28 @@ export const JOB_KATALOG = {
       'heute Fälliges, fehlende Dokumente und Rechnungen, fällige Raten, überfällige ETA); nichts offen → keine Nachricht.',
     faehigkeit: 'einkauf:zusammenfassung',
   },
+  ki_mail_triage: {
+    label: 'Eingehende Mail sichten (KI)',
+    beschreibung:
+      'Der Einkaufs-Agent sichtet eine eingehende Lieferanten-Nachricht und legt NUR Vorschläge (Zuordnung, Angebot, ' +
+      'Wiedervorlage, Entscheidungsvorlage) und einen Antwort-Entwurf an — gesendet und entschieden wird von Menschen. ' +
+      'Ohne eingeschaltete KI-Ebene „Einkauf" oder ohne Schlüssel übersprungen.',
+    faehigkeit: 'ki:mail_sichten',
+    spur: 'ki',
+  },
+  ki_dokument_lesen: {
+    label: 'Dokument lesen (KI)',
+    beschreibung:
+      'Gibt ein PDF oder Bild aus der Ablage an die KI, speichert den Text am Dokument (durchsuchbar) und schlägt bei ' +
+      'einem Angebot „Angebot erfassen" vor. Excel ist ohne Parser nicht lesbar.',
+    faehigkeit: 'ki:dokument_lesen',
+    spur: 'ki',
+  },
 } satisfies Record<string, JobEintrag>
 
 export type JobKind = keyof typeof JOB_KATALOG
+
+/** Die Jobs der KI-Spur (eigener Cron, eigenes Zeitbudget). */
+export const KI_SPUR_JOBS: string[] = Object.entries(JOB_KATALOG as Record<string, JobEintrag>)
+  .filter(([, j]) => j.spur === 'ki')
+  .map(([kind]) => kind)

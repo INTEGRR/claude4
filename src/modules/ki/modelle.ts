@@ -69,6 +69,13 @@ export const KI_EBENEN = [
     standard: 'claude-sonnet-5',
     env: ['UEBERSETZUNG_MODELL'],
   },
+  {
+    key: 'einkauf',
+    label: 'Einkaufs-Agent',
+    hinweis: 'sichtet jede eingehende Lieferanten-Mail, liest PDFs und Bilder — schreibt nur Vorschläge und Entwürfe (0109)',
+    standard: 'claude-sonnet-5',
+    env: ['EINKAUF_AGENT_MODELL'],
+  },
 ] as const
 
 export type KiEbene = (typeof KI_EBENEN)[number]['key']

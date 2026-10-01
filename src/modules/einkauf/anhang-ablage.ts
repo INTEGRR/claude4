@@ -4,7 +4,7 @@ import { zielOrdner } from '@/modules/google/ablage'
 import { driveKonfiguriert } from '@/modules/google/auth'
 import { drive } from '@/modules/google/drive'
 import { gmail } from '@/modules/google/gmail'
-import { artAusDateiname } from './dokument-modelle.ts'
+import { artAusDateiname, dokumentLesbarkeit } from './dokument-modelle.ts'
 import { mailZerlegen } from './mail-zerlegen.ts'
 
 /**
@@ -102,6 +102,11 @@ export async function anhangAblegen(anhangId: string): Promise<string> {
               on conflict do nothing`
     }
     await t`update mail_anhaenge set dokument_id = ${dokumentId}, fehler = null where id = ${a.id}`
+    // Einkaufs-Agent (0109): PDFs und Bilder liest die KI-Spur (Excel wird
+    // dort „nicht lesbar"); schon gelesene überspringt der Job selbst.
+    if (dokumentLesbarkeit(a.mime, a.dateiname) !== 'nicht_lesbar') {
+      await t`select enqueue_job('ki_dokument_lesen', ${t.json({ dokument_id: dokumentId })}, ${`ki-dokument:${dokumentId}`})`
+    }
   })
   return text
 }
