@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-02 — Zugänge bleiben in Vercel-Umgebungsvariablen
+
+**Anlass:** Betreiber fragte, ob die rund 35 Umgebungsvariablen (Shopify,
+DHL, Resend, Telegram, Odoo, Google, KI …) nicht besser in den Einstellungen
+der App, also in der Datenbank, lägen — ändern im Tool statt in Vercel.
+
+**Abgewogen:** Für die Datenbank sprächen Ändern ohne Redeploy, „Verbindung
+testen" beim Speichern, Verlauf je Änderung und Instanzen ohne Vercel-Zugang.
+Dagegen: Die Datenbank würde zum Schlüsselspeicher (Dump, Backup, Kopien für
+Probelauf und Demo trügen echte Zugänge — ein Testsystem könnte live drucken
+oder an Shopify schreiben), ein gekapertes Admin-Konto könnte Schlüssel
+tauschen, und ganz ohne Vercel ginge es ohnehin nicht (Datenbank-URL,
+Sitzungs-, Cron- und Hauptschlüssel). Lösbar wäre das mit Verschlüsselung
+und nur-schreibbaren Feldern — zum Preis eines eigenen Umbaus.
+
+**Entschieden (Betreiber):** Zugänge bleiben in Vercel. Die Seite
+Einstellungen → Schnittstellen zeigt weiter je Anbindung, was gesetzt ist und
+was fehlt (`einstellungen/umgebung.ts`); neue Anbindungen (z. B. das
+Zulauf-Tracking) kommen dort als Karte dazu. Einstellungen ohne Geheimnisse
+(Modi, Modelle, Benachrichtigungen, Formate) bleiben wie bisher in `settings`.
+
 ## 2026-10-01 — Einkauf Stufe 6: Agent nur mit Entwürfen — Vorschläge, eigene KI-Spur, Dokument-Leser
 
 Stufe 6 des Einkaufstools (Migration 0109). Betreiber-Vorgabe (Interview
