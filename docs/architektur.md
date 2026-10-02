@@ -20,7 +20,14 @@ Bewusst **nicht** im ersten Ausbau: Redis/Queues, Microservices, Multi-Tenant, B
 **Hinweis zum Datenzugriff:** `prepare: false` ist gesetzt. Prepared Statements
 brechen zum einen mit dem Supabase-Pooler im Transaction-Mode, zum anderen
 zeigen zwischengespeicherte Statements nach Migrationen, die Enums neu anlegen,
-auf verschwundene Typ-OIDs.
+auf verschwundene Typ-OIDs. Ebenso `max_pipeline: 0` (seit 2026-10-02): Bei
+vollem Pool stapelt postgres.js sonst Abfragen auf eine laufende Verbindung,
+und Supavisor im Transaction-Mode beantwortet die gestapelte nie — die Seite
+hängt bis zum Funktions-Timeout. Ohne Pipelining wirft `sql.begin`
+`UNSAFE_TRANSACTION`; Transaktionen laufen deshalb über `tx()` bzw.
+`transaktion()` (`src/db/transaktion.ts`, reservierte Verbindung mit
+BEGIN/COMMIT und Savepoints). Der Wächter `tests/db-client.test.ts` hält
+beides fest.
 
 ## Architekturprinzipien
 

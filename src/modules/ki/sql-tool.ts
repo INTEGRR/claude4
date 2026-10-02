@@ -1,4 +1,5 @@
 import type { Sql, TransactionSql } from 'postgres'
+import { transaktion } from '../../db/transaktion.ts'
 
 /**
  * Das SQL-Werkzeug des KI-Agenten, bewusst ohne App-Abhängigkeiten:
@@ -83,10 +84,15 @@ export async function runReadOnlyQuery(
     }
   }
   try {
-    const rows = await client.begin('read only', async (tx: TransactionSql) => {
-      await tx.unsafe("set local statement_timeout = '10s'")
-      return (await tx.unsafe(query)) as unknown as Record<string, unknown>[]
-    })
+    // transaktion statt client.begin: der App-Client fährt ohne Pipelining (src/db/transaktion.ts).
+    const rows = await transaktion(
+      client,
+      async (tx: TransactionSql) => {
+        await tx.unsafe("set local statement_timeout = '10s'")
+        return (await tx.unsafe(query)) as unknown as Record<string, unknown>[]
+      },
+      'read only',
+    )
     const gekappt = rows.length > MAX_ROWS
     return {
       rows: gekappt ? rows.slice(0, MAX_ROWS) : rows,

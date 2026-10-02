@@ -1,5 +1,6 @@
 import postgres from 'postgres'
 import { datenbankSsl } from './ssl.ts'
+import { OHNE_PIPELINING, transaktion } from './transaktion.ts'
 
 /**
  * Datenbankzugriff.
@@ -21,6 +22,15 @@ function createClient(): postgres.Sql {
     // TLS für entfernte Datenbanken (Supabase), lokal ohne — src/db/ssl.ts.
     ...datenbankSsl(url),
     max: 10,
+    // Kein Pipelining (2026-10-02, Bestellung P00003 hing 300 s): sind alle
+    // Verbindungen belegt, stapelt postgres.js weitere Abfragen auf eine
+    // laufende. Supavisor im Transaction-Mode gibt die Serververbindung
+    // nach der ersten Antwort frei — die gestapelte bekommt nie eine, ihr
+    // Backend wartet in ClientRead, die Verbindung ist bis zum Neustart der
+    // Instanz vergiftet. Mit 0 wartet jede Abfrage auf eine freie
+    // Verbindung. Transaktionen deshalb über reserve() (./transaktion.ts),
+    // `sql.begin` wirft so UNSAFE_TRANSACTION (Wächter: tests/db-client.test.ts).
+    ...OHNE_PIPELINING,
     // Ohne Prepared Statements, aus zwei Gründen:
     //  - Supabase/Supavisor im Transaction-Mode unterstützt sie nicht.
     //  - Nach Migrationen, die Enums neu anlegen, zeigen zwischengespeicherte
@@ -62,7 +72,7 @@ export const sql: postgres.Sql = new Proxy(function () {} as unknown as postgres
   },
 })
 
-/** Führt `fn` in einer Transaktion aus. */
+/** Führt `fn` in einer Transaktion aus (reservierte Verbindung, siehe ./transaktion.ts). */
 export async function tx<T>(fn: (t: postgres.TransactionSql) => Promise<T>): Promise<T> {
-  return client().begin(fn as (t: postgres.TransactionSql) => Promise<T>) as Promise<T>
+  return transaktion(client(), fn)
 }

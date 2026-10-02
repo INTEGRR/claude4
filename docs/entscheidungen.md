@@ -9,6 +9,44 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-02 — Datenbank-Client ohne Pipelining (Bestellung P00003 hing)
+
+**Anlass:** In Prod fror „Hinzufügen" an Bestellung P00003 ein, danach ließ
+sich die Bestellung nicht mehr öffnen. Vercel meldete für POST und GET
+`/einkauf/[id]` je einen 300-s-Timeout bei Status 200. Die Datenbank war
+unauffällig (alle Abfragen der Seite unter 1 ms, keine Sperren). In
+`pg_stat_activity` standen aber zwei Backends minutenlang auf `active` /
+`ClientRead`, beide mit der Sitzungsabfrage. Sie hatten Parse/Describe
+bekommen und warteten auf den Rest der Abfrage, der nie kam.
+
+**Ursache:** postgres.js pipelined. Sind alle Verbindungen des Pools belegt
+(max 10, auf einer Fluid-Instanz geteilt mit Crons und anderen Anfragen),
+schreibt es weitere Abfragen auf eine laufende Verbindung. Supavisor im
+Transaction-Mode gibt die Serververbindung nach der ersten Antwort frei. Die
+gestapelte Abfrage bekommt nie eine Antwort, und die Verbindung bleibt bis
+zum Ende der Instanz vergiftet. Die Bestellseite ist besonders anfällig: Ihre
+sechs Bausteine (Sendungen, KI-Vorschläge, Mails, Wiedervorlagen, Dokumente,
+Verlauf) fragen parallel ab, das Layout gleichzeitig. Bekanntes Zusammenspiel
+(postgres.js #970, Supabase-Doku zu Pipelining im Transaction-Mode).
+
+**Entschieden:** `max_pipeline: 0` im App-Client (`src/db/client.ts`):
+- Jede Abfrage wartet auf eine freie Verbindung.
+- Folge: postgres.js' `begin` wirft so `UNSAFE_TRANSACTION`.
+- Transaktionen laufen deshalb über `transaktion()` (`src/db/transaktion.ts`):
+  `reserve()`, BEGIN/COMMIT/ROLLBACK und Savepoints wie bei postgres.js.
+- `tx()` und das KI-SQL-Werkzeug nutzen sie, ebenso die Test-Helfer mit
+  denselben Optionen.
+
+Verworfen:
+- Session-Mode: alle Instanzen teilen sich die 15 Serververbindungen.
+- Größerer Pool: verschiebt nur die Schwelle.
+- Patch an postgres.js: bricht bei jedem Update.
+
+Der Wächter `tests/db-client.test.ts` prüft die Einstellung, verbietet
+`.begin(` im Code und testet Commit, Rollback, Savepoints und parallele
+Transaktionen über die Poolgröße hinaus. Doku: docs/architektur.md (Hinweis
+zum Datenzugriff).
+
 ## 2026-10-02 — Zugänge bleiben in Vercel-Umgebungsvariablen
 
 **Anlass:** Betreiber fragte, ob die rund 35 Umgebungsvariablen (Shopify,

@@ -6,6 +6,7 @@
 import '../scripts/env.ts'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
+import { OHNE_PIPELINING, transaktion } from '../src/db/transaktion.ts'
 
 const ROLLBACK = Symbol('rollback')
 
@@ -17,6 +18,9 @@ export function db(): Sql {
     if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
     client = postgres(url, {
       max: 4,
+      // Ohne Pipelining wie der Betrieb (Supavisor, src/db/client.ts) —
+      // Transaktionen deshalb über transaktion() statt begin().
+      ...OHNE_PIPELINING,
       // Dieselben Optionen wie src/db/client.ts — sonst laufen die Tests mit
       // anderer Treiber-Semantik als die Produktion und ein Fehler rutscht
       // gruen durch. prepare:false wegen Enum-Migrationen ("cache lookup
@@ -45,8 +49,8 @@ export async function closeDb(): Promise<void> {
 export async function withRollback<T>(fn: (t: TransactionSql) => Promise<T>): Promise<T> {
   let result: T
   try {
-    await db().begin(async (t) => {
-      result = await fn(t as TransactionSql)
+    await transaktion(db(), async (t) => {
+      result = await fn(t)
       throw ROLLBACK
     })
   } catch (err) {
