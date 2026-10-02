@@ -152,9 +152,11 @@ export function Auswahl({
   const panelId = `${basisId}-liste`
 
   const mitSuche = optionen.length >= SUCHE_AB
+  // Ein gesperrter Platzhalter („— auswählen —") steht im Knopf, nicht in der Liste.
+  const waehlbar = useMemo(() => optionen.filter((o) => !(o.wert === '' && o.deaktiviert)), [optionen])
   const { treffer, mehr } = useMemo(
-    () => (offen ? filtern(optionen, eingabe) : { treffer: [], mehr: 0 }),
-    [offen, optionen, eingabe],
+    () => (offen ? filtern(waehlbar, eingabe) : { treffer: [], mehr: 0 }),
+    [offen, waehlbar, eingabe],
   )
 
   // Formular zurückgesetzt (ActionForm nach Erfolg) → Vorgabe wiederherstellen.
@@ -249,8 +251,8 @@ export function Auswahl({
     setEingabe(start)
     // Startzeile: die aktuelle Wahl, sonst die erste freie Option.
     // (Ohne Eingabe zeigt die Liste die ersten 200 — weiter hinten bleibt die erste freie aktiv.)
-    const index = start ? -1 : optionen.findIndex((o) => o.wert === gewaehlt[0] && !o.deaktiviert)
-    const sichtbar = filtern(optionen, start).treffer
+    const index = start ? -1 : waehlbar.findIndex((o) => o.wert === gewaehlt[0] && !o.deaktiviert)
+    const sichtbar = filtern(waehlbar, start).treffer
     setAktiv(index >= 0 && index < sichtbar.length ? index : Math.max(0, ersteFreie(sichtbar)))
     try {
       p.showPopover()
@@ -431,7 +433,7 @@ export function Auswahl({
             value={eingabe}
             onChange={(e) => {
               setEingabe(e.target.value)
-              setAktiv(Math.max(0, ersteFreie(filtern(optionen, e.target.value).treffer)))
+              setAktiv(Math.max(0, ersteFreie(filtern(waehlbar, e.target.value).treffer)))
             }}
           />
         )}

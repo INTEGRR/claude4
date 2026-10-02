@@ -1978,6 +1978,7 @@ label.field > span.auswahl {
   border-radius: var(--radius-sm);
   color: var(--text);
   transform: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .auswahl > button.auswahl-knopf:hover { background: var(--surface); border-color: var(--text-muted); }
 .auswahl > button.auswahl-knopf:focus-visible,
