@@ -28,6 +28,7 @@ import {
   sendungZollErfassen,
 } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -406,7 +407,7 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field">
                   <span>Spediteur</span>
-                  <Auswahl name="spediteur_id" defaultValue={s.spediteur_id ?? ''}>
+                  <Auswahl kurzanlage={kurzLieferant(user, 'Spediteur')} name="spediteur_id" defaultValue={s.spediteur_id ?? ''}>
                     <option value="">—</option>
                     {partner.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -701,7 +702,7 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
               </label>
               <label className="field">
                 <span>Rechnungssteller</span>
-                <Auswahl name="partner_id" defaultValue={s.spediteur_id ?? ''}>
+                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" defaultValue={s.spediteur_id ?? ''}>
                   <option value="">—</option>
                   {partner.map((p) => (
                     <option key={p.id} value={p.id}>

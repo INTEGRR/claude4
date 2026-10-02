@@ -30,6 +30,7 @@ import {
 } from '../../finanzen/actions'
 import { belegLink } from '../querverweise'
 import { Auswahl } from '@/components/auswahl'
+import { kurzArtikel } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -465,7 +466,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               <div className="row">
                 <label className="field" style={{ flex: 3 }}>
                   <span>Produkt</span>
-                  <Auswahl name="variant_id" required defaultValue="">
+                  <Auswahl kurzanlage={kurzArtikel(user, 'einkauf')} name="variant_id" required defaultValue="">
                     <option value="" disabled>— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>

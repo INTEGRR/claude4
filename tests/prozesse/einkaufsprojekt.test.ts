@@ -243,6 +243,66 @@ describe('Einkaufsprojekt: Angebotsvergleich und Anfragen', () => {
     )
   })
 
+  test('Angebot ändern: das Formular ersetzt komplett — Leeres wird geleert, Staffeln ersetzt', async () => {
+    const angelegt = await aktion('einkauf.angebot_erfassen', ids.projekt, {
+      partner_id: ids.de,
+      waehrung: 'EUR',
+      incoterm_code: 'EXW',
+      lieferzeit_tage: 20,
+      fracht_je_stueck_eur: 0.5,
+      staffeln: [
+        { position_id: ids.set, ab_menge: 1, preis: 9 },
+        { position_id: ids.puller, ab_menge: 1, preis: 2 },
+      ],
+    })
+    const angebotId = String(angelegt.daten!.angebot_id)
+
+    // Teiländerung (KI): nur Genanntes ändert sich.
+    await aktion('einkauf.angebot_aendern', undefined, { angebot_id: angebotId, lieferzeit_tage: 25 })
+    const [teil] = await h.sql<{ lieferzeit_tage: number; incoterm_code: string | null }[]>`
+      select lieferzeit_tage, incoterm_code from lieferantenangebote where id = ${angebotId}`
+    assert.deepEqual(teil, { lieferzeit_tage: 25, incoterm_code: 'EXW' })
+
+    // Formular an der Projektseite: so abgeschickt, wie der Mensch es ausfüllt.
+    const formular = new FormData()
+    formular.set('angebot_id', angebotId)
+    formular.set('vollstaendig', '1')
+    formular.set('waehrung', 'EUR')
+    formular.set('incoterm_code', '')
+    formular.set('lieferzeit_tage', '30')
+    formular.set('fracht_je_stueck_eur', '')
+    formular.set(`staffeln_${ids.set}`, '1: 8,50\n100: 7,90')
+    formular.set(`staffeln_${ids.puller}`, '')
+    await aktionAusfuehrenGeprueft('einkauf.angebot_aendern', { formData: formular }, ADMIN)
+
+    const [voll] = await h.sql<{ lieferzeit_tage: number; incoterm_code: string | null; fracht: string | null }[]>`
+      select lieferzeit_tage, incoterm_code, fracht_je_stueck_eur::text as fracht
+      from lieferantenangebote where id = ${angebotId}`
+    assert.deepEqual(voll, { lieferzeit_tage: 30, incoterm_code: null, fracht: null })
+    const staffeln = await h.sql<{ position_id: string; ab_menge: number; preis: number }[]>`
+      select position_id, ab_menge::float as ab_menge, preis::float as preis
+      from lieferantenangebot_staffeln where angebot_id = ${angebotId} order by position_id, ab_menge`
+    assert.deepEqual(
+      staffeln.map((z) => [z.position_id === ids.set ? 'set' : 'puller', z.ab_menge, z.preis]),
+      [
+        ['set', 1, 8.5],
+        ['set', 100, 7.9],
+      ],
+      'die geleerte Position hat keine Preise mehr, die andere die neuen',
+    )
+
+    // Ganz ohne Preis geht es nicht.
+    const ohne = new FormData()
+    ohne.set('angebot_id', angebotId)
+    ohne.set('vollstaendig', '1')
+    ohne.set('waehrung', 'EUR')
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('einkauf.angebot_aendern', { formData: ohne }, ADMIN),
+      /mindestens einen Preis/,
+    )
+    await aktion('einkauf.angebot_verwerfen', undefined, { angebot_id: angebotId, verworfen: true })
+  })
+
   test('Entscheiden, bestellen; Abbruch nur ohne offene Bestellung; Abschluss beim Wareneingang', async () => {
     await aktion('einkauf.projekt_entscheiden', ids.projekt, { angebot_id: ids.angebotCn, begruendung: 'günstigster Einstand' })
     await assert.rejects(aktion('einkauf.angebot_verwerfen', undefined, { angebot_id: ids.angebotCn }), /gewählte Angebot/)

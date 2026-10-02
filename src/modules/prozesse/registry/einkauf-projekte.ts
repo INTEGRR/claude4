@@ -279,16 +279,22 @@ export const EINKAUF_PROJEKTE = {
     ki: true,
     beschreibung:
       'Ändert ein erfasstes Angebot. Staffeln werden je genannter Position ersetzt; Positionen ohne ' +
-      'Angabe behalten ihre Preise.',
+      'Angabe behalten ihre Preise. Mit vollstaendig=true (das Formular an der Projektseite) gilt das ' +
+      'Angebot als komplett neu angegeben: leere Felder werden geleert, Staffeln ganz ersetzt.',
     bindung: 'frei',
     // partial(): fehlende Felder bleiben, wie sie sind (keine Standardwerte).
     schema: z.object({
       angebot_id: uuid,
       ...z.object(angebotsFelder).partial().shape,
       staffeln: z.array(staffelSchema).max(500).default([]),
+      vollstaendig: z.boolean().default(false),
     }),
     zusammenfassung: () => 'Angebot ändern',
-    formdata: (fd) => ({ angebot_id: String(fd.get('angebot_id') ?? ''), ...angebotAusFormular(fd) }),
+    formdata: (fd) => ({
+      angebot_id: String(fd.get('angebot_id') ?? ''),
+      ...angebotAusFormular(fd),
+      vollstaendig: fd.get('vollstaendig') === '1',
+    }),
     revalidate: ['/einkauf/projekte'],
   },
 

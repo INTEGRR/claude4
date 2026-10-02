@@ -2097,6 +2097,31 @@ label.field > span.auswahl {
   padding: 6px 8px 6px 12px;
   border-top: 1px solid var(--border);
 }
+/* Kurzanlage: „+ Neu anlegen" am Listenende, Mini-Formular im Panel. */
+.auswahl-option.auswahl-neu { color: var(--accent-text); border-top: 1px solid var(--border); margin-top: 2px; }
+.auswahl-plus { flex: 0 0 auto; width: 15px; text-align: center; font-weight: 700; }
+.auswahl-was {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.auswahl-kurz { display: grid; gap: 10px; padding: 12px; overflow-y: auto; }
+.auswahl-kurz-titel { font-weight: 600; }
+.auswahl-kurz-feld > .feld-titel {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.auswahl-kurz-wahl { display: flex; gap: 6px; flex-wrap: wrap; }
+.auswahl-kurz-knoepfe { display: flex; justify-content: flex-end; gap: 8px; }
 /* Druckweg-Wahl in der Arbeitsplatz-Tabelle: kompakt, leer gedimmt. */
 .auswahl > button.druckweg-wahl { min-width: 150px; padding: 4px 6px; font-size: 13px; color: var(--text-muted); }
 .auswahl > button.druckweg-wahl.gesetzt { color: inherit; }

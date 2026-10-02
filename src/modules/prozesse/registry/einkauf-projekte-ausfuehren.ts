@@ -441,12 +441,45 @@ async function angebotLesen(id: string) {
   return a
 }
 
-export async function angebotAendern(p: AngebotFelder & { angebot_id: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+export async function angebotAendern(
+  p: AngebotFelder & { angebot_id: string; vollstaendig?: boolean },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
   const a = await angebotLesen(p.angebot_id)
   const projekt = await projektLesen(a.projekt_id, VOR_BESTELLUNG, 'nach der Bestellung bleibt das Angebot, wie es bestellt wurde')
   await stammdatenPruefen(p)
   await staffelnPruefen(projekt.id, p.staffeln)
+  if (p.vollstaendig && p.staffeln.length === 0) throw new Error('Bitte mindestens einen Preis angeben.')
   await tx(async (t) => {
+    if (p.vollstaendig) {
+      // Das Formular schickt das ganze Angebot: Leeres heißt „leer", nicht „unverändert".
+      await t`
+        update lieferantenangebote set
+          waehrung = coalesce(${p.waehrung ?? null}, waehrung),
+          incoterm_code = ${p.incoterm_code ?? null},
+          incoterm_ort = ${p.incoterm_ort ?? null},
+          zahlungsbedingung = ${p.zahlungsbedingung ?? null},
+          anzahlung_pct = ${p.anzahlung_pct ?? null},
+          lieferzeit_tage = ${p.lieferzeit_tage ?? null},
+          moq = ${p.moq ?? null},
+          werkzeugkosten = ${p.werkzeugkosten ?? 0},
+          musterkosten = ${p.musterkosten ?? 0},
+          fracht_modus = ${p.fracht_modus ?? null},
+          fracht_je_stueck_eur = ${p.fracht_je_stueck_eur ?? null},
+          gueltig_bis = ${p.gueltig_bis ?? null}::date,
+          quell_dokument_id = ${p.quell_dokument_id ?? null}::uuid,
+          quell_nachricht_id = ${p.quell_nachricht_id ?? null}::uuid,
+          notiz = ${p.notiz ?? null}
+        where id = ${a.id}`
+      await t`delete from lieferantenangebot_staffeln where angebot_id = ${a.id}`
+      await staffelnSchreiben(t as unknown as typeof sql, a.id, p.staffeln)
+      if (p.quell_dokument_id) {
+        await t`insert into dokument_verweise (dokument_id, modell, record_id, verknuepft_von)
+                values (${p.quell_dokument_id}, 'einkaufsprojekt', ${projekt.id}, ${ctx.actor}) on conflict do nothing`
+      }
+      await t`select log_event('einkaufsprojekt', ${projekt.id}, 'info', ${`Angebot von ${a.partner} geändert`}, ${ctx.actor})`
+      return
+    }
     await t`
       update lieferantenangebote set
         waehrung = coalesce(${p.waehrung ?? null}, waehrung),

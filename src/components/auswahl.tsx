@@ -12,7 +12,10 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useRouter } from 'next/navigation'
+import { isActionError } from '@/modules/shared/action'
 import { type AuswahlOption, filtern, normalisieren, startwert } from './auswahl-logik'
+import type { Kurzanlage } from './kurzanlage-typen'
 
 /**
  * Auswahlbox mit Suche — ersetzt <select> in ganz KRNL (Betreiber
@@ -53,6 +56,11 @@ interface Props {
   title?: string
   'aria-label'?: string
   'aria-invalid'?: boolean
+  /**
+   * Kurzanlage: „+ Neu anlegen" in der Liste, Mini-Formular im Panel, der
+   * neue Eintrag ist danach gewählt (src/app/(erp)/kurzanlage.ts).
+   */
+  kurzanlage?: Kurzanlage
   children?: ReactNode
 }
 
@@ -118,9 +126,16 @@ export function Auswahl({
   title,
   'aria-label': ariaLabel,
   'aria-invalid': ariaInvalid,
+  kurzanlage,
   children,
 }: Props) {
-  const optionen = useMemo(() => optionenAus(children), [children])
+  // Eben per Kurzanlage angelegt — bis die Seite sie selbst mitliefert.
+  const [neue, setNeue] = useState<AuswahlOption[]>([])
+  const ausKindern = useMemo(() => optionenAus(children), [children])
+  const optionen = useMemo(
+    () => [...ausKindern, ...neue.filter((n) => !ausKindern.some((o) => o.wert === n.wert))],
+    [ausKindern, neue],
+  )
   const gesteuert = value !== undefined
   const [eigen, setEigen] = useState<string | string[]>(() => startwert(optionen, defaultValue, multiple))
   const wert: string | string[] = gesteuert ? value : eigen
@@ -151,7 +166,14 @@ export function Auswahl({
   const basisId = useId()
   const panelId = `${basisId}-liste`
 
-  const mitSuche = optionen.length >= SUCHE_AB
+  const mitNeu = Boolean(kurzanlage)
+  // Mit Kurzanlage immer ein Suchfeld: dort steht der Name des Neuen.
+  const mitSuche = optionen.length >= SUCHE_AB || mitNeu
+  const router = useRouter()
+  /** Werte des Mini-Formulars; null = Liste statt Formular. */
+  const [kurz, setKurz] = useState<Record<string, string> | null>(null)
+  const [kurzFehler, setKurzFehler] = useState<string | null>(null)
+  const [kurzLaeuft, setKurzLaeuft] = useState(false)
   // Ein gesperrter Platzhalter („— auswählen —") steht im Knopf, nicht in der Liste.
   const waehlbar = useMemo(() => optionen.filter((o) => !(o.wert === '' && o.deaktiviert)), [optionen])
   const { treffer, mehr } = useMemo(
@@ -184,7 +206,11 @@ export function Auswahl({
     const danach = (e: Event) => {
       const auf = (e as ToggleEvent).newState === 'open'
       setOffen(auf)
-      if (!auf) setEingabe('')
+      if (!auf) {
+        setEingabe('')
+        setKurz(null)
+        setKurzFehler(null)
+      }
     }
     el.addEventListener('beforetoggle', vorher)
     el.addEventListener('toggle', danach)
@@ -240,9 +266,18 @@ export function Auswahl({
     liste.current?.querySelector<HTMLElement>(`[data-index="${aktiv}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [aktiv, offen])
 
-  function ersteFreie(liste: AuswahlOption[], ab = 0, schritt = 1): number {
-    for (let i = ab; i >= 0 && i < liste.length; i += schritt) if (!liste[i].deaktiviert) return i
+  /** Nächste wählbare Zeile ab `ab`; die Zeile hinter den Treffern ist „Neu anlegen". */
+  function freieZeile(liste: AuswahlOption[], ab = 0, schritt = 1): number {
+    const ende = liste.length + (mitNeu ? 1 : 0)
+    for (let i = ab; i >= 0 && i < ende; i += schritt) {
+      if (i === liste.length || !liste[i].deaktiviert) return i
+    }
     return -1
+  }
+
+  /** Startzeile: erste freie Option — ohne Treffer gleich „Neu anlegen". */
+  function startZeile(liste: AuswahlOption[]): number {
+    return Math.max(0, freieZeile(liste))
   }
 
   function oeffnen(start = '') {
@@ -253,7 +288,9 @@ export function Auswahl({
     // (Ohne Eingabe zeigt die Liste die ersten 200 — weiter hinten bleibt die erste freie aktiv.)
     const index = start ? -1 : waehlbar.findIndex((o) => o.wert === gewaehlt[0] && !o.deaktiviert)
     const sichtbar = filtern(waehlbar, start).treffer
-    setAktiv(index >= 0 && index < sichtbar.length ? index : Math.max(0, ersteFreie(sichtbar)))
+    setAktiv(index >= 0 && index < sichtbar.length ? index : startZeile(sichtbar))
+    setKurz(null)
+    setKurzFehler(null)
     try {
       p.showPopover()
     } catch {
@@ -293,6 +330,78 @@ export function Auswahl({
     schliessen(true)
   }
 
+  function kurzStarten() {
+    if (!kurzanlage) return
+    const werte: Record<string, string> = {}
+    let suchtextVergeben = false
+    for (const f of kurzanlage.felder) {
+      if ((f.art ?? 'text') === 'text' && !suchtextVergeben) {
+        werte[f.name] = eingabe.trim()
+        suchtextVergeben = true
+      } else {
+        werte[f.name] = f.vorgabe ?? ''
+      }
+    }
+    setKurzFehler(null)
+    setKurz(werte)
+  }
+
+  function kurzZurueck() {
+    setKurz(null)
+    setKurzFehler(null)
+    suche.current?.focus({ preventScroll: true })
+  }
+
+  async function anlegen() {
+    if (!kurzanlage || !kurz || kurzLaeuft) return
+    const fehlt = kurzanlage.felder.find((f) => f.pflicht && !kurz[f.name]?.trim())
+    if (fehlt) {
+      setKurzFehler(`Bitte „${fehlt.label}" ausfüllen`)
+      return
+    }
+    setKurzLaeuft(true)
+    setKurzFehler(null)
+    try {
+      const r = await kurzanlage.aktion(kurz)
+      if (isActionError(r)) {
+        setKurzFehler(r.error)
+        return
+      }
+      const daten = r && 'daten' in r ? r.daten : undefined
+      const id = typeof daten?.id === 'string' ? daten.id : null
+      const text = typeof daten?.text === 'string' ? daten.text : (kurz.name ?? '')
+      if (!id) {
+        setKurzFehler('Angelegt, aber ohne Rückmeldung — bitte die Seite neu laden')
+        return
+      }
+      setNeue((alt) => [...alt, { wert: id, text, deaktiviert: false, suche: normalisieren(text) }])
+      setKurz(null)
+      setEingabe('')
+      geaendert.current = true
+      setUngueltig(false)
+      if (multiple) {
+        setEigen((alt) => [...alsListe(alt).filter(Boolean), id])
+        suche.current?.focus({ preventScroll: true })
+      } else {
+        if (!gesteuert) setEigen(id)
+        onAuswahl?.(id)
+        schliessen(true)
+      }
+      // Die anderen Listen der Seite kennen den Neuen erst nach dem Neuladen.
+      router.refresh()
+    } catch (fehler) {
+      setKurzFehler(fehler instanceof Error ? fehler.message : 'Anlegen fehlgeschlagen')
+    } finally {
+      setKurzLaeuft(false)
+    }
+  }
+
+  // Mini-Formular offen → erstes Eingabefeld fokussieren.
+  const kurzOffen = kurz !== null
+  useEffect(() => {
+    if (kurzOffen) panel.current?.querySelector<HTMLInputElement>('.auswahl-kurz input')?.focus()
+  }, [kurzOffen])
+
   function knopfTasten(e: KeyboardEvent<HTMLButtonElement>) {
     if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
       e.preventDefault()
@@ -304,10 +413,26 @@ export function Auswahl({
   }
 
   function panelTasten(e: KeyboardEvent<HTMLDivElement>) {
-    const n = treffer.length
+    if (kurz) {
+      // Im Mini-Formular: Enter legt an (nicht das umgebende Formular
+      // abschicken), Escape zurück zur Liste, Tab wandert durch die Felder.
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+        e.preventDefault()
+        void anlegen()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        kurzZurueck()
+      }
+      return
+    }
+    const n = treffer.length + (mitNeu ? 1 : 0)
     const springe = (ziel: number, schritt: number) => {
-      const i = ersteFreie(treffer, Math.min(Math.max(ziel, 0), n - 1), schritt)
+      const i = freieZeile(treffer, Math.min(Math.max(ziel, 0), n - 1), schritt)
       if (i >= 0) setAktiv(i)
+    }
+    const zeileWaehlen = () => {
+      if (mitNeu && aktiv === treffer.length) kurzStarten()
+      else waehlen(treffer[aktiv])
     }
     switch (e.key) {
       case 'ArrowDown':
@@ -328,13 +453,13 @@ export function Auswahl({
         break
       case 'Enter':
         e.preventDefault()
-        waehlen(treffer[aktiv])
+        zeileWaehlen()
         break
       case ' ':
         // Leertaste gehört dem Suchfeld; ohne Suchfeld wählt sie.
         if (!mitSuche) {
           e.preventDefault()
-          waehlen(treffer[aktiv])
+          zeileWaehlen()
         }
         break
       case 'Escape':
@@ -352,7 +477,7 @@ export function Auswahl({
     ? gewaehlteOptionen.map((o) => o.text).join(', ')
     : (gewaehlteOptionen[0]?.text ?? '')
   const leer = multiple ? gewaehlt.length === 0 : !gewaehlt[0]
-  const aktiveId = treffer[aktiv] ? `${basisId}-o${aktiv}` : undefined
+  const aktiveId = treffer[aktiv] || (mitNeu && aktiv === treffer.length) ? `${basisId}-o${aktiv}` : undefined
 
   let letzteGruppe: string | undefined
 
@@ -417,7 +542,7 @@ export function Auswahl({
           e.stopPropagation()
         }}
       >
-        {mitSuche && (
+        {mitSuche && !kurz && (
           <input
             ref={suche}
             className="auswahl-suche"
@@ -433,11 +558,66 @@ export function Auswahl({
             value={eingabe}
             onChange={(e) => {
               setEingabe(e.target.value)
-              setAktiv(Math.max(0, ersteFreie(filtern(waehlbar, e.target.value).treffer)))
+              setAktiv(startZeile(filtern(waehlbar, e.target.value).treffer))
             }}
           />
         )}
+        {kurz && kurzanlage && (
+          <div className="auswahl-kurz" role="group" aria-label={kurzanlage.titel}>
+            <div className="auswahl-kurz-titel">{kurzanlage.titel}</div>
+            {kurzanlage.felder.map((f) =>
+              f.art === 'wahl' ? (
+                <div key={f.name} className="auswahl-kurz-feld">
+                  <span className="feld-titel">{f.label}</span>
+                  <div className="auswahl-kurz-wahl" role="radiogroup" aria-label={f.label}>
+                    {f.optionen?.map((o) => (
+                      <button
+                        key={o.wert}
+                        type="button"
+                        role="radio"
+                        aria-checked={kurz[f.name] === o.wert}
+                        className={`small${kurz[f.name] === o.wert ? ' primary' : ''}`}
+                        onClick={() => setKurz({ ...kurz, [f.name]: o.wert })}
+                      >
+                        {o.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div key={f.name} className="auswahl-kurz-feld">
+                  <span className="feld-titel">{f.label}</span>
+                  {/* Ohne name: gehört nicht zum umgebenden Formular. Kein
+                      type="email" — dessen Prüfung würde dort mitgreifen. */}
+                  <input
+                    type="text"
+                    inputMode={f.art === 'email' ? 'email' : undefined}
+                    aria-label={f.label}
+                    value={kurz[f.name] ?? ''}
+                    placeholder={f.platzhalter}
+                    autoComplete="off"
+                    onChange={(e) => setKurz({ ...kurz, [f.name]: e.target.value })}
+                  />
+                </div>
+              ),
+            )}
+            {kurzFehler && (
+              <div className="notice danger small" role="alert" style={{ margin: 0 }}>
+                {kurzFehler}
+              </div>
+            )}
+            <div className="auswahl-kurz-knoepfe">
+              <button type="button" className="small" onClick={kurzZurueck}>
+                Zurück
+              </button>
+              <button type="button" className="small primary" disabled={kurzLaeuft} onClick={() => void anlegen()}>
+                {kurzLaeuft ? 'Lege an …' : 'Anlegen'}
+              </button>
+            </div>
+          </div>
+        )}
         <div
+          hidden={Boolean(kurz)}
           ref={liste}
           id={`${panelId}-box`}
           role="listbox"
@@ -477,12 +657,33 @@ export function Auswahl({
                 </Fragment>
               )
             })}
-          {offen && treffer.length === 0 && <div className="auswahl-hinweis">Kein Treffer für „{eingabe}"</div>}
           {offen && mehr > 0 && (
             <div className="auswahl-hinweis">… {mehr} weitere — Suche eingrenzen</div>
           )}
+          {offen && treffer.length === 0 && !mitNeu && (
+            <div className="auswahl-hinweis">Kein Treffer für „{eingabe}"</div>
+          )}
+          {offen && kurzanlage && (
+            <div
+              id={`${basisId}-o${treffer.length}`}
+              data-index={treffer.length}
+              role="option"
+              tabIndex={-1}
+              aria-selected={false}
+              className={`auswahl-option auswahl-neu${aktiv === treffer.length ? ' aktiv' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseMove={() => aktiv !== treffer.length && setAktiv(treffer.length)}
+              onClick={kurzStarten}
+            >
+              <span className="auswahl-plus" aria-hidden="true">
+                +
+              </span>
+              <span>{eingabe.trim() ? `„${eingabe.trim()}" neu anlegen` : 'Neu anlegen'}</span>
+              <span className="auswahl-was">{kurzanlage.was}</span>
+            </div>
+          )}
         </div>
-        {multiple && offen && (
+        {multiple && offen && !kurz && (
           <div className="auswahl-fuss">
             <span className="muted small">{gewaehlt.length} gewählt</span>
             <button type="button" className="small" onClick={() => schliessen(true)}>

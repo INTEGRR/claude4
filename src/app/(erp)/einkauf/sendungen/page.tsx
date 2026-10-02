@@ -8,6 +8,7 @@ import { SENDUNG_MODI, type SendungModus } from '@/modules/einkauf/sendungen'
 import { date } from '@/modules/shared/format'
 import { sendungAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -182,7 +183,7 @@ export default async function SendungenPage({ searchParams }: { searchParams: Pr
               </label>
               <label className="field">
                 <span>Spediteur</span>
-                <Auswahl name="spediteur_id" defaultValue="">
+                <Auswahl kurzanlage={kurzLieferant(user, 'Spediteur')} name="spediteur_id" defaultValue="">
                   <option value="">— (Express: Kurier des Lieferanten)</option>
                   {spediteure.map((p) => (
                     <option key={p.id} value={p.id}>

@@ -132,6 +132,15 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   `defaultValue`, `required`, `multiple`, `disabled`), dazu Suche ab acht
   Optionen; `data-suche` an einer Option sucht mit (z. B. E-Mail, Ort). In
   Client-Komponenten gesteuert über `value` + `onAuswahl(wert)`.
+- **Kurzanlage** → `kurzanlage={kurzLieferant(user)}` (bzw. `kurzKunde`,
+  `kurzArtikel(user, 'einkauf'|'verkauf')`, `kurzKategorie`) aus
+  `app/(erp)/kurzanlage.ts` an der Auswahlbox: „+ Neu anlegen" am
+  Listenende (ohne Treffer gleich aktiv, Enter genügt), Mini-Formular im
+  Panel, angelegt über die vorhandene Registry-Aktion
+  (`serverAktion(…, { mitBeleg: true })` liefert die neue ID), danach
+  gewählt. Ohne Schreibrecht im Bereich kein Angebot. Neues Thema: eine
+  Server Action in `kurzanlage-actions.ts` plus Beschreibung in
+  `kurzanlage.ts`.
 - **Formatierung** → `modules/shared/format.ts` (`qty`, `money`, `pct`,
   `date`, `isoDatum` — bitte nichts davon lokal nachbauen)
 

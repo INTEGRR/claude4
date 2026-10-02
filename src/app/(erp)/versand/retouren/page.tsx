@@ -7,11 +7,12 @@ import { dateTime } from '@/modules/shared/format'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { createReturnLabel } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzKunde } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
 export default async function RetourenPage() {
-  await requireArea('versand')
+  const user = await requireArea('versand')
   const labels = await sql<
     {
       id: string
@@ -62,7 +63,7 @@ export default async function RetourenPage() {
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Kunde</span>
-              <Auswahl name="partner_id" required defaultValue="">
+              <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>

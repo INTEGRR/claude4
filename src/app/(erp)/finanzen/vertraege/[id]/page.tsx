@@ -9,6 +9,7 @@ import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money } from '@/modules/shared/format'
 import { vertragAendern, vertragZahlen } from '../../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,7 +88,7 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
             </label>
             <label className="field" style={{ flex: 1.5 }}>
               <span>Partner</span>
-              <Auswahl name="partner_id" defaultValue={v.partner_id ?? ''}>
+              <Auswahl kurzanlage={kurzLieferant(user, 'Vertragspartner')} name="partner_id" defaultValue={v.partner_id ?? ''}>
                 <option value="">—</option>
                 {partner.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>

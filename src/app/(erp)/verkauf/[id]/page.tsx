@@ -21,11 +21,12 @@ import {
   updateOrderHeader,
 } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzArtikel } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('verkauf')
+  const user = await requireArea('verkauf')
   const { id } = await params
 
   const [order] = await sql<
@@ -526,7 +527,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div className="row">
                 <label className="field" style={{ flex: 3 }}>
                   <span>Produkt</span>
-                  <Auswahl name="variant_id" required>
+                  <Auswahl kurzanlage={kurzArtikel(user, 'verkauf')} name="variant_id" required>
                     <option value="">— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>

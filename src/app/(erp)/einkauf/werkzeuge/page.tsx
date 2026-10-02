@@ -9,6 +9,7 @@ import { EIGENTUEMER, WERKZEUG_ARTEN, WERKZEUG_STATUS } from '@/modules/einkauf/
 import { money } from '@/modules/shared/format'
 import { werkzeugAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,7 +192,7 @@ export default async function WerkzeugePage({
               </label>
               <label className="field">
                 <span>Standort (Lieferant)</span>
-                <Auswahl name="partner_id" defaultValue={vorLieferant}>
+                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" defaultValue={vorLieferant}>
                   <option value="">— aus der Bestellzeile —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>

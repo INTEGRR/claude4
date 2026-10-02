@@ -28,6 +28,7 @@ import { date, dateTime, money } from '@/modules/shared/format'
 import {
   anfragenFreigeben,
   anfragenVorbereiten,
+  angebotAendern,
   angebotErfassen,
   angebotVerwerfen,
   bestellungZuordnen,
@@ -42,6 +43,8 @@ import {
 import { belegLink } from '../../querverweise'
 import { musterAnfordern } from '../../muster/actions'
 import { Auswahl } from '@/components/auswahl'
+import { AufklappLink } from '@/components/aufklapp-link'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,7 +92,166 @@ interface Angebot {
   verworfen: boolean
   quelle_name: string | null
   quelle_drive_id: string | null
+  quell_dokument_id: string | null
+  quell_nachricht_id: string | null
   created_at: string
+}
+
+/** Zahl fürs Formular: deutsch, ohne Nullen am Ende; leer bleibt leer. */
+function feldZahl(x: string | number | null | undefined, nullAlsLeer = false): string {
+  if (x === null || x === undefined || x === '') return ''
+  const n = Number(x)
+  if (!Number.isFinite(n) || (nullAlsLeer && n === 0)) return ''
+  return String(n).replace('.', ',')
+}
+
+/**
+ * Die Felder eines Lieferantenangebots — dieselben für „Angebot erfassen"
+ * und „Angebot ändern" (dann mit den gespeicherten Werten vorausgefüllt).
+ */
+function AngebotFelder({
+  a,
+  staffeln,
+  lieferantFeld,
+  positionen,
+  waehrungen,
+  incoterms,
+  dokumente,
+  nachrichten,
+}: {
+  a?: Angebot
+  /** Staffeltext je Position („Menge: Preis" je Zeile). */
+  staffeln?: Map<string, string>
+  lieferantFeld?: React.ReactNode
+  positionen: { id: string; bezeichnung: string; menge: string }[]
+  waehrungen: { code: string }[]
+  incoterms: { code: string; name: string }[]
+  dokumente: { id: string; name: string }[]
+  nachrichten: { id: string; label: string }[]
+}) {
+  return (
+    <>
+      <div className="row">
+        {lieferantFeld}
+        <label className="field">
+          <span>Währung</span>
+          <Auswahl name="waehrung" defaultValue={a?.waehrung ?? 'USD'} className="mono">
+            {waehrungen.map((w) => (
+              <option key={w.code} value={w.code}>
+                {w.code}
+              </option>
+            ))}
+          </Auswahl>
+        </label>
+        <label className="field">
+          <span>Incoterm</span>
+          <Auswahl name="incoterm_code" defaultValue={a?.incoterm_code ?? ''} className="mono">
+            <option value="">—</option>
+            {incoterms.map((i) => (
+              <option key={i.code} value={i.code}>
+                {i.code} – {i.name}
+              </option>
+            ))}
+          </Auswahl>
+        </label>
+        <label className="field">
+          <span>Ort</span>
+          <input name="incoterm_ort" placeholder="Shenzhen" defaultValue={a?.incoterm_ort ?? ''} />
+        </label>
+      </div>
+      <div className="row">
+        <label className="field">
+          <span>Anzahlung %</span>
+          <input name="anzahlung_pct" inputMode="decimal" placeholder="30" defaultValue={feldZahl(a?.anzahlung_pct)} />
+        </label>
+        <label className="field">
+          <span>Zahlung (Text)</span>
+          <input name="zahlungsbedingung" placeholder="T/T 30/70" defaultValue={a?.zahlungsbedingung ?? ''} />
+        </label>
+        <label className="field">
+          <span>Lieferzeit Tage</span>
+          <input name="lieferzeit_tage" inputMode="numeric" placeholder="35" defaultValue={feldZahl(a?.lieferzeit_tage)} />
+        </label>
+        <label className="field">
+          <span>MOQ</span>
+          <input name="moq" inputMode="decimal" defaultValue={feldZahl(a?.moq)} />
+        </label>
+        <label className="field">
+          <span>Gültig bis</span>
+          <input type="date" name="gueltig_bis" defaultValue={a?.gueltig_bis ?? ''} />
+        </label>
+      </div>
+      <div className="row">
+        <label className="field">
+          <span>Werkzeugkosten (Angebotswährung)</span>
+          <input name="werkzeugkosten" inputMode="decimal" placeholder="0" defaultValue={feldZahl(a?.werkzeugkosten, true)} />
+        </label>
+        <label className="field">
+          <span>Musterkosten</span>
+          <input name="musterkosten" inputMode="decimal" placeholder="0" defaultValue={feldZahl(a?.musterkosten, true)} />
+        </label>
+        <label className="field">
+          <span>Fracht</span>
+          <Auswahl name="fracht_modus" defaultValue={a?.fracht_modus ?? 'see'}>
+            {Object.entries(FRACHT_MODI).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label} (Satz je kg)
+              </option>
+            ))}
+          </Auswahl>
+        </label>
+        <label className="field">
+          <span>oder Fracht €/Stk fest</span>
+          <input name="fracht_je_stueck_eur" inputMode="decimal" defaultValue={feldZahl(a?.fracht_je_stueck_eur)} />
+        </label>
+      </div>
+      <div className="field">
+        <span className="feld-titel">Preise je Position — eine Staffel je Zeile „Menge: Preis"</span>
+        {positionen.map((pos) => (
+          <label key={pos.id} className="field">
+            <span>
+              {pos.bezeichnung} ({stk(pos.menge, 4).replace(/,00$/, '')} Stk)
+            </span>
+            <textarea
+              name={`staffeln_${pos.id}`}
+              rows={2}
+              className="mono"
+              placeholder={'500: 0,85\n1000: 0,72'}
+              defaultValue={staffeln?.get(pos.id) ?? ''}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="row">
+        <label className="field">
+          <span>Quelle: Datei</span>
+          <Auswahl name="quell_dokument_id" defaultValue={a?.quell_dokument_id ?? ''}>
+            <option value="">—</option>
+            {dokumente.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Auswahl>
+        </label>
+        <label className="field">
+          <span>oder Nachricht</span>
+          <Auswahl name="quell_nachricht_id" defaultValue={a?.quell_nachricht_id ?? ''}>
+            <option value="">—</option>
+            {nachrichten.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.label}
+              </option>
+            ))}
+          </Auswahl>
+        </label>
+      </div>
+      <label className="field">
+        <span>Notiz</span>
+        <textarea name="notiz" rows={2} defaultValue={a?.notiz ?? ''} />
+      </label>
+    </>
+  )
 }
 
 type EinstandVoll = EinstandZeile & {
@@ -179,7 +341,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                a.zahlungsbedingung, a.anzahlung_pct::text, a.lieferzeit_tage, a.moq::text, a.werkzeugkosten::text,
                a.musterkosten::text, a.fracht_modus, a.fracht_je_stueck_eur::text, a.gueltig_bis::text as gueltig_bis,
                a.notiz, a.verworfen, d.name as quelle_name, d.drive_file_id as quelle_drive_id,
-               a.created_at::text as created_at
+               a.quell_dokument_id, a.quell_nachricht_id, a.created_at::text as created_at
         from lieferantenangebote a join partners pa on pa.id = a.partner_id
         left join dokumente d on d.id = a.quell_dokument_id
         where a.projekt_id = ${id} order by a.verworfen, a.created_at`,
@@ -281,6 +443,19 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                fracht_eur::text, zoll_eur::text, einstand_eur::float as einstand_eur, zielpreis_eur::float as zielpreis_eur, hinweise
         from einstand_schaetzen(${a.id})`,
     )
+  }
+  // Gespeicherte Staffeln als Formulartext („Menge: Preis"), fürs Ändern.
+  const staffelZeilen = angebote.length
+    ? await sql<{ angebot_id: string; position_id: string; ab_menge: string; preis: string }[]>`
+        select angebot_id, position_id, ab_menge::text, preis::text from lieferantenangebot_staffeln
+        where angebot_id = any(${angebote.map((a) => a.id)}::uuid[]) order by angebot_id, position_id, ab_menge`
+    : []
+  const staffelText = new Map<string, Map<string, string>>()
+  for (const z of staffelZeilen) {
+    const jePosition = staffelText.get(z.angebot_id) ?? new Map<string, string>()
+    const zeile = `${feldZahl(z.ab_menge)}: ${feldZahl(z.preis)}`
+    jePosition.set(z.position_id, jePosition.has(z.position_id) ? `${jePosition.get(z.position_id)}\n${zeile}` : zeile)
+    staffelText.set(z.angebot_id, jePosition)
   }
   const summen = new Map<string, AngebotSumme>(angebote.map((a) => [a.id, angebotSumme(einstaende.get(a.id) ?? [])]))
   const bestes = bestesAngebot(angebote.map((a) => ({ id: a.id, verworfen: a.verworfen, summe: summen.get(a.id)! })))
@@ -549,7 +724,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
               <div className="row">
                 <label className="field">
                   <span>Lieferanten (mehrere möglich)</span>
-                  <Auswahl name="partner_id" multiple required placeholder="Lieferanten wählen …">
+                  <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" multiple required placeholder="Lieferanten wählen …">
                     {lieferanten
                       .filter((l) => !angefragtIds.has(l.id))
                       .map((l) => (
@@ -729,6 +904,9 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                             </button>
                           </ActionForm>
                         )}
+                        <AufklappLink ziel={`angebot-${a.id}`} className="btn small">
+                          Ändern
+                        </AufklappLink>
                         {a.id !== p.gewaehltes_angebot_id && (
                           <ActionButton action={angebotVerwerfen.bind(null, id, a.id, true)} className="small">
                             Verwerfen
@@ -767,148 +945,77 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
           D-Klauseln ohne) + Zoll nach HS-Code (DDP ohne); EUSt ist nicht enthalten. Sätze unter{' '}
           <Link href="/einkauf/einstand">Einstand</Link>, Kurse unter <Link href="/einkauf/kurse">Wechselkurse</Link>.
         </p>
+        {darf &&
+          offen &&
+          positionen.length > 0 &&
+          sichtbar.map((a) => (
+            <details key={a.id} id={`angebot-${a.id}`} style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+              <summary className="small">
+                Angebot ändern: {a.lieferant}
+                {a.version > 1 ? ` v${a.version}` : ''}
+              </summary>
+              <ActionForm action={angebotAendern.bind(null, id)} behalten style={{ marginTop: 8 }}>
+                <input type="hidden" name="angebot_id" value={a.id} />
+                <input type="hidden" name="vollstaendig" value="1" />
+                <AngebotFelder
+                  a={a}
+                  staffeln={staffelText.get(a.id)}
+                  positionen={positionen}
+                  waehrungen={waehrungen}
+                  incoterms={incoterms}
+                  dokumente={dokumente}
+                  nachrichten={nachrichten}
+                />
+                <button type="submit" className="small primary">
+                  Änderungen speichern
+                </button>
+              </ActionForm>
+            </details>
+          ))}
         {darf && offen && positionen.length > 0 && (
           <details style={{ padding: '10px 12px' }} open={angebote.length === 0 && anfragen.length > 0}>
             <summary className="small">Angebot erfassen</summary>
             <ActionForm action={angebotErfassen.bind(null, id)} style={{ marginTop: 8 }}>
-              <div className="row">
-                <label className="field">
-                  <span>Lieferant</span>
-                  <Auswahl name="partner_id" required defaultValue={anfragen.find((a) => a.status === 'angefragt')?.partner_id ?? ''}>
-                    <option value="" disabled>
-                      — wählen —
-                    </option>
-                    {anfragen.length > 0 && (
-                      <optgroup label="Angefragt">
-                        {anfragen.map((a) => (
-                          <option key={a.partner_id} value={a.partner_id}>
-                            {a.lieferant}
-                          </option>
-                        ))}
+              <AngebotFelder
+                lieferantFeld={
+                  <label className="field">
+                    <span>Lieferant</span>
+                    <Auswahl
+                      kurzanlage={kurzLieferant(user)}
+                      name="partner_id"
+                      required
+                      defaultValue={anfragen.find((a) => a.status === 'angefragt')?.partner_id ?? ''}
+                    >
+                      <option value="" disabled>
+                        — wählen —
+                      </option>
+                      {anfragen.length > 0 && (
+                        <optgroup label="Angefragt">
+                          {anfragen.map((a) => (
+                            <option key={a.partner_id} value={a.partner_id}>
+                              {a.lieferant}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Alle Lieferanten">
+                        {lieferanten
+                          .filter((l) => !angefragtIds.has(l.id))
+                          .map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}
+                            </option>
+                          ))}
                       </optgroup>
-                    )}
-                    <optgroup label="Alle Lieferanten">
-                      {lieferanten
-                        .filter((l) => !angefragtIds.has(l.id))
-                        .map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.name}
-                          </option>
-                        ))}
-                    </optgroup>
-                  </Auswahl>
-                </label>
-                <label className="field">
-                  <span>Währung</span>
-                  <Auswahl name="waehrung" defaultValue="USD" className="mono">
-                    {waehrungen.map((w) => (
-                      <option key={w.code} value={w.code}>
-                        {w.code}
-                      </option>
-                    ))}
-                  </Auswahl>
-                </label>
-                <label className="field">
-                  <span>Incoterm</span>
-                  <Auswahl name="incoterm_code" defaultValue="" className="mono">
-                    <option value="">—</option>
-                    {incoterms.map((i) => (
-                      <option key={i.code} value={i.code}>
-                        {i.code} – {i.name}
-                      </option>
-                    ))}
-                  </Auswahl>
-                </label>
-                <label className="field">
-                  <span>Ort</span>
-                  <input name="incoterm_ort" placeholder="Shenzhen" />
-                </label>
-              </div>
-              <div className="row">
-                <label className="field">
-                  <span>Anzahlung %</span>
-                  <input name="anzahlung_pct" inputMode="decimal" placeholder="30" />
-                </label>
-                <label className="field">
-                  <span>Zahlung (Text)</span>
-                  <input name="zahlungsbedingung" placeholder="T/T 30/70" />
-                </label>
-                <label className="field">
-                  <span>Lieferzeit Tage</span>
-                  <input name="lieferzeit_tage" inputMode="numeric" placeholder="35" />
-                </label>
-                <label className="field">
-                  <span>MOQ</span>
-                  <input name="moq" inputMode="decimal" />
-                </label>
-                <label className="field">
-                  <span>Gültig bis</span>
-                  <input type="date" name="gueltig_bis" />
-                </label>
-              </div>
-              <div className="row">
-                <label className="field">
-                  <span>Werkzeugkosten (Angebotswährung)</span>
-                  <input name="werkzeugkosten" inputMode="decimal" placeholder="0" />
-                </label>
-                <label className="field">
-                  <span>Musterkosten</span>
-                  <input name="musterkosten" inputMode="decimal" placeholder="0" />
-                </label>
-                <label className="field">
-                  <span>Fracht</span>
-                  <Auswahl name="fracht_modus" defaultValue="see">
-                    {Object.entries(FRACHT_MODI).map(([k, label]) => (
-                      <option key={k} value={k}>
-                        {label} (Satz je kg)
-                      </option>
-                    ))}
-                  </Auswahl>
-                </label>
-                <label className="field">
-                  <span>oder Fracht €/Stk fest</span>
-                  <input name="fracht_je_stueck_eur" inputMode="decimal" />
-                </label>
-              </div>
-              <div className="field">
-                <span className="feld-titel">Preise je Position — eine Staffel je Zeile „Menge: Preis"</span>
-                {positionen.map((pos) => (
-                  <label key={pos.id} className="field">
-                    <span>
-                      {pos.bezeichnung} ({stk(pos.menge, 4).replace(/,00$/, '')} Stk)
-                    </span>
-                    <textarea name={`staffeln_${pos.id}`} rows={2} className="mono" placeholder={'500: 0,85\n1000: 0,72'} />
+                    </Auswahl>
                   </label>
-                ))}
-              </div>
-              <div className="row">
-                <label className="field">
-                  <span>Quelle: Datei</span>
-                  <Auswahl name="quell_dokument_id" defaultValue="">
-                    <option value="">—</option>
-                    {dokumente.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </Auswahl>
-                </label>
-                <label className="field">
-                  <span>oder Nachricht</span>
-                  <Auswahl name="quell_nachricht_id" defaultValue="">
-                    <option value="">—</option>
-                    {nachrichten.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {n.label}
-                      </option>
-                    ))}
-                  </Auswahl>
-                </label>
-              </div>
-              <label className="field">
-                <span>Notiz</span>
-                <textarea name="notiz" rows={2} />
-              </label>
+                }
+                positionen={positionen}
+                waehrungen={waehrungen}
+                incoterms={incoterms}
+                dokumente={dokumente}
+                nachrichten={nachrichten}
+              />
               <button type="submit" className="small primary">Angebot speichern</button>
             </ActionForm>
           </details>
@@ -999,7 +1106,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                   <div className="row">
                     <label className="field">
                       <span>Lieferant</span>
-                      <Auswahl name="partner_id" required defaultValue={gewaehlt?.partner_id ?? musterLieferanten[0]?.id ?? ''}>
+                      <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" required defaultValue={gewaehlt?.partner_id ?? musterLieferanten[0]?.id ?? ''}>
                         {musterLieferanten.length > 0 && (
                           <optgroup label="Mit Angebot">
                             {musterLieferanten.map((l) => (

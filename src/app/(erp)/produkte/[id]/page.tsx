@@ -12,11 +12,12 @@ import { RecordComments } from '@/components/record-comments'
 import { DokumenteKarte } from '@/components/dokumente'
 import { TagEditor } from '@/components/tag-editor'
 import { Auswahl } from '@/components/auswahl'
+import { kurzKategorie, kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireArea('produkte')
+  const user = await requireArea('produkte')
   const { id } = await params
 
   const [tpl] = await sql<
@@ -218,7 +219,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <div className="row">
             <label className="field">
               <span>Kategorie</span>
-              <Auswahl name="category_id" defaultValue={tpl.category_id}>
+              <Auswahl kurzanlage={kurzKategorie(user)} name="category_id" defaultValue={tpl.category_id}>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.full_path}</option>
                 ))}
@@ -411,7 +412,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="row" style={{ alignItems: 'flex-end' }}>
               <label className="field" style={{ flex: 2 }}>
                 <span>Lieferant</span>
-                <Auswahl name="vendor_id" required defaultValue="">
+                <Auswahl kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>

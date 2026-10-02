@@ -7,6 +7,7 @@ import { date, money } from '@/modules/shared/format'
 import { createPurchaseOrder } from './actions'
 import { belegLink } from './querverweise'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ export default async function EinkaufPage({
 }: {
   searchParams: Promise<{ filter?: string }>
 }) {
-  await requireArea('einkauf')
+  const user = await requireArea('einkauf')
   const { filter } = await searchParams
 
   const rows = await sql<
@@ -96,7 +97,7 @@ export default async function EinkaufPage({
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Lieferant</span>
-              <Auswahl name="vendor_id" required defaultValue="">
+              <Auswahl kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {vendors.map((v) => (
                   <option key={v.id} value={v.id}>{v.name}</option>

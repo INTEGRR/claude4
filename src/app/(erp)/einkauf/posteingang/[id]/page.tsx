@@ -19,6 +19,7 @@ import { entwurfAnlegen, nachrichtUebersetzen } from '../../entwuerfe/actions'
 import { VORLAGEN_ANLAESSE } from '@/modules/einkauf/mail-vorlagen'
 import { uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -309,7 +310,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
             <div className="row">
               <label className="field">
                 <span>Lieferant</span>
-                <Auswahl name="partner_id" defaultValue={t.partner_id ?? ''}>
+                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" defaultValue={t.partner_id ?? ''}>
                   <option value="">— aus der Bestellung —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>

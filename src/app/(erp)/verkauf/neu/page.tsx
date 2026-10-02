@@ -4,11 +4,12 @@ import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
 import { createOrder, createOrderForNewCustomer } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzKunde } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
 export default async function NewOrderPage() {
-  await requireArea('verkauf')
+  const user = await requireArea('verkauf')
   const partners = await sql<{ id: string; name: string; city: string | null }[]>`
     select id, name, city from partners where is_customer and active order by name limit 500`
 
@@ -19,7 +20,7 @@ export default async function NewOrderPage() {
         <ActionForm action={createOrder} style={{ maxWidth: 460 }}>
           <label className="field">
             <span>Kunde</span>
-            <Auswahl name="partner_id" required defaultValue="">
+            <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
               <option value="" disabled>— auswählen —</option>
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>

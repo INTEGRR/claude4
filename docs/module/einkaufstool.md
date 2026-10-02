@@ -393,6 +393,14 @@ Lieferant mit Sammelfreigabe** hinaus.
     (`staffelnLesen`: „ab 1.000 = 0,72", „2000 pcs → 0.65 USD"; unlesbare
     Zeilen werden abgewiesen, nicht verschluckt).
   - Ein weiteres Angebot desselben Lieferanten wird Version 2.
+- **Angebot ändern** (`einkauf.angebot_aendern`, seit 2026-10-02 auch an
+  der Projektseite): „Ändern" unter jedem Angebot klappt dasselbe Formular
+  vorausgefüllt auf, Staffeln stehen als „Menge: Preis"-Zeilen darin. Das
+  Formular schickt das ganze Angebot (`vollstaendig`): Leeres wird geleert,
+  die Staffeln werden komplett ersetzt, mindestens ein Preis bleibt Pflicht.
+  Die KI ändert weiter nur, was sie nennt.
+- Lieferanten fehlen in der Auswahl? Die **Kurzanlage** der Auswahlbox
+  legt einen neuen direkt an (Name, optional E-Mail) und wählt ihn aus.
 - **Einstand je Stück in EUR** (`einstand_schaetzen(angebot)`, SQL):
   - **Ware** = Staffelpreis (größte Staffel ≤ Projektmenge, sonst die
     kleinste) × Kurs.

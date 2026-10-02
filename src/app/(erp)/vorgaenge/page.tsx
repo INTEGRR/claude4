@@ -6,6 +6,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { vorgangStarten } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzKunde } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic'
  * neue Fachtabelle.
  */
 export default async function VorgaengePage() {
-  await requireArea('verkauf')
+  const user = await requireArea('verkauf')
 
   const prozesse = await sql<{ code: string; name: string }[]>`
     select code, name from prozesse
@@ -90,7 +91,7 @@ export default async function VorgaengePage() {
               </label>
               <label className="field">
                 <span>Kontakt (optional)</span>
-                <Auswahl name="partner_id" defaultValue="">
+                <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" defaultValue="">
                   <option value="">—</option>
                   {partner.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>

@@ -25,7 +25,16 @@ import { arbeitsplatzIdDesGeraets } from '@/modules/druck/arbeitsplatz'
  */
 export async function serverAktion(
   name: AktionsName,
-  aufruf: { recordId?: string; formData?: FormData; parameter?: unknown } = {},
+  {
+    mitBeleg,
+    ...aufruf
+  }: {
+    recordId?: string
+    formData?: FormData
+    parameter?: unknown
+    /** Die ID des angelegten Belegs immer zurückgeben (Kurzanlage in der Auswahlbox). */
+    mitBeleg?: boolean
+  } = {},
 ): Promise<ActionResult> {
   const user = await requireUser()
   // Der Arbeitsplatz des Geräts reist als Kontext mit — Druckaktionen
@@ -64,5 +73,8 @@ export async function serverAktion(
     if (!aufgeloest.endsWith('/')) revalidatePath(aufgeloest)
   }
 
+  if (mitBeleg) {
+    return actionInfo(ergebnis.text ?? '', ergebnis.link, { ...ergebnis.daten, recordId: ergebnis.recordId })
+  }
   if (ergebnis.text) return actionInfo(ergebnis.text, ergebnis.link, ergebnis.daten)
 }

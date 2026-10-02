@@ -6,6 +6,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { LABELS, date } from '@/modules/shared/format'
 import { createRepair } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzKunde } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export default async function ReparaturPage({
 }: {
   searchParams: Promise<{ zustand?: string }>
 }) {
-  await requireArea('reparatur')
+  const user = await requireArea('reparatur')
   const { zustand } = await searchParams
   const filter = ZUSTAENDE.find((z) => z === zustand) ?? null
 
@@ -82,7 +83,7 @@ export default async function ReparaturPage({
           <div className="row">
             <label className="field" style={{ flex: 2 }}>
               <span>Kunde</span>
-              <Auswahl name="partner_id" required defaultValue="">
+              <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>

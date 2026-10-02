@@ -15,6 +15,7 @@ import {
 } from '../../actions'
 import { RecordComments } from '@/components/record-comments'
 import { Auswahl } from '@/components/auswahl'
+import { kurzArtikel } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export default async function BomPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ variante?: string }>
 }) {
-  await requireArea('fertigung')
+  const user = await requireArea('fertigung')
   const { id } = await params
   const { variante } = await searchParams
 
@@ -278,7 +279,7 @@ export default async function BomPage({
             <div className="row">
               <label className="field" style={{ flex: 3 }}>
                 <span>Komponente</span>
-                <Auswahl name="component_variant_id" required defaultValue="">
+                <Auswahl kurzanlage={kurzArtikel(user, 'einkauf')} name="component_variant_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {components.map((c) => (
                     <option key={c.id} value={c.id}>{c.label}</option>

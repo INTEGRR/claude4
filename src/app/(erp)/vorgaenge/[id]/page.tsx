@@ -14,6 +14,7 @@ import type { FormularFeld } from '@/modules/prozesse/schema-felder'
 import { LABELS, dateTime } from '@/modules/shared/format'
 import { vorgangKopfAendern } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzKunde } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -226,7 +227,7 @@ export default async function VorgangDetail({
             </label>
             <label className="field" style={{ minWidth: 220 }}>
               <span>Kunde/Partner</span>
-              <Auswahl name="partner_id" defaultValue={v.partner_id ?? ''}>
+              <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" defaultValue={v.partner_id ?? ''}>
                 <option value="">— auswählen —</option>
                 {partner.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>

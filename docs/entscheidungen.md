@@ -9,6 +9,57 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-02 — Kurzanlage in der Auswahlbox; Angebot ändern an der Projektseite
+
+**Anlass (Betreiber):** „Man muss auch hier neue anlegen können, ad hoc,
+Kurzanlage. Das sollte generell ein Feature für alle Themen sein, die so
+etwas erfordern." (Screenshot: Lieferanten anfragen im Einkaufsprojekt.)
+Dazu: „Angebote können nicht geändert werden." Die Aktion
+`einkauf.angebot_aendern` gab es, aber die Projektseite hatte kein
+Formular dafür.
+
+**Entschieden — Kurzanlage:**
+- Die Auswahlbox bekommt die Prop `kurzanlage` (Titel, Felder, Server
+  Action).
+- Ablauf: Am Listenende steht „+ „Suchtext" neu anlegen". Findet die Suche
+  nichts, ist diese Zeile gleich aktiv, Enter genügt. Im Panel öffnet sich
+  ein Mini-Formular, der Name ist vorausgefüllt. Danach ist der neue
+  Eintrag gewählt, bei Mehrfachauswahl zusätzlich angehakt.
+- Angelegt wird über die vorhandenen Registry-Aktionen, also durch den
+  Torwächter:
+  - Kontakt anlegen: Lieferant oder Spediteur als Firma, Kunde als Person
+    oder Firma, Name in einem Feld;
+  - Produkt anlegen: Artikel ohne Varianten, für den Einkauf als Kaufteil;
+  - Kategorie anlegen: nur Admin.
+- Neu ist dafür `serverAktion(…, { mitBeleg: true })`. Es liefert die ID des
+  Angelegten zurück.
+- Ohne Schreibrecht im Bereich erscheint kein Angebot.
+- Eingeschaltet an 23 Auswahlfeldern:
+  - Lieferanten, Spediteure und Vertragspartner im Einkauf und in den
+    Finanzen;
+  - Kunden in Verkauf, Reparatur, Retouren und Vorgängen;
+  - Artikel an Bestellung, Verkaufsauftrag und Stückliste;
+  - die Kategorie am Produkt.
+- Das Mini-Formular liegt im umgebenden Formular, deshalb haben seine
+  Felder keinen `name`. Enter legt an, statt das äußere Formular
+  abzuschicken.
+
+**Entschieden — Angebot ändern:**
+- „Ändern" unter jedem Angebot im Vergleich klappt dasselbe Formular wie
+  „Angebot erfassen" auf, vorausgefüllt samt Staffeln. Beide nutzen eine
+  gemeinsame Komponente `AngebotFelder`.
+- Das Formular gilt als vollständig (`vollstaendig`): Leeres wird geleert,
+  die Staffeln werden ersetzt.
+- Die Teiländerung der KI bleibt, wie sie war.
+
+**Tests:**
+- `tests/auswahl.test.ts`: Namensaufteilung beim Kontakt.
+- `tests/prozesse/einkaufsprojekt.test.ts`: Teil- gegen Vollständig-Ändern.
+- Browsertest: Lieferant per Enter in der Mehrfachauswahl, Artikel an der
+  Bestellung, Kunde als Person, 390 px, Angebot ändern.
+
+**Doku:** docs/entwicklung.md, docs/module/einkaufstool.md.
+
 ## 2026-10-02 — Storno von Shop-Aufträgen führt Shopify
 
 **Anlass:** Beim Abgleich, was KRNL an Shopify schreibt, stand der Storno

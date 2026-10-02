@@ -10,6 +10,7 @@ import { postfachKonfiguriert } from '@/modules/google/auth'
 import { dateTime } from '@/modules/shared/format'
 import { nachrichtErfassen, postfachAbgleichen } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -236,7 +237,7 @@ export default async function PosteingangPage({
               </label>
               <label className="field">
                 <span>Lieferant</span>
-                <Auswahl name="partner_id" required defaultValue="">
+                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" required defaultValue="">
                   <option value="" disabled>
                     — wählen —
                   </option>

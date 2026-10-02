@@ -144,3 +144,35 @@ describe('Auswahlbox: abgeschickter Wert wie beim nativen <select>', () => {
     assert.equal(startwert([], 'x', false), '')
   })
 })
+
+describe('Kurzanlage: Kontakt aus einem Namensfeld', async () => {
+  const { kontaktAusKurzanlage } = await import('../src/modules/kontakte/kurzanlage.ts')
+
+  test('Lieferant ist eine Firma', () => {
+    assert.deepEqual(kontaktAusKurzanlage('lieferant', { name: '  Shenzhen  Foo Co. ', email: '' }), {
+      name: 'Shenzhen Foo Co.',
+      is_company: true,
+      is_customer: false,
+      is_vendor: true,
+      email: undefined,
+    })
+  })
+
+  test('Kunde als Person: letztes Wort ist der Nachname', () => {
+    const k = kontaktAusKurzanlage('kunde', { name: 'Anna Maria Müller', art: 'person', email: 'a@b.de' })
+    assert.deepEqual(k, {
+      vorname: 'Anna Maria',
+      nachname: 'Müller',
+      is_company: false,
+      is_customer: true,
+      is_vendor: false,
+      email: 'a@b.de',
+    })
+    assert.equal((kontaktAusKurzanlage('kunde', { name: 'Cher' }) as { nachname: string }).nachname, 'Cher')
+  })
+
+  test('Kunde als Firma und ohne Namen', () => {
+    assert.equal((kontaktAusKurzanlage('kunde', { name: 'ACME GmbH', art: 'firma' }) as { is_company: boolean }).is_company, true)
+    assert.deepEqual(kontaktAusKurzanlage('kunde', { name: '   ' }), { fehler: 'Bitte einen Namen angeben' })
+  })
+})

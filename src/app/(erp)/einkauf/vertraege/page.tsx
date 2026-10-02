@@ -8,6 +8,7 @@ import { VERTRAG_ARTEN, type VertragStatus, vertragsLage } from '@/modules/einka
 import { date } from '@/modules/shared/format'
 import { vertragAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,7 +154,7 @@ export default async function VertraegePage({
             <div className="row">
               <label className="field">
                 <span>Lieferant</span>
-                <Auswahl name="partner_id" required defaultValue={vorLieferant}>
+                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" required defaultValue={vorLieferant}>
                   <option value="" disabled>
                     — wählen —
                   </option>

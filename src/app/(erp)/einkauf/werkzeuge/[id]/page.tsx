@@ -13,6 +13,7 @@ import { EIGENTUEMER, WERKZEUG_ARTEN, WERKZEUG_STATUS, lebensdauer } from '@/mod
 import { dateTime, money } from '@/modules/shared/format'
 import { werkzeugAendern, werkzeugSchussBuchen, werkzeugStatusSetzen } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -213,7 +214,7 @@ export default async function WerkzeugPage({ params }: { params: Promise<{ id: s
                 </label>
                 <label className="field">
                   <span>Standort (Lieferant)</span>
-                  <Auswahl name="partner_id" defaultValue={w.partner_id}>
+                  <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" defaultValue={w.partner_id}>
                     {lieferanten.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.name}
