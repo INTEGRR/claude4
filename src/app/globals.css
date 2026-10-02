@@ -488,8 +488,8 @@ button.primary, .btn.primary {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
 }
 button.primary:hover, .btn.primary:hover { filter: brightness(1.06); border-color: var(--accent); }
-button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
-button.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+button.danger, .btn.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+button.danger:hover, .btn.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
 /* Der Schlüsselschalter: die Taste, die eine gewichtige Entscheidung buchen
    lässt (Freigabe, Befugnis-Schritt, KI-Vorschlag anlegen). */
 button.wichtig, .btn.wichtig {

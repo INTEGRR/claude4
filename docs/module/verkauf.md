@@ -10,8 +10,9 @@ Verkaufsaufträge verwalten — bei uns entstehen sie fast ausschließlich **aut
 
 ```
 draft ──(Per E-Mail senden)──▶ sent
-draft/sent ──(Bestätigen)──▶ sale ──(Stornieren)──▶ cancel
-cancel/sent ──(Auf Angebot zurücksetzen)──▶ draft
+draft/sent ──(Bestätigen)──▶ sale ──(Stornieren — nur manuelle Aufträge)──▶ cancel
+Shop-Auftrag ──(Storno/Erstattung in Shopify → Webhook)──▶ cancel
+cancel/sent ──(Auf Angebot zurücksetzen — nur manuelle Aufträge)──▶ draft
 sale: Sperren/Entsperren über Flag `locked` (kein eigener Status — Odoo-18-Verhalten)
 ```
 
@@ -20,7 +21,7 @@ sale: Sperren/Entsperren über Flag `locked` (kein eigener Status — Odoo-18-Ve
   2. **Lieferauftrag anlegen**: ein Picking (Vorgangsart Warenausgang, `WH/Stock → Partner/Kunden`) mit einem Move je lagergeführter Position; Status `confirmed`, Reservierung gemäß Vorgangsart.
   3. **Fertigung anlegen (MTO)**: für jede Position, deren Produkt `route_manufacture + route_mto` hat und eine aktive Stückliste besitzt → ein Fertigungsauftrag je Position (Variante, Menge, `sales_order_id` als Quellbeleg), Status direkt `confirmed`. Odoo-Verhalten: MTO beschafft auch bei vorhandenem Bestand.
   4. Produkte ohne Fertigungsroute werden nur über den Lieferauftrag bedient (ab Lager).
-- **Stornieren**: offene, nicht erledigte Lieferungen des Auftrags → `cancel`. Verknüpfte MOs werden **nicht** automatisch storniert, sondern bekommen einen Warnhinweis (Aktivität/Notiz) — bewusst Odoo-Verhalten, Entscheidung liegt beim Fertiger.
+- **Stornieren** (`cancel_sales_order`, Stand 0110): offene Lieferungen samt Reservierung → `cancel`; nicht begonnene Fertigungsaufträge werden storniert (seit 0029), angebrochene bleiben mit Hinweis; offene Druckaufträge und wartende Shop-Rückmeldungen werden zurückgezogen; danach storniert der Nachlauf DHL-Labels nicht übergebener Sendungen (ausgebucht, aber nicht übergeben → Aufgabe fürs Lager). **Shop-Aufträge storniert Shopify** (Entscheidungslog 2026-10-02): kein Knopf, sondern der Link „In Shopify stornieren"; KRNL meldet keinen Storno an Shopify.
 - **Sperren**: `locked = true` → Beleg schreibgeschützt (UI + DB-Check in Update-Funktionen).
 
 ## Auftragspositionen
@@ -37,7 +38,7 @@ Produkt-Auswahl auf **Varianten-Ebene** (Suche über SKU/Name inkl. Attributwert
 - `source = 'shopify'`, `shopify_order_id`/`shopify_order_name` gesetzt, Kunde per `shopify_customer_id`-Upsert.
 - Bezahlte Shopify-Orders entstehen direkt in `sale` (Bestätigungslogik läuft identisch durch — Lieferung + MOs).
 - Auf dem Formular: Link zur Order im Shopify-Admin, Anzeige der gesetzten Tags, Fulfillment-/Zahlungsstatus aus Shopify (read-only Info).
-- Stornierte Shopify-Orders (`orders/cancelled`-Webhook) stornieren den Verkaufsauftrag nach denselben Regeln.
+- Stornierte oder voll erstattete Shopify-Orders (`orders/cancelled`-Webhook) stornieren den Verkaufsauftrag samt allem Nachgelagerten (siehe Stornieren). Das ist der einzige Storno-Weg für Shop-Aufträge — Shopify führt.
 
 ## UI
 

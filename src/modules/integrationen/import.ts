@@ -2,6 +2,7 @@ import 'server-only'
 import type { TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
 import { splitStreet } from '@/modules/shared/address'
+import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { fetchOrder, type ShopifyOrder } from './shopify'
 import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
 
@@ -137,7 +138,10 @@ export async function importShopifyOrder(
   order: ShopifyOrder,
   eventId: string | null = null,
 ): Promise<ImportResult> {
-  return tx(async (t) => {
+  // Storno führt Shopify (2026-10-02): storniert der Shop einen bestehenden
+  // Auftrag, zieht KRNL nach der Transaktion noch die DHL-Labels nach.
+  let storniert: string | null = null
+  const ergebnis = await tx(async (t): Promise<ImportResult> => {
     const [existing] = await t<{ id: string; state: string; delivery_status: string }[]>`
       select id, state, delivery_status from sales_orders where shopify_order_id = ${order.id}`
 
@@ -154,6 +158,7 @@ export async function importShopifyOrder(
           message: `${order.name} ist ${grund} - war bereits storniert` }
       }
       await t`select cancel_sales_order(${existing.id}, 'shopify')`
+      storniert = existing.id
       if (erstattet) {
         await t`select log_event('sales_order', ${existing.id}, 'note',
           'In Shopify erstattet — Auftrag storniert.', 'shopify')`
@@ -361,6 +366,8 @@ export async function importShopifyOrder(
         (unmatched > 0 ? ` (${unmatched} Position(en) offen)` : ''),
     }
   })
+  if (storniert) await stornoNachlauf(storniert, 'shopify')
+  return ergebnis
 }
 
 // --- Erstübernahme -----------------------------------------------------------

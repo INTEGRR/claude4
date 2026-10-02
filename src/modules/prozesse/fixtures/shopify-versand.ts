@@ -97,6 +97,33 @@ export async function bestellungEinspeisen(ctx: FixtureKontext, sql: Sql): Promi
 }
 
 /**
+ * Storno im Shop simulieren: dieselbe Bestellung, jetzt storniert, als
+ * Webhook orders/cancelled — verarbeitet wie im Betrieb.
+ */
+export async function shopStornoEinspeisen(sql: Sql, auftragId: string): Promise<void> {
+  const [auftrag] = await sql<{ shopify_order_id: string }[]>`
+    select shopify_order_id from sales_orders where id = ${auftragId}`
+  assert.ok(auftrag?.shopify_order_id, 'kein Shop-Auftrag')
+  const gid = auftrag.shopify_order_id
+
+  const { fakeOrderHolen, fakeOrderHinterlegen } = await import('../../integrationen/shopify-fake.ts')
+  const bestellung = fakeOrderHolen(gid)
+  assert.ok(bestellung, `keine hinterlegte Fake-Bestellung ${gid}`)
+  fakeOrderHinterlegen({ ...bestellung, cancelledAt: '2026-10-02T09:00:00Z' } as { id: string })
+
+  const webhook = `prozesstest-storno-${gid.split('/').pop()}`
+  await sql`
+    insert into shopify_webhook_events (webhook_id, topic, shopify_order_id, payload)
+    values (${webhook}, 'orders/cancelled', ${gid}, ${sql.json({ id: gid })})
+    on conflict (webhook_id) do nothing`
+  const { processPendingWebhooks } = await import('../../integrationen/import.ts')
+  await processPendingWebhooks(10)
+  const [ev] = await sql<{ status: string; error: string | null }[]>`
+    select status, error from shopify_webhook_events where webhook_id = ${webhook}`
+  assert.equal(ev.status, 'done', `Storno-Webhook: ${ev.status}${ev.error ? ` — ${ev.error}` : ''}`)
+}
+
+/**
  * Klärfall provozieren: eine bezahlte Bestellung mit UNBEKANNTER SKU. Der
  * Import legt den Auftrag OHNE die Position an (Entwurf, kein Picking) und
  * schreibt die Klärzeile — der Prozess wartet am matching-Schritt. Liefert

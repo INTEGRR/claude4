@@ -1,4 +1,5 @@
 import { sql } from '@/db/client'
+import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
 
@@ -98,43 +99,38 @@ export async function bestaetigen(_p: object, ctx: AktionsKontext): Promise<Akti
   return { recordId: ctx.recordId }
 }
 
-export async function stornieren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
-  const [auftrag] = await sql<
-    { source: string; shopify_order_id: string | null; delivery_status: string }[]
-  >`
-    select source, shopify_order_id, delivery_status
-    from sales_orders where id = ${ctx.recordId!}`
+/** Der Satz, mit dem KRNL Storno und Reaktivierung von Shop-Aufträgen ablehnt. */
+export const SHOP_STORNO_HINWEIS =
+  'Shop-Bestellungen storniert Shopify: bitte im Shopify-Admin stornieren (mit Erstattung) — ' +
+  'KRNL übernimmt den Storno dann automatisch samt Lieferung, Fertigung und DHL-Label.'
 
-  // Versandte Shop-Aufträge lassen sich nicht mehr stornieren — Shopify kann
-  // versendete Bestellungen nicht sauber stornieren; der Weg ist die Retoure.
-  // ('pending'/'started' = nichts beim Kunden, nur reserviert — stornierbar.)
-  if (auftrag?.source === 'shopify' && ['partial', 'full'].includes(auftrag.delivery_status)) {
-    throw new Error(
-      'Die Ware ist (teilweise) versandt — der Shop-Auftrag lässt sich nicht mehr ' +
-        'stornieren. Bitte eine Retoure anlegen (Versand → Retouren).',
-    )
-  }
+export async function stornieren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [auftrag] = await sql<{ source: string }[]>`
+    select source from sales_orders where id = ${ctx.recordId!}`
+
+  // Storno führt Shopify (Entscheidungslog 2026-10-02): kein Storno aus KRNL,
+  // keine Meldung an den Shop. Der Shop-Webhook storniert hier.
+  if (auftrag?.source === 'shopify') throw new Error(SHOP_STORNO_HINWEIS)
 
   await sql`select cancel_sales_order(${ctx.recordId!}, ${ctx.actor})`
-
-  // ERP-Storno eines Shop-Auftrags → Storno im Shop nachziehen (Outbox):
-  // Restock ja, Rückerstattung bleibt bewusst manuell im Shopify-Backend.
-  if (auftrag?.source === 'shopify' && auftrag.shopify_order_id) {
-    await sql`select enqueue_job('shopify_order_cancel',
-      ${sql.json({ sales_order_id: ctx.recordId })},
-      ${`shop-storno-${ctx.recordId}`})`
-    return {
-      recordId: ctx.recordId,
-      text: 'Storniert — der Shop-Storno (mit Restock) läuft; Rückerstattung bitte manuell im Shop.',
-    }
+  const nachlauf = await stornoNachlauf(ctx.recordId!, ctx.actor)
+  return {
+    recordId: ctx.recordId,
+    text: nachlauf.aufgaben
+      ? 'Storniert — ein Paket ist schon ausgebucht, aber nicht übergeben: Aufgabe fürs Lager angelegt.'
+      : undefined,
   }
-  return { recordId: ctx.recordId }
 }
 
 export async function zurueckAufAngebot(
   _p: object,
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Ein in Shopify stornierter Auftrag lebt hier nicht wieder auf — Shopify führt.
+  const [auftrag] = await sql<{ source: string }[]>`
+    select source from sales_orders where id = ${ctx.recordId!}`
+  if (auftrag?.source === 'shopify') throw new Error(SHOP_STORNO_HINWEIS)
+
   await sql`update sales_orders set state = 'draft', locked = false
             where id = ${ctx.recordId!} and state in ('cancel', 'sent')`
   await sql`select log_event('sales_order', ${ctx.recordId!}, 'state',

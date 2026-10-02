@@ -25,6 +25,11 @@ export function fakeOrderHinterlegen(order: { id: string }): void {
   FAKE_BESTELLUNGEN.set(order.id, order)
 }
 
+/** Eine hinterlegte Bestellung (z. B. um sie storniert neu zu hinterlegen). */
+export function fakeOrderHolen(id: string): ({ id: string } & Record<string, unknown>) | undefined {
+  return FAKE_BESTELLUNGEN.get(id) as ({ id: string } & Record<string, unknown>) | undefined
+}
+
 /** Alle hinterlegten Bestellungen vergessen (Tests mit eigenem Bestand). */
 export function fakeBestellungenLeeren(): void {
   FAKE_BESTELLUNGEN.clear()
@@ -171,21 +176,6 @@ export async function fakeShopifyGraphQL<T>(
       }
       case 'products':
         return { products: { nodes: FAKE_PRODUKTE, pageInfo: { hasNextPage: false, endCursor: null } } }
-      case 'orderCancel': {
-        // Wie im echten Shop: die Bestellung gilt danach als storniert.
-        const bestellung = FAKE_BESTELLUNGEN.get(String(variables.orderId)) as
-          | { cancelledAt?: string | null }
-          | undefined
-        if (bestellung) bestellung.cancelledAt = '2026-01-03T12:00:00Z'
-        return {
-          orderCancel: {
-            job: { id: 'gid://shopify/Job/1' },
-            orderCancelUserErrors: bestellung
-              ? []
-              : [{ field: null, message: 'Order not found' }],
-          },
-        }
-      }
       default:
         return null
     }

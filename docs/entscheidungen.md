@@ -9,6 +9,43 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-02 — Storno von Shop-Aufträgen führt Shopify
+
+**Anlass:** Beim Abgleich, was KRNL an Shopify schreibt, stand der Storno
+nicht auf der Liste des Betreibers. Erlaubt sind dort nur Bestand,
+Reservierung, baubare Mengen, Fulfillment und Tracking. Bisher stornierte
+ein KRNL-Storno die Shop-Bestellung mit (0047: `orderCancel`, Restock,
+Kundenmail, aber ohne Erstattung). Für einen Storno brauchte es so zwei
+Stellen: KRNL stornieren, Shopify erstatten. Wird die Erstattung vergessen,
+hat der Kunde eine Storno-Mail, aber kein Geld zurück.
+
+**Entschieden (Betreiber):** „Keine Stornofunktion in KRNL — Shopify führt."
+- Shop-Aufträge werden nur im Shopify-Admin storniert. Erstattung,
+  Rücklage in den Bestand und Kundenmail laufen dort in einem Schritt.
+- Am Auftrag steht statt „Stornieren" der Link „In Shopify stornieren".
+- `verkauf.stornieren` und `verkauf.zurueck_auf_angebot` lehnen
+  Shop-Aufträge ab.
+- Job, Mutation und Prozessschritt für den Storno an Shopify sind
+  entfernt. In Prod lief der Job nie, Shopify stand auf Probe.
+- Der Webhook storniert den Auftrag und zieht alles Nachgelagerte mit:
+  - Lieferungen und Reservierungen;
+  - nicht begonnene Fertigung;
+  - neu: offene Druckaufträge und wartende Fulfillment-Meldungen;
+  - neu: DHL-Labels nicht übergebener Sendungen;
+  - neu: ist die Ware ausgebucht, aber das Paket nicht übergeben, bekommt
+    das Lager eine Aufgabe. Automatisch zurückbuchen wäre falsch, ob das
+    Paket schon weg ist, weiß nur das Lager.
+- Aufträge, die nicht aus dem Shop kommen, storniert KRNL wie bisher.
+  Derselbe Nachlauf gilt auch dort.
+
+**Umgesetzt:**
+- Migration 0110: neue Version des Verkaufsprozesses (Storno-Zweig je
+  Herkunft, Ereignis `shop_storniert`) und `cancel_sales_order`.
+- Code: `src/modules/verkauf/storno-nachlauf.ts`.
+- Seite: `verkauf/[id]`.
+- Tests: Fixture `verkauf`, `tests/prozesse/shop-storno.test.ts`.
+- Doku: docs/prozesse.md, docs/module/verkauf.md, docs/module/integrationen.md.
+
 ## 2026-10-02 — Auswahlbox mit Suche statt Dropdowns
 
 **Anlass (Betreiber):** „An vielen Stellen sind Dropdowns, z. B. Kunden oder

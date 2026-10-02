@@ -10,6 +10,7 @@ import { TagEditor } from '@/components/tag-editor'
 import { herkunftHref } from '@/app/(erp)/lager/herkunft'
 import { adressePruefen } from '@/app/(erp)/versand/actions'
 import { dhlConfigured } from '@/modules/versand/dhl'
+import { shopifyBestellungUrl } from '@/modules/integrationen/shopify-links'
 import {
   addLine,
   cancelOrder,
@@ -66,6 +67,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     where so.id = ${id}`
 
   if (!order) notFound()
+  const shopAuftrag = order.source === 'shopify'
+  const shopUrl = shopAuftrag ? shopifyBestellungUrl(order.shopify_order_id) : null
 
   const kopf = (order as unknown) as {
     user_id: string | null
@@ -242,16 +245,36 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <ActionButton action={setLocked.bind(null, id, true)}>Sperren</ActionButton>
               ))}
-            {order.state !== 'cancel' && (
+            {/* Storno führt Shopify (2026-10-02): Shop-Aufträge werden im
+                Shopify-Admin storniert (mit Erstattung); der Webhook storniert
+                hier samt Lieferung, Fertigung und Label. */}
+            {order.state !== 'cancel' && shopAuftrag && (
+              shopUrl ? (
+                <a
+                  className="btn danger"
+                  href={shopUrl}
+                  target="_blank"
+                  rel="noopener"
+                  title="Storno und Erstattung im Shopify-Admin — KRNL storniert den Auftrag dann automatisch samt Lieferung, Fertigung und DHL-Label"
+                >
+                  In Shopify stornieren ↗
+                </a>
+              ) : (
+                <span className="muted small" title="SHOPIFY_SHOP_DOMAIN fehlt — deshalb kein Link">
+                  Storno in Shopify
+                </span>
+              )
+            )}
+            {order.state !== 'cancel' && !shopAuftrag && (
               <ActionButton
                 className="danger"
                 action={cancelOrder.bind(null, id)}
-                confirm="Auftrag wirklich stornieren? Offene Lieferungen werden abgebrochen."
+                confirm="Auftrag wirklich stornieren? Offene Lieferungen, nicht begonnene Fertigung und DHL-Labels werden storniert."
               >
                 Stornieren
               </ActionButton>
             )}
-            {(order.state === 'cancel' || order.state === 'sent') && (
+            {!shopAuftrag && (order.state === 'cancel' || order.state === 'sent') && (
               <ActionButton action={resetToDraft.bind(null, id)}>Auf Angebot zurücksetzen</ActionButton>
             )}
           </>
@@ -332,7 +355,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <span>ID</span>
             </div>
             <div className="mono" style={{ fontSize: 15, color: 'var(--display-bright)' }}>
-              {order.shopify_order_name ?? '—'}
+              {shopUrl ? (
+                <a href={shopUrl} target="_blank" rel="noopener" style={{ color: 'inherit' }} title="Im Shopify-Admin öffnen">
+                  {order.shopify_order_name ?? 'Shopify'} ↗
+                </a>
+              ) : (
+                (order.shopify_order_name ?? '—')
+              )}
             </div>
             <div className="mono small">{order.shopify_order_id}</div>
           </div>

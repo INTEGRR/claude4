@@ -1591,6 +1591,36 @@ gewünscht, ein Schritt im Fertigungsprozess, keine Nebenwirkung von
 `fertigung.bestaetigen` (Entscheidungslog 2026-10-01). Aufbau der Etiketten:
 [module/versand.md](module/versand.md) „Etiketten".
 
+## Storno von Shop-Aufträgen führt Shopify (Migration 0110, umgesetzt)
+
+Betreiber 2026-10-02: „Keine Stornofunktion in KRNL — Shopify führt." Der
+Verkaufsprozess bekommt einen Storno-Zweig je Herkunft:
+
+- **Manuelle Aufträge:** Aktion `verkauf.stornieren` wie bisher (Kanten
+  `anlegen/bestaetigen → stornieren` nur, wenn `source` nicht `shopify`).
+- **Shop-Aufträge:** Ereignis `shop_storniert` (`shop:bestellung_storniert`).
+  Storniert und erstattet wird im Shopify-Admin; der Webhook ruft
+  `cancel_sales_order` auf. Der Dienstschritt „Storno an den Shop melden"
+  (0047, Job `shopify_order_cancel`) ist weg — KRNL schreibt keinen Storno
+  mehr an Shopify. `verkauf.stornieren` und `verkauf.zurueck_auf_angebot`
+  lehnen Shop-Aufträge ab; am Auftrag steht statt des Knopfs der Link
+  „In Shopify stornieren".
+
+Nachgelagert zieht der Storno (beide Wege) mit:
+- `cancel_sales_order`: offene Lieferungen samt Reservierung (die frei
+  gewordene Ware geht an Wartende, 0086, und als Bestand an den Shop),
+  nicht begonnene Fertigung (angebrochene bleibt mit Hinweis), offene
+  Druckaufträge, wartende Shop-Rückmeldungen.
+- `verkauf/storno-nachlauf.ts` nach der Transaktion: DHL-Labels stornierter
+  Lieferungen werden bei DHL storniert. Ist die Lieferung schon ausgebucht,
+  das Paket aber nicht übergeben, gibt es eine Aufgabe fürs Lager
+  („nicht verschicken, Label stornieren, per Retoure zurückbuchen").
+
+Der Belegstatus bleibt die Wahrheit: Nach dem Shop-Storno steht der Auftrag
+auf dem Schritt mit Zustand `cancel` („Stornieren"). Das Ereignis ist der
+sichtbare Zweig, kein zweiter Zustand. Tests: Fixture `verkauf` (Lauf
+„Shop-Auftrag: Storno kommt aus Shopify"), `tests/prozesse/shop-storno.test.ts`.
+
 ## Noch offen (Kurzfassung)
 
 - **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:

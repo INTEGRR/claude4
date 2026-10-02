@@ -13,7 +13,6 @@ const TITEL: Record<string, string> = {
   fulfillmentCreate: 'Bestellung als versendet melden',
   fulfillmentTrackingInfoUpdate: 'Sendungsnummer nachreichen',
   tagsAdd: 'Tags an der Bestellung setzen',
-  orderCancel: 'Bestellung stornieren',
   productCreate: 'Produkt anlegen',
   productUpdate: 'Produkt ändern',
   productSet: 'Produkt anlegen/ändern',

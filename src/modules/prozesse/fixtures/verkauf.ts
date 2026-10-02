@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import type { Sql } from 'postgres'
 import type { ProzessFixture } from './typen.ts'
-import { bestellungEinspeisen } from './shopify-versand.ts'
+import { bestellungEinspeisen, shopStornoEinspeisen } from './shopify-versand.ts'
 
 /**
  * P: Manueller Verkauf als KOMPONIERTE Kette (0064) — Angebot,
  * wiederholbarer Positionsschritt, Bestätigung (der Ausgangs-Transfer
  * entsteht), Teilprozess Lieferung am Transfer, Ende. Dazu der
- * Storno-Ausstieg (im Entwurf und als Shop-Auftrag).
+ * Storno-Ausstieg: manuell im Entwurf, beim Shop-Auftrag aus Shopify.
  */
 
 /** Den Warenausgang buchen — wie im Betrieb über picking_validate. */
@@ -70,44 +70,54 @@ export const VERKAUF_FIXTURE: ProzessFixture = {
       },
     },
     {
-      // BUG/00001: der ERP-Storno eines Shop-Auftrags zieht den Shop nach
-      // (orderCancel mit Restock; Rückerstattung bleibt manuell) — als
-      // sichtbarer dienst-Schritt, den es nur für Shop-Aufträge gibt.
-      name: 'Shop-Auftrag stornieren meldet den Storno an den Shop',
+      // Storno führt Shopify (2026-10-02, löst BUG/00001 ab): KRNL lehnt den
+      // Storno eines Shop-Auftrags ab und meldet nichts an den Shop; der
+      // Shop-Storno (Webhook) storniert hier samt Lieferung.
+      name: 'Shop-Auftrag: Storno kommt aus Shopify, KRNL zieht nach',
       beleg: async (ctx, sql) => {
         await bestellungEinspeisen(ctx, sql)
         return ctx.p4AuftragId
       },
-      pfad: ['stornieren', 'shop_storno'],
+      pfad: ['shop_storniert'],
+      ereignisse: {
+        shop_storniert: async (ctx, sql) => {
+          const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+          await assert.rejects(
+            aktionAusfuehrenGeprueft(
+              'verkauf.stornieren',
+              { recordId: ctx.p4AuftragId },
+              { name: 'prozesstest', role: 'admin' },
+            ),
+            /im Shopify-Admin stornieren/,
+            'Shop-Aufträge storniert Shopify, nicht KRNL',
+          )
+          await shopStornoEinspeisen(sql, ctx.p4AuftragId)
+          return undefined
+        },
+      },
+      danachKeineSchritte: true,
       pruefen: async (sql, ctx) => {
         const [auftrag] = await sql<{ state: string }[]>`
           select state from sales_orders where id = ${ctx.p4AuftragId}`
         assert.equal(auftrag.state, 'cancel')
 
-        const [job] = await sql<{ status: string }[]>`
-          select status from integration_jobs
-          where kind = 'shopify_order_cancel'
-            and payload ->> 'sales_order_id' = ${ctx.p4AuftragId}`
-        assert.equal(job?.status, 'done', 'der Shop-Storno-Job muss durchgelaufen sein')
+        const lieferungen = await sql<{ state: string }[]>`
+          select state from stock_pickings
+          where origin_model = 'sales_order' and origin_id = ${ctx.p4AuftragId}`
+        assert.ok(lieferungen.length > 0)
+        assert.ok(lieferungen.every((l) => l.state === 'cancel'), 'offene Lieferungen werden mit storniert')
 
-        // Der Storno-Hinweis (inkl. „Rückerstattung manuell") steht am Auftrag.
-        const [hinweis] = await sql<{ message: string }[]>`
-          select message from audit_log
+        // Kein Rückweg an den Shop: es gibt keinen Storno-Job mehr.
+        const [{ n }] = await sql<{ n: number }[]>`
+          select count(*)::int as n from integration_jobs
+          where kind = 'shopify_order_cancel' and payload ->> 'sales_order_id' = ${ctx.p4AuftragId}`
+        assert.equal(n, 0, 'KRNL meldet keinen Storno an Shopify')
+
+        const [log] = await sql<{ actor: string }[]>`
+          select actor from audit_log
           where model = 'sales_order' and record_id = ${ctx.p4AuftragId}::uuid
-            and message like '%Shop-Bestellung storniert%'`
-        assert.ok(hinweis, 'der Storno-Hinweis muss am Auftrag stehen')
-
-        // Der Riegel: ein bereits versandter Shop-Auftrag (aus dem
-        // Klärfall-Lauf) lässt sich NICHT stornieren — der Weg ist die Retoure.
-        const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
-        await assert.rejects(
-          aktionAusfuehrenGeprueft(
-            'verkauf.stornieren',
-            { recordId: ctx.p4KlaerAuftragId },
-            { name: 'prozesstest', role: 'admin' },
-          ),
-          /Retoure/,
-        )
+            and message = 'Auftrag storniert'`
+        assert.equal(log?.actor, 'shopify', 'storniert hat der Shop')
       },
     },
   ],

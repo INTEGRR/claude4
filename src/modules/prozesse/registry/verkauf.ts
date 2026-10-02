@@ -117,7 +117,10 @@ export const VERKAUF = {
     label: 'Auftrag stornieren',
     bereich: 'verkauf',
     ki: true,
-    beschreibung: 'Storniert den Auftrag samt offener Lieferungen (nach den Storno-Regeln).',
+    beschreibung:
+      'Storniert einen Auftrag, der NICHT aus dem Shop kommt, samt offener Lieferungen, nicht begonnener ' +
+      'Fertigung und DHL-Labels. Shop-Aufträge storniert Shopify (im Shopify-Admin, mit Erstattung) — ' +
+      'KRNL zieht dann automatisch nach.',
     bindung: 'beleg',
     modell: 'sales_order',
     uebergang: { von: ['draft', 'sent', 'sale'], nach: ['cancel'] },
@@ -128,7 +131,7 @@ export const VERKAUF = {
   'verkauf.zurueck_auf_angebot': {
     label: 'Auf Angebot zurücksetzen',
     bereich: 'verkauf',
-    beschreibung: 'Holt einen stornierten/versendeten Beleg zurück in den Entwurf.',
+    beschreibung: 'Holt einen stornierten/versendeten Beleg zurück in den Entwurf (nicht für Shop-Aufträge — Shopify führt).',
     bindung: 'beleg',
     modell: 'sales_order',
     uebergang: { von: ['cancel', 'sent'], nach: ['draft'] },
