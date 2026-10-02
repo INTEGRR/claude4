@@ -3,6 +3,7 @@ import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
 import { createOrder, createOrderForNewCustomer } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export default async function NewOrderPage() {
         <ActionForm action={createOrder} style={{ maxWidth: 460 }}>
           <label className="field">
             <span>Kunde</span>
-            <select name="partner_id" required defaultValue="">
+            <Auswahl name="partner_id" required defaultValue="">
               <option value="" disabled>— auswählen —</option>
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -26,7 +27,7 @@ export default async function NewOrderPage() {
                   {p.city ? ` · ${p.city}` : ''}
                 </option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <button className="primary" type="submit">Auftrag anlegen</button>
         </ActionForm>

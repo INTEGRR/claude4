@@ -5,6 +5,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { createMo } from './actions'
 import { FertigungBulk } from './bulk'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,12 +119,12 @@ export default async function FertigungPage({
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Produkt (nur Produkte mit Stückliste)</span>
-              <select name="variant_id" required defaultValue="">
+              <Auswahl name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Menge</span>
@@ -179,12 +180,12 @@ export default async function FertigungPage({
           <form method="get" className="actions" style={{ gap: 8 }}>
             {status && <input type="hidden" name="status" value={status} />}
             {auftrag && <input type="hidden" name="auftrag" value={auftrag} />}
-            <select name="produkt" defaultValue={produkt ?? ''} aria-label="Nach Produkt filtern">
+            <Auswahl name="produkt" defaultValue={produkt ?? ''} aria-label="Nach Produkt filtern">
               <option value="">Alle Produkte</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
-            </select>
+            </Auswahl>
             <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <input type="checkbox" name="material" value="bereit" defaultChecked={nurStartbare} />
               <span>nur startbare</span>

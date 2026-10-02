@@ -11,6 +11,7 @@ import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 import { RecordComments } from '@/components/record-comments'
 import { DokumenteKarte } from '@/components/dokumente'
 import { TagEditor } from '@/components/tag-editor'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,56 +191,56 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field">
               <span>Einkaufseinheit</span>
-              <select name="purchase_uom_id" defaultValue={tpl.purchase_uom_id ?? ''}>
+              <Auswahl name="purchase_uom_id" defaultValue={tpl.purchase_uom_id ?? ''}>
                 <option value="">wie Lagereinheit</option>
                 {uoms.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row">
             <label className="field">
               <span>Abrechnung Verkauf</span>
-              <select name="invoice_policy" defaultValue={tpl.invoice_policy}>
+              <Auswahl name="invoice_policy" defaultValue={tpl.invoice_policy}>
                 <option value="order">nach bestellter Menge</option>
                 <option value="delivery">nach gelieferter Menge</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Abrechnung Einkauf</span>
-              <select name="bill_policy" defaultValue={tpl.bill_policy}>
+              <Auswahl name="bill_policy" defaultValue={tpl.bill_policy}>
                 <option value="received">nach erhaltener Menge</option>
                 <option value="ordered">nach bestellter Menge</option>
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row">
             <label className="field">
               <span>Kategorie</span>
-              <select name="category_id" defaultValue={tpl.category_id}>
+              <Auswahl name="category_id" defaultValue={tpl.category_id}>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.full_path}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Steuer Verkauf</span>
-              <select name="sale_tax_id" defaultValue={tpl.sale_tax_id ?? ''}>
+              <Auswahl name="sale_tax_id" defaultValue={tpl.sale_tax_id ?? ''}>
                 <option value="">keine</option>
                 {taxes.filter((t) => t.type_tax_use === 'sale').map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Steuer Einkauf</span>
-              <select name="purchase_tax_id" defaultValue={tpl.purchase_tax_id ?? ''}>
+              <Auswahl name="purchase_tax_id" defaultValue={tpl.purchase_tax_id ?? ''}>
                 <option value="">keine</option>
                 {taxes.filter((t) => t.type_tax_use === 'purchase').map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Lieferzeit an Kunden (Tage)</span>
@@ -247,20 +248,20 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field">
               <span>Verantwortlich</span>
-              <select name="responsible_id" defaultValue={tpl.responsible_id ?? ''}>
+              <Auswahl name="responsible_id" defaultValue={tpl.responsible_id ?? ''}>
                 <option value="">—</option>
                 {benutzer.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Rückverfolgung</span>
-              <select name="tracking" defaultValue={(tpl as { tracking?: string }).tracking ?? 'none'}>
+              <Auswahl name="tracking" defaultValue={(tpl as { tracking?: string }).tracking ?? 'none'}>
                 <option value="none">keine</option>
                 <option value="lot">Losnummern (Chargen)</option>
                 <option value="serial">Seriennummern</option>
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row">
@@ -410,12 +411,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="row" style={{ alignItems: 'flex-end' }}>
               <label className="field" style={{ flex: 2 }}>
                 <span>Lieferant</span>
-                <select name="vendor_id" required defaultValue="">
+                <Auswahl name="vendor_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>ab Menge (MOQ)</span>
@@ -486,20 +487,20 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <div className="row">
             <label className="field">
               <span>Attribut</span>
-              <select name="attribute_id" required defaultValue="">
+              <Auswahl name="attribute_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {allAttributes.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ flex: 2 }}>
               <span>Werte (Mehrfachauswahl)</span>
-              <select name="value_ids" multiple size={5} required>
+              <Auswahl name="value_ids" multiple required placeholder="Werte wählen …">
                 {attributeValues.map((v) => (
                   <option key={v.id} value={v.id}>{v.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <div className="shrink field">
               <button className="primary" type="submit">Varianten erzeugen</button>

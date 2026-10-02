@@ -5,6 +5,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, hours, isoDatum } from '@/modules/shared/format'
 import { createShift, deleteShift } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,23 +191,23 @@ export default async function SchichtplanPage({
           <div className="row">
             <label className="field" style={{ flex: 2, marginBottom: 0 }}>
               <span>Mitarbeiter</span>
-              <select name="employee_id" required defaultValue="">
+              <Auswahl name="employee_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {mitarbeiter.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ flex: 2, marginBottom: 0 }}>
               <span>Schicht</span>
-              <select name="template_id" required defaultValue="">
+              <Auswahl name="template_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {vorlagen.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name} ({v.start_time.slice(0, 5)}–{v.end_time.slice(0, 5)})
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Tag</span>
@@ -214,12 +215,12 @@ export default async function SchichtplanPage({
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Arbeitsplatz</span>
-              <select name="work_center_id" defaultValue="">
+              <Auswahl name="work_center_id" defaultValue="">
                 <option value="">— egal —</option>
                 {arbeitsplaetze.map((w) => (
                   <option key={w.id} value={w.id}>{w.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <div className="shrink">
               <button className="primary" type="submit">Einplanen</button>

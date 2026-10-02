@@ -19,6 +19,7 @@ import {
   refreshTracking,
 } from './actions'
 import { AuswahlAlle, AuswahlBereich, AuswahlBox, PackzettelLeiste } from './packzettel-auswahl'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -262,12 +263,12 @@ export default async function VersandPage({
           </label>
           <label className="field shrink">
             <span>Produkt (laut Regel)</span>
-            <select name="produkt" className="mono" defaultValue={filter.produkt} style={{ width: 130 }}>
+            <Auswahl name="produkt" className="mono" defaultValue={filter.produkt} style={{ width: 130 }}>
               <option value="">alle</option>
               {PRODUCTS.map((p) => (
                 <option key={p.code} value={p.code}>{p.code}</option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <div className="shrink field">
             <button className="small" type="submit">Filtern</button>
@@ -428,7 +429,7 @@ export default async function VersandPage({
                               <span className="mono-label">g</span>
                             </div>
                             <div className="shrink">
-                              <select
+                              <Auswahl
                                 name="dhl_product"
                                 className="mono"
                                 aria-label="DHL-Produkt"
@@ -439,7 +440,7 @@ export default async function VersandPage({
                                 {PRODUCTS.map((p) => (
                                   <option key={p.code} value={p.code}>{p.code} — {p.label}</option>
                                 ))}
-                              </select>
+                              </Auswahl>
                             </div>
                             <div className="shrink">
                               {/* Zeilenaktion bleibt neutral — Orange ist der Kopfzeile vorbehalten. */}

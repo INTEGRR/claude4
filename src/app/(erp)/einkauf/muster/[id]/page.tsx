@@ -13,6 +13,7 @@ import { BEWERTUNG_NOTEN, MUSTER_ERGEBNISSE, naechsteRevision, rundeText, tracki
 import { date, dateTime, money } from '@/modules/shared/format'
 import { entwurfAnlegen } from '../../entwuerfe/actions'
 import { musterAendern, musterBewerten, musterErhalten } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -254,17 +255,17 @@ export default async function MusterRundePage({ params }: { params: Promise<{ id
             <div className="row">
               <label className="field shrink">
                 <span>Ergebnis</span>
-                <select name="ergebnis" defaultValue="freigeben">
+                <Auswahl name="ergebnis" defaultValue="freigeben">
                   {Object.entries(MUSTER_ERGEBNISSE).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Note</span>
-                <select name="note" defaultValue="">
+                <Auswahl name="note" defaultValue="">
                   <option value="">—</option>
                   {Object.entries(BEWERTUNG_NOTEN)
                     .reverse()
@@ -273,7 +274,7 @@ export default async function MusterRundePage({ params }: { params: Promise<{ id
                         {label}
                       </option>
                     ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Nächste Revision (beim Nachbessern)</span>

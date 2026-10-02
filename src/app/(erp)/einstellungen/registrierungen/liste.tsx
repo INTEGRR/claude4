@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui'
 import { standSetzen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export interface Registrierung {
   id: string
@@ -81,11 +82,11 @@ export function Liste({ zeilen }: { zeilen: Registrierung[] }) {
           >
             <div className="field" style={{ flex: '0 0 160px' }}>
               <label htmlFor={`stand-${z.id}`}>Stand</label>
-              <select id={`stand-${z.id}`} name="status" defaultValue={z.status}>
+              <Auswahl id={`stand-${z.id}`} name="status" defaultValue={z.status}>
                 {STAENDE.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
-              </select>
+              </Auswahl>
             </div>
             <div className="field" style={{ flex: '1 1 260px' }}>
               <label htmlFor={`notiz-${z.id}`}>Notiz</label>

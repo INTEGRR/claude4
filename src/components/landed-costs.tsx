@@ -4,6 +4,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, TableWrap } from '@/components/ui'
 import { cancelLandedCost, createLandedCost, postLandedCost } from '@/app/(erp)/einkauf/actions'
 import { dateTime, money } from '@/modules/shared/format'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Einstandsnebenkosten zu einem Wareneingang: Fracht, Zoll, Versicherung,
@@ -161,21 +162,21 @@ export async function LandedCosts({ pickingId }: { pickingId: string }) {
           <div className="row" style={{ alignItems: 'flex-end' }}>
             <label className="field">
               <span>Kostenart</span>
-              <select name="cost_type" defaultValue="freight">
+              <Auswahl name="cost_type" defaultValue="freight">
                 <option value="freight">Fracht</option>
                 <option value="customs_duty">Zoll</option>
                 <option value="insurance">Versicherung</option>
                 <option value="handling">Handling</option>
                 <option value="other">Sonstiges</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Verteilung</span>
-              <select name="basis" defaultValue="weight">
+              <Auswahl name="basis" defaultValue="weight">
                 <option value="weight">nach Gewicht</option>
                 <option value="value">nach Wert</option>
                 <option value="quantity">nach Menge</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Betrag</span>
@@ -183,20 +184,20 @@ export async function LandedCosts({ pickingId }: { pickingId: string }) {
             </label>
             <label className="field">
               <span>Währung</span>
-              <select className="mono" name="currency" defaultValue="EUR">
+              <Auswahl className="mono" name="currency" defaultValue="EUR">
                 {currencies.map((c) => (
                   <option key={c.code} value={c.code}>{c.code}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Rechnungssteller</span>
-              <select name="vendor_id" defaultValue="">
+              <Auswahl name="vendor_id" defaultValue="">
                 <option value="">—</option>
                 {vendors.map((v) => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="shrink" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingBottom: 7 }}>
               <input type="checkbox" name="is_estimate" />

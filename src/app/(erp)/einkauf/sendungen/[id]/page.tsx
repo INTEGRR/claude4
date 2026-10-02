@@ -27,6 +27,7 @@ import {
   sendungVerzollen,
   sendungZollErfassen,
 } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -395,24 +396,24 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field shrink">
                   <span>Modus</span>
-                  <select name="modus" defaultValue={s.modus}>
+                  <Auswahl name="modus" defaultValue={s.modus}>
                     {Object.entries(SENDUNG_MODI).map(([k, label]) => (
                       <option key={k} value={k}>
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Spediteur</span>
-                  <select name="spediteur_id" defaultValue={s.spediteur_id ?? ''}>
+                  <Auswahl name="spediteur_id" defaultValue={s.spediteur_id ?? ''}>
                     <option value="">—</option>
                     {partner.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Träger</span>
@@ -462,14 +463,14 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field shrink">
                   <span>Zuständig</span>
-                  <select name="zustaendig_id" defaultValue={s.zustaendig_id ?? ''}>
+                  <Auswahl name="zustaendig_id" defaultValue={s.zustaendig_id ?? ''}>
                     <option value="">—</option>
                     {nutzer.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
               </div>
               <label className="field">
@@ -558,14 +559,14 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
             <div className="row">
               <label className="field" style={{ flex: 2 }}>
                 <span>Bestellung aufnehmen</span>
-                <select name="bestellung" defaultValue="">
+                <Auswahl name="bestellung" defaultValue="">
                   <option value="">—</option>
                   {kandidaten.map((k) => (
                     <option key={k.id} value={k.id}>
                       {k.label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>oder Nummern</span>
@@ -678,13 +679,13 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
             <div className="row">
               <label className="field shrink">
                 <span>Art</span>
-                <select name="art" defaultValue="fracht">
+                <Auswahl name="art" defaultValue="fracht">
                   {Object.entries(KOSTEN_ARTEN).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Betrag</span>
@@ -700,38 +701,38 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
               </label>
               <label className="field">
                 <span>Rechnungssteller</span>
-                <select name="partner_id" defaultValue={s.spediteur_id ?? ''}>
+                <Auswahl name="partner_id" defaultValue={s.spediteur_id ?? ''}>
                   <option value="">—</option>
                   {partner.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             </div>
             <div className="row">
               <label className="field">
                 <span>Lieferantenrechnung (optional)</span>
-                <select name="vendor_bill_id" defaultValue="">
+                <Auswahl name="vendor_bill_id" defaultValue="">
                   <option value="">—</option>
                   {rechnungen.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Dokument (optional)</span>
-                <select name="dokument_id" defaultValue="">
+                <Auswahl name="dokument_id" defaultValue="">
                   <option value="">—</option>
                   {dokumente.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <input type="checkbox" name="schaetzung" />
@@ -846,14 +847,14 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
               </label>
               <label className="field">
                 <span>Dokument (optional)</span>
-                <select name="dokument_id" defaultValue="">
+                <Auswahl name="dokument_id" defaultValue="">
                   <option value="">—</option>
                   {dokumente.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <div className="field shrink">
                 <button type="submit" className="small primary">

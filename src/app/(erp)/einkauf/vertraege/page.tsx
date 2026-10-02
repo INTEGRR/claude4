@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { VERTRAG_ARTEN, type VertragStatus, vertragsLage } from '@/modules/einkauf/lieferantenvertraege'
 import { date } from '@/modules/shared/format'
 import { vertragAnlegen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -152,7 +153,7 @@ export default async function VertraegePage({
             <div className="row">
               <label className="field">
                 <span>Lieferant</span>
-                <select name="partner_id" required defaultValue={vorLieferant}>
+                <Auswahl name="partner_id" required defaultValue={vorLieferant}>
                   <option value="" disabled>
                     — wählen —
                   </option>
@@ -161,17 +162,17 @@ export default async function VertraegePage({
                       {l.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Art</span>
-                <select name="art" defaultValue="nda">
+                <Auswahl name="art" defaultValue="nda">
                   {Object.entries(VERTRAG_ARTEN).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field" style={{ flex: 2 }}>
                 <span>Titel</span>
@@ -201,14 +202,14 @@ export default async function VertraegePage({
               </label>
               <label className="field shrink">
                 <span>Währung der Preise</span>
-                <select name="waehrung" defaultValue="" className="mono">
+                <Auswahl name="waehrung" defaultValue="" className="mono">
                   <option value="">wie Lieferant</option>
                   {waehrungen.map((w) => (
                     <option key={w.code} value={w.code}>
                       {w.code}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             </div>
             <label className="field">

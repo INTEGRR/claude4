@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import type { ActionResult } from '@/modules/shared/action'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Kompakte Zeile "Verantwortlich + Dringend" für Beleg-Detailseiten
@@ -25,12 +26,12 @@ export async function ResponsibleForm({
       <div className="row" style={{ marginBottom: 0 }}>
         <label className="field" style={{ marginBottom: 0, minWidth: 180 }}>
           <span>Verantwortlich</span>
-          <select name="user_id" defaultValue={userId ?? ''}>
+          <Auswahl name="user_id" defaultValue={userId ?? ''}>
             <option value="">—</option>
             {benutzer.map((u) => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
-          </select>
+          </Auswahl>
         </label>
         {/* "Dringend" ist ein kritischer Zustand — hier darf die Leuchte glühen. */}
         <label className="shrink" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingBottom: 7 }}>

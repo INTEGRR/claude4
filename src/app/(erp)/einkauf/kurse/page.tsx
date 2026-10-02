@@ -5,6 +5,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, isoDatum } from '@/modules/shared/format'
 import { setExchangeRate } from '../actions'
 import { ezbKurseHolen } from '../projekte/actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,12 +68,12 @@ export default async function KursePage() {
           <div className="row" style={{ alignItems: 'flex-end' }}>
             <label className="field">
               <span>Währung</span>
-              <select className="mono" name="currency" required defaultValue="">
+              <Auswahl className="mono" name="currency" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {currencies.map((c) => (
                   <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Kurs (in Euro)</span>

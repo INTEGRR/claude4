@@ -8,6 +8,7 @@ import { ProzessPanel } from '@/components/prozess-panel'
 import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money } from '@/modules/shared/format'
 import { vertragAendern, vertragZahlen } from '../../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,20 +79,20 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
             </label>
             <label className="field shrink">
               <span>Kategorie</span>
-              <select name="kategorie" defaultValue={v.kategorie}>
+              <Auswahl name="kategorie" defaultValue={v.kategorie}>
                 {kategorien.map((k) => (
                   <option key={k} value={k}>{k}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ flex: 1.5 }}>
               <span>Partner</span>
-              <select name="partner_id" defaultValue={v.partner_id ?? ''}>
+              <Auswahl name="partner_id" defaultValue={v.partner_id ?? ''}>
                 <option value="">—</option>
                 {partner.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -105,11 +106,11 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
             </label>
             <label className="field shrink">
               <span>Intervall</span>
-              <select name="intervall" defaultValue={v.intervall}>
+              <Auswahl name="intervall" defaultValue={v.intervall}>
                 <option value="monatlich">monatlich</option>
                 <option value="quartalsweise">quartalsweise</option>
                 <option value="jaehrlich">jährlich</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field shrink">
               <span>Zahltag</span>
@@ -265,12 +266,12 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
                 </label>
                 <label className="field shrink">
                   <span>Bankkonto</span>
-                  <select name="bankkonto_id" defaultValue="">
+                  <Auswahl name="bankkonto_id" defaultValue="">
                     <option value="">—</option>
                     {konten.map((k) => (
                       <option key={k.id} value={k.id}>{k.name}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <div className="shrink field">
                   <button className="small" type="submit">

@@ -12,6 +12,7 @@ import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { EIGENTUEMER, WERKZEUG_ARTEN, WERKZEUG_STATUS, lebensdauer } from '@/modules/einkauf/werkzeuge'
 import { dateTime, money } from '@/modules/shared/format'
 import { werkzeugAendern, werkzeugSchussBuchen, werkzeugStatusSetzen } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -169,13 +170,13 @@ export default async function WerkzeugPage({ params }: { params: Promise<{ id: s
             <div className="row">
               <label className="field shrink">
                 <span>Neuer Status</span>
-                <select name="status" defaultValue={w.status === 'in_auftrag' ? 'aktiv' : statusWechsel[0]}>
+                <Auswahl name="status" defaultValue={w.status === 'in_auftrag' ? 'aktiv' : statusWechsel[0]}>
                   {statusWechsel.map((s) => (
                     <option key={s} value={s}>
                       {WERKZEUG_STATUS[s]}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Grund (Pflicht beim Sperren und Ausmustern)</span>
@@ -202,33 +203,33 @@ export default async function WerkzeugPage({ params }: { params: Promise<{ id: s
                 </label>
                 <label className="field">
                   <span>Art</span>
-                  <select name="art" defaultValue={w.art}>
+                  <Auswahl name="art" defaultValue={w.art}>
                     {Object.entries(WERKZEUG_ARTEN).map(([k, label]) => (
                       <option key={k} value={k}>
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Standort (Lieferant)</span>
-                  <select name="partner_id" defaultValue={w.partner_id}>
+                  <Auswahl name="partner_id" defaultValue={w.partner_id}>
                     {lieferanten.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.name}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field shrink">
                   <span>Eigentümer</span>
-                  <select name="eigentuemer" defaultValue={w.eigentuemer}>
+                  <Auswahl name="eigentuemer" defaultValue={w.eigentuemer}>
                     {Object.entries(EIGENTUEMER).map(([k, label]) => (
                       <option key={k} value={k}>
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
               </div>
               <div className="row">
@@ -238,13 +239,13 @@ export default async function WerkzeugPage({ params }: { params: Promise<{ id: s
                 </label>
                 <label className="field shrink">
                   <span>Währung</span>
-                  <select name="waehrung" defaultValue={w.waehrung} className="mono">
+                  <Auswahl name="waehrung" defaultValue={w.waehrung} className="mono">
                     {waehrungen.map((c) => (
                       <option key={c.code} value={c.code}>
                         {c.code}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field shrink">
                   <span>Lebensdauer (Schuss)</span>
@@ -252,14 +253,14 @@ export default async function WerkzeugPage({ params }: { params: Promise<{ id: s
                 </label>
                 <label className="field">
                   <span>Einkaufsprojekt</span>
-                  <select name="einkaufsprojekt_id" defaultValue={w.projekt_id ?? ''}>
+                  <Auswahl name="einkaufsprojekt_id" defaultValue={w.projekt_id ?? ''}>
                     <option value="">—</option>
                     {projekte.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Anderer Artikel (SKU)</span>

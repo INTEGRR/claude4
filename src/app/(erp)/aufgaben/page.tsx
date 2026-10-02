@@ -7,6 +7,7 @@ import { Card, Empty, PageHeader } from '@/components/ui'
 import { type AufgabenFilter, aufgabenListe } from '@/modules/aufgaben/liste'
 import { TEAMS, heuteInBerlin } from '@/modules/aufgaben/termin'
 import { aufgabeAnlegen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,7 @@ export default async function AufgabenPage({ searchParams }: { searchParams: Pro
             </label>
             <label className="field" style={{ flex: 1.4 }}>
               <span>Für</span>
-              <select name="zustaendig" defaultValue="">
+              <Auswahl name="zustaendig" defaultValue="">
                 <option value="">mich</option>
                 <optgroup label="Team">
                   {Object.entries(TEAMS).map(([rolle, name]) => (
@@ -64,7 +65,7 @@ export default async function AufgabenPage({ searchParams }: { searchParams: Pro
                       </option>
                     ))}
                 </optgroup>
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row">

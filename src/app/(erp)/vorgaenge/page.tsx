@@ -5,6 +5,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { vorgangStarten } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,11 +78,11 @@ export default async function VorgaengePage() {
             <div className="row">
               <label className="field">
                 <span>Prozess</span>
-                <select name="prozess_code" required defaultValue={prozesse[0].code}>
+                <Auswahl name="prozess_code" required defaultValue={prozesse[0].code}>
                   {prozesse.map((p) => (
                     <option key={p.code} value={p.code}>{p.name}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field" style={{ flex: 2 }}>
                 <span>Titel</span>
@@ -89,12 +90,12 @@ export default async function VorgaengePage() {
               </label>
               <label className="field">
                 <span>Kontakt (optional)</span>
-                <select name="partner_id" defaultValue="">
+                <Auswahl name="partner_id" defaultValue="">
                   <option value="">—</option>
                   {partner.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <div className="shrink field">
                 <button className="primary" type="submit">Starten</button>

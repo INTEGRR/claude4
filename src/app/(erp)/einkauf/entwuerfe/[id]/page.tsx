@@ -16,6 +16,7 @@ import { driveLink } from '@/modules/google/drive'
 import { uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
 import { dateTime } from '@/modules/shared/format'
 import { entwurfBearbeiten, entwurfVerwerfen } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -167,11 +168,11 @@ export default async function EntwurfPage({ params }: { params: Promise<{ id: st
               </label>
               <label className="field shrink">
                 <span>Sprache</span>
-                <select name="sprache" defaultValue={e.sprache}>
+                <Auswahl name="sprache" defaultValue={e.sprache}>
                   <option value="de">Deutsch</option>
                   <option value="en">Englisch</option>
                   <option value="zh">Chinesisch</option>
-                </select>
+                </Auswahl>
               </label>
             </div>
             <label className="field">

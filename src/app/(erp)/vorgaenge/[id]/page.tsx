@@ -13,6 +13,7 @@ import { naechsteAngebote } from '@/modules/prozesse/angebote'
 import type { FormularFeld } from '@/modules/prozesse/schema-felder'
 import { LABELS, dateTime } from '@/modules/shared/format'
 import { vorgangKopfAendern } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -225,12 +226,12 @@ export default async function VorgangDetail({
             </label>
             <label className="field" style={{ minWidth: 220 }}>
               <span>Kunde/Partner</span>
-              <select name="partner_id" defaultValue={v.partner_id ?? ''}>
+              <Auswahl name="partner_id" defaultValue={v.partner_id ?? ''}>
                 <option value="">— auswählen —</option>
                 {partner.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
           </div>
           {felder.length > 0 && (

@@ -16,6 +16,7 @@ import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { driveLink } from '@/modules/google/drive'
 import { date, money, qty } from '@/modules/shared/format'
 import { lieferantendatenSetzen } from '../../dokumente-actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,12 +204,12 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
           <div className="row">
             <label className="field">
               <span>Sprache</span>
-              <select name="sprache" defaultValue={p.sprache ?? ''}>
+              <Auswahl name="sprache" defaultValue={p.sprache ?? ''}>
                 <option value="">—</option>
                 <option value="de">Deutsch</option>
                 <option value="en">Englisch</option>
                 <option value="zh">Chinesisch</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ flex: 2 }}>
               <span>Maildomains / Adressen (Komma-getrennt)</span>
@@ -221,36 +222,36 @@ export default async function LieferantenaktePage({ params }: { params: Promise<
             </label>
             <label className="field">
               <span>Einkäufer</span>
-              <select name="einkaeufer_id" defaultValue={p.einkaeufer_id ?? ''}>
+              <Auswahl name="einkaeufer_id" defaultValue={p.einkaeufer_id ?? ''}>
                 <option value="">—</option>
                 {einkaeufer.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name}
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field shrink">
               <span>Incoterm</span>
-              <select name="standard_incoterm" defaultValue={p.standard_incoterm ?? ''}>
+              <Auswahl name="standard_incoterm" defaultValue={p.standard_incoterm ?? ''}>
                 <option value="">—</option>
                 {incoterms.map((i) => (
                   <option key={i.code} value={i.code}>
                     {i.code}
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field shrink">
               <span>Währung</span>
-              <select name="standard_waehrung" defaultValue={p.standard_waehrung ?? ''}>
+              <Auswahl name="standard_waehrung" defaultValue={p.standard_waehrung ?? ''}>
                 <option value="">—</option>
                 {waehrungen.map((w) => (
                   <option key={w.code} value={w.code}>
                     {w.code}
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <div className="shrink field">
               <button className="primary" type="submit">

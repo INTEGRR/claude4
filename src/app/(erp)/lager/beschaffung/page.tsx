@@ -12,6 +12,7 @@ import {
   snoozeOrderpoint,
   wakeOrderpoint,
 } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -295,12 +296,12 @@ export default async function BeschaffungPage() {
             <div className="row" style={{ alignItems: 'flex-end' }}>
               <label className="field" style={{ flex: 3 }}>
                 <span>Produkt</span>
-                <select name="variant_id" required defaultValue="">
+                <Auswahl name="variant_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {variants.map((v) => (
                     <option key={v.id} value={v.id}>{v.label}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Mindestbestand</span>
@@ -316,11 +317,11 @@ export default async function BeschaffungPage() {
               </label>
               <label className="field">
                 <span>Weg</span>
-                <select name="route" defaultValue="">
+                <Auswahl name="route" defaultValue="">
                   <option value="">aus Produktrouten</option>
                   <option value="buy">Einkaufen</option>
                   <option value="manufacture">Fertigen</option>
-                </select>
+                </Auswahl>
               </label>
               <div className="shrink field">
                 <button className="primary" type="submit">Regel anlegen</button>

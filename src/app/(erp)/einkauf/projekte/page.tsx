@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { PROJEKT_ARTEN } from '@/modules/einkauf/einkaufsprojekt'
 import { date } from '@/modules/shared/format'
 import { projektAnlegen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -161,13 +162,13 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
               </label>
               <label className="field">
                 <span>Art</span>
-                <select name="art" defaultValue="nachproduktion">
+                <Auswahl name="art" defaultValue="nachproduktion">
                   {Object.entries(PROJEKT_ARTEN).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Zieltermin</span>
@@ -175,13 +176,13 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
               </label>
               <label className="field">
                 <span>Verantwortlich</span>
-                <select name="verantwortlich_id" defaultValue={user.id}>
+                <Auswahl name="verantwortlich_id" defaultValue={user.id}>
                   {nutzer.map((n) => (
                     <option key={n.id} value={n.id}>
                       {n.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             </div>
             <div className="row">

@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { ActionResult } from '@/modules/shared/action'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Eine Zelle der Druckweg-Matrix: Auswahl ändern = Weg setzen (leer =
@@ -27,14 +28,14 @@ export function DruckwegWahl({
   const andere = drucker.filter((d) => !d.passend)
 
   return (
-    <select
+    <Auswahl
       className={`druckweg-wahl${wert ? ' gesetzt' : ''}`}
       value={wert ?? ''}
       disabled={pending}
       title={fehler ?? undefined}
       aria-invalid={fehler ? true : undefined}
-      onChange={(e) => {
-        const id = e.target.value || null
+      onAuswahl={(wert) => {
+        const id = wert || null
         startTransition(async () => {
           const r = await action(id)
           setFehler(r && 'error' in r ? r.error : null)
@@ -57,6 +58,6 @@ export function DruckwegWahl({
           ))}
         </optgroup>
       )}
-    </select>
+    </Auswahl>
   )
 }

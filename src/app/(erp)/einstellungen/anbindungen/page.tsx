@@ -12,6 +12,7 @@ import { dateTime, qty } from '@/modules/shared/format'
 import { madeToOrderEinstellung, madeToOrderVorschau } from '@/modules/integrationen/made-to-order'
 import { POSTFACH_SCHLUESSEL, type PostfachStand } from '@/modules/einkauf/postfach-abgleich'
 import { postfachKonfiguriert } from '@/modules/google/auth'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -269,10 +270,10 @@ export default async function SchnittstellenPage() {
           <div className="row">
             <label className="field">
               <span>Meldung</span>
-              <select name="modus" defaultValue={mto.modus}>
+              <Auswahl name="modus" defaultValue={mto.modus}>
                 <option value="baubar">baubare Menge − Puffer (höchstens Deckel)</option>
                 <option value="fest">fest der Deckel, solange mehr als der Puffer baubar ist</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field shrink">
               <span>Puffer</span>

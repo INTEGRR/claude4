@@ -18,6 +18,7 @@ import {
   prozessAbnehmen,
   versionSchalten,
 } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Der Einrichtungs-Assistent nach dem Design-Handoff „KRNL Onboarding":
@@ -630,11 +631,11 @@ export function Wizard({
                     </div>
                     <div className="feldreihe">
                       <div className="feld"><label htmlFor="t-rolle">Rolle</label>
-                        <select id="t-rolle" name="role" defaultValue="mitarbeiter">
+                        <Auswahl id="t-rolle" name="role" defaultValue="mitarbeiter">
                           {ROLLEN.map((r) => (
                             <option key={r.wert} value={r.wert}>{r.label}</option>
                           ))}
-                        </select></div>
+                        </Auswahl></div>
                       <div className="feld"><label htmlFor="t-pw">Startpasswort (min. 8)</label>
                         <input id="t-pw" name="password" type="password" required minLength={8} /></div>
                     </div>

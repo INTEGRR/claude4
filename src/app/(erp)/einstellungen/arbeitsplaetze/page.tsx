@@ -19,6 +19,7 @@ import {
   type Druckart,
 } from '@/modules/druck/routing'
 import { DruckwegWahl } from './druckweg-wahl'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,13 +108,13 @@ function PlatzFormular({ platz }: { platz?: Platz }) {
         </label>
         <label className="field">
           <span>Art</span>
-          <select name="art" defaultValue={platz?.art ?? 'versand'}>
+          <Auswahl name="art" defaultValue={platz?.art ?? 'versand'}>
             {ARBEITSPLATZ_ARTEN.map((a) => (
               <option key={a} value={a}>
                 {ARBEITSPLATZ_ART_LABELS[a]}
               </option>
             ))}
-          </select>
+          </Auswahl>
         </label>
         <label className="field shrink">
           <span>Stundensatz (€)</span>
@@ -164,14 +165,14 @@ function DruckerFormular({ drucker, plaetze }: { drucker?: Drucker; plaetze: Pla
         </label>
         <label className="field">
           <span>Steht an</span>
-          <select name="work_center_id" defaultValue={drucker?.work_center_id ?? ''}>
+          <Auswahl name="work_center_id" defaultValue={drucker?.work_center_id ?? ''}>
             <option value="">— kein fester Platz —</option>
             {plaetze.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
+          </Auswahl>
         </label>
         <label className="field" style={{ flex: 2 }}>
           <span>Name unter Windows (leer = Standarddrucker)</span>
@@ -186,10 +187,10 @@ function DruckerFormular({ drucker, plaetze }: { drucker?: Drucker; plaetze: Pla
       <div className="row">
         <label className="field shrink">
           <span>Typ</span>
-          <select name="typ" defaultValue={drucker?.typ ?? 'label'}>
+          <Auswahl name="typ" defaultValue={drucker?.typ ?? 'label'}>
             <option value="label">Etikett</option>
             <option value="a4">A4</option>
-          </select>
+          </Auswahl>
         </label>
         <label className="field shrink">
           <span>Etikett Breite (mm)</span>
@@ -219,14 +220,14 @@ function DruckerFormular({ drucker, plaetze }: { drucker?: Drucker; plaetze: Pla
         </label>
         <label className="field">
           <span>DHL-Format auf diesem Drucker</span>
-          <select name="dhl_format" defaultValue={drucker?.dhl_format ?? ''}>
+          <Auswahl name="dhl_format" defaultValue={drucker?.dhl_format ?? ''}>
             <option value="">Standard (Versand &amp; Druck)</option>
             {DRUCKFORMATE.map((f) => (
               <option key={f.wert} value={f.wert}>
                 {f.label}
               </option>
             ))}
-          </select>
+          </Auswahl>
         </label>
         <div className="shrink field">
           <button className="primary" type="submit">

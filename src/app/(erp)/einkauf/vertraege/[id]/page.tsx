@@ -11,6 +11,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { MIT_PREISEN, VERTRAG_ARTEN, type VertragArt, type VertragStatus, vertragsLage } from '@/modules/einkauf/lieferantenvertraege'
 import { date, qty } from '@/modules/shared/format'
 import { preislisteUebernehmen, vertragAendern, vertragStatusSetzen } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,11 +140,11 @@ export default async function VertragPage({ params }: { params: Promise<{ id: st
             <div className="row">
               <label className="field shrink">
                 <span>Status</span>
-                <select name="status" defaultValue={v.status === 'aktiv' ? 'gekuendigt' : 'aktiv'}>
+                <Auswahl name="status" defaultValue={v.status === 'aktiv' ? 'gekuendigt' : 'aktiv'}>
                   {v.status === 'aktiv' && <option value="gekuendigt">Gekündigt (läuft bis zum Ende)</option>}
                   {v.status !== 'beendet' && <option value="beendet">Beendet (endet zum Datum)</option>}
                   {v.status !== 'aktiv' && <option value="aktiv">Wieder aktiv</option>}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Datum (leer = heute)</span>
@@ -171,23 +172,23 @@ export default async function VertragPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field">
                   <span>Art</span>
-                  <select name="art" defaultValue={v.art}>
+                  <Auswahl name="art" defaultValue={v.art}>
                     {Object.entries(VERTRAG_ARTEN).map(([k, label]) => (
                       <option key={k} value={k}>
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field shrink">
                   <span>Währung</span>
-                  <select name="waehrung" defaultValue={v.waehrung} className="mono">
+                  <Auswahl name="waehrung" defaultValue={v.waehrung} className="mono">
                     {waehrungen.map((w) => (
                       <option key={w.code} value={w.code}>
                         {w.code}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
               </div>
               <div className="row">

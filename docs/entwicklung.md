@@ -100,6 +100,8 @@ Sie sind der Grund, warum die Konventionen mitwachsen statt zu verrotten:
 | `tests/daten-tuev.test.ts` | Die Invariantenprüfung findet echte Korruption |
 | `tests/actions.test.ts` | Server Actions werfen nicht (Next schwärzt Fehler in Produktion) |
 | `tests/formularfelder.test.ts` | `min` ist ein Vielfaches von `step` — sonst sperrt der Browser glatte Werte |
+| `tests/auswahl.test.ts` | Kein natives `<select>` im internen Teil — Auswahlfelder sind `<Auswahl>` mit Suche (Ausnahmen: zwei öffentliche Formulare) |
+| `tests/db-client.test.ts` | App-Client ohne Pipelining (Supavisor), kein `.begin(` — Transaktionen über `tx()`/`transaktion()` |
 | `tests/prozesse/fakes.test.ts` (`after`) | Ein Test ohne Datenbank lässt keine Verbindung offen |
 
 Neue Konvention, die immer mitwachsen muss? Dann gehört ein Wächter dazu.
@@ -125,6 +127,11 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
 - **Buchen** → `db/migrations/*.sql`
 - **Lesen** → `app/(erp)/<bereich>/**/page.tsx` (Server Components)
 - **Wiederverwendbare UI** → `components/`
+- **Auswahlfelder** → `<Auswahl>` aus `components/auswahl.tsx` statt
+  `<select>`: gleiche Kinder (`<option>`, `<optgroup>`) und Props (`name`,
+  `defaultValue`, `required`, `multiple`, `disabled`), dazu Suche ab acht
+  Optionen; `data-suche` an einer Option sucht mit (z. B. E-Mail, Ort). In
+  Client-Komponenten gesteuert über `value` + `onAuswahl(wert)`.
 - **Formatierung** → `modules/shared/format.ts` (`qty`, `money`, `pct`,
   `date`, `isoDatum` — bitte nichts davon lokal nachbauen)
 

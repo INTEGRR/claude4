@@ -19,6 +19,7 @@ import {
   setLocked,
   updateOrderHeader,
 } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -343,12 +344,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <div className="row">
             <label className="field">
               <span>Verkäufer</span>
-              <select name="user_id" defaultValue={kopf.user_id ?? ''} disabled={!editable}>
+              <Auswahl name="user_id" defaultValue={kopf.user_id ?? ''} disabled={!editable}>
                 <option value="">—</option>
                 {benutzer.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Kundenreferenz</span>
@@ -374,21 +375,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </label>
             <label className="field">
               <span>Zahlungsbedingung</span>
-              <select name="payment_term_id" defaultValue={kopf.payment_term_id ?? ''} disabled={!editable}>
+              <Auswahl name="payment_term_id" defaultValue={kopf.payment_term_id ?? ''} disabled={!editable}>
                 <option value="">—</option>
                 {terms.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Incoterm</span>
-              <select name="incoterm_code" defaultValue={kopf.incoterm_code ?? ''} disabled={!editable}>
+              <Auswahl name="incoterm_code" defaultValue={kopf.incoterm_code ?? ''} disabled={!editable}>
                 <option value="">—</option>
                 {incoterms.map((i) => (
                   <option key={i.code} value={i.code}>{i.code} — {i.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Incoterm-Ort</span>
@@ -496,12 +497,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div className="row">
                 <label className="field" style={{ flex: 3 }}>
                   <span>Produkt</span>
-                  <select name="variant_id" required>
+                  <Auswahl name="variant_id" required>
                     <option value="">— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Menge</span>

@@ -15,6 +15,7 @@ import {
   schrittSchalten,
   versionAktivieren,
 } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -274,13 +275,13 @@ export default async function ProzessDetailPage({
                 </label>
                 <label className="field" style={{ minWidth: 130 }}>
                   <span>Art</span>
-                  <select name="typ" defaultValue="text">
+                  <Auswahl name="typ" defaultValue="text">
                     <option value="text">Text</option>
                     <option value="nummer">Zahl</option>
                     <option value="schalter">Ja/Nein</option>
                     <option value="auswahl">Auswahl</option>
                     <option value="datum">Datum</option>
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field" style={{ flex: 1, minWidth: 200 }}>
                   <span>Auswahlwerte (bei Art „Auswahl", Komma)</span>

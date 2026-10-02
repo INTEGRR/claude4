@@ -19,6 +19,7 @@ import {
   startRepair,
   updateRepairDetails,
 } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -418,20 +419,20 @@ export default async function RepairPage({
               <div className="row">
                 <label className="field">
                   <span>Art</span>
-                  <select name="part_type" defaultValue="add">
+                  <Auswahl name="part_type" defaultValue="add">
                     {Object.entries(PART_TYPES).map(([key, v]) => (
                       <option key={key} value={key}>{v.label}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field" style={{ flex: 3 }}>
                   <span>Teil</span>
-                  <select name="variant_id" required defaultValue="">
+                  <Auswahl name="variant_id" required defaultValue="">
                     <option value="" disabled>— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Menge</span>

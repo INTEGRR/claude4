@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui
 import { RecordComments } from '@/components/record-comments'
 import { date, dateTime, hours, isoDatum, money } from '@/modules/shared/format'
 import { addTimeEntry, deleteTimeEntry, requestAbsence, updateEmployee } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,11 +191,11 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           <div className="row">
             <label className="field">
               <span>Vertrag</span>
-              <select name="employment_type" defaultValue={e.employment_type}>
+              <Auswahl name="employment_type" defaultValue={e.employment_type}>
                 {Object.entries(EMPLOYMENT_LABEL).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Kostensatz (€/Std.)</span>
@@ -217,12 +218,12 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             </label>
             <label className="field">
               <span>Benutzerkonto</span>
-              <select name="user_id" defaultValue={e.user_id ?? ''}>
+              <Auswahl name="user_id" defaultValue={e.user_id ?? ''}>
                 <option value="">— keines —</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row">
@@ -388,11 +389,11 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             <div className="row">
               <label className="field" style={{ marginBottom: 0 }}>
                 <span>Art</span>
-                <select name="kind" defaultValue="vacation">
+                <Auswahl name="kind" defaultValue="vacation">
                   {Object.entries(ABSENCE_LABEL).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field" style={{ marginBottom: 0 }}>
                 <span>Von</span>

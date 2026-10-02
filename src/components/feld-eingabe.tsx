@@ -1,4 +1,5 @@
 import type { FormularFeld } from '@/modules/prozesse/schema-felder'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * DER Feld-Renderer der generierten Masken — eine Darstellung je Feldtyp,
@@ -49,19 +50,19 @@ export function FeldEingabe({
       return (
         <label className="field shrink">
           <span>{feld.label}</span>
-          <select name={name} required={feld.pflicht} defaultValue={typeof vorgabe === 'string' ? vorgabe : ''}>
+          <Auswahl name={name} required={feld.pflicht} defaultValue={typeof vorgabe === 'string' ? vorgabe : ''}>
             {!feld.pflicht && <option value="">—</option>}
             {(feld.auswahl ?? []).map((wert) => (
               <option key={wert} value={wert}>{wert}</option>
             ))}
-          </select>
+          </Auswahl>
         </label>
       )
     case 'verweis':
       return (
         <label className="field" style={{ minWidth: 220 }}>
           <span>{feld.label}</span>
-          <select
+          <Auswahl
             name={name}
             required={feld.pflicht}
             defaultValue={typeof vorgabe === 'string' ? vorgabe : ''}
@@ -70,7 +71,7 @@ export function FeldEingabe({
             {(optionen ?? []).map((o) => (
               <option key={o.id} value={o.id}>{o.label}</option>
             ))}
-          </select>
+          </Auswahl>
         </label>
       )
     case 'datum':

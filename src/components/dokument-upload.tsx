@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import { dokumentAendern, dokumentLoesen, dokumentRegistrieren, uploadVorbereiten } from '@/app/(erp)/einkauf/dokumente-actions'
 import { DOKUMENT_ARTEN, type DokumentArt, type DokumentModell } from '@/modules/einkauf/dokument-modelle'
 import { isActionError, isActionInfo } from '@/modules/shared/action'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Hochladen in die Google-Ablage (0092): Datei wählen oder hineinziehen →
@@ -181,18 +182,18 @@ export function DokumentZeilenKnoepfe({
 
   return (
     <div className="dok-knoepfe">
-      <select
+      <Auswahl
         aria-label="Art"
         defaultValue={art}
         disabled={pending}
-        onChange={(e) => speichern({ art: e.currentTarget.value })}
+        onAuswahl={(wert) => speichern({ art: wert })}
       >
         {Object.entries(DOKUMENT_ARTEN).map(([wert, label]) => (
           <option key={wert} value={wert}>
             {label}
           </option>
         ))}
-      </select>
+      </Auswahl>
       <input
         aria-label="Revision"
         placeholder="Rev."

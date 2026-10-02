@@ -14,6 +14,7 @@ import {
   setBomLineIssueMethod,
 } from '../../actions'
 import { RecordComments } from '@/components/record-comments'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -188,11 +189,11 @@ export default async function BomPage({
               {/* Label statt dreifach wiederholtem Präfix in den Optionen. */}
               <label className="field" style={{ marginBottom: 0, width: 220 }}>
                 <span>Verbrauchsregel</span>
-                <select name="consumption" defaultValue={bom.consumption}>
+                <Auswahl name="consumption" defaultValue={bom.consumption}>
                   <option value="warning">Abweichung mit Warnung</option>
                   <option value="allowed">Abweichung erlaubt</option>
                   <option value="blocked">Abweichung gesperrt</option>
-                </select>
+                </Auswahl>
               </label>
               <div className="shrink">
                 <button className="small" type="submit">Speichern</button>
@@ -277,12 +278,12 @@ export default async function BomPage({
             <div className="row">
               <label className="field" style={{ flex: 3 }}>
                 <span>Komponente</span>
-                <select name="component_variant_id" required defaultValue="">
+                <Auswahl name="component_variant_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {components.map((c) => (
                     <option key={c.id} value={c.id}>{c.label}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Menge</span>
@@ -290,19 +291,19 @@ export default async function BomPage({
               </label>
               <label className="field">
                 <span>Verbrauch</span>
-                <select name="issue_method" defaultValue="backflush">
+                <Auswahl name="issue_method" defaultValue="backflush">
                   <option value="backflush">automatisch (Backflush)</option>
                   <option value="manual">manuell erfassen</option>
-                </select>
+                </Auswahl>
               </label>
               {ptavs.length > 0 && (
                 <label className="field" style={{ flex: 2 }}>
                   <span>Auf Varianten anwenden (leer = alle)</span>
-                  <select name="ptav_ids" multiple size={Math.min(ptavs.length, 4)}>
+                  <Auswahl name="ptav_ids" multiple placeholder="alle Varianten">
                     {ptavs.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
               )}
               <div className="shrink field">
@@ -319,12 +320,12 @@ export default async function BomPage({
             <div className="row">
               <label className="field" style={{ maxWidth: 320 }}>
                 <span>Variante</span>
-                <select name="variante" defaultValue={variante ?? ''}>
+                <Auswahl name="variante" defaultValue={variante ?? ''}>
                   <option value="">— auswählen —</option>
                   {variants.map((v) => (
                     <option key={v.id} value={v.id}>{v.label}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <div className="shrink field">
                 <button type="submit">Anzeigen</button>
@@ -464,12 +465,12 @@ export default async function BomPage({
                 </label>
                 <label className="field" style={{ flex: 2 }}>
                   <span>Arbeitsplatz</span>
-                  <select name="work_center_id" required defaultValue="">
+                  <Auswahl name="work_center_id" required defaultValue="">
                     <option value="" disabled>— auswählen —</option>
                     {workCenters.map((w) => (
                       <option key={w.id} value={w.id}>{w.label}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Zeit (Min. je {qty(bom.qty)} {bom.uom})</span>

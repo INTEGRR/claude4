@@ -10,6 +10,7 @@ import { aktionsFelder } from '@/modules/prozesse/introspektion'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { dateTime } from '@/modules/shared/format'
 import { vorschlagAendern, vorschlagAnnehmen, vorschlagVerwerfen } from '@/app/(erp)/einkauf/vorschlaege-actions'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Baustein „KI-Vorschläge" (0109) für Thread, Einkaufsprojekt, Bestellung
@@ -56,10 +57,10 @@ function Feld({ name, wert, hinweis }: { name: string; wert: unknown; hinweis?: 
       <label className="field shrink">
         <span title={hinweis}>{name}</span>
         <input type="hidden" name={`t:${name}`} value="boolean" />
-        <select name={`p:${name}`} defaultValue={String(wert)}>
+        <Auswahl name={`p:${name}`} defaultValue={String(wert)}>
           <option value="true">ja</option>
           <option value="false">nein</option>
-        </select>
+        </Auswahl>
       </label>
     )
   }

@@ -8,6 +8,7 @@ import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { EIGENTUEMER, WERKZEUG_ARTEN, WERKZEUG_STATUS } from '@/modules/einkauf/werkzeuge'
 import { money } from '@/modules/shared/format'
 import { werkzeugAnlegen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -180,34 +181,34 @@ export default async function WerkzeugePage({
               </label>
               <label className="field">
                 <span>Art</span>
-                <select name="art" defaultValue="form">
+                <Auswahl name="art" defaultValue="form">
                   {Object.entries(WERKZEUG_ARTEN).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Standort (Lieferant)</span>
-                <select name="partner_id" defaultValue={vorLieferant}>
+                <Auswahl name="partner_id" defaultValue={vorLieferant}>
                   <option value="">— aus der Bestellzeile —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Eigentümer</span>
-                <select name="eigentuemer" defaultValue="wir">
+                <Auswahl name="eigentuemer" defaultValue="wir">
                   {Object.entries(EIGENTUEMER).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             </div>
             <div className="row">
@@ -217,14 +218,14 @@ export default async function WerkzeugePage({
               </label>
               <label className="field shrink">
                 <span>Währung</span>
-                <select name="waehrung" defaultValue="" className="mono">
+                <Auswahl name="waehrung" defaultValue="" className="mono">
                   <option value="">—</option>
                   {waehrungen.map((w) => (
                     <option key={w.code} value={w.code}>
                       {w.code}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Lebensdauer (Schuss)</span>
@@ -236,26 +237,26 @@ export default async function WerkzeugePage({
               </label>
               <label className="field shrink">
                 <span>Status</span>
-                <select name="status" defaultValue="in_auftrag">
+                <Auswahl name="status" defaultValue="in_auftrag">
                   {Object.entries(WERKZEUG_STATUS).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             </div>
             <div className="row">
               <label className="field">
                 <span>Einkaufsprojekt</span>
-                <select name="einkaufsprojekt_id" defaultValue={vorProjekt}>
+                <Auswahl name="einkaufsprojekt_id" defaultValue={vorProjekt}>
                   <option value="">—</option>
                   {projekte.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Artikel (SKU)</span>
@@ -263,14 +264,14 @@ export default async function WerkzeugePage({
               </label>
               <label className="field" style={{ flex: 2 }}>
                 <span>Werkzeugkosten-Zeile einer Bestellung</span>
-                <select name="purchase_order_line_id" defaultValue="">
+                <Auswahl name="purchase_order_line_id" defaultValue="">
                   <option value="">—</option>
                   {zeilen.map((z) => (
                     <option key={z.id} value={z.id}>
                       {z.label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             </div>
             <label className="field">

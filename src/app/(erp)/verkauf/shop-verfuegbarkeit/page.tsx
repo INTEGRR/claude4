@@ -15,6 +15,7 @@ import {
   shopVerfuegbarkeit,
 } from '@/modules/integrationen/shop-verfuegbarkeit'
 import { dateTime, qty } from '@/modules/shared/format'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,13 +75,13 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
           <div className="row">
             <label className="field">
               <span>{a.name} — an Shopify</span>
-              <select name="modus" defaultValue={a.modus}>
+              <Auswahl name="modus" defaultValue={a.modus}>
                 {MODI.map((m) => (
                   <option key={m.wert} value={m.wert}>
                     {m.text}
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Shop-Projekt (Farb-Pills)</span>
@@ -186,14 +187,14 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
                       <ActionForm action={varianteSetzen}>
                         <input type="hidden" name="variant_id" value={v.id} />
                         <div className="actions">
-                          <select name="modus" defaultValue={v.modus ?? 'erben'} className="small" aria-label={`Steuerung ${v.name}`}>
+                          <Auswahl name="modus" defaultValue={v.modus ?? 'erben'} className="small" aria-label={`Steuerung ${v.name}`}>
                             <option value="erben">wie Artikel</option>
                             {MODI.map((m) => (
                               <option key={m.wert} value={m.wert}>
                                 {m.text}
                               </option>
                             ))}
-                          </select>
+                          </Auswahl>
                           <button type="submit" className="small">
                             OK
                           </button>
@@ -395,7 +396,7 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                         <ActionForm action={zweitangebotSetzen}>
                           <input type="hidden" name="angebot_id" value={z.id} />
                           <div className="actions">
-                            <select
+                            <Auswahl
                               name="modus"
                               defaultValue={z.modus}
                               className="small"
@@ -404,7 +405,7 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                               <option value="auto">wie der Artikel</option>
                               <option value="immer">immer verfügbar</option>
                               <option value="aus">aus (ausverkauft)</option>
-                            </select>
+                            </Auswahl>
                             <button type="submit" className="small">
                               OK
                             </button>
@@ -454,14 +455,14 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                           <input type="hidden" name="variant_id" value={w.id} />
                           <input type="hidden" name="zurueckhalten_feld" value="1" />
                           <div className="actions">
-                            <select name="modus" defaultValue={w.modus ?? 'erben'} className="small" aria-label={`Steuerung ${w.name}`}>
+                            <Auswahl name="modus" defaultValue={w.modus ?? 'erben'} className="small" aria-label={`Steuerung ${w.name}`}>
                               <option value="erben">wie Artikel ({MODI.find((m) => m.wert === w.artikelModus)?.text})</option>
                               {MODI.map((m) => (
                                 <option key={m.wert} value={m.wert}>
                                   {m.text}
                                 </option>
                               ))}
-                            </select>
+                            </Auswahl>
                             <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                               aus unter
                               <input name="oos_unter" type="number" min={1} defaultValue={w.oosUnter ?? ''} style={{ width: 70 }} />

@@ -5,6 +5,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { createBom } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,12 +59,12 @@ export default async function BomListPage({ searchParams }: { searchParams: Prom
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Produkt</span>
-              <select name="template_id" required defaultValue="">
+              <Auswahl name="template_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Referenzmenge</span>

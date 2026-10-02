@@ -9,6 +9,7 @@ import { TagEditor } from '@/components/tag-editor'
 import { date } from '@/modules/shared/format'
 import { herkunftHref } from '@/app/(erp)/lager/herkunft'
 import { createChildContact, updatePartner } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -244,30 +245,30 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
             </label>
             <label className="field">
               <span>Verkäufer</span>
-              <select name="user_id" defaultValue={partner.user_id ?? ''}>
+              <Auswahl name="user_id" defaultValue={partner.user_id ?? ''}>
                 <option value="">—</option>
                 {benutzer.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Zahlungsbedingung (Kunde)</span>
-              <select name="customer_payment_term_id" defaultValue={partner.customer_payment_term_id ?? ''}>
+              <Auswahl name="customer_payment_term_id" defaultValue={partner.customer_payment_term_id ?? ''}>
                 <option value="">—</option>
                 {terms.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Zahlungsbedingung (Lieferant)</span>
-              <select name="supplier_payment_term_id" defaultValue={partner.supplier_payment_term_id ?? ''}>
+              <Auswahl name="supplier_payment_term_id" defaultValue={partner.supplier_payment_term_id ?? ''}>
                 <option value="">—</option>
                 {terms.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
           </div>
           <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
@@ -309,12 +310,12 @@ export default async function KontaktPage({ params }: { params: Promise<{ id: st
               </label>
               <label className="field">
                 <span>Typ</span>
-                <select name="partner_type" defaultValue="contact">
+                <Auswahl name="partner_type" defaultValue="contact">
                   <option value="contact">Ansprechpartner</option>
                   <option value="invoice">Rechnungsadresse</option>
                   <option value="delivery">Lieferadresse</option>
                   <option value="other">Sonstige</option>
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>E-Mail</span>

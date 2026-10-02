@@ -7,6 +7,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { SENDUNG_MODI, type SendungModus } from '@/modules/einkauf/sendungen'
 import { date } from '@/modules/shared/format'
 import { sendungAnlegen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,24 +172,24 @@ export default async function SendungenPage({ searchParams }: { searchParams: Pr
               </label>
               <label className="field shrink">
                 <span>Modus</span>
-                <select name="modus" defaultValue="see">
+                <Auswahl name="modus" defaultValue="see">
                   {Object.entries(SENDUNG_MODI).map(([k, label]) => (
                     <option key={k} value={k}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Spediteur</span>
-                <select name="spediteur_id" defaultValue="">
+                <Auswahl name="spediteur_id" defaultValue="">
                   <option value="">— (Express: Kurier des Lieferanten)</option>
                   {spediteure.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Träger</span>

@@ -320,8 +320,9 @@ a:hover { text-decoration: underline; }
 
 /* Arbeitsplatz dieses PCs (0087): Leuchte plus Auswahl, ohne Wahl in Warnfarbe. */
 .arbeitsplatz-waehler { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.arbeitsplatz-waehler select { padding: 4px 8px; font-size: 13px; max-width: 200px; }
-.arbeitsplatz-waehler.offen select { border-color: var(--warn); }
+.arbeitsplatz-waehler .auswahl { max-width: 200px; }
+.arbeitsplatz-waehler .auswahl-knopf { padding: 4px 8px; font-size: 13px; }
+.arbeitsplatz-waehler.offen .auswahl-knopf { border-color: var(--warn); }
 
 /* Fortschritt des Historie-Imports (Integrationen → Historie aus Shopify). */
 .historie-fortschritt { flex: 1; min-width: 120px; max-width: 360px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
@@ -329,9 +330,6 @@ a:hover { text-decoration: underline; }
 
 /* Druckwege-Matrix (Einstellungen → Arbeitsplätze): eine Auswahl je Zelle. */
 .druckwege td { vertical-align: top; }
-.druckweg-wahl { width: 100%; min-width: 150px; padding: 4px 6px; font-size: 13px; color: var(--text-muted); }
-.druckweg-wahl.gesetzt { color: inherit; }
-.druckweg-wahl[aria-invalid] { border-color: var(--danger); }
 
 .scan-form { flex-wrap: nowrap; min-width: 0; }
 .scan-zustand { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -962,7 +960,7 @@ label.field > span, .field > .feld-titel {
 .dok-text { min-width: 0; }
 .dok-name { font-weight: 550; overflow-wrap: anywhere; }
 .dok-knoepfe { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.dok-knoepfe select { max-width: 160px; }
+.dok-knoepfe .auswahl { max-width: 160px; }
 @media (max-width: 560px) {
   .dok-zeile { flex-direction: column; align-items: stretch; }
   .dok-knoepfe { justify-content: flex-start; }
@@ -1223,7 +1221,7 @@ label.field > span, .field > .feld-titel {
   .scan-form { grid-area: scan; }
   .arbeitsplatz-waehler { grid-area: platz; }
   .arbeitsplatz-waehler { min-width: 0; }
-  .arbeitsplatz-waehler select { flex: 1; min-width: 0; max-width: none; }
+  .arbeitsplatz-waehler .auswahl { flex: 1; min-width: 0; max-width: none; }
   .scan-form input { flex: 1; width: auto; }
   /* Ohne Tastatur ist der F2-Hinweis nur Ballast. */
   .scan-taste { display: none; }
@@ -1948,3 +1946,163 @@ html[data-splash-gesehen] .splash { display: none; }
 .probe-liste { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
 .probe-liste > li { border-left: 3px solid var(--warn); padding-left: 8px; }
 .probe-liste ul { margin: 4px 0 0; padding-left: 16px; }
+
+/* ── Auswahlbox (src/components/auswahl.tsx) ─────────────────────────────
+   Ersetzt <select> überall im internen Teil: Knopf im Look eines Feldes,
+   Liste im Top-Layer (popover) mit Suchfeld ab acht Optionen. */
+.auswahl { position: relative; display: inline-block; width: 100%; min-width: 0; vertical-align: middle; }
+/* Steht die Box direkt in <label class="field">, greift dort die Regel für
+   den Feldtitel (`label.field > span`: Mono, Versalien, 10 px) — zurücksetzen. */
+label.field > span.auswahl {
+  display: inline-block;
+  margin-bottom: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  color: inherit;
+}
+.auswahl > button.auswahl-knopf {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 13.5px;
+  font-weight: 400;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transform: none;
+}
+.auswahl > button.auswahl-knopf:hover { background: var(--surface); border-color: var(--text-muted); }
+.auswahl > button.auswahl-knopf:focus-visible,
+.auswahl > button.auswahl-knopf[aria-expanded='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.auswahl > button.auswahl-knopf[aria-invalid='true'] { border-color: var(--danger); }
+.auswahl-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auswahl-text.leer { color: var(--text-muted); }
+.auswahl-pfeil {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin: -3px 2px 0 0;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(45deg);
+}
+/* Unsichtbares Pflichtfeld: trägt `required`, die Meldung erscheint am Knopf. */
+.auswahl-pruef {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0;
+  border: 0;
+}
+.auswahl-panel {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  /* Eigene Schrift: die Liste darf nichts von Tabellenköpfen oder
+     Feldtiteln erben, in denen die Box steckt. */
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+  max-height: 380px;
+}
+.auswahl-panel:popover-open { display: flex; flex-direction: column; }
+.auswahl-panel .auswahl-suche {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 9px 12px;
+  background: var(--surface);
+  outline: none;
+}
+.auswahl-liste { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0; outline: none; }
+.auswahl-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.auswahl-option.aktiv { background: var(--accent-soft); }
+.auswahl-option.gewaehlt { font-weight: 600; }
+.auswahl-option.gewaehlt:not(:has(.auswahl-haken))::after {
+  content: '';
+  margin-left: auto;
+  width: 4px;
+  height: 8px;
+  border-right: 2px solid var(--accent-text);
+  border-bottom: 2px solid var(--accent-text);
+  transform: rotate(45deg);
+  flex: 0 0 auto;
+}
+.auswahl-option[aria-disabled='true'] { color: var(--text-muted); cursor: default; background: none; }
+.auswahl-haken {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg);
+}
+.auswahl-option.gewaehlt .auswahl-haken {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--surface);
+}
+.auswahl-gruppe {
+  padding: 8px 12px 3px;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.auswahl-hinweis { padding: 8px 12px; font-size: 12.5px; color: var(--text-muted); }
+.auswahl-fuss {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-top: 1px solid var(--border);
+}
+/* Druckweg-Wahl in der Arbeitsplatz-Tabelle: kompakt, leer gedimmt. */
+.auswahl > button.druckweg-wahl { min-width: 150px; padding: 4px 6px; font-size: 13px; color: var(--text-muted); }
+.auswahl > button.druckweg-wahl.gesetzt { color: inherit; }
+.auswahl > button.druckweg-wahl[aria-invalid='true'] { border-color: var(--danger); }
+.auswahl > button.auswahl-knopf.small { padding: 3px 8px; font-size: 12.5px; }
+.auswahl > button.auswahl-knopf.mono { font-family: var(--font-mono), monospace; }
+@media (max-width: 760px) {
+  /* Fingergerecht: größere Zeilen in der Liste. */
+  .auswahl-option { padding: 10px 14px; }
+}

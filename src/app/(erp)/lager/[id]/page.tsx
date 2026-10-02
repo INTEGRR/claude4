@@ -20,6 +20,7 @@ import {
   validatePicking,
 } from '../actions'
 import { herkunftHref } from '../herkunft'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -361,10 +362,10 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
               <div className="row">
                 <label className="field" style={{ maxWidth: 340 }}>
                   <span>Bei Teilmenge</span>
-                  <select name="backorder" defaultValue="yes">
+                  <Auswahl name="backorder" defaultValue="yes">
                     <option value="yes">Rückstand für die Restmenge anlegen</option>
                     <option value="no">Restmenge aufgeben</option>
-                  </select>
+                  </Auswahl>
                 </label>
                 <div className="shrink field">
                   <button className="primary" type="submit">Validieren</button>

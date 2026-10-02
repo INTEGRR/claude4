@@ -9,6 +9,41 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-02 — Auswahlbox mit Suche statt Dropdowns
+
+**Anlass (Betreiber):** „An vielen Stellen sind Dropdowns, z. B. Kunden oder
+Produkt auswählen — das muss eine interaktive Box mit Filter/Suche sein, so
+nervt das nur."
+
+**Entschieden:** Eine Komponente für alle Auswahlfelder im internen Teil:
+`<Auswahl>` (`src/components/auswahl.tsx`). Sie ersetzt alle 175 `<select>`
+in 67 Dateien, auch kurze Listen — ein Bedienmuster überall.
+- **Austauschbar gebaut:** gleiche Kinder (`<option>`, `<optgroup>`), gleiche
+  Props (`name`, `defaultValue`, `required`, `multiple`, `disabled`) und
+  derselbe abgeschickte Wert wie beim nativen Feld, auch der Rückfall auf
+  die erste freie Option. Server Actions bleiben unverändert.
+- **Bedienung:** Ab acht Optionen steht oben ein Suchfeld. Die Wörter dürfen
+  in beliebiger Reihenfolge kommen, Akzente zählen nicht, die Artikelnummer
+  findet mit. Treffer am Textanfang stehen vorn. Steuerung per Tastatur
+  (Pfeile, Enter, Escape, Tippen auf dem Knopf öffnet die Suche). Die
+  Mehrfachauswahl hat Haken statt Strg-Klick.
+- **Technik:** Die Liste liegt im Top-Layer (`popover`). So schneiden
+  Tabellen sie nicht ab, und das Fehler-Overlay verdeckt sie nicht. Ist unten
+  kein Platz, klappt sie nach oben. Vor der Hydrierung öffnet
+  `popovertarget` die Liste nativ.
+- **Formular:** Versteckte Felder tragen den Wert, ein unsichtbares
+  Pflichtfeld trägt `required`. Das Zurücksetzen des Formulars stellt die
+  Vorgabe wieder her.
+- **Ausnahmen (geschlossene Liste im Wächter):** das öffentliche
+  Reparaturformular (auch im Shop) und die öffentliche Registrierung. Dort
+  ist auf dem Telefon der System-Auswähler besser, und die Listen sind kurz.
+
+**Wächter:** `tests/auswahl.test.ts` verbietet `<select>` außerhalb der
+Ausnahmen und prüft Suche und Startwert gegen das native Verhalten.
+**Browsertest** (Desktop, 390 px, dunkel): Suche, Wahl, Pflichtfeld,
+Mehrfachauswahl, Tabelle, Overlay, Formular-Reset. Doku:
+docs/entwicklung.md (Wo liegt was?, Wächter).
+
 ## 2026-10-02 — Datenbank-Client ohne Pipelining (Bestellung P00003 hing)
 
 **Anlass:** In Prod fror „Hinzufügen" an Bestellung P00003 ein, danach ließ

@@ -13,6 +13,7 @@ import { resetRunningJob, retryJob, runDueJobs } from '@/modules/integrationen/j
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { DIENST_LABELS, dienstStatusLesen } from '@/modules/integrationen/wache'
 import { actionError, actionInfo } from '@/modules/shared/action'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -561,12 +562,12 @@ export default async function IntegrationenPage() {
                     <td>
                       <ActionForm action={resolveUnmatched.bind(null, u.id)}>
                         <div className="row" style={{ gap: 6 }}>
-                          <select name="variant_id" required defaultValue="">
+                          <Auswahl name="variant_id" required defaultValue="">
                             <option value="" disabled>— Variante wählen —</option>
                             {variants.map((v) => (
                               <option key={v.id} value={v.id}>{v.label}</option>
                             ))}
-                          </select>
+                          </Auswahl>
                           <div className="shrink">
                             <button className="small" type="submit">Zuordnen</button>
                           </div>
@@ -626,20 +627,20 @@ export default async function IntegrationenPage() {
             <div className="row">
               <label className="field">
                 <span>Was</span>
-                <select name="was" defaultValue="beides">
+                <Auswahl name="was" defaultValue="beides">
                   <option value="beides">Kunden (mit Bestellung) und Bestellungen</option>
                   <option value="kunden">Nur Kunden (mit Bestellung)</option>
                   <option value="bestellungen">Nur Bestellungen</option>
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Bestellungen ab</span>
-                <select name="tage" defaultValue="365">
+                <Auswahl name="tage" defaultValue="365">
                   <option value="90">letzte 90 Tage</option>
                   <option value="365">letzte 12 Monate</option>
                   <option value="1095">letzte 3 Jahre</option>
                   <option value="3650">alles (10 Jahre)</option>
-                </select>
+                </Auswahl>
               </label>
               <div className="shrink field">
                 <button className="primary" type="submit">2 · Übernahme starten</button>

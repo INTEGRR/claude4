@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { ActionResult } from '@/modules/shared/action'
+import { Auswahl } from '@/components/auswahl'
 
 interface Platz {
   id: string
@@ -47,12 +48,12 @@ export function ArbeitsplatzWaehler({
       }
     >
       <span className={`led ${gewaehlt ? 'ok' : 'warn'}`} />
-      <select
+      <Auswahl
         aria-label="Arbeitsplatz dieses PCs"
         value={gewaehlt?.id ?? ''}
         disabled={pending}
-        onChange={(e) => {
-          const id = e.target.value || null
+        onAuswahl={(wert) => {
+          const id = wert || null
           startTransition(async () => {
             const r = await action(id)
             setFehler(r && 'error' in r ? r.error : null)
@@ -72,7 +73,7 @@ export function ArbeitsplatzWaehler({
               ))}
           </optgroup>
         ))}
-      </select>
+      </Auswahl>
     </label>
   )
 }

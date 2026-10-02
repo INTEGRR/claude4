@@ -18,6 +18,7 @@ import { mailStatusSetzen, mailZuordnen, nachrichtErfassen } from '../actions'
 import { entwurfAnlegen, nachrichtUebersetzen } from '../../entwuerfe/actions'
 import { VORLAGEN_ANLAESSE } from '@/modules/einkauf/mail-vorlagen'
 import { uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -277,7 +278,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
             <div className="row">
               <label className="field">
                 <span>Vorlage</span>
-                <select name="vorlage" defaultValue="">
+                <Auswahl name="vorlage" defaultValue="">
                   <option value="">— freier Text —</option>
                   {Object.entries(VORLAGEN_ANLAESSE)
                     .filter(([k]) => k !== 'anfrage' && k !== 'bestellung')
@@ -286,7 +287,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                         {label}
                       </option>
                     ))}
-                </select>
+                </Auswahl>
               </label>
               <div className="field shrink">
                 <button className="primary" type="submit">
@@ -308,36 +309,36 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
             <div className="row">
               <label className="field">
                 <span>Lieferant</span>
-                <select name="partner_id" defaultValue={t.partner_id ?? ''}>
+                <Auswahl name="partner_id" defaultValue={t.partner_id ?? ''}>
                   <option value="">— aus der Bestellung —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Bestellung</span>
-                <select name="purchase_order_id" defaultValue={t.purchase_order_id ?? ''}>
+                <Auswahl name="purchase_order_id" defaultValue={t.purchase_order_id ?? ''}>
                   <option value="">—</option>
                   {bestellungen.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.number} · {b.lieferant}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Zuständig</span>
-                <select name="zustaendig_id" defaultValue={t.zustaendig_id ?? ''}>
+                <Auswahl name="zustaendig_id" defaultValue={t.zustaendig_id ?? ''}>
                   <option value="">— Einkäufer des Lieferanten —</option>
                   {nutzer.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <div className="field shrink">
                 <button className="primary" type="submit">
@@ -365,19 +366,19 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
             <div className="row">
               <label className="field shrink">
                 <span>Kanal</span>
-                <select name="kanal" defaultValue={t.kanal === 'email' ? 'telefon' : t.kanal}>
+                <Auswahl name="kanal" defaultValue={t.kanal === 'email' ? 'telefon' : t.kanal}>
                   <option value="alibaba">Alibaba</option>
                   <option value="telefon">Telefon</option>
                   <option value="sonstiges">Sonstiges</option>
                   <option value="email">Mail (anderes Postfach)</option>
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Richtung</span>
-                <select name="richtung" defaultValue="eingang">
+                <Auswahl name="richtung" defaultValue="eingang">
                   <option value="eingang">vom Lieferanten</option>
                   <option value="ausgang">von uns</option>
-                </select>
+                </Auswahl>
               </label>
             </div>
             <label className="field">

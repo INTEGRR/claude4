@@ -4,6 +4,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { applyCount, createCount, deleteCount } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,14 +52,14 @@ export default async function InventurPage() {
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Produkt</span>
-              <select name="variant_id" required defaultValue="">
+              <Auswahl name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.label} (Bestand: {qty(v.on_hand)})
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Gezählte Menge</span>

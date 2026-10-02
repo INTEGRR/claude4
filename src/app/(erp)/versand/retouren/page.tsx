@@ -6,6 +6,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { createReturnLabel } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,14 +62,14 @@ export default async function RetourenPage() {
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Kunde</span>
-              <select name="partner_id" required defaultValue="">
+              <Auswahl name="partner_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}{p.city ? ` · ${p.city}` : ''}
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ flex: 2 }}>
               <span>Referenz</span>

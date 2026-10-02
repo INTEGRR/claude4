@@ -6,6 +6,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { money, qty } from '@/modules/shared/format'
 import { createProduct } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,11 +78,11 @@ export default async function ProduktePage({
             </label>
             <label className="field">
               <span>Einheit</span>
-              <select name="uom_id" required defaultValue={uoms.find((u) => u.name === 'Stück')?.id}>
+              <Auswahl name="uom_id" required defaultValue={uoms.find((u) => u.name === 'Stück')?.id}>
                 {uoms.map((u) => (
                   <option key={u.id} value={u.id}>{u.name} ({u.category})</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Verkaufspreis</span>

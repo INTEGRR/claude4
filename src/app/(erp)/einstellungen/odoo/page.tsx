@@ -9,6 +9,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { odooKonfiguriert } from '@/modules/migration/odoo/api'
 import { dateTime, qty } from '@/modules/shared/format'
 import { OdooUebernahme } from './odoo-uebernahme'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,7 +154,7 @@ export default async function OdooPage() {
                         <input type="hidden" name="aufloesen_id" value={l.id} />
                         <div className="row">
                           <label className="field">
-                            <select
+                            <Auswahl
                               name="behalten_id"
                               defaultValue={l.vorschlag ?? ''}
                               required
@@ -166,7 +167,7 @@ export default async function OdooPage() {
                                   {r.sku ? ` · ${r.sku}` : ''}
                                 </option>
                               ))}
-                            </select>
+                            </Auswahl>
                           </label>
                           <div className="shrink field">
                             <button type="submit" className="small">

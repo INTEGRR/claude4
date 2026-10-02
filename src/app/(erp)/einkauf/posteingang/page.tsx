@@ -9,6 +9,7 @@ import { postfachStand } from '@/modules/einkauf/postfach-abgleich'
 import { postfachKonfiguriert } from '@/modules/google/auth'
 import { dateTime } from '@/modules/shared/format'
 import { nachrichtErfassen, postfachAbgleichen } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -220,22 +221,22 @@ export default async function PosteingangPage({
             <div className="row">
               <label className="field shrink">
                 <span>Kanal</span>
-                <select name="kanal" defaultValue="alibaba">
+                <Auswahl name="kanal" defaultValue="alibaba">
                   <option value="alibaba">Alibaba</option>
                   <option value="telefon">Telefon</option>
                   <option value="sonstiges">Sonstiges (WeChat …)</option>
-                </select>
+                </Auswahl>
               </label>
               <label className="field shrink">
                 <span>Richtung</span>
-                <select name="richtung" defaultValue="eingang">
+                <Auswahl name="richtung" defaultValue="eingang">
                   <option value="eingang">vom Lieferanten</option>
                   <option value="ausgang">von uns</option>
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Lieferant</span>
-                <select name="partner_id" required defaultValue="">
+                <Auswahl name="partner_id" required defaultValue="">
                   <option value="" disabled>
                     — wählen —
                   </option>
@@ -244,7 +245,7 @@ export default async function PosteingangPage({
                       {l.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field" style={{ flex: 2 }}>
                 <span>Betreff</span>

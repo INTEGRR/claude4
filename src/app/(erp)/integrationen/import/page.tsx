@@ -8,6 +8,7 @@ import { dateTime, money } from '@/modules/shared/format'
 import { actionError, actionInfo } from '@/modules/shared/action'
 import { type ShopifyOrder, fetchOrdersPage, shopifyConfigured } from '@/modules/integrationen/shopify'
 import { runDueJobs } from '@/modules/integrationen/jobs'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,19 +137,19 @@ export default async function ImportUebersicht({
         <form method="get" className="row">
           <label className="field">
             <span>Status</span>
-            <select name="status" defaultValue={status}>
+            <Auswahl name="status" defaultValue={status}>
               {Object.entries(STATUS_FILTER).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <label className="field">
             <span>Zeitraum</span>
-            <select name="zeitraum" defaultValue={zeitraum}>
+            <Auswahl name="zeitraum" defaultValue={zeitraum}>
               {Object.entries(ZEITRAUM).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <label className="field" style={{ flex: 2 }}>
             <span>Suche (Name, E-Mail, #Nummer)</span>

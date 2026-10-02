@@ -5,6 +5,7 @@ import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { LABELS, date } from '@/modules/shared/format'
 import { createRepair } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,21 +82,21 @@ export default async function ReparaturPage({
           <div className="row">
             <label className="field" style={{ flex: 2 }}>
               <span>Kunde</span>
-              <select name="partner_id" required defaultValue="">
+              <Auswahl name="partner_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ flex: 2 }}>
               <span>Produkt</span>
-              <select name="variant_id" required defaultValue="">
+              <Auswahl name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Menge</span>

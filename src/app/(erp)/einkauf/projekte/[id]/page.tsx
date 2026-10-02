@@ -41,6 +41,7 @@ import {
 } from '../actions'
 import { belegLink } from '../../querverweise'
 import { musterAnfordern } from '../../muster/actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -547,8 +548,8 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
             <ActionForm action={anfragenVorbereiten.bind(null, id)} style={{ marginTop: 8 }}>
               <div className="row">
                 <label className="field">
-                  <span>Lieferanten (Strg/⌘ für mehrere)</span>
-                  <select name="partner_id" multiple size={Math.min(8, Math.max(3, lieferanten.length))} required>
+                  <span>Lieferanten (mehrere möglich)</span>
+                  <Auswahl name="partner_id" multiple required placeholder="Lieferanten wählen …">
                     {lieferanten
                       .filter((l) => !angefragtIds.has(l.id))
                       .map((l) => (
@@ -558,7 +559,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                           {l.email ? '' : ' — ohne Mail'}
                         </option>
                       ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Antwort bis</span>
@@ -773,7 +774,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
               <div className="row">
                 <label className="field">
                   <span>Lieferant</span>
-                  <select name="partner_id" required defaultValue={anfragen.find((a) => a.status === 'angefragt')?.partner_id ?? ''}>
+                  <Auswahl name="partner_id" required defaultValue={anfragen.find((a) => a.status === 'angefragt')?.partner_id ?? ''}>
                     <option value="" disabled>
                       — wählen —
                     </option>
@@ -795,28 +796,28 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                           </option>
                         ))}
                     </optgroup>
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Währung</span>
-                  <select name="waehrung" defaultValue="USD" className="mono">
+                  <Auswahl name="waehrung" defaultValue="USD" className="mono">
                     {waehrungen.map((w) => (
                       <option key={w.code} value={w.code}>
                         {w.code}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Incoterm</span>
-                  <select name="incoterm_code" defaultValue="" className="mono">
+                  <Auswahl name="incoterm_code" defaultValue="" className="mono">
                     <option value="">—</option>
                     {incoterms.map((i) => (
                       <option key={i.code} value={i.code}>
                         {i.code} – {i.name}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Ort</span>
@@ -856,13 +857,13 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field">
                   <span>Fracht</span>
-                  <select name="fracht_modus" defaultValue="see">
+                  <Auswahl name="fracht_modus" defaultValue="see">
                     {Object.entries(FRACHT_MODI).map(([k, label]) => (
                       <option key={k} value={k}>
                         {label} (Satz je kg)
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>oder Fracht €/Stk fest</span>
@@ -883,25 +884,25 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
               <div className="row">
                 <label className="field">
                   <span>Quelle: Datei</span>
-                  <select name="quell_dokument_id" defaultValue="">
+                  <Auswahl name="quell_dokument_id" defaultValue="">
                     <option value="">—</option>
                     {dokumente.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>oder Nachricht</span>
-                  <select name="quell_nachricht_id" defaultValue="">
+                  <Auswahl name="quell_nachricht_id" defaultValue="">
                     <option value="">—</option>
                     {nachrichten.map((n) => (
                       <option key={n.id} value={n.id}>
                         {n.label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
               </div>
               <label className="field">
@@ -998,7 +999,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                   <div className="row">
                     <label className="field">
                       <span>Lieferant</span>
-                      <select name="partner_id" required defaultValue={gewaehlt?.partner_id ?? musterLieferanten[0]?.id ?? ''}>
+                      <Auswahl name="partner_id" required defaultValue={gewaehlt?.partner_id ?? musterLieferanten[0]?.id ?? ''}>
                         {musterLieferanten.length > 0 && (
                           <optgroup label="Mit Angebot">
                             {musterLieferanten.map((l) => (
@@ -1017,7 +1018,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                               </option>
                             ))}
                         </optgroup>
-                      </select>
+                      </Auswahl>
                     </label>
                     <label className="field">
                       <span>Was (Bezeichnung)</span>
@@ -1039,14 +1040,14 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                     </label>
                     <label className="field shrink">
                       <span>Währung</span>
-                      <select name="waehrung" defaultValue="" className="mono">
+                      <Auswahl name="waehrung" defaultValue="" className="mono">
                         <option value="">wie Angebot</option>
                         {waehrungen.map((w) => (
                           <option key={w.code} value={w.code}>
                             {w.code}
                           </option>
                         ))}
-                      </select>
+                      </Auswahl>
                     </label>
                     <label className="field shrink">
                       <span>Angefordert am</span>
@@ -1196,13 +1197,13 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                 <div className="row">
                   <label className="field">
                     <span>Bestellung</span>
-                    <select name="purchase_order_id" required>
+                    <Auswahl name="purchase_order_id" required>
                       {freiePos.map((po) => (
                         <option key={po.id} value={po.id}>
                           {po.number} · {po.lieferant}
                         </option>
                       ))}
-                    </select>
+                    </Auswahl>
                   </label>
                   <div className="shrink field">
                     <button type="submit" className="small">Zuordnen</button>
@@ -1273,13 +1274,13 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field">
                   <span>Art</span>
-                  <select name="art" defaultValue={p.art}>
+                  <Auswahl name="art" defaultValue={p.art}>
                     {Object.entries(PROJEKT_ARTEN).map(([k, label]) => (
                       <option key={k} value={k}>
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Zieltermin</span>
@@ -1287,14 +1288,14 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
                 </label>
                 <label className="field">
                   <span>Verantwortlich</span>
-                  <select name="verantwortlich_id" defaultValue={p.verantwortlich_id ?? ''}>
+                  <Auswahl name="verantwortlich_id" defaultValue={p.verantwortlich_id ?? ''}>
                     <option value="">—</option>
                     {nutzer.map((n) => (
                       <option key={n.id} value={n.id}>
                         {n.name}
                       </option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
               </div>
               <label className="field">

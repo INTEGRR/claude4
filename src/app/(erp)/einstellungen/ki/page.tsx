@@ -9,6 +9,7 @@ import { KI_EBENEN, MODELL_KATALOG, modellAufloesen } from '@/modules/ki/modelle
 import { kiConfigured } from '@/modules/ki/agent'
 import { kiFake, uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
 import { einkaufKiStandLesen, verbrauchImMonat, verbrauchJeEbene } from '@/modules/ki/einkauf-ki'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,13 +50,13 @@ export default async function KiModellePage() {
             {KI_EBENEN.map((ebene) => (
               <label key={ebene.key} className="field">
                 <span title={ebene.hinweis}>{ebene.label}</span>
-                <select name={ebene.key} defaultValue={modellAufloesen(modelle, ebene.key)}>
+                <Auswahl name={ebene.key} defaultValue={modellAufloesen(modelle, ebene.key)}>
                   {MODELL_KATALOG.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.label} — {m.hinweis}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             ))}
           </div>

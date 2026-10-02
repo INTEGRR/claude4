@@ -6,6 +6,7 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { HBars } from '@/components/charts'
 import { date, hours, money } from '@/modules/shared/format'
 import { createEmployee } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -199,11 +200,11 @@ export default async function PersonalPage() {
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Vertrag</span>
-              <select name="employment_type" defaultValue="full_time">
+              <Auswahl name="employment_type" defaultValue="full_time">
                 {Object.entries(EMPLOYMENT_LABEL).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Kostensatz (€/Std.)</span>

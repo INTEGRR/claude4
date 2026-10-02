@@ -6,6 +6,7 @@ import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
 import { createPurchaseOrder } from './actions'
 import { belegLink } from './querverweise'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,12 +96,12 @@ export default async function EinkaufPage({
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Lieferant</span>
-              <select name="vendor_id" required defaultValue="">
+              <Auswahl name="vendor_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {vendors.map((v) => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <div className="shrink field">
               <button className="primary" type="submit">Anlegen</button>

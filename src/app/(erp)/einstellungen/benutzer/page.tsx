@@ -6,6 +6,7 @@ import { Card, TableWrap } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { date as datum, dateTime } from '@/modules/shared/format'
 import { createUser, deleteUser, resetPassword, resetZweiFaktor, setActive, setBefugnisse, setRole } from './actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,11 +86,11 @@ export default async function BenutzerPage() {
                           <input type="hidden" name="zusatz_gezeigt" value="1" />
                           <div className="row" style={{ alignItems: 'flex-start' }}>
                             <div>
-                              <select name="role" defaultValue={u.role} className="small" aria-label="Hauptrolle">
+                              <Auswahl name="role" defaultValue={u.role} className="small" aria-label="Hauptrolle">
                                 {ALL_ROLES.map((r) => (
                                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                                 ))}
-                              </select>
+                              </Auswahl>
                               {u.role !== 'admin' && (
                                 <div style={{ marginTop: 4 }}>
                                   {ZUSATZ_ROLLEN.filter((r) => r !== u.role).map((r) => (
@@ -243,11 +244,11 @@ export default async function BenutzerPage() {
             </label>
             <label className="field">
               <span>Hauptrolle</span>
-              <select name="role" defaultValue="mitarbeiter">
+              <Auswahl name="role" defaultValue="mitarbeiter">
                 {ALL_ROLES.map((r) => (
                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <div className="field">
               <span className="feld-titel">Zusatzrollen</span>

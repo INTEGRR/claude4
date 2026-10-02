@@ -5,6 +5,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { scrapProduct } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -134,12 +135,12 @@ export default async function BestandPage({
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Produkt</span>
-              <select name="variant_id" required defaultValue="">
+              <Auswahl name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>{v.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Menge</span>

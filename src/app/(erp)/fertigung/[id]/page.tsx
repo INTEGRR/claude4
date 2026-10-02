@@ -19,6 +19,7 @@ import {
   updateMoDetails,
   zettelDrucken,
 } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -457,7 +458,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                               <ActionForm action={startOperation.bind(null, id, o.id)}>
                                 <span className="actions">
                                   {mitarbeiter.length > 0 && (
-                                    <select
+                                    <Auswahl
                                       name="employee_id"
                                       defaultValue=""
                                       style={{ width: 150 }}
@@ -467,7 +468,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
                                       {mitarbeiter.map((m) => (
                                         <option key={m.id} value={m.id}>{m.name}</option>
                                       ))}
-                                    </select>
+                                    </Auswahl>
                                   )}
                                   <button className="small" type="submit">Starten</button>
                                 </span>
@@ -548,10 +549,10 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
               )}
               <label className="field">
                 <span>Bei Teilmenge</span>
-                <select name="backorder" defaultValue="yes">
+                <Auswahl name="backorder" defaultValue="yes">
                   <option value="yes">Rückstand für die Restmenge anlegen</option>
                   <option value="no">Restmenge verwerfen</option>
-                </select>
+                </Auswahl>
               </label>
             </div>
 

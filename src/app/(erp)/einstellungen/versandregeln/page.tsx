@@ -5,6 +5,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { Card, Empty, TableWrap } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,12 +90,12 @@ function RegelFormular({ regel }: { regel?: Regel }) {
           </label>
           <label className="field shrink">
             <span>Zone</span>
-            <select name="zone" defaultValue={regel?.zone ?? ''}>
+            <Auswahl name="zone" defaultValue={regel?.zone ?? ''}>
               <option value="">alle</option>
               {ZONEN.map(([wert, text]) => (
                 <option key={wert} value={wert}>{text}</option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <label className="field" style={{ flex: 2 }}>
             <span>SKU-Muster (Komma-getrennt, * erlaubt)</span>
@@ -102,10 +103,10 @@ function RegelFormular({ regel }: { regel?: Regel }) {
           </label>
           <label className="field shrink">
             <span>SKU-Treffer</span>
-            <select name="sku_scope" defaultValue={regel?.sku_scope ?? 'any'}>
+            <Auswahl name="sku_scope" defaultValue={regel?.sku_scope ?? 'any'}>
               <option value="any">eine Position genügt</option>
               <option value="all">alle Positionen</option>
-            </select>
+            </Auswahl>
           </label>
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
@@ -127,12 +128,12 @@ function RegelFormular({ regel }: { regel?: Regel }) {
         <div className="row">
           <label className="field">
             <span>DHL-Produkt</span>
-            <select name="dhl_product" className="mono" defaultValue={regel?.dhl_product ?? ''}>
+            <Auswahl name="dhl_product" className="mono" defaultValue={regel?.dhl_product ?? ''}>
               <option value="">— nicht setzen —</option>
               {PRODUKTE.map(([code, text]) => (
                 <option key={code} value={code}>{code} — {text}</option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <label className="field">
             <span>Abrechnungsnummer (leer = automatisch zum Produkt)</span>

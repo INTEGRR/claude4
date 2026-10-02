@@ -7,6 +7,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { DRUCKFORMATE } from '@/modules/einstellungen/finanz-parameter'
 import { dateTime } from '@/modules/shared/format'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,11 +47,11 @@ export default async function VersandPage() {
           <div className="row">
             <label className="field" style={{ maxWidth: 320 }}>
               <span>Druckformat der Labels</span>
-              <select name="print_format" defaultValue={dhl.print_format ?? '910-300-700'}>
+              <Auswahl name="print_format" defaultValue={dhl.print_format ?? '910-300-700'}>
                 {DRUCKFORMATE.map((f) => (
                   <option key={f.wert} value={f.wert}>{f.label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <div className="shrink field">
               <button className="primary" type="submit">Speichern</button>

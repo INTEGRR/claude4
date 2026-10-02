@@ -11,6 +11,7 @@ import { WiedervorlagenKarte } from '@/components/mail-threads'
 import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { cancelBill, payBill, postBill, setBillChecked, setBillDate } from '../../actions'
 import { rechnungTeilzahlung, zahlungStornieren } from '../../../finanzen/actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,12 +204,12 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
               </label>
               <label className="field">
                 <span>Zahlungsbedingung</span>
-                <select name="payment_term_id" defaultValue={bill.payment_term_id ?? ''}>
+                <Auswahl name="payment_term_id" defaultValue={bill.payment_term_id ?? ''}>
                   <option value="">—</option>
                   {terms.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
               <label className="field">
                 <span>Verwendungszweck</span>
@@ -341,12 +342,12 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
                   </label>
                   <label className="field shrink">
                     <span>Bankkonto</span>
-                    <select name="bankkonto_id" defaultValue="">
+                    <Auswahl name="bankkonto_id" defaultValue="">
                       <option value="">—</option>
                       {konten.map((k) => (
                         <option key={k.id} value={k.id}>{k.name}</option>
                       ))}
-                    </select>
+                    </Auswahl>
                   </label>
                   <div className="shrink field">
                     <button className="primary" type="submit">Zahlung erfassen</button>

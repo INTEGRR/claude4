@@ -29,6 +29,7 @@ import {
   zahlplanRateEntfernen,
 } from '../../finanzen/actions'
 import { belegLink } from '../querverweise'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -281,30 +282,30 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           <div className="row">
             <label className="field">
               <span>Einkäufer</span>
-              <select name="user_id" defaultValue={kopf.user_id ?? ''}>
+              <Auswahl name="user_id" defaultValue={kopf.user_id ?? ''}>
                 <option value="">—</option>
                 {benutzer.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Zahlungsbedingung</span>
-              <select name="payment_term_id" defaultValue={kopf.payment_term_id ?? ''}>
+              <Auswahl name="payment_term_id" defaultValue={kopf.payment_term_id ?? ''}>
                 <option value="">— vom Lieferanten —</option>
                 {terms.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Incoterm</span>
-              <select name="incoterm_code" defaultValue={kopf.incoterm_code ?? ''}>
+              <Auswahl name="incoterm_code" defaultValue={kopf.incoterm_code ?? ''}>
                 <option value="">—</option>
                 {incoterms.map((i) => (
                   <option key={i.code} value={i.code}>{i.code} — {i.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="shrink field">
               <input type="checkbox" name="priority" defaultChecked={kopf.priority === '1'} /> Dringend
@@ -464,12 +465,12 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
               <div className="row">
                 <label className="field" style={{ flex: 3 }}>
                   <span>Produkt</span>
-                  <select name="variant_id" required defaultValue="">
+                  <Auswahl name="variant_id" required defaultValue="">
                     <option value="" disabled>— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="field">
                   <span>Menge</span>
@@ -560,11 +561,11 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   </label>
                   <label className="field shrink">
                     <span>Rest fällig bei</span>
-                    <select name="rest_ausloeser" defaultValue="verschiffung">
+                    <Auswahl name="rest_ausloeser" defaultValue="verschiffung">
                       <option value="verschiffung">Verschiffung</option>
                       <option value="ankunft">Ankunft</option>
                       <option value="termin">Termin</option>
-                    </select>
+                    </Auswahl>
                   </label>
                   <label className="field shrink">
                     <span>Rest-Termin (optional)</span>

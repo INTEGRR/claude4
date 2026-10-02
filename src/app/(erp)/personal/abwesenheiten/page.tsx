@@ -5,6 +5,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { date, dateTime, isoDatum } from '@/modules/shared/format'
 import { decideAbsence, requestAbsence } from '../actions'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -183,20 +184,20 @@ export default async function AbwesenheitenPage() {
           <div className="row">
             <label className="field" style={{ flex: 2, marginBottom: 0 }}>
               <span>Mitarbeiter</span>
-              <select name="employee_id" required defaultValue="">
+              <Auswahl name="employee_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {mitarbeiter.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Art</span>
-              <select name="kind" defaultValue="vacation">
+              <Auswahl name="kind" defaultValue="vacation">
                 {Object.entries(ABSENCE_LABEL).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Von</span>

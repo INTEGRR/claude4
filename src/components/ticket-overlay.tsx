@@ -3,6 +3,7 @@ import { useRef, useState, useTransition } from 'react'
 import { usePathname } from 'next/navigation'
 import { ticketMelden } from '@/app/(erp)/tickets/actions'
 import { isActionError, isActionInfo } from '@/modules/shared/action'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Fehler melden, ohne die Arbeit zu verlassen: ein Reiter am rechten
@@ -87,11 +88,11 @@ export function TicketOverlay() {
           <div className="row">
             <label className="field">
               <span>Schwere</span>
-              <select name="schwere" defaultValue="stoerend">
+              <Auswahl name="schwere" defaultValue="stoerend">
                 <option value="kritisch">kritisch — blockiert</option>
                 <option value="stoerend">störend — Umweg nötig</option>
                 <option value="kosmetisch">kosmetisch</option>
-              </select>
+              </Auswahl>
             </label>
             <label className="field">
               <span>Seite</span>

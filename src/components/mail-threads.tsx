@@ -9,6 +9,7 @@ import { currentUser } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { VORLAGEN_ANLAESSE } from '@/modules/einkauf/mail-vorlagen'
 import type { WiedervorlageModell } from '@/modules/prozesse/registry/einkauf-postfach'
+import { Auswahl } from '@/components/auswahl'
 
 /**
  * Bausteine des Einkaufspostfachs (0093) für Lieferantenakte, Bestellung und
@@ -123,25 +124,25 @@ export async function MailThreadsKarte({
             {einkaufsprojektId && (
               <label className="field">
                 <span>An</span>
-                <select name="partner_id" required>
+                <Auswahl name="partner_id" required>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
                     </option>
                   ))}
-                </select>
+                </Auswahl>
               </label>
             )}
             <label className="field">
               <span>Neue Mail</span>
-              <select name="vorlage" defaultValue={purchaseOrderId ? 'liefertermin' : einkaufsprojektId ? '' : 'anfrage'}>
+              <Auswahl name="vorlage" defaultValue={purchaseOrderId ? 'liefertermin' : einkaufsprojektId ? '' : 'anfrage'}>
                 <option value="">— freier Text —</option>
                 {Object.entries(VORLAGEN_ANLAESSE).map(([k, label]) => (
                   <option key={k} value={k}>
                     {label}
                   </option>
                 ))}
-              </select>
+              </Auswahl>
             </label>
             {purchaseOrderId && (
               <label className="field shrink" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -258,14 +259,14 @@ export async function WiedervorlagenKarte({
           </label>
           <label className="field shrink">
             <span>Zuständig</span>
-            <select name="zustaendig_id" defaultValue="">
+            <Auswahl name="zustaendig_id" defaultValue="">
               <option value="">ich</option>
               {nutzer.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>
               ))}
-            </select>
+            </Auswahl>
           </label>
           <div className="field shrink">
             <button className="small" type="submit">

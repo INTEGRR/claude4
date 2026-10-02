@@ -5,6 +5,7 @@ import { Card, Empty, TableWrap } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { qty } from '@/modules/shared/format'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,12 +111,12 @@ export default async function StammdatenPage() {
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
                   <span>Übergeordnet</span>
-                  <select name="parent_id" defaultValue="">
+                  <Auswahl name="parent_id" defaultValue="">
                     <option value="">— oberste Ebene —</option>
                     {kategorien.map((k) => (
                       <option key={k.id} value={k.id}>{k.full_path}</option>
                     ))}
-                  </select>
+                  </Auswahl>
                 </label>
                 <div className="shrink">
                   <button type="submit">Anlegen</button>
@@ -161,10 +162,10 @@ export default async function StammdatenPage() {
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
                   <span>Verwendung</span>
-                  <select name="type_tax_use" defaultValue="sale">
+                  <Auswahl name="type_tax_use" defaultValue="sale">
                     <option value="sale">Verkauf</option>
                     <option value="purchase">Einkauf</option>
-                  </select>
+                  </Auswahl>
                 </label>
                 <label className="shrink" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input type="checkbox" name="price_include" /> inkl.
@@ -222,10 +223,10 @@ export default async function StammdatenPage() {
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
                   <span>Fälligkeit</span>
-                  <select name="delay_type" defaultValue="days_after">
+                  <Auswahl name="delay_type" defaultValue="days_after">
                     <option value="days_after">nach Rechnungsdatum</option>
                     <option value="days_after_end_of_month">nach Monatsende</option>
-                  </select>
+                  </Auswahl>
                 </label>
               </div>
               <div className="row">

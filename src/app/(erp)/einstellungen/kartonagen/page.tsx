@@ -5,6 +5,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { Card, Empty, TableWrap } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { qty } from '@/modules/shared/format'
+import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,12 +56,12 @@ function Formular({
         </label>
         <label className="field" style={{ flex: 2 }}>
           <span>Bestandsartikel (Karton im Lager)</span>
-          <select name="variant_id" defaultValue={kartonage?.variant_id ?? ''} required>
+          <Auswahl name="variant_id" defaultValue={kartonage?.variant_id ?? ''} required>
             <option value="">— wählen —</option>
             {artikel.map((a) => (
               <option key={a.id} value={a.id}>{a.label}</option>
             ))}
-          </select>
+          </Auswahl>
         </label>
         <label className="field shrink">
           <span>Reihenfolge</span>
