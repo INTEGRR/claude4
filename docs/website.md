@@ -16,17 +16,17 @@ derselben Bildsprache: Aufnehmen → Zeichnen → Läuft.
 
 | Abschnitt | Inhalt | interaktiv |
 |---|---|---|
-| Held | Positionierung + **Prozessversion zum Anfassen**: derselbe Ablauf einmal geschaltet (v1.4) und einmal als Entwurf mit einem zusätzlichen Prüfschritt (v1.5). Ein Knopf schaltet um. | ja |
-| Prozess First | Gegenüberstellung „Sonst" / „In KRNL" | — |
+| Held | **Trailer** (rund 40 s, ein Auftrag einmal durch KRNL, Endkarte mit Knopf zum Erstgespräch), darunter Positionierung und Knöpfe — Abschnitt „Trailer" unten | ja |
+| Prozess First | Gegenüberstellung „Sonst" / „In KRNL" + **Prozessversion zum Anfassen**: derselbe Ablauf einmal geschaltet (v1.4) und einmal als Entwurf mit einem zusätzlichen Qualitätscheck (v1.5). Ein Knopf schaltet um. | ja |
 | Sprechen | Dialogpanel mit **Bestätigungstor**: die Stimme bekommt keine Sonderrechte | ja |
 | Einstieg | drei Schritte (Aufnehmen, Zeichnen, Läuft) | — |
 | Betrieb | eigene Instanz, Rückholbarkeit, Daten-TÜV | — |
 | Kosten | Modellrechnung klassisches ERP-Projekt vs. KRNL, mit Reglern | ja |
 | Registrierung | das Anmeldeformular | ja |
 
-Die drei interaktiven Stücke sind Client-Komponenten im selben Verzeichnis
-(`prozess-vorschau.tsx`, `sprech-vorschau.tsx`, `kosten-rechner.tsx`,
-`registrierung.tsx`). Alles andere ist eine Server Component ohne
+Die interaktiven Stücke sind Client-Komponenten im selben Verzeichnis
+(`trailer.tsx`, `prozess-vorschau.tsx`, `sprech-vorschau.tsx`,
+`kosten-rechner.tsx`, `registrierung.tsx`). Alles andere ist eine Server Component ohne
 Datenbankzugriff — die Seite lässt sich statisch ausliefern.
 
 ### Gestaltung
@@ -48,8 +48,64 @@ beim Herausziehen der Seite mitkommen.
 142 px breiten Knoten und braucht rund 452 px Panelbreite, sonst laufen die
 Knoten ineinander. Unterhalb von 1080 px wird deshalb die **Darstellung
 getauscht** (senkrechte Liste, gleiche Knoten und Farben) statt der Graph
-umgebrochen. Unter 980 px verschwindet die Kopfnavigation — ein
-Mobilmenü ist offen (siehe unten).
+umgebrochen. Der Trailer wechselt unter 820 px Rahmenbreite auf eine
+hochkante Bühne; die Steuerleiste zeigt unter 560 px nur noch die
+Beschriftung des laufenden Kapitels. Unter 980 px verschwindet die
+Kopfnavigation — ein Mobilmenü ist offen (siehe unten).
+
+### Trailer
+
+Der Held ist ein Film — aber **kein Video**: Er ist eine CSS-Zeitleiste in
+[`trailer.tsx`](../src/app/start/trailer.tsx) mit den Stilen in
+`start.css` (Abschnitt „Trailer", Präfix `tr-`, weil die Seite `.mono`,
+`.anzeige`, `.knoten` usw. schon belegt). Text bleibt in jeder Größe scharf,
+ist echter Text und kostet keine Video-Bytes.
+
+**Ablauf** (Sekunden, Demodaten):
+
+| Zeit | Szene | Was passiert |
+|---|---|---|
+| 0–4 | Auftakt | „Ein Auftrag. Ein System." |
+| 4–9,5 | Shop | Bestellung #5012 aus Shopify, bezahlt → reserviert → Fertigung angestoßen |
+| 9,5–15 | Fertigung | FA/0418, Material reserviert, baubare Menge 24 → 23 an Shopify |
+| 15–20,5 | Versand | Scan, DHL-Label, Tracking an Shopify (die Versandmail schickt der Shop) |
+| 20,5–28 | Einkauf im Ausland | Postfach mit Angeboten aus CN, PL, VN, US — Chinesisch wird übersetzt; Vergleich in Euro je Stück mit Fracht und Zoll, EZB-Kurs |
+| 28–33,5 | Prozess | neuer Schritt „Qualitätscheck" kommt dazu, Version 1.5 wird geschaltet |
+| 33,5–38,6 | KI | „Was ist heute fällig?" mit drei Antworten |
+| 38,6–41 | Endkarte | Claim, **„Erstgespräch anfragen →"** (Link auf `#anmelden`), „Nochmal ansehen" |
+
+**Bedienung:** Er startet von selbst, sobald die Schriften geladen sind und
+der Held im Bild ist. Die Steuerleiste darunter hat Pause/Abspielen, sechs
+Kapitel (zugleich der Fortschrittsfaden, anklickbar), die Zeit und
+„Überspringen" bzw. „Nochmal". Ein Klick auf die Bühne pausiert. Außer Sicht
+(unter 30 % sichtbar) oder im Hintergrund-Tab hält er an und läuft beim
+Zurückkommen weiter. Bei `prefers-reduced-motion` steht sofort die Endkarte
+da; der Film läuft nur auf Knopfdruck.
+
+**Technik:** Alle Animationen hängen mit absoluter Verzögerung an
+`.tr-laeuft`. Pause, Kapitel und Überspringen setzen über die Web Animations
+API nur `currentTime` aller `tr-`-Animationen unter der Wurzel; die Uhr ist
+die Animation `tr-zeit` (Fortschrittslinie), ihr `animationend` markiert das
+Ende. Die Bühne hat eine feste logische Größe — 16:9 (1920×1080) ab 820 px
+Rahmenbreite oder bei querem Fenster, sonst hochkant (1080×1400) — und wird
+per transform skaliert, höchstens auf 85 bzw. 80 % der Fensterhöhe
+(`masse` in [`trailer-logik.ts`](../src/app/start/trailer-logik.ts)).
+
+**Szene ändern:** Der Zeitplan steht an drei Stellen — `--t`/`--e` der Szene
+in `trailer.tsx`, die absoluten Zeiten in `start.css`, `KAPITEL`/`DAUER` in
+`trailer-logik.ts`. Der Wächter `tests/trailer.test.ts` gleicht Szenen,
+Kapitel, Uhr und Fortschrittsfaden ab.
+
+**Ehrlichkeit:** Alle Namen und Zahlen sind Demodaten (die Bühne sagt es
+oben rechts), jede Behauptung muss das System aber wirklich können. Darum
+z. B. nur die Sprachen, die KRNL im Einkauf kennt (Deutsch, Englisch,
+Chinesisch — automatisch übersetzt wird Chinesisch), der Einstand mit
+EZB-Kurs, Fracht und Zoll so, wie `einstand_schaetzen` ihn rechnet, und die
+Versandmail beim Shop statt bei KRNL. Wer eine Szene ergänzt, prüft das
+zuerst im Code.
+
+Der 15-Sekunden-Werbeschnitt (eigenständige HTML-Datei und MP4 für Anzeigen)
+ist nicht Teil des Repos.
 
 ---
 

@@ -9,6 +9,44 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-05 — Startseite: Trailer als Held
+
+**Anlass (Betreiber):** Den 15-Sekunden-Werbetrailer „muss natürlich auf die
+Webseite" — ausführlicher und ruhiger, Einkauf nicht nur China, sondern
+mehrere Länder, als Held und interaktiv, mit dem Knopf am Ende zum Kontakt.
+
+**Entschieden:**
+- Der Held von `/start` ist der Trailer (`src/app/start/trailer.tsx`).
+  - Rund 40 Sekunden: Auftakt, Shop, Fertigung, Versand, Einkauf im
+    Ausland, Prozessversion schalten, KI, dann die Endkarte.
+  - Die Endkarte hat „Erstgespräch anfragen →" als Link auf `#anmelden`.
+  - Darunter bleiben Überschrift, Erklärung und Knöpfe als HTML (Überschrift
+    und Suchmaschinen brauchen keinen Film).
+- **CSS-Zeitleiste statt Video.**
+  - Begründung: scharf in jeder Größe, echter Text, keine Video-Bytes, und
+    Kapitel lassen sich anspringen.
+  - Gesteuert wird über die Web Animations API (`currentTime`).
+  - Der Zeitplan steht an drei Stellen. Der Wächter `tests/trailer.test.ts`
+    hält sie gleich.
+- **Bedienung:**
+  - Er startet von selbst und pausiert außer Sicht und im Hintergrund-Tab.
+  - Kapitel in der Steuerleiste (zugleich der Fortschritt), Pause,
+    Überspringen und Nochmal.
+  - Bei `prefers-reduced-motion` steht sofort die Endkarte; der Film läuft
+    nur auf Knopfdruck.
+- **Mehrere Länder, aber nur, was das System kann.**
+  - Angebote aus CN, PL, VN und US in den Sprachen, die KRNL im Einkauf
+    kennt (Deutsch, Englisch, Chinesisch; übersetzt wird Chinesisch).
+  - Vergleich in Euro mit Fracht und Zoll, wie `einstand_schaetzen` rechnet.
+  - Polnisch oder Portugiesisch als Mailsprache wären eine Behauptung ohne
+    Deckung — Sprache je Lieferant ist auf de/en/zh beschränkt (0092).
+- Die Prozessversion zum Anfassen (`ProzessVorschau`) zieht vom Held in den
+  Abschnitt „Prozess First". Dort steht sie neben der Gegenüberstellung, die
+  sie belegt.
+- Der 15-Sekunden-Werbeschnitt (HTML und MP4) bleibt außerhalb des Repos.
+
+Doku: [website.md](website.md), Abschnitt „Trailer".
+
 ## 2026-10-02 — Kurzanlage in der Auswahlbox; Angebot ändern an der Projektseite
 
 **Anlass (Betreiber):** „Man muss auch hier neue anlegen können, ad hoc,

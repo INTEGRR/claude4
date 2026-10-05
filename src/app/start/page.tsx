@@ -6,6 +6,7 @@ import { KostenRechner } from './kosten-rechner'
 import { ProzessVorschau } from './prozess-vorschau'
 import { Registrierung } from './registrierung'
 import { SprechVorschau } from './sprech-vorschau'
+import { Trailer } from './trailer'
 import './start.css'
 
 /**
@@ -24,9 +25,10 @@ import './start.css'
  * siehe docs/website.md und die Disclaimer-Zeile im Rechner selbst).
  *
  * Aufbau nach dem Design-Handoff „KRNL Sales": heller Chassis-Grund, dunkle
- * eingelassene Anzeigen für alles Technische, drei interaktive Stücke
- * (Prozessversion umschalten, Bestätigungstor, Kostenrechner) und das
- * Anmeldeformular.
+ * eingelassene Anzeigen für alles Technische. Der Held ist ein Trailer
+ * (ein Auftrag einmal durch KRNL, Endkarte mit Knopf zum Erstgespräch);
+ * dazu drei interaktive Stücke (Prozessversion umschalten,
+ * Bestätigungstor, Kostenrechner) und das Anmeldeformular.
  */
 
 export const metadata: Metadata = {
@@ -152,13 +154,17 @@ export default function StartSeite() {
               <span className="mono"><span className="punkt" /> Prozess-ERP · deutsch · sprachgesteuert</span>
               <span className="mono"><span className="punkt kern" /> Betrieb in der EU · eigene Instanz je Kunde</span>
             </div>
-            <div className="held-raster">
+            {/* Der Film zeigt, was KRNL tut — am Ende führt er zum Erstgespräch. */}
+            <Trailer />
+            <div className="held-text">
               <div>
                 <Eyebrow text="Prozess First" />
                 <h1>
                   Das ERP richtet sich nach eurem Prozess.{' '}
                   <em>Nicht umgekehrt.</em>
                 </h1>
+              </div>
+              <div>
                 <p>
                   In KRNL sind Abläufe keine Programmierung, sondern Daten. Ihr erzählt,
                   wie bei euch gearbeitet wird — daraus entsteht ein Diagramm, und aus
@@ -172,8 +178,6 @@ export default function StartSeite() {
                   <a className="zweitweg" href="#einstieg">Wie ein Einstieg abläuft</a>
                 </div>
               </div>
-              {/* Das Kernversprechen zum Anfassen — nicht Dekoration. */}
-              <ProzessVorschau />
             </div>
           </div>
         </section>
@@ -204,6 +208,18 @@ export default function StartSeite() {
                   ))}
                 </ul>
               </div>
+            </div>
+            <div className="zwei prozess-demo">
+              <div>
+                <h3>Zum Anfassen</h3>
+                <p>
+                  Derselbe Auftragsdurchlauf zweimal: geschaltet als Version 1.4 und als
+                  Entwurf 1.5 mit zusätzlichem Qualitätscheck. Ein Knopf schaltet um — so
+                  sieht „am selben Tag, ohne Release" im System aus.
+                </p>
+              </div>
+              {/* Das Kernversprechen zum Anfassen — nicht Dekoration. */}
+              <ProzessVorschau />
             </div>
           </div>
         </section>
