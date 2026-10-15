@@ -17,11 +17,15 @@ rot. Entscheidungslog 2026-10-15.
 | `tests/abnahme/modell.ts` | Das Rechenmodell: Bestand, Reservierung, gleitender Durchschnitt mit den Rundungen der SQL-Funktionen, Belege, Umsatz, Zahlungen, Fälligkeiten, Shopify-Mengen. Rein, ohne Datenbank. |
 | `tests/abnahme/ist.ts` | Liest denselben Stand aus der Datenbank — nur über die Funktionen und Sichten, die auch die Oberfläche nutzt. |
 | `tests/abnahme/vergleich.ts` | Plättet beide Stände zu Pfaden und nennt JEDE Abweichung mit Soll und Ist. |
-| `tests/abnahme-modell.test.ts` | Teil 1 (`npm test`): das Modell gegen Handrechnungen und Invarianten. |
-| `tests/prozesse/abnahme.test.ts` | Teil 2 (`npm run test:prozesse`): der Live-Lauf gegen eine frische Datenbank, Vergleich je Monatsende, Prüfung der an Shopify übergebenen Mengen. |
+| `tests/abnahme/zufall.ts` | Der Zufallsgenerator: seedbar, Umfang über `faktor`, nutzt das Modell als Orakel (es entsteht nur, was machbar ist). |
+| `tests/abnahme/live.ts` | Der Live-Interpreter: ein Schritt = Aktionen über den Torwächter; Webhooks, Labels, Outbox; Vergleich je Monatsende, Prüfung der an Shopify übergebenen Mengen. |
+| `tests/abnahme-modell.test.ts` | Teil 1 (`npm test`): das Modell gegen Handrechnungen und Invarianten; der Generator auf Determinismus, Umfang und Invarianten. |
+| `tests/prozesse/abnahme.test.ts` | Teil 2 (`npm run test:prozesse`): das feste Szenario live gegen eine frische Datenbank. |
+| `tests/prozesse/abnahme-zufall.test.ts` | Teil 3 (`npm run test:prozesse`): das Zufallsszenario in zehnfachem Umfang live (`ABNAHME_FAKTOR`, `ABNAHME_SEED`). |
 
-Beide Teile laufen bei jedem `npm run check`. Der Live-Lauf braucht etwa
-eine Minute (Datenbank anlegen, migrieren, 97 Schritte, drei Vergleiche).
+Alle Teile laufen bei jedem `npm run check`. Jeder Live-Lauf braucht rund
+eine Minute — davon der größte Teil Datenbank anlegen und migrieren; die
+~900 Schritte des Zufallsszenarios selbst laufen in etwa 30 Sekunden.
 
 ## Das Szenario
 
@@ -95,6 +99,57 @@ Switch-Einstand 0,28 USD × 0,92 = 0,2576 €; Vorkasse PO2 = (1.400 + 60)
 × 1,19 = 1.737,40 USD × 0,92 = 1.598,41 €; Rechnung PO1 = 2.470 netto +
 469,30 Steuer = 2.939,30 €; Lohn 24 € je Tastatur; Rechnung PO4 =
 (810 + 40) × 1,19 = 1.011,50 USD × 0,90 = 910,35 €.
+
+## Zufallsszenario ×10
+
+Das feste Szenario ist von Hand nachrechenbar, aber klein. Der Generator
+(`tests/abnahme/zufall.ts`) erzeugt denselben Schritt-Typ zufällig und
+vielfach — Faktor 10 heißt rund zehnmal so viel wie der feste Plan:
+
+| | fest | zufällig ×10 (Seed 20261015) |
+|---|---|---|
+| Schritte | 97 | 903 |
+| Shop-Bestellungen / B2B-Aufträge | 18 / 2 | 185 / 24 |
+| Bestellungen / Wareneingänge / Rechnungen | 4 / 5 / 5 | 44 / 60 / 54 |
+| Fertigmeldungen / Fertigung auf Lager / Demontagen | 13 / 1 / 1 | 114 / 12 / 3 |
+| Versand (Label bzw. Buchen) | 16 | 196 |
+| Stornos (Shop / B2B) | 1 / 1 | 12 / 1 |
+| Verträge / Darlehen / Steuertermine | 2 / 1 / 3 | 20 / 3 / 4 |
+| Inventuren / Ausschuss / Nebenkosten | 2 / 1 / 2 | 19 / 13 / 32 |
+
+Zufällig sind Mengen, Preise, Kurse, Beträge, Zahltage, Laufzeiten,
+Darlehensarten (Annuität, Rate, endfällig), Teillieferungen, die Basis
+der Nebenkosten, Zahlungszeitpunkte, Stornos, Kündigungen — und die
+Reihenfolge, in der all das über die Tage verteilt passiert.
+
+**Machbarkeit durch das Orakel.** Der Generator führt jeden erzeugten
+Schritt sofort im Modell aus und fragt es vor dem nächsten: Ist der
+Fertigungsauftrag voll reserviert? Ist die Lieferung versandbereit? Wie
+viel ist frei (Ausschuss, Inventur, Demontage)? Gibt es Abrechenbares?
+So entsteht nur, was das System auch annimmt — Wartezeiten entstehen
+trotzdem von selbst (Engpässe bei Komponenten lassen Fertigungsaufträge
+auf den nächsten Wareneingang warten, die Live-Reservierung verteilt dann
+nach Reihenfolge).
+
+**Seed und Umfang.** Derselbe Seed ergibt denselben Plan; ein roter Lauf
+nennt Seed und Faktor im Testnamen:
+
+    ABNAHME_FAKTOR=10 ABNAHME_SEED=20261015 npm run test:prozesse
+
+Standard ist Faktor 10 mit Seed 20261015.
+
+**Ergebnis (2026-10-15):** drei Seeds mit Faktor 10 live gegengerechnet,
+jeder in Monat 1, 2 und 3 **Soll = Ist in jedem Feld**:
+
+| Seed | Schritte | Shop / B2B | Bestellungen | Fertigmeldungen | Stornos |
+|---|---|---|---|---|---|
+| 20261015 | 903 | 185 / 24 | 44 | 114 | 13 |
+| 7 | 906 | 181 / 22 | 46 | 115 | 22 |
+| 2026 | 837 | 180 / 22 | 34 | 119 | 13 |
+
+Der erste Lauf fand noch eine Lücke im Generator, nicht im System: zwei
+Steuertermine derselben Art für denselben Zeitraum (Unique-Constraint in
+`steuerzahlungen`); die Gewerbesteuer hat seitdem ihre eigene Art.
 
 ## Was der Lauf gezeigt hat
 

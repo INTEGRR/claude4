@@ -9,6 +9,36 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Abnahmetest ×10: zufällig, seedbar, das Modell als Orakel
+
+**Anlass (Betreiber):** „Viel zu wenig Testdaten, ×10 mindestens, random."
+Das feste Szenario (97 Schritte) ist von Hand nachrechenbar, aber als
+Abnahme zu klein.
+
+**Entschieden:** Ein seedbarer Generator (`tests/abnahme/zufall.ts`,
+mulberry32) erzeugt denselben Schritt-Typ in beliebigem Umfang —
+Standard Faktor 10 ≈ 900 Schritte, 185 Shop-Bestellungen, 44
+Bestellungen, 20 Verträge, 3 Darlehen, zufällige Mengen, Preise, Kurse,
+Teillieferungen, Stornos, Kündigungen. Machbarkeit erzwingt der Generator
+nicht durch Regeln, sondern durch das **Rechenmodell als Orakel**: jeder
+erzeugte Schritt wird sofort im Modell gebucht, der nächste fragt den
+Modellstand (reserviert? versandbereit? frei?). Der Live-Lauf
+(`tests/prozesse/abnahme-zufall.test.ts`, Interpreter in
+`tests/abnahme/live.ts`) prüft dann das Orakel — Seed und Faktor über
+`ABNAHME_SEED`/`ABNAHME_FAKTOR`, beide stehen im Testnamen, damit ein
+roter Lauf nachstellbar ist. Teil des `npm run check` (~1 Min).
+
+**Ergebnis:** Seed 20261015 ×10 — alle drei Monate Soll = Ist in jedem
+Feld; weitere Seeds siehe [abnahmetest.md](abnahmetest.md). Der einzige
+Fund war eine Generatorlücke (zwei Steuertermine derselben Art für
+denselben Zeitraum, Unique-Constraint), kein Systemfehler. Das Modell
+wurde für den Umfang um Darlehensarten (Rate, endfällig), mehrere Darlehen
+und den Nachzahlungsfall von „Als bezahlt markieren" (Vorkasse deckt
+nach Kursanstieg nicht) erweitert.
+
+**Wo:** `tests/abnahme/zufall.ts`, `tests/abnahme/live.ts`,
+`tests/prozesse/abnahme-zufall.test.ts`; [abnahmetest.md](abnahmetest.md).
+
 ## 2026-10-15 — Abnahmetest: drei Monate vorher gerechnet, live wiederholt, Feld für Feld verglichen
 
 **Anlass (Betreiber):** „Das ist der letzte Test" — für jeden Beleg und

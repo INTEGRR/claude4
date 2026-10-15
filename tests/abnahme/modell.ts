@@ -76,13 +76,10 @@ export interface Stand {
   verbindlichkeiten: { offen: number; rechnungen: number }
   faellig: Record<string, { anzahl: number; summe: number }>
   vertraege: Record<string, { status: string; ende: string | null; gezahlt: number }>
-  darlehen: {
-    status: string
-    restschuld: number
-    bezahlte_raten: number
-    naechste: string | null
-    annuitaet: number
-  }
+  darlehen: Record<
+    string,
+    { status: string; restschuld: number; bezahlte_raten: number; naechste: string | null; rate: number }
+  >
   steuern: { offen: number; bezahlt: number }
   deckungsbeitrag: { umsatz: number; einsatz: number }
 }
@@ -215,6 +212,7 @@ interface Rate {
 
 interface Darlehen {
   id: string
+  name: string
   betrag: number
   annuitaet: number
   raten: Rate[]
@@ -231,7 +229,7 @@ interface Steuer {
 const JE: Record<Sku, number> = { 'ALU-CASE': 0, 'PCB-65': 0, 'SW-LIN': 0, DESKMAT: 0, 'KB-65': 0 }
 for (const k of STUECKLISTE.komponenten) JE[k.sku] = k.menge
 
-class Modell {
+export class Modell {
   heute: Datum
   artikel = {} as Record<Sku, Artikel>
   kurse: { waehrung: string; kurs: number; ab: Datum }[] = []
@@ -634,20 +632,26 @@ class Modell {
     }
   }
 
+  /** darlehen_raten_generieren: Annuität, lineare Rate oder endfällig; Monatszins, Rundung je Rate. */
   private tilgungsplan(s: Extract<Schritt, { art: 'darlehen' }>): Darlehen {
+    const art = s.darlehensart ?? 'annuitaet'
     const i = s.zins_pct / 100 / 12
     const n = s.laufzeit
-    const annuitaet = i > 0 ? r2((s.betrag * i) / (1 - (1 + i) ** -n)) : r2(s.betrag / n)
+    const annuitaet = art !== 'annuitaet' ? 0 : i > 0 ? r2((s.betrag * i) / (1 - (1 + i) ** -n)) : r2(s.betrag / n)
     let rest = s.betrag
     const raten: Rate[] = []
     for (let m = 1; m <= s.laufzeit; m++) {
       const faellig = tageAddieren(monatsanfang(monateAddieren(s.auszahlung_am, m)), s.zahltag - 1)
       const zins = r2(rest * i)
-      const tilgung = m === s.laufzeit ? rest : Math.min(rest, r2(annuitaet - zins))
+      let tilgung: number
+      if (m === s.laufzeit) tilgung = rest
+      else if (art === 'endfaellig') tilgung = 0
+      else if (art === 'rate') tilgung = r2(s.betrag / n)
+      else tilgung = Math.min(rest, r2(annuitaet - zins))
       rest = r2(rest - tilgung)
       raten.push({ nr: m, faellig, zins, tilgung, restschuld: rest, bezahlt: null })
     }
-    return { id: s.id, betrag: s.betrag, annuitaet, raten, status: 'geplant' }
+    return { id: s.id, name: s.name, betrag: s.betrag, annuitaet, raten, status: 'geplant' }
   }
 
   private bestellen(s: Extract<Schritt, { art: 'bestellung' }>): void {
@@ -733,6 +737,13 @@ class Modell {
       this.zahlen('aus', offen, s.zahlen_am, true)
       r.gezahltEur = r2(r.gezahltEur + offen)
     }
+    if (s.gedeckt && this.rechnungOffen(r) > 0) {
+      // pay_vendor_bill: was die Vorkasse nicht deckt (Kurs gestiegen), zahlt
+      // „Als bezahlt markieren" heute ohne Konto nach.
+      const rest = this.rechnungOffen(r)
+      this.zahlen('aus', rest, this.heute, false)
+      r.gezahltEur = r2(r.gezahltEur + rest)
+    }
     if ((s.zahlen_am || s.gedeckt) && this.rechnungOffen(r) <= 0) r.status = 'paid'
   }
 
@@ -812,15 +823,18 @@ class Modell {
       vertraege[v.name] = { status: v.status, ende: v.gekuendigtZum, gezahlt: r2(v.zahlungen.length * v.betrag) }
     }
 
-    const [d] = [...this.darlehen.values()]
-    const bezahlte = d?.raten.filter((x) => x.bezahlt) ?? []
-    const naechste = d?.raten.find((x) => !x.bezahlt)
-    const darlehen = {
-      status: d?.status ?? 'keins',
-      restschuld: bezahlte.length ? bezahlte[bezahlte.length - 1].restschuld : (d?.betrag ?? 0),
-      bezahlte_raten: bezahlte.length,
-      naechste: naechste?.faellig ?? null,
-      annuitaet: d?.annuitaet ?? 0,
+    const darlehen: Stand['darlehen'] = {}
+    for (const d of this.darlehen.values()) {
+      const bezahlte = d.raten.filter((x) => x.bezahlt)
+      const naechste = d.raten.find((x) => !x.bezahlt)
+      darlehen[d.name] = {
+        status: d.status,
+        restschuld: bezahlte.length ? bezahlte[bezahlte.length - 1].restschuld : d.betrag,
+        bezahlte_raten: bezahlte.length,
+        naechste: naechste?.faellig ?? null,
+        // Rate 1 (Zins + Tilgung) — bei der Annuität die Annuität selbst.
+        rate: r2(d.raten[0].zins + d.raten[0].tilgung),
+      }
     }
 
     const steuern = { offen: 0, bezahlt: 0 }

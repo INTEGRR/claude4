@@ -12,6 +12,7 @@ import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { simulieren, runden } from './abnahme/modell.ts'
 import { PRODUKTE, szenarioErzeugen } from './abnahme/szenario.ts'
+import { szenarioStatistik, szenarioZufaellig } from './abnahme/zufall.ts'
 
 const HEUTE = '2026-10-15'
 const szenario = szenarioErzeugen(HEUTE)
@@ -97,10 +98,11 @@ describe('Abnahmetest — Rechenmodell', () => {
 
   test('Finanzen: Darlehen, Verträge, Steuern am Ende von Monat 3', () => {
     // Annuität 12.000 € zu 4,8 % über 24 Monate; zwei Raten bezahlt.
-    assert.equal(m3.darlehen.bezahlte_raten, 2)
-    assert.equal(m3.darlehen.status, 'laufend')
-    assert.equal(m3.darlehen.naechste, '2026-11-05')
-    assert.ok(m3.darlehen.restschuld < 12000 && m3.darlehen.restschuld > 11000)
+    const d = m3.darlehen['Maschinen-Darlehen']
+    assert.equal(d.bezahlte_raten, 2)
+    assert.equal(d.status, 'laufend')
+    assert.equal(d.naechste, '2026-11-05')
+    assert.ok(d.restschuld < 12000 && d.restschuld > 11000)
     // Lizenz gekündigt zum Jahresende, Miete läuft; je drei Zahlungen.
     assert.deepEqual(m3.vertraege['Software-Lizenz'], { status: 'gekuendigt', ende: '2026-12-31', gezahlt: 267 })
     assert.deepEqual(m3.vertraege['Miete Werkstatt'], { status: 'aktiv', ende: null, gezahlt: 3600 })
@@ -124,5 +126,32 @@ describe('Abnahmetest — Rechenmodell', () => {
     assert.deepEqual(m3.belege.rechnungen, { paid: 5 })
     assert.equal(m3.belege.fertigungsauftraege.cancel, 1, 'B2 storniert vor der Fertigung')
     assert.equal(m3.belege.fertigungsauftraege.confirmed, 1, 'SH17 wartet auf die Fertigung')
+  })
+
+  test('Zufallsszenario: seedbar, zehnfach, nur machbare Schritte, Invarianten halten', () => {
+    const a = szenarioZufaellig({ heute: HEUTE, seed: 42, faktor: 10 })
+    const b = szenarioZufaellig({ heute: HEUTE, seed: 42, faktor: 10 })
+    assert.deepEqual(a.schritte, b.schritte, 'derselbe Seed ergibt denselben Plan')
+    assert.notDeepEqual(szenarioZufaellig({ heute: HEUTE, seed: 43, faktor: 10 }).schritte, a.schritte)
+
+    const statistik = szenarioStatistik(a)
+    assert.ok(a.schritte.length >= 10 * 97 * 0.8, `Umfang ≥ ~zehnfach (${a.schritte.length} Schritte)`)
+    assert.ok(statistik.shop_bestellung >= 150, `Shop-Bestellungen ×10 (${statistik.shop_bestellung})`)
+    assert.ok(statistik.bestellung >= 30 && statistik.vertrag >= 20 && statistik.darlehen >= 2)
+
+    // Das Modell nimmt jeden erzeugten Schritt an (der Generator fragt es vorher) —
+    // und die Invarianten gelten nach jedem Monat wie im festen Szenario.
+    const e = simulieren(a)
+    for (const monat of [1, 2, 3]) {
+      const stand = e.monate[monat]
+      for (const p of PRODUKTE) {
+        const z = stand.bestand[p.sku]
+        assert.ok(z.on_hand >= 0 && z.reserviert >= 0 && z.reserviert <= z.on_hand, `${p.sku} Monat ${monat}: ${JSON.stringify(z)}`)
+        assert.equal(z.bewertet, z.on_hand)
+      }
+      assert.ok(stand.shopify.soll['KB-65'] <= 99 && stand.shopify.soll['KB-65'] >= 0)
+      const versendet = stand.belege.lieferungen.done ?? 0
+      assert.ok(stand.shopify.fulfillments <= versendet, 'nie mehr Fulfillments als Lieferungen')
+    }
   })
 })

@@ -139,19 +139,19 @@ export async function istStandLesen(sql: Sql, k: Kennungen, faelligBis: Datum): 
     vertraege[z.name] = { status: z.status, ende: z.ende, gezahlt: r(z.gezahlt, 2) }
   }
 
-  const [d] = await sql<
-    { status: string; restschuld: number; bezahlte_raten: number; naechste: string | null; annuitaet: number }[]
+  const darlehen: Stand['darlehen'] = {}
+  for (const d of await sql<
+    { name: string; status: string; restschuld: number; bezahlte_raten: number; naechste: string | null; rate: number }[]
   >`
-    select d.status::text as status,
+    select d.name, d.status::text as status,
            coalesce((select r.restschuld from darlehen_raten r where r.darlehen_id = d.id and r.bezahlt_am is not null
                      order by r.nr desc limit 1), d.betrag) as restschuld,
            (select count(*)::int from darlehen_raten r where r.darlehen_id = d.id and r.bezahlt_am is not null) as bezahlte_raten,
            (select min(r.faellig_am)::text from darlehen_raten r where r.darlehen_id = d.id and r.bezahlt_am is null) as naechste,
-           (select r.zins + r.tilgung from darlehen_raten r where r.darlehen_id = d.id and r.nr = 1) as annuitaet
-    from darlehen d order by d.created_at limit 1`
-  const darlehen = d
-    ? { status: d.status, restschuld: r(d.restschuld, 2), bezahlte_raten: Number(d.bezahlte_raten), naechste: d.naechste, annuitaet: r(d.annuitaet, 2) }
-    : { status: 'keins', restschuld: 0, bezahlte_raten: 0, naechste: null, annuitaet: 0 }
+           (select r.zins + r.tilgung from darlehen_raten r where r.darlehen_id = d.id and r.nr = 1) as rate
+    from darlehen d order by d.created_at`) {
+    darlehen[d.name] = { status: d.status, restschuld: r(d.restschuld, 2), bezahlte_raten: Number(d.bezahlte_raten), naechste: d.naechste, rate: r(d.rate, 2) }
+  }
 
   const [st] = await sql<{ offen: number; bezahlt: number }[]>`
     select coalesce(sum(betrag) filter (where bezahlt_am is null), 0) as offen,

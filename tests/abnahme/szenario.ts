@@ -83,10 +83,11 @@ export type Schritt =
   | { art: 'vertrag'; id: string; name: string; betrag: number; zahltag: number; beginn: Datum; frist: number }
   | { art: 'vertrag_zahlen'; vertrag: string; am: Datum }
   | { art: 'vertrag_kuendigen'; vertrag: string; zum: Datum }
-  | { art: 'darlehen'; id: string; name: string; betrag: number; zins_pct: number; laufzeit: number; zahltag: number; auszahlung_am: Datum }
+  | { art: 'darlehen'; id: string; name: string; betrag: number; zins_pct: number; laufzeit: number; zahltag: number; auszahlung_am: Datum; darlehensart?: 'annuitaet' | 'rate' | 'endfaellig' }
   | { art: 'darlehen_auszahlen'; darlehen: string; am: Datum }
   | { art: 'darlehen_rate'; darlehen: string; nr: number; am: Datum }
-  | { art: 'steuer'; id: string; bezeichnung: string; betrag: number; von: Datum; bis: Datum; faellig: Datum }
+  /** Steuertermin; `steuerart` Standard „ust" — je Art und Zeitraum nur ein Termin (Unique in steuerzahlungen). */
+  | { art: 'steuer'; id: string; bezeichnung: string; betrag: number; von: Datum; bis: Datum; faellig: Datum; steuerart?: 'ust' | 'gewst' | 'kst' | 'sonstige' }
   | { art: 'steuer_zahlen'; steuer: string; am: Datum }
   /** Inventur im Hauptlager: `gezaehlt` absolut oder `differenz` gegen den Buchbestand. */
   | { art: 'inventur'; produkt: Sku; gezaehlt?: number; differenz?: number }

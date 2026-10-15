@@ -103,7 +103,7 @@ Sie sind der Grund, warum die Konventionen mitwachsen statt zu verrotten:
 | `tests/auswahl.test.ts` | Kein natives `<select>` im internen Teil — Auswahlfelder sind `<Auswahl>` mit Suche (Ausnahmen: zwei öffentliche Formulare) |
 | `tests/db-client.test.ts` | App-Client ohne Pipelining (Supavisor), kein `.begin(` — Transaktionen über `tx()`/`transaktion()` |
 | `tests/prozesse/fakes.test.ts` (`after`) | Ein Test ohne Datenbank lässt keine Verbindung offen |
-| `tests/abnahme-modell.test.ts` + `tests/prozesse/abnahme.test.ts` | Der Abnahmetest: drei Monate Belege, vorher im Modell gerechnet, live wiederholt — Soll = Ist in jedem Feld ([abnahmetest.md](abnahmetest.md)) |
+| `tests/abnahme-modell.test.ts` + `tests/prozesse/abnahme*.test.ts` | Der Abnahmetest: drei Monate Belege, vorher im Modell gerechnet, live wiederholt — fest (97 Schritte) und zufällig in zehnfachem Umfang (seedbar); Soll = Ist in jedem Feld ([abnahmetest.md](abnahmetest.md)) |
 
 Neue Konvention, die immer mitwachsen muss? Dann gehört ein Wächter dazu.
 
