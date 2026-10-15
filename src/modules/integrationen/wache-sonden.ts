@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { sql } from '@/db/client'
 import { dhlConfigured, dhlErreichbar } from '@/modules/versand/dhl'
-import { kontingentLesen, track17Konfiguriert } from '@/modules/versand/track17'
+import { track17Konfiguriert } from '@/modules/versand/track17'
+import { kontingentMerken } from '@/modules/versand/track17-einstellung'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { aktiveDruckerVorhanden, stilleDrucker } from '@/modules/druck/abholen'
 import { kiConfigured } from '@/modules/ki/agent'
@@ -49,8 +50,10 @@ export function standardSonden(): Sonde[] {
           where system = 'track17' and ok and created_at > now() - interval '55 minutes'
           limit 1`
         if (juengst) return
-        const k = await kontingentLesen()
-        if (k.quota_remain <= 0) throw new Error('Kontingent erschöpft — keine Sendung lässt sich mehr anmelden')
+        // Gelesen wird gemerkt (settings track17_kontingent) — Panel und
+        // Knopf „Verfolgen" zeigen den Stand, ohne selbst zu fragen.
+        const k = await kontingentMerken(sql)
+        if (k.remain <= 0) throw new Error('Kontingent erschöpft — keine Sendung lässt sich mehr anmelden')
       },
     },
     {

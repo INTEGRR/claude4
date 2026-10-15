@@ -9,6 +9,38 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — 17TRACK-Kontingent schonen: Anmeldung von Hand als Standard
+
+**Anlass (Betreiber):** „200 sind free, ich will die erst nächstes Jahr
+aufladen — das muss mindestens ein Jahr halten, also nicht so häufig
+abfragen." Klärung: Das Kontingent (200, laut `getquota`) zählt
+**angemeldete Sendungen**, nicht Abfragen — Abrufe und Webhooks kosten
+nichts. Was das Kontingent verbraucht, ist die automatische Anmeldung
+jeder Sendungsnummer (auch des DHL-Pakets vom deutschen Lieferanten, das
+übermorgen ohnehin da ist).
+
+**Entschieden:**
+- **Vorgemerkt statt angemeldet:** Eine Sendungsnummer am Beleg kostet
+  nichts mehr — Status `vorgemerkt` (0113). Angemeldet wird per
+  **„Verfolgen (1 vom Kontingent)"** am Beleg; der Knopf nennt den Rest.
+  Der Betreiber entscheidet, welche Sendung das Kontingent wert ist (die
+  Seefracht aus Shenzhen ja, das Inlandspaket eher nicht).
+- **Automatik als Einstellung** (`settings track17 {automatisch,
+  reserve}`, Registry `einstellungen.sendungsverfolgung_setzen`), Standard aus; eine
+  Reserve (20) stoppt die Automatik, bevor das Kontingent leer ist — von
+  Hand geht es weiter, erschöpft sagt der Knopf es klar.
+- **Kontingentstand gemerkt** (`settings track17_kontingent`): nach jeder
+  Anmeldung und vom Wächter gelesen, von allen Seiten nur gezeigt — kein
+  17TRACK-Aufruf je Seitenansicht.
+- **Abfragerhythmus bleibt** (Nachfassen 5/15/45 min, stündlich frische,
+  sonst alle sechs Stunden): er kostet kein Kontingent; mit 200 Sendungen
+  im Jahr sind das im Schnitt unter zehn Aufrufe am Tag.
+
+**Wo:** Migration 0113, `track17-einstellung.ts`, `zulauf-verfolgung.ts`,
+Komponente `sendungsverfolgung.tsx`, Schnittstellen-Seite, Test
+`tests/prozesse/zulauf-verfolgung.test.ts`;
+[module/einkauf.md](module/einkauf.md), [module/integrationen.md](module/integrationen.md).
+
 ## 2026-10-15 — Erster Stand nach der Anmeldung: nachfassen statt sechs Stunden warten
 
 **Anlass (Betreiber):** Erste echte Sendung (DHL, liegt laut DHL in der

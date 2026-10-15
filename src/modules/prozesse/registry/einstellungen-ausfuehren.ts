@@ -1294,3 +1294,19 @@ export async function druckwegSetzen(p: {
     on conflict (work_center_id, druckart) do update set drucker_id = excluded.drucker_id`
   return { text: 'Druckweg gesetzt.' }
 }
+
+/** 17TRACK: Zulauf-Sendungen automatisch oder von Hand anmelden (0113). */
+export async function track17Setzen(
+  p: { automatisch: boolean; reserve: number },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const wert = { automatisch: p.automatisch, reserve: p.reserve }
+  await sql`
+    insert into settings (key, value) values ('track17', ${sql.json(wert)})
+    on conflict (key) do update set value = settings.value || ${sql.json(wert)}::jsonb`
+  return {
+    text: p.automatisch
+      ? `17TRACK: jede Sendungsnummer wird automatisch angemeldet, solange mehr als ${p.reserve} frei sind.`
+      : '17TRACK: Sendungen werden nur von Hand angemeldet („Verfolgen" am Beleg).',
+  }
+}

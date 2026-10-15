@@ -8,6 +8,7 @@
 
 /** Unser Status an der Sendung (sendungsverfolgung.status). */
 export type VerfolgungStatus =
+  | 'vorgemerkt'
   | 'registriert'
   | 'nicht_verfolgbar'
   | 'nicht_gefunden'
@@ -21,6 +22,7 @@ export type VerfolgungStatus =
   | 'abgelaufen'
 
 export const VERFOLGUNG_LABELS: Record<VerfolgungStatus, string> = {
+  vorgemerkt: 'Vorgemerkt',
   registriert: 'Angemeldet',
   nicht_verfolgbar: 'Nicht verfolgbar',
   nicht_gefunden: 'Noch nicht im Tracking',

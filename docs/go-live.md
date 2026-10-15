@@ -74,7 +74,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
 - [ ] **17TRACK** (Zulauf-Sendungsverfolgung, seit 2026-10-15):
   - `TRACK17_API_KEY` — Security Key aus dem 17TRACK-API-Dashboard
     (api.17track.net/admin → Settings); Konto mit passendem Kontingent
-    (jede Zulauf-Sendung kostet einmalig eine Anmeldung).
+    (jede angemeldete Zulauf-Sendung kostet einmalig eine vom Kontingent;
+    Standard ist Anmeldung von Hand per „Verfolgen" am Beleg, die
+    Automatik lässt sich unter Schnittstellen einschalten).
   - Im Dashboard unter Settings → Webhook die Adresse
     `https://<erp>/api/webhooks/17track` eintragen und den Test-Push
     auslösen — Einstellungen → Schnittstellen zeigt die Adresse fertig.

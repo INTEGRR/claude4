@@ -12,7 +12,7 @@ import { dateTime, qty } from '@/modules/shared/format'
 import { madeToOrderEinstellung, madeToOrderVorschau } from '@/modules/integrationen/made-to-order'
 import { POSTFACH_SCHLUESSEL, type PostfachStand } from '@/modules/einkauf/postfach-abgleich'
 import { postfachKonfiguriert } from '@/modules/google/auth'
-import { type Kontingent, kontingentLesen } from '@/modules/versand/track17'
+import { type KontingentStand, kontingentStand, track17Einstellung } from '@/modules/versand/track17-einstellung'
 import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
@@ -49,6 +49,11 @@ async function einkaufspostfachAbgleichen() {
 async function webhooksRegistrieren(formData: FormData) {
   'use server'
   return serverAktion('integrationen.webhooks_registrieren', { formData })
+}
+
+async function track17Speichern(formData: FormData) {
+  'use server'
+  return serverAktion('einstellungen.sendungsverfolgung_setzen', { formData })
 }
 
 /** Fehlende Pflichtwerte sind nur hier ein Problem — der Rest ist optional. */
@@ -158,14 +163,10 @@ export default async function SchnittstellenPage() {
   }
 
   // 17TRACK-Kontingent — best effort, ein Aufruf je Seitenansicht (Admin).
-  let kontingent: Kontingent | null = null
-  if (stand.track17.vollstaendig) {
-    try {
-      kontingent = await kontingentLesen()
-    } catch {
-      kontingent = null
-    }
-  }
+  // 17TRACK-Kontingent: gemerkter Stand (höchstens eine Stunde alt), sonst ein Aufruf.
+  let kontingent: KontingentStand | null = null
+  if (stand.track17.vollstaendig) kontingent = await kontingentStand(sql)
+  const track17 = await track17Einstellung(sql)
   // Kommt der Push überhaupt an? Ohne diese Zeile sähe niemand, dass der
   // Stand nur über den stündlichen Abruf kommt (Entscheidungslog 2026-10-15).
   const [letzterPush] = await sql<{ am: string | null }[]>`
@@ -390,9 +391,10 @@ export default async function SchnittstellenPage() {
           Kontingent:{' '}
           {kontingent ? (
             <>
-              <span className="mono">{qty(kontingent.quota_remain)}</span> von{' '}
-              <span className="mono">{qty(kontingent.quota_total)}</span> Sendungen übrig
-              {kontingent.today_used > 0 ? ` · heute ${qty(kontingent.today_used)} angemeldet` : ''}
+              <span className="mono">{qty(kontingent.remain)}</span> von{' '}
+              <span className="mono">{qty(kontingent.total)}</span> Sendungen übrig
+              {kontingent.today > 0 ? ` · heute ${qty(kontingent.today)} angemeldet` : ''}
+              <span className="muted"> (Stand {dateTime(kontingent.am)})</span>
             </>
           ) : stand.track17.vollstaendig ? (
             <span className="muted">gerade nicht abrufbar</span>
@@ -414,6 +416,31 @@ export default async function SchnittstellenPage() {
             trägt der Abruf.
           </p>
         )}
+        <ActionForm action={track17Speichern}>
+          <fieldset style={{ border: 0, padding: 0, margin: '0 0 12px' }}>
+            <legend className="mono-label" style={{ marginBottom: 8 }}>Anmeldung bei 17TRACK</legend>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+              <input type="checkbox" name="automatisch" defaultChecked={track17.automatisch} />
+              <span>
+                <strong>Jede Sendungsnummer automatisch anmelden</strong> — kostet je Sendung eine vom
+                Kontingent. Aus (Standard): Sendungen werden nur vorgemerkt und per „Verfolgen" am Beleg
+                angemeldet — du entscheidest, welche Sendung das Kontingent wert ist.
+              </span>
+            </label>
+            <div className="row">
+              <label className="field shrink">
+                <span>Reserve</span>
+                <input name="reserve" type="number" min={0} max={100000} defaultValue={track17.reserve} style={{ width: 90 }} />
+              </label>
+              <span className="small muted" style={{ alignSelf: 'end', paddingBottom: 8 }}>
+                Unter dieser Restmenge meldet KRNL nicht mehr automatisch an — nur noch von Hand.
+              </span>
+              <div className="shrink field">
+                <button type="submit">Speichern</button>
+              </div>
+            </div>
+          </fieldset>
+        </ActionForm>
         <p className="small" style={{ margin: '0 0 10px' }}>
           Webhook-Adresse im 17TRACK-Dashboard (Settings → Webhook) eintragen:{' '}
           <span className="mono">

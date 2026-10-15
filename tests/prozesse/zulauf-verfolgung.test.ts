@@ -36,6 +36,8 @@ const NR = 'JJD01460000300012345'
 before(async () => {
   h = await harnessStart(DATENBANK)
   const sql = h.sql
+  // Standard ist „von Hand" (0113) — die ersten Fälle beschreiben die Automatik.
+  await aktion('einstellungen.sendungsverfolgung_setzen', undefined, { automatisch: true, reserve: 0 })
   const [v] = await sql<{ id: string }[]>`
     insert into partners (name, is_vendor, is_company, country_code) values ('Zulauf Lieferant', true, true, 'CN') returning id`
   const r = await aktion('einkauf.bestellung_anlegen', undefined, { vendor_id: v.id })
@@ -278,5 +280,52 @@ describe('Zulauf-Sendungsverfolgung (17TRACK)', () => {
     // „Jetzt abfragen" ohne Daten: ehrlicher Text statt „kennt die Nummer nicht".
     const m = await aktion('einkauf.zulauf_verfolgen', po2.recordId!)
     assert.match(m.text ?? '', /noch keine Daten — 17TRACK sammelt noch/)
+  })
+  test('Kontingent schonen (0113): Standard „von Hand" merkt vor, „Verfolgen" meldet an; Reserve stoppt die Automatik', async () => {
+    const sql = h.sql
+    const [v] = await sql<{ id: string }[]>`
+      insert into partners (name, is_vendor, is_company, country_code) values ('Zulauf Lieferant 4', true, true, 'DE') returning id`
+    await aktion('einstellungen.sendungsverfolgung_setzen', undefined, { automatisch: false, reserve: 20 })
+    const [e] = await sql<{ value: { automatisch: boolean; reserve: number } }[]>`select value from settings where key = 'track17'`
+    assert.deepEqual(e.value, { automatisch: false, reserve: 20 })
+
+    const po = await aktion('einkauf.bestellung_anlegen', undefined, { vendor_id: v.id })
+    await aktion('einkauf.kopf_aendern', po.recordId!, { ...KOPF, carrier: 'DHL', tracking_nummer: '00340434000000000047' })
+    let [z] = await zeile('purchase_order', po.recordId!)
+    assert.equal(z.status, 'vorgemerkt')
+    assert.equal(z.aktiv, true)
+    assert.equal(z.registriert_am, null)
+    const [{ n }] = await sql<{ n: number }[]>`
+      select count(*)::int as n from integration_jobs where kind = 'track17_registrieren' and payload ->> 'verfolgung_id' = ${z.id}`
+    assert.equal(Number(n), 0, 'vorgemerkt kostet nichts — kein Job')
+    // Der stündliche Abruf meldet Vorgemerktes auch nach Stunden nicht nach.
+    await sql`update sendungsverfolgung set created_at = now() - interval '2 hours' where id = ${z.id}`
+    const r = await verfolgungAbrufen()
+    assert.equal(r.nachgemeldet, 0)
+
+    // „Verfolgen": meldet an, holt den Stand, merkt das Kontingent.
+    const m = await aktion('einkauf.zulauf_verfolgen', po.recordId!)
+    assert.match(m.text ?? '', /00340434000000000047 angemeldet — Zugestellt/)
+    ;[z] = await zeile('purchase_order', po.recordId!)
+    assert.equal(z.status, 'zugestellt')
+    assert.ok(z.registriert_am)
+    const [k] = await sql<{ value: { total: number; remain: number; am: string } }[]>`select value from settings where key = 'track17_kontingent'`
+    assert.equal(k.value.total, 100, 'Attrappe: 100 Sendungen')
+    assert.ok(k.value.remain < 100 && k.value.am, 'Stand nach der Anmeldung gemerkt')
+
+    // Automatik mit Reserve über dem Rest: nur vormerken.
+    await aktion('einstellungen.sendungsverfolgung_setzen', undefined, { automatisch: true, reserve: 100 })
+    const po2 = await aktion('einkauf.bestellung_anlegen', undefined, { vendor_id: v.id })
+    await aktion('einkauf.kopf_aendern', po2.recordId!, { ...KOPF, carrier: 'DHL', tracking_nummer: '00340434000000000055' })
+    const [z2] = await zeile('purchase_order', po2.recordId!)
+    assert.equal(z2.status, 'vorgemerkt', 'Reserve angebrochen → nur von Hand')
+    // Reserve wieder frei: dieselbe Nummer erneut gespeichert → jetzt angemeldet.
+    await aktion('einstellungen.sendungsverfolgung_setzen', undefined, { automatisch: true, reserve: 0 })
+    await aktion('einkauf.kopf_aendern', po2.recordId!, { ...KOPF, carrier: 'DHL', tracking_nummer: '00340434000000000055' })
+    const [z3] = await zeile('purchase_order', po2.recordId!)
+    assert.equal(z3.status, 'registriert')
+    const [{ n2 }] = await sql<{ n2: number }[]>`
+      select count(*)::int as n2 from integration_jobs where kind = 'track17_registrieren' and payload ->> 'verfolgung_id' = ${z3.id}`
+    assert.equal(Number(n2), 1)
   })
 })

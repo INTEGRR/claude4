@@ -7,6 +7,7 @@ import { dateTime } from '@/modules/shared/format'
 import { type Ereignis, subStatusText, zeitKurz } from '@/modules/versand/track17-logik'
 import { track17Konfiguriert } from '@/modules/versand/track17'
 import { type Verfolgung, type VerfolgungModell, verfolgungLesen } from '@/modules/versand/zulauf-verfolgung'
+import { kontingentStandLesen, kontingentText } from '@/modules/versand/track17-einstellung'
 
 /**
  * Zulauf-Sendungsverfolgung (0112) an Bestellung und Eingangssendung: Status,
@@ -46,6 +47,7 @@ export function VerfolgungKurz({
       <Badge state={v.status} kind="sendungsverfolgung" led />
       {zusatz && <span className="muted"> {zusatz}</span>}
       {v.status === 'registriert' && <span className="muted"> · 17TRACK sammelt noch</span>}
+      {v.status === 'vorgemerkt' && <span className="muted"> · nicht angemeldet — „Verfolgen" am Beleg</span>}
       {v.letztes_ereignis && <span className="muted"> · {ereignisText(v.letztes_ereignis)}</span>}
       {v.registrierung_fehler && <span style={{ color: 'var(--danger)' }}> · {v.registrierung_fehler}</span>}
       <div className="muted small">{abgefragtText(v)}</div>
@@ -70,6 +72,9 @@ export async function Sendungsverfolgung({
   const zeilen = alle.some((v) => v.aktiv) ? alle.filter((v) => v.aktiv) : alle.slice(0, 1)
   if (zeilen.length === 0 && !nummer?.trim()) return null
   const angebunden = track17Konfiguriert()
+  // Kontingent (gemerkter Stand, kein Aufruf je Seitenansicht) — „Verfolgen" kostet eine Sendung davon.
+  const kontingent = await kontingentStandLesen(sql)
+  const vorgemerkt = zeilen.length === 0 || zeilen.some((v) => v.status === 'vorgemerkt')
   // Noch ohne Stand: wann fasst KRNL nach? (Job track17_nachfassen, sonst der stündliche Abruf)
   const frisch = zeilen.filter((v) => v.status === 'registriert' || v.status === 'nicht_gefunden').map((v) => v.id)
   const nachfassen = new Map<string, string>()
@@ -90,8 +95,8 @@ export async function Sendungsverfolgung({
       </div>
       {zeilen.length === 0 ? (
         <div className="small muted">
-          <span className="mono">{nummer}</span> ist noch nicht angemeldet
-          {angebunden ? ' — „Jetzt abfragen" meldet die Sendung an.' : '.'}
+          <span className="mono">{nummer}</span> ist nicht bei 17TRACK angemeldet
+          {angebunden ? ` — „Verfolgen" meldet die Sendung an (kostet eine Sendung vom Kontingent, ${kontingentText(kontingent)}).` : '.'}
         </div>
       ) : (
         zeilen.map((v) => (
@@ -104,6 +109,13 @@ export async function Sendungsverfolgung({
               <span className="muted"> · wird nicht mehr abgefragt</span>
             )}
             {v.letztes_ereignis && <div className="muted">{ereignisText(v.letztes_ereignis)}</div>}
+            {v.aktiv && v.status === 'vorgemerkt' && (
+              <div className="muted">
+                Nicht bei 17TRACK angemeldet — kostet nichts, liefert aber auch keinen Stand. „Verfolgen" meldet die
+                Sendung an (eine Sendung vom Kontingent, {kontingentText(kontingent)}); automatisch anmelden lässt
+                sich unter <Link href="/einstellungen/anbindungen">Schnittstellen</Link> einschalten.
+              </div>
+            )}
             {v.aktiv && (v.status === 'registriert' || v.status === 'nicht_gefunden') && (
               <div className="muted">
                 {v.status === 'registriert'
@@ -139,8 +151,8 @@ export async function Sendungsverfolgung({
       )}
       <div className="actions" style={{ marginTop: 6 }}>
         {angebunden ? (
-          <ActionButton className="small" action={abfragen}>
-            Jetzt abfragen
+          <ActionButton className="small" action={abfragen} title={vorgemerkt ? 'Meldet die Sendung bei 17TRACK an und holt den Stand' : undefined}>
+            {vorgemerkt ? 'Verfolgen (1 vom Kontingent)' : 'Jetzt abfragen'}
           </ActionButton>
         ) : (
           <span className="small muted">

@@ -126,6 +126,14 @@ Carrier — Fachlogik und Oberfläche im [Einkauf](einkauf.md#sendungsverfolgung
   als sechs Stunden nicht abgefragt wurden), `getquota` (Dienste-Wächter,
   höchstens stündlich: erschöpftes Kontingent = Störung). Rate-Limit 3
   Aufrufe je Sekunde.
+- **Kontingent (0113):** zählt angemeldete Sendungen, nicht Abfragen —
+  Free-Plan 200 (laut `getquota`, Stand auf der Schnittstellen-Seite).
+  Standard ist deshalb **Anmeldung von Hand** („Verfolgen" am Beleg,
+  Sendungen sonst nur vorgemerkt); die Automatik (`settings track17
+  {automatisch, reserve}`, Formular auf der Schnittstellen-Seite) meldet
+  jede Nummer an, solange mehr als die Reserve frei ist. Der zuletzt
+  gelesene Stand liegt in `settings track17_kontingent` (nach jeder
+  Anmeldung, vom Wächter, von der Schnittstellen-Seite höchstens stündlich).
 - **Aufrufbudget (bewusst sparsam):** je Sendung eine Anmeldung plus bis
   zu drei Nachfass-Abrufe (5/15/45 Minuten, solange 17TRACK noch sammelt);
   der stündliche Abruf stellt höchstens einen Aufruf je 40 aktive

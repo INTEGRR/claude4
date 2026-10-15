@@ -18,6 +18,7 @@ import {
   verfolgungAktiv,
 } from './track17-logik'
 import { type Abgelehnt, type Angemeldet, Track17Error, nummernAnmelden, staendeAbfragen, track17Konfiguriert } from './track17'
+import { automatischAnmelden, kontingentMerken, kontingentStandLesen } from './track17-einstellung'
 
 type Db = Sql | TransactionSql
 
@@ -103,26 +104,33 @@ export async function verfolgungAnmelden(
   if (!nummer) return null
 
   const konfiguriert = track17Konfiguriert()
+  // Kontingent schonen (0113): Standard ist „vorgemerkt" — angemeldet wird
+  // per „Verfolgen" oder automatisch, wenn die Einstellung es erlaubt.
+  const automatisch = konfiguriert && (await automatischAnmelden(db))
+  const neuerStatus = !konfiguriert ? 'nicht_verfolgbar' : automatisch ? 'registriert' : 'vorgemerkt'
   const [row] = await db<Verfolgung[]>`
     insert into sendungsverfolgung (modell, record_id, nummer, carrier_code, carrier, status, registrierung_fehler, aktiv, erstellt_von)
     values (${modell}, ${recordId}, ${nummer}, ${carrierCode(carrierText)}, ${carrierText?.trim() || null},
-            ${konfiguriert ? 'registriert' : 'nicht_verfolgbar'},
+            ${neuerStatus},
             ${konfiguriert ? null : '17TRACK nicht angebunden (TRACK17_API_KEY) — Einstellungen → Schnittstellen'},
             ${konfiguriert}, ${actor})
     on conflict (modell, record_id, nummer) do update set
       carrier_code = coalesce(sendungsverfolgung.carrier_code, excluded.carrier_code),
       carrier = coalesce(sendungsverfolgung.carrier, excluded.carrier),
       -- Eine früher nicht verfolgbare Nummer (Dienst war nicht angebunden,
-      -- Carrier fehlte) bekommt mit der erneuten Pflege eine neue Chance.
-      status = case when sendungsverfolgung.status = 'nicht_verfolgbar' and ${konfiguriert}
-                    then 'registriert' else sendungsverfolgung.status end,
+      -- Carrier fehlte) bekommt mit der erneuten Pflege eine neue Chance;
+      -- eine vorgemerkte wird angemeldet, sobald die Automatik es erlaubt.
+      status = case
+                 when sendungsverfolgung.status = 'nicht_verfolgbar' and ${konfiguriert} then ${neuerStatus}
+                 when sendungsverfolgung.status = 'vorgemerkt' and ${automatisch} then 'registriert'
+                 else sendungsverfolgung.status end,
       registrierung_fehler = case when sendungsverfolgung.status = 'nicht_verfolgbar' and ${konfiguriert}
                                   then null else sendungsverfolgung.registrierung_fehler end,
       aktiv = sendungsverfolgung.status not in ('zugestellt', 'abgelaufen')
               and (sendungsverfolgung.status <> 'nicht_verfolgbar' or ${konfiguriert})
     returning ${spalten(db)}`
 
-  if (row.aktiv && !row.registriert_am) {
+  if (row.aktiv && row.status === 'registriert' && !row.registriert_am) {
     await db`select enqueue_job('track17_registrieren', ${db.json({ verfolgung_id: row.id })}, ${`track17:${row.id}`})`
   }
   return row
@@ -203,9 +211,11 @@ async function anmelden(v: Verfolgung): Promise<Anmeldung> {
     return { text: `${v.nummer}: 17TRACK nicht angebunden`, ergebnis: 'nicht_verfolgbar' }
   }
   const [beansprucht] = await sql<{ id: string }[]>`
-    update sendungsverfolgung set registriert_am = now()
+    update sendungsverfolgung set registriert_am = now(),
+      status = case when status = 'vorgemerkt' then 'registriert' else status end
     where id = ${v.id} and registriert_am is null returning id`
   if (!beansprucht) return { text: `${v.nummer}: bereits angemeldet`, ergebnis: 'schon' }
+  const zurueck = () => sql`update sendungsverfolgung set registriert_am = null, status = ${v.status} where id = ${v.id}`
 
   let angemeldet: Angemeldet[]
   let abgelehnt: Abgelehnt[]
@@ -214,7 +224,7 @@ async function anmelden(v: Verfolgung): Promise<Anmeldung> {
       { nummer: v.nummer, carrier: v.carrier_code, tag: `${v.modell}:${v.record_id}` },
     ]))
   } catch (err) {
-    await sql`update sendungsverfolgung set registriert_am = null where id = ${v.id}`
+    await zurueck()
     throw err
   }
   const ok = angemeldet.find((a) => a.number === v.nummer)
@@ -222,7 +232,7 @@ async function anmelden(v: Verfolgung): Promise<Anmeldung> {
   if (!ok && nein && nein.code !== BEREITS_ANGEMELDET) {
     const grund = registrierungsFehlerText(nein.code, nein.message)
     if (registrierungWiederholen(nein.code)) {
-      await sql`update sendungsverfolgung set registriert_am = null where id = ${v.id}`
+      await zurueck()
       throw new Error(`${v.nummer}: ${grund}`)
     }
     await sql`update sendungsverfolgung set status = 'nicht_verfolgbar', aktiv = false, registriert_am = null,
@@ -234,6 +244,8 @@ async function anmelden(v: Verfolgung): Promise<Anmeldung> {
   }
 
   const carrier = ok?.carrier ?? nein?.carrier ?? v.carrier_code
+  // Der Stand des Kontingents nach dieser Anmeldung — für Panel und Knopf.
+  await kontingentMerken(sql).catch(() => undefined)
   await sql`update sendungsverfolgung set registrierung_fehler = null,
     carrier_code = coalesce(${carrier}, carrier_code),
     zuletzt_abgefragt_am = now(), zuletzt_abgefragt_via = 'registrierung'
@@ -312,7 +324,7 @@ export async function verfolgungAbrufen(
 ): Promise<{ checked: number; updated: number; nachgemeldet: number; fehler?: string }> {
   const nachzumelden = await sql<{ id: string }[]>`
     select v.id from sendungsverfolgung v
-    where v.aktiv and v.registriert_am is null and v.created_at < now() - interval '1 hour'
+    where v.aktiv and v.status = 'registriert' and v.registriert_am is null and v.created_at < now() - interval '1 hour'
       and not exists (select 1 from integration_jobs j
                       where j.kind = 'track17_registrieren' and j.payload ->> 'verfolgung_id' = v.id::text
                         and j.status in ('pending', 'running'))
@@ -425,6 +437,10 @@ export async function verfolgungJetztAbfragen(
   if (!row) throw new Error('Keine Sendungsnummer am Beleg.')
   let text: string | null = null
   if (!row.registriert_am) {
+    const stand = await kontingentStandLesen(sql)
+    if (stand && stand.remain <= 0) {
+      throw new Error('17TRACK-Kontingent erschöpft — keine Anmeldung möglich, bis es aufgeladen ist (api.17track.net).')
+    }
     const a = await anmelden(row)
     // „schon": der Outbox-Job war schneller — dann wie angemeldet nur abfragen.
     if (a.ergebnis !== 'schon') text = a.text

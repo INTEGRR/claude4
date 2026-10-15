@@ -91,11 +91,26 @@ Seit 0112 verfolgt KRNL jede Zulauf-Sendung über **17TRACK** (ein Dienst
 für alle Carrier; Entscheidungslog 2026-10-15), Tabelle
 `sendungsverfolgung`, eine Zeile je Beleg und Sendungsnummer:
 
+- **Kontingent schonen — Anmeldung von Hand ist der Standard (0113):**
+  das 17TRACK-Kontingent zählt angemeldete Sendungen (200 im Jahr im
+  Free-Plan; Abfragen kosten nichts). Eine Sendungsnummer am Beleg wird
+  deshalb nur **vorgemerkt** („Vorgemerkt · nicht angemeldet") — kostet
+  nichts, liefert aber keinen Stand. **„Verfolgen (1 vom Kontingent)"** am
+  Beleg meldet die Sendung an und holt den Stand; der Knopf nennt, wie
+  viele Sendungen noch frei sind (gemerkter Stand aus `settings
+  track17_kontingent`, aktualisiert nach jeder Anmeldung und stündlich vom
+  Wächter — kein 17TRACK-Aufruf je Seitenansicht). Einstellungen →
+  Schnittstellen: **„Jede Sendungsnummer automatisch anmelden"** (Registry
+  `einstellungen.sendungsverfolgung_setzen`, `settings track17 {automatisch,
+  reserve}`) schaltet die Automatik ein; unter der **Reserve** (Standard 20)
+  meldet KRNL wieder nur von Hand an. Erschöpftes Kontingent: „Verfolgen"
+  sagt es klar, der Wächter meldet eine Störung.
 - **Anmelden:** `einkauf.kopf_aendern` (Tracking-Nummer der Bestellung) und
   `einkauf.sendung_anlegen/aendern/verschiffen` (HBL/AWB der
-  Eingangssendung) legen die Zeile an („Angemeldet") und reihen den
-  Outbox-Job `track17_registrieren` ein; der meldet die Nummer an (kostet
-  einmalig Kontingent) und holt den ersten Stand. Der Carrier-Text wird auf
+  Eingangssendung) legen die Zeile an (vorgemerkt bzw. — mit Automatik —
+  „Angemeldet") und reihen dann den Outbox-Job `track17_registrieren` ein;
+  der meldet die Nummer an (kostet einmalig Kontingent) und holt den ersten
+  Stand. Der Carrier-Text wird auf
   den 17TRACK-Code abgebildet (`track17-logik.ts`: DHL, DHL Express, DPD,
   GLS, UPS, FedEx, K+N, Schenker, Maersk, …), sonst erkennt 17TRACK ihn
   selbst. Abgelehnte Nummern (Format, Carrier nicht erkennbar) stehen als

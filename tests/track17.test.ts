@@ -62,8 +62,11 @@ describe('17TRACK: Status', () => {
 
   test('jeder Status hat ein Schild und einen Ton', () => {
     for (const status of Object.keys(LABELS.sendungsverfolgung)) {
+      // „Vorgemerkt" ist bewusst tonlos: noch keine Aussage über die Sendung.
+      if (status === 'vorgemerkt') continue
       assert.notEqual(tone(status), 'neutral', `${status} braucht einen Ton`)
     }
+    assert.equal(verfolgungAktiv('vorgemerkt'), true, 'vorgemerkt bleibt aktiv — wartet auf „Verfolgen"')
     assert.equal(tone('zugestellt'), 'success')
     assert.equal(tone('problem'), 'danger')
     assert.equal(tone('unterwegs'), 'info')

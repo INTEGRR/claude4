@@ -1201,4 +1201,26 @@ export const EINSTELLUNGEN = {
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'einstellungen.sendungsverfolgung_setzen': {
+    label: '17TRACK: Anmeldung der Zulauf-Sendungen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Ob Sendungsnummern des Einkaufs automatisch bei 17TRACK angemeldet werden (kostet je Sendung Kontingent) ' +
+      'oder nur von Hand per „Verfolgen" (Standard, schont das Kontingent). Reserve: unter dieser Restmenge ' +
+      'meldet KRNL nicht mehr automatisch an (settings.track17).',
+    bindung: 'frei',
+    schema: z.object({
+      automatisch: z.boolean().default(false),
+      reserve: z.number({ invalid_type_error: 'Reserve: ganze Zahl' }).int().min(0).max(100000).default(20),
+    }),
+    zusammenfassung: (p) =>
+      p.automatisch ? `17TRACK: automatisch anmelden, Reserve ${p.reserve}` : '17TRACK: Anmeldung nur von Hand',
+    formdata: (fd) => ({
+      automatisch: fd.get('automatisch') === 'on',
+      reserve: Number(String(fd.get('reserve') ?? '20').trim() || '0'),
+    }),
+    revalidate: ['/einstellungen/anbindungen'],
+  },
 } satisfies Record<string, RegistrierteAktion<any>>
