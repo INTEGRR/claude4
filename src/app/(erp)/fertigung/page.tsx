@@ -3,11 +3,10 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { createMo } from './actions'
+import { cancelMo, createMo, produceMoDirekt } from './actions'
 import { FertigungBulk } from './bulk'
 import { Auswahl } from '@/components/auswahl'
 import { ActionButton } from '@/components/action-button'
-import { aufgabeErledigen } from '@/app/(erp)/aufgaben/actions'
 import { aufgabenListe } from '@/modules/aufgaben/liste'
 import { NACHFRAGE_PRAEFIX, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
 import { date } from '@/modules/shared/format'
@@ -111,9 +110,13 @@ export default async function FertigungPage({
     (a) => a.rolle === 'fertigung' && a.titel.startsWith(NACHFRAGE_PRAEFIX),
   )
   const nachfrageNrn = [...new Set(nachfragen.flatMap((a) => nachfrageNummern(a.titel)))]
+  // manuell = Komponenten mit Verbrauchsart „manuell": die Fertigmeldung
+  // braucht dann Ist-Mengen — Antwort am Auftrag, nicht per Knopf.
   const nachfrageMos = nachfrageNrn.length
-    ? await sql<{ id: string; number: string; state: string; sales_order_id: string | null; auftrag: string | null }[]>`
-        select m.id, m.number, m.state, m.sales_order_id, so.number as auftrag
+    ? await sql<{ id: string; number: string; state: string; sales_order_id: string | null; auftrag: string | null; manuell: boolean }[]>`
+        select m.id, m.number, m.state, m.sales_order_id, so.number as auftrag,
+               exists (select 1 from stock_moves sm where sm.production_id = m.id and sm.issue_method = 'manual'
+                       and sm.state not in ('done', 'cancel')) as manuell
         from manufacturing_orders m left join sales_orders so on so.id = m.sales_order_id
         where m.number = any(${nachfrageNrn})`
     : []
@@ -142,9 +145,10 @@ export default async function FertigungPage({
         >
           <p className="small muted" style={{ margin: '10px 12px 6px' }}>
             Der Shop meldet diese Aufträge als versendet (Sendcloud), KRNL hat den Warenausgang gebucht — der
-            Fertigungsauftrag ist aber noch offen. Wurde gebaut: <strong>Fertig melden</strong> (Material wird
-            verbraucht, Bestand des Erzeugnisses geht auf null). Nicht gebaut: <strong>stornieren</strong> und den
-            Bestand per Inventur korrigieren. Beides hakt die Nachfrage von selbst ab.
+            Fertigungsauftrag ist aber noch offen. Die Antwort ist die Buchung: <strong>Ja, gebaut</strong> meldet
+            den Auftrag fertig (Material wird verbraucht, Bestand des Erzeugnisses geht auf null);{' '}
+            <strong>Nein, nicht gebaut</strong> storniert ihn (dann den Bestand per Inventur korrigieren). Die
+            Nachfrage hakt sich damit von selbst ab — abhaken allein stellt nichts fertig.
           </p>
           <TableWrap>
             <table>
@@ -154,7 +158,7 @@ export default async function FertigungPage({
                   <th>Status</th>
                   <th>Verkaufsauftrag</th>
                   <th>Gemeldet</th>
-                  <th />
+                  <th>Antwort</th>
                 </tr>
               </thead>
               <tbody>
@@ -176,9 +180,36 @@ export default async function FertigungPage({
                       </td>
                       <td className="small mono nowrap">{date(a.faellig_am)}</td>
                       <td className="num">
-                        <ActionButton className="small" action={aufgabeErledigen.bind(null, a.id)} title="Nachfrage ohne Buchung schließen — z. B. wenn schon anders erledigt">
-                          Abhaken
-                        </ActionButton>
+                        <div className="actions" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {mos.map((m) =>
+                            !m.id || m.state === 'done' || m.state === 'cancel' ? null : m.manuell ? (
+                              <Link key={m.number} className="btn small" href={`/fertigung/${m.id}`} title="Komponenten mit manueller Verbrauchsart — Ist-Mengen am Auftrag erfassen">
+                                {mos.length > 1 ? `${m.number}: ` : ''}Fertig melden am Auftrag
+                              </Link>
+                            ) : (
+                              <ActionButton
+                                key={m.number}
+                                className="small primary"
+                                action={produceMoDirekt.bind(null, m.id)}
+                                confirm={`${m.number} fertig melden? Das Material wird laut Stückliste verbraucht.`}
+                              >
+                                {mos.length > 1 ? `${m.number}: ` : ''}Ja, gebaut → fertig melden
+                              </ActionButton>
+                            ),
+                          )}
+                          {mos.map((m) =>
+                            !m.id || m.state === 'done' || m.state === 'cancel' ? null : (
+                              <ActionButton
+                                key={`${m.number}-nein`}
+                                className="small"
+                                action={cancelMo.bind(null, m.id)}
+                                confirm={`${m.number} stornieren? Der Bestand des Erzeugnisses bleibt im Minus — danach per Inventur korrigieren.`}
+                              >
+                                {mos.length > 1 ? `${m.number}: ` : ''}Nein, nicht gebaut → stornieren
+                              </ActionButton>
+                            ),
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

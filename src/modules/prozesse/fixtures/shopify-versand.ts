@@ -755,8 +755,16 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
         assert.equal(r2.nachgezogen, 0)
         assert.equal((await nachfrage()).length, 1)
 
-        // Fertig melden beantwortet die Nachfrage — abgehakt mit Notiz, von selbst.
+        // Abhaken allein stellt nichts fertig — solange der Auftrag offen ist, verweigert die Aufgabe.
         const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+        await assert.rejects(
+          aktionAusfuehrenGeprueft('aufgaben.erledigen', { parameter: { aufgabe: a.id } }, { name: 'prozesstest', role: 'admin' }),
+          /am Fertigungsauftrag beantwortet/,
+        )
+        ;[a] = await nachfrage()
+        assert.equal(a.status, 'offen')
+
+        // Fertig melden beantwortet die Nachfrage — abgehakt mit Notiz, von selbst.
         const f = await aktionAusfuehrenGeprueft(
           'fertigung.fertig_melden',
           { parameter: { mengen: {}, backorder: true }, recordId: ctx.p4MtoMoId },

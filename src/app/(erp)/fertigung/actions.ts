@@ -58,6 +58,11 @@ export async function cancelMo(moId: string): Promise<ActionResult> {
   return serverAktion('fertigung.stornieren', { recordId: moId })
 }
 
+/** Nachfrage „Extern versendet" (2026-10-15): „Ja, gebaut" — Sollmengen, kein Rückstand. */
+export async function produceMoDirekt(moId: string): Promise<ActionResult> {
+  return serverAktion('fertigung.fertig_melden', { recordId: moId, parameter: { mengen: {}, backorder: false } })
+}
+
 // --- Demontage -------------------------------------------------------------
 
 export async function createUnbuild(formData: FormData): Promise<ActionResult> {

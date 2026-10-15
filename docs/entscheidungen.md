@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Die Nachfrage „Fertigung noch durchführen?" wird gebucht, nicht abgehakt
+
+**Anlass (Betreiber):** „Du hast für die Fertigungsaufträge einfach
+Aufgaben erzeugt — das Abhaken stellt die Produktion nicht fertig?" Stimmt:
+eine Aufgabe ist eine Frage an einen Menschen, der Belegstatus bleibt die
+einzige Zustandswahrheit. Ein „Abhaken" ohne Buchung hätte so ausgesehen,
+als wäre etwas erledigt, obwohl der Fertigungsauftrag offen und der
+Bestand im Minus bleibt.
+
+**Entschieden:**
+- **Die Antwort ist die Buchung.** Die Karte auf `/fertigung` bietet je
+  Auftrag „Ja, gebaut → fertig melden" (`fertigung.fertig_melden` mit
+  Sollmengen, kein Rückstand) und „Nein, nicht gebaut → stornieren"
+  (`fertigung.stornieren`); Aufträge mit manueller Verbrauchsart führen zum
+  Auftrag, weil Ist-Mengen nötig sind. Kein „Abhaken" mehr auf der Karte.
+- **`aufgaben.erledigen` verweigert die Nachfrage**, solange ein genannter
+  Fertigungsauftrag offen ist — mit dem Hinweis, wo sie beantwortet wird.
+  Sobald die Aufträge fertig oder storniert sind, hakt sie sich von selbst
+  ab (Notiz „Fertigungsauftrag … fertig gemeldet/storniert").
+
+**Wo:** Fertigungsseite, `fertigung/actions.ts` (produceMoDirekt),
+`registry/aufgaben-ausfuehren.ts`, Fixture `shopify-versand.ts`;
+[module/fertigung.md](module/fertigung.md).
+
 ## 2026-10-15 — Übersicht: Aufgaben als Kachel mit Zahl, nicht als Liste
 
 **Anlass (Betreiber):** „In der Übersicht bitte die Aufgaben nur als Anzahl

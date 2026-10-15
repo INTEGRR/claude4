@@ -9,6 +9,7 @@ import {
   uhrzeitAufloesen,
 } from '@/modules/aufgaben/termin'
 import { darfAbhaken, darfVerwerfen } from '@/modules/aufgaben/rechte'
+import { NACHFRAGE_PRAEFIX, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
 import { type AktionsErgebnis, type AktionsKontext, UUID_MUSTER } from './typen.ts'
 
 /** Ausführung der Aufgaben (0104): anlegen, abhaken, verwerfen. */
@@ -136,6 +137,21 @@ export async function aufgabeErledigen(p: { aufgabe: string; notiz?: string }, c
   const a = await offeneAufgabeFinden(p.aufgabe, ctx)
   if (!darfAbhaken(a, nutzerSicht(ctx))) {
     throw new Error(`„${a.titel}" ist nicht deine Aufgabe — abhaken dürfen der Zuständige, wer sie angelegt hat, und das Büro.`)
+  }
+  // Die Nachfrage „Extern versendet: Fertigung … noch durchführen?" (2026-10-15)
+  // ist eine Frage an den Fertigungsauftrag — abhaken allein stellt nichts
+  // fertig. Beantwortet wird sie am Auftrag (Fertig melden / Stornieren), und
+  // das hakt sie von selbst ab. Solange ein genannter Auftrag offen ist: nein.
+  if (a.titel.startsWith(NACHFRAGE_PRAEFIX)) {
+    const nummern = nachfrageNummern(a.titel)
+    const offen = await sql<{ number: string }[]>`
+      select number from manufacturing_orders where number = any(${nummern}) and state not in ('done', 'cancel')`
+    if (offen.length > 0) {
+      throw new Error(
+        `Diese Nachfrage wird am Fertigungsauftrag beantwortet, nicht abgehakt: ${offen.map((o) => o.number).join(', ')} ` +
+          '„Fertig melden" (wurde gebaut — Material wird verbraucht) oder „Stornieren" (nicht gebaut) — beides hakt sie von selbst ab. Siehe /fertigung.',
+      )
+    }
   }
   const [fertig] = await sql<{ id: string }[]>`
     update aufgaben set status = 'erledigt', erledigt_am = now(), erledigt_von = ${ctx.actor},
