@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Nachfragen an die Fertigung sind eine Projektion: der Abgleich legt sie nach
+
+**Anlass (Betreiber):** „Hab auf Abhaken geklickt, jetzt sind alle externen
+weg." In der ersten Fassung ließ sich die Nachfrage ohne Buchung schließen;
+die Fertigungsaufträge blieben offen, der Bestand im Minus — und niemand
+fragte mehr danach.
+
+**Entschieden:** Die Nachfrage ist keine eigenständige Zustandswahrheit,
+sondern eine **Projektion aus den Belegen**: extern versendete Lieferung
+plus noch offener Fertigungsauftrag ⇒ es muss eine offene Nachfrage
+geben. Der Versand-Abgleich (alle 15 Minuten, Monitor-Knopf) legt fehlende
+nach (`fertigungsNachfragenNachziehen`, Protokolleintrag am Auftrag). Kein
+Eingriff in die Produktionsdaten von Hand: die fälschlich geschlossenen
+Aufgaben bleiben als Historie stehen, die lebenden kommen von selbst
+wieder — und lassen sich seit heute nicht mehr ohne Buchung schließen.
+
+**Wo:** `verkauf/extern-versand.ts`, `integrationen/import.ts`
+(versandAbgleichen), Fixture `shopify-versand.ts`;
+[module/fertigung.md](module/fertigung.md).
+
 ## 2026-10-15 — Die Nachfrage „Fertigung noch durchführen?" wird gebucht, nicht abgehakt
 
 **Anlass (Betreiber):** „Du hast für die Fertigungsaufträge einfach

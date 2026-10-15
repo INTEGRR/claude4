@@ -635,7 +635,7 @@ export async function reconcileOrders(): Promise<{
  */
 export async function versandAbgleichen(
   limit = 10,
-): Promise<{ geprueft: number; nachgezogen: number; fehler: number; meldungen: string[] }> {
+): Promise<{ geprueft: number; nachgezogen: number; fehler: number; nachfragen: number; meldungen: string[] }> {
   const [cursorRow] = await sql<{ value: string | null }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'versand_abgleich_cursor'`
   const cursor = cursorRow?.value ?? ''
@@ -677,7 +677,11 @@ export async function versandAbgleichen(
     insert into shopify_sync_state (key, value)
     values ('versand_abgleich_cursor', to_jsonb(${neuerCursor}::text))
     on conflict (key) do update set value = excluded.value, updated_at = now()`
-  return { geprueft: stapel.length, nachgezogen, fehler, meldungen }
+  // Nachfragen ans Team Fertigung sind eine Projektion aus den Belegen —
+  // ohne Buchung geschlossene werden hier wieder angelegt.
+  const { fertigungsNachfragenNachziehen } = await import('@/modules/verkauf/extern-versand')
+  const nachfragen = await fertigungsNachfragenNachziehen(sql)
+  return { geprueft: stapel.length, nachgezogen, fehler, nachfragen, meldungen }
 }
 
 /** Holt genau eine Bestellung frisch von Shopify und importiert sie. */

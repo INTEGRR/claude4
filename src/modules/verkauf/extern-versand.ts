@@ -116,3 +116,37 @@ export async function fertigungsNachfrageAbhaken(
   }
   return erledigt
 }
+
+/**
+ * Nachfragen sind eine Projektion aus den Belegen (2026-10-15): extern
+ * versendete Lieferung + noch offener Fertigungsauftrag ⇒ es muss eine
+ * offene Nachfrage geben. Wurde sie ohne Buchung geschlossen (alte Fassung
+ * „Abhaken"), legt der Abgleich sie wieder an — die Frage ist erst
+ * beantwortet, wenn der Fertigungsauftrag fertig oder storniert ist.
+ */
+export async function fertigungsNachfragenNachziehen(db: Sql | TransactionSql): Promise<number> {
+  const faelle = await db<{ id: string; number: string; shopify_order_name: string | null; mo_ids: string[]; mo_nummern: string[] }[]>`
+    select so.id, so.number, so.shopify_order_name,
+           array_agg(m.id order by m.number) as mo_ids, array_agg(m.number order by m.number) as mo_nummern
+    from sales_orders so
+    join manufacturing_orders m on m.sales_order_id = so.id and m.state not in ('done', 'cancel')
+    where exists (select 1 from stock_pickings p
+                  where p.origin_model = 'sales_order' and p.origin_id = so.id
+                    and p.extern_versand is not null and p.state = 'done')
+    group by so.id, so.number, so.shopify_order_name`
+  let neu = 0
+  for (const f of faelle) {
+    const mos = f.mo_ids.map((id, i) => ({ id, number: f.mo_nummern[i] }))
+    const { titel, beschreibung } = fertigungsNachfrage({ id: f.id, number: f.number, shopify_order_name: f.shopify_order_name }, mos)
+    const [row] = await db<{ id: string }[]>`
+      insert into aufgaben (titel, beschreibung, rolle, faellig_am, erstellt_von)
+      select ${titel}, ${beschreibung}, 'fertigung', (now() at time zone 'Europe/Berlin')::date, 'shopify'
+      where not exists (select 1 from aufgaben where titel = ${titel} and status = 'offen')
+      returning id`
+    if (!row) continue
+    neu++
+    await db`select log_event('sales_order', ${f.id}, 'error',
+      ${`Fertigung ${mos.map((m) => m.number).join(', ')} noch offen — Nachfrage ans Team Fertigung erneut angelegt (die vorige war ohne Buchung geschlossen).`}, 'shopify')`
+  }
+  return neu
+}

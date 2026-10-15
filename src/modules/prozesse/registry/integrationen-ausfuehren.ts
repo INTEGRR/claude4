@@ -272,14 +272,17 @@ export async function odooArtikelZusammenfuehren(
 export async function versandAbgleichenAktion(): Promise<AktionsErgebnis> {
   const { versandAbgleichen } = await import('@/modules/integrationen/import')
   const r = await versandAbgleichen(200)
-  if (r.geprueft === 0) return { text: 'Kein offener Shop-Auftrag ohne eigene Sendung — nichts zu prüfen.' }
+  if (r.geprueft === 0 && r.nachfragen === 0) {
+    return { text: 'Kein offener Shop-Auftrag ohne eigene Sendung — nichts zu prüfen, keine Nachfrage nachzulegen.' }
+  }
   const teile = [
     `${r.geprueft} offene Shop-Aufträge geprüft`,
     r.nachgezogen ? `${r.nachgezogen} im Shop versendet → nachgezogen` : 'keiner im Shop versendet',
+    r.nachfragen ? `${r.nachfragen} Nachfrage(n) an die Fertigung nachgelegt` : null,
     r.fehler ? `${r.fehler} Fehler` : null,
   ].filter(Boolean)
   return {
     text: `${teile.join(', ')}.${r.meldungen.length ? ` ${r.meldungen.slice(0, 8).join(' · ')}${r.meldungen.length > 8 ? ' · …' : ''}` : ''}`,
-    link: r.nachgezogen ? '/fertigung' : undefined,
+    link: r.nachgezogen || r.nachfragen ? '/fertigung' : undefined,
   }
 }

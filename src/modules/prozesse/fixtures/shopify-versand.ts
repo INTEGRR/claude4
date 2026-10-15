@@ -755,14 +755,24 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
         assert.equal(r2.nachgezogen, 0)
         assert.equal((await nachfrage()).length, 1)
 
+        // Alte Fassung („Abhaken" ohne Buchung): die Nachfrage ist eine Projektion
+        // aus den Belegen — der nächste Abgleich legt sie wieder an.
+        await sql`update aufgaben set status = 'erledigt', erledigt_am = now(), erledigt_von = 'alt' where id = ${a.id}`
+        const r3 = await versandAbgleichen(10)
+        assert.equal(r3.nachfragen, 1, 'ohne Buchung geschlossen → nachgelegt')
+        const offene = (await nachfrage()).filter((x) => x.status === 'offen')
+        assert.equal(offene.length, 1)
+        a = offene[0]
+        assert.equal((await versandAbgleichen(10)).nachfragen, 0, 'nicht doppelt')
+
         // Abhaken allein stellt nichts fertig — solange der Auftrag offen ist, verweigert die Aufgabe.
         const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
         await assert.rejects(
           aktionAusfuehrenGeprueft('aufgaben.erledigen', { parameter: { aufgabe: a.id } }, { name: 'prozesstest', role: 'admin' }),
           /am Fertigungsauftrag beantwortet/,
         )
-        ;[a] = await nachfrage()
-        assert.equal(a.status, 'offen')
+        ;[a] = (await nachfrage()).filter((x) => x.status === 'offen')
+        assert.equal(a?.status, 'offen')
 
         // Fertig melden beantwortet die Nachfrage — abgehakt mit Notiz, von selbst.
         const f = await aktionAusfuehrenGeprueft(
@@ -771,10 +781,10 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
           { name: 'prozesstest', role: 'admin' },
         )
         assert.match(f.text ?? '', /ist abgehakt/)
-        ;[a] = await nachfrage()
-        assert.equal(a.status, 'erledigt')
-        assert.equal(a.erledigt_von, 'prozesstest')
-        assert.equal(a.notiz, `Fertigungsauftrag ${mo.number} fertig gemeldet`)
+        const danach = await nachfrage()
+        assert.ok(danach.every((x) => x.status === 'erledigt'), 'keine offene Nachfrage mehr')
+        const beantwortet = danach.find((x) => x.erledigt_von === 'prozesstest')
+        assert.equal(beantwortet?.notiz, `Fertigungsauftrag ${mo.number} fertig gemeldet`)
         const [{ on_hand }] = await sql<{ on_hand: number }[]>`
           select on_hand_qty(pv.id) as on_hand from product_variants pv where pv.sku = ${ctx.p4MtoSku}`
         assert.equal(Number(on_hand), 0, 'Erzeugnis: extern raus (−1) und gebaut (+1) = 0')
