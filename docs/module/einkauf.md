@@ -165,6 +165,7 @@ für alle Carrier; Entscheidungslog 2026-10-15), Tabelle
 
 - **Liste** mit Filter-Kacheln wie Odoo: **Zu senden**, **Wartend** (gesendet), **Verspätet** (Liefertermin überschritten); Status- und Lieferanten-Filter.
 - **Formular**: Kopf (Lieferant, Lieferantenreferenz, Bestellfrist, erwartete Ankunft), Positionen, Buttons je Status, Smart-Buttons **Wareneingänge (n)** und **Rechnungen (n)**, Beleg-Verlauf (E-Mails, Statuswechsel).
+- **Details-Karte (Einkäufer, Zahlungsbedingung, Incoterm, Termine, Carrier, Tracking)** hat ein eigenes „Speichern" — seit 2026-10-15 markiert sie geänderte, noch nicht gespeicherte Eingaben („Änderungen noch nicht gespeichert"), fragt beim Verlassen der Seite nach, und **„Speichern & bestätigen"** erledigt Details und Bestätigung in einem Zug (zwei Registry-Aktionen nacheinander). Grund: Tippen und dann oben „Bestellung bestätigen" drücken verlor die Eingaben stumm.
 
 ### Querverweise (seit 2026-10-01)
 

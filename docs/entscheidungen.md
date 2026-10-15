@@ -9,6 +9,32 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Ungespeicherte Eingaben sind sichtbar; „Speichern & bestätigen" an der Bestellung
+
+**Anlass (Betreiber):** „Neue Bestellung angelegt, UPS Carrier und Tracking,
+Einkäufer Tino — kein Tracking mehr drin, kein Tino, nur die Produkte."
+Befund (Nutzungszähler): Bestellung anlegen 12:59:43, Produkt anlegen,
+Position hinzufügen, **Bestätigen 13:00:31 — aber nie „Kopf ändern"**. Die
+Details-Karte hat ein eigenes „Speichern"; getippt und dann oben
+„Bestellung bestätigen" gedrückt — die Seite lädt neu, die Eingaben sind
+stumm weg. Kein Datenfehler, eine Falle in der Oberfläche.
+
+**Entschieden:**
+- `ActionForm` bekommt `ungespeichertHinweis`: geänderte Eingaben zeigen
+  „Änderungen noch nicht gespeichert", das Verlassen der Seite fragt nach.
+  Eingeschaltet an der Details-Karte der Bestellung; weitere
+  Bearbeitungsformulare mit eigenem Speichern folgen dem Muster.
+- **„Speichern & bestätigen"** in der Details-Karte: erst
+  `einkauf.kopf_aendern`, dann `einkauf.bestaetigen` — zwei geprüfte
+  Registry-Aktionen, kein neuer Pfad. Der Kopf-Knopf bleibt für alle, die
+  schon gespeichert haben.
+- Nicht gemacht: Autosave bei jeder Eingabe (Requests je Tastendruck,
+  halbfertige Werte im Beleg) und ein Sperren des Kopf-Knopfs über
+  Formulargrenzen (Kopplung über Fenster-Zustand).
+
+**Wo:** `components/action-button.tsx`, Bestellseite, `einkauf/actions.ts`;
+[module/einkauf.md](module/einkauf.md).
+
 ## 2026-10-15 — Extern versendete Shop-Aufträge: alle offenen prüfen, Nachfragen dort, wo entschieden wird
 
 **Anlass (Betreiber):** „Wo sehe ich jetzt die Fertigungsaufträge, die ich

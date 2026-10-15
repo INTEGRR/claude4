@@ -281,7 +281,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       )}
 
       <Card title="Details">
-        <ActionForm action={updatePoHeader.bind(null, id)}>
+        {/* Tippen und dann oben „Bestellung bestätigen" drücken verlor die
+            Eingaben stumm (2026-10-15): deshalb der Hinweis und ein Knopf,
+            der beides tut. */}
+        <ActionForm action={updatePoHeader.bind(null, id)} ungespeichertHinweis>
           <div className="row">
             <label className="field">
               <span>Einkäufer</span>
@@ -376,6 +379,13 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             <div className="shrink field">
               <button type="submit">Speichern</button>
             </div>
+            {editable && (
+              <div className="shrink field">
+                <button type="submit" className="primary" name="weiter" value="bestaetigen" title="Speichert die Details und bestätigt die Bestellung">
+                  Speichern &amp; bestätigen
+                </button>
+              </div>
+            )}
           </div>
         </ActionForm>
         {/* Was 17TRACK zur Sendung weiß — und wann KRNL zuletzt gefragt hat (0112). */}

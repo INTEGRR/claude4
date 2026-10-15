@@ -21,7 +21,11 @@ export async function addPoLine(orderId: string, formData: FormData): Promise<Ac
 }
 
 export async function updatePoHeader(orderId: string, formData: FormData): Promise<ActionResult> {
-  return serverAktion('einkauf.kopf_aendern', { recordId: orderId, formData })
+  const gespeichert = await serverAktion('einkauf.kopf_aendern', { recordId: orderId, formData })
+  // „Speichern & bestätigen" (2026-10-15): erst die Details, dann die
+  // Bestätigung — zwei Registry-Aktionen, beide geprüft und auditiert.
+  if (formData.get('weiter') !== 'bestaetigen' || isActionError(gespeichert)) return gespeichert
+  return serverAktion('einkauf.bestaetigen', { recordId: orderId })
 }
 
 /** Zulauf-Sendung sofort bei 17TRACK abfragen (0112). */

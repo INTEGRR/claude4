@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { type ActionResult, isActionError, isActionInfo } from '@/modules/shared/action'
 
 /**
@@ -110,6 +110,7 @@ export function ActionForm({
   style,
   linkOeffnen,
   behalten,
+  ungespeichertHinweis,
 }: {
   action: (formData: FormData) => Promise<ActionResult>
   children: React.ReactNode
@@ -119,10 +120,27 @@ export function ActionForm({
   linkOeffnen?: boolean
   /** Eingaben nach Erfolg stehen lassen (z. B. Etiketten-Anzahlen für einen zweiten Druck). */
   behalten?: boolean
+  /**
+   * Bearbeitungsformulare mit eigenem „Speichern" neben anderen Knöpfen
+   * (Entscheidungslog 2026-10-15): geänderte Eingaben werden als „noch nicht
+   * gespeichert" markiert, und das Verlassen der Seite fragt nach — Tippen
+   * und dann woanders klicken verliert sonst stumm alles.
+   */
+  ungespeichertHinweis?: boolean
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<{ text: string; link?: string } | null>(null)
+  const [geaendert, setGeaendert] = useState(false)
+
+  useEffect(() => {
+    if (!ungespeichertHinweis || !geaendert) return
+    const warnen = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', warnen)
+    return () => window.removeEventListener('beforeunload', warnen)
+  }, [ungespeichertHinweis, geaendert])
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -143,6 +161,7 @@ export function ActionForm({
           if (linkOeffnen && result.link) window.open(result.link, '_blank', 'noopener')
           setInfo({ text: result.info, link: result.link })
         }
+        setGeaendert(false)
         if (!behalten) form.reset()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen')
@@ -151,10 +170,20 @@ export function ActionForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className={className} style={style}>
+    <form
+      onSubmit={onSubmit}
+      onChange={ungespeichertHinweis ? () => setGeaendert(true) : undefined}
+      className={className}
+      style={style}
+    >
       <fieldset disabled={pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         {children}
       </fieldset>
+      {ungespeichertHinweis && geaendert && !pending && (
+        <div className="small" role="status" style={{ marginTop: 6, color: 'var(--warn)' }}>
+          <span className="led warn" /> Änderungen noch nicht gespeichert — „Speichern" drücken, sonst gehen sie verloren.
+        </div>
+      )}
       {error && <ErrorNotice message={error} style={{ marginTop: 8 }} />}
       {info && <InfoNotice text={info.text} link={info.link} style={{ marginTop: 8 }} />}
     </form>
