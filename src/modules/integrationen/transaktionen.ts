@@ -11,7 +11,7 @@ import { sql } from '@/db/client'
 const MAX_PAYLOAD_CHARS = 20_000
 
 export interface Transaktion {
-  system: 'shopify' | 'dhl' | 'mail' | 'telegram' | 'google' | 'ezb'
+  system: 'shopify' | 'dhl' | 'mail' | 'telegram' | 'google' | 'ezb' | 'track17'
   kind: string
   reference?: string | null
   request?: unknown

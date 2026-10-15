@@ -11,6 +11,8 @@ import {
 import { benachrichtigungenVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
 import { datenbankAusfallMelden, wacheAusfuehren } from '@/modules/integrationen/wache-sonden'
 import { pruneTrackingData, syncTracking } from '@/modules/versand/service'
+import { track17Konfiguriert } from '@/modules/versand/track17'
+import { verfolgungAbrufen } from '@/modules/versand/zulauf-verfolgung'
 import { pruneLoginVersuche, pruneSessions, pruneGeraete } from '@/modules/auth'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { ausloeserAktiv, shopifyModus } from '@/modules/integrationen/shopify-modus'
@@ -28,7 +30,7 @@ export const maxDuration = 60
  *   /api/cron?task=mail          jede Minute   - Einkaufspostfach abgleichen (Gmail)
  *   /api/cron?task=ki            jede Minute   - KI-Spur: Mails sichten, Dokumente lesen (0109)
  *   /api/cron?task=reconcile     alle 15 Min   - Abgleich mit Shopify
- *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus
+ *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus + Zulauf über 17TRACK (0112)
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
  *   /api/cron?task=einkauf       täglich       - Einkaufs-Zusammenfassung (Telegram)
  */
@@ -100,8 +102,11 @@ export async function GET(request: Request) {
         return NextResponse.json({ task, ...orders, inventar: 'eingereiht', shopStand })
       }
       case 'tracking': {
-        if (!dhlConfigured()) return NextResponse.json({ skipped: 'DHL nicht konfiguriert' })
-        return NextResponse.json({ task, ...(await syncTracking()) })
+        // Eigene DHL-Sendungen (Ausgang) und der Zulauf über 17TRACK (0112) —
+        // beide stündlich; ein nicht angebundener Dienst wird übersprungen.
+        const dhl = dhlConfigured() ? await syncTracking() : { skipped: 'DHL nicht konfiguriert' }
+        const zulauf = track17Konfiguriert() ? await verfolgungAbrufen() : { skipped: '17TRACK nicht konfiguriert' }
+        return NextResponse.json({ task, ...dhl, zulauf })
       }
       case 'wache': {
         // Dienste-Wächter: erst die Datenbank selbst — ohne sie gibt es keine

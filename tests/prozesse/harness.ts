@@ -64,6 +64,8 @@ export async function harnessStart(datenbank: string): Promise<Harness> {
   // (deterministische Antworten für Shopify/DHL an den Fetch-Kapselungen).
   process.env.SHOPIFY_FAKE ??= '1'
   process.env.DHL_FAKE ??= '1'
+  // Zulauf-Sendungsverfolgung (0112): 17TRACK-Attrappe.
+  process.env.TRACK17_FAKE ??= '1'
   // Einkaufstool (0094): Gmail/Drive-Attrappe und KI ohne Schlüssel.
   process.env.GOOGLE_FAKE ??= '1'
   process.env.KI_FAKE ??= '1'

@@ -9,6 +9,8 @@ import { ResponsibleForm } from '@/components/responsible-form'
 import { LandedCosts } from '@/components/landed-costs'
 import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
+import { VerfolgungKurz } from '@/components/sendungsverfolgung'
+import type { Ereignis, VerfolgungStatus } from '@/modules/versand/track17-logik'
 import { date, qty } from '@/modules/shared/format'
 import {
   artikeletikettenDrucken,
@@ -166,10 +168,25 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
             carrier: string | null
             tracking_number: string | null
             tracking_url: string | null
+            v_status: VerfolgungStatus | null
+            v_sub_status: string | null
+            v_ereignis: Ereignis | null
+            v_abgefragt: string | null
+            v_via: 'registrierung' | 'abruf' | 'webhook' | 'manuell' | null
+            v_fehler: string | null
           }[]
         >`
-          select expected_arrival, eta_confirmed::text, carrier, tracking_number, tracking_url
-          from purchase_orders where id = ${picking.origin_id}`
+          select po.expected_arrival, po.eta_confirmed::text, po.carrier, po.tracking_number, po.tracking_url,
+                 v.status as v_status, v.sub_status as v_sub_status, v.letztes_ereignis as v_ereignis,
+                 v.zuletzt_abgefragt_am::text as v_abgefragt, v.zuletzt_abgefragt_via as v_via,
+                 v.registrierung_fehler as v_fehler
+          from purchase_orders po
+          -- Zulauf-Sendungsverfolgung (0112): die aktive, sonst die jüngste.
+          left join lateral (
+            select * from sendungsverfolgung sv
+            where sv.modell = 'purchase_order' and sv.record_id = po.id
+            order by sv.aktiv desc, sv.created_at desc limit 1) v on true
+          where po.id = ${picking.origin_id}`
       : [undefined]
 
   return (
@@ -287,6 +304,18 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
               </>
             )}
           </div>
+          {zulauf.v_status && (
+            <VerfolgungKurz
+              v={{
+                status: zulauf.v_status,
+                sub_status: zulauf.v_sub_status,
+                letztes_ereignis: zulauf.v_ereignis,
+                zuletzt_abgefragt_am: zulauf.v_abgefragt,
+                zuletzt_abgefragt_via: zulauf.v_via,
+                registrierung_fehler: zulauf.v_fehler,
+              }}
+            />
+          )}
         </div>
       )}
 

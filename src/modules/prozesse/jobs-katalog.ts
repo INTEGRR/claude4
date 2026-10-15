@@ -117,6 +117,13 @@ export const JOB_KATALOG = {
       'heute Fälliges, fehlende Dokumente und Rechnungen, fällige Raten, überfällige ETA); nichts offen → keine Nachricht.',
     faehigkeit: 'einkauf:zusammenfassung',
   },
+  track17_registrieren: {
+    label: 'Zulauf-Sendung bei 17TRACK anmelden',
+    beschreibung:
+      'Meldet die Sendungsnummer einer Bestellung bzw. Eingangssendung bei 17TRACK an (kostet einmalig Kontingent) ' +
+      'und holt den ersten Stand; danach kommen Statuswechsel per Webhook und stündlichem Abruf (0112).',
+    faehigkeit: 'tracking:anmelden',
+  },
   ki_mail_triage: {
     label: 'Eingehende Mail sichten (KI)',
     beschreibung:

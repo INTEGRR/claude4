@@ -2,6 +2,8 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader } from '@/components/ui'
 import { date as datum, isoDatum } from '@/modules/shared/format'
+import { VerfolgungKurz } from '@/components/sendungsverfolgung'
+import type { Ereignis, VerfolgungStatus } from '@/modules/versand/track17-logik'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +29,13 @@ interface Eingang {
   tracking_url: string | null
   termin: string | null
   positionen: number
+  // Zulauf-Sendungsverfolgung (0112): Stand laut 17TRACK und wann zuletzt gefragt.
+  v_status: VerfolgungStatus | null
+  v_sub_status: string | null
+  v_ereignis: Ereignis | null
+  v_abgefragt: string | null
+  v_via: 'registrierung' | 'abruf' | 'webhook' | 'manuell' | null
+  v_fehler: string | null
 }
 
 const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
@@ -76,6 +85,18 @@ function EingangsKarte({ e, heute }: { e: Eingang; heute: string }) {
           )}
         </div>
       )}
+      {e.v_status && (
+        <VerfolgungKurz
+          v={{
+            status: e.v_status,
+            sub_status: e.v_sub_status,
+            letztes_ereignis: e.v_ereignis,
+            zuletzt_abgefragt_am: e.v_abgefragt,
+            zuletzt_abgefragt_via: e.v_via,
+            registrierung_fehler: e.v_fehler,
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -97,12 +118,20 @@ export default async function ZulaufPage({
            po.carrier, po.tracking_number, po.tracking_url,
            coalesce(po.eta_confirmed::text, p.scheduled_date::date::text) as termin,
            (select count(*) from stock_moves m
-             where m.picking_id = p.id and m.state <> 'cancel')::int as positionen
+             where m.picking_id = p.id and m.state <> 'cancel')::int as positionen,
+           v.status as v_status, v.sub_status as v_sub_status, v.letztes_ereignis as v_ereignis,
+           v.zuletzt_abgefragt_am::text as v_abgefragt, v.zuletzt_abgefragt_via as v_via,
+           v.registrierung_fehler as v_fehler
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id and ot.kind = 'receipt'
     left join partners part on part.id = p.partner_id
     left join purchase_orders po
       on p.origin_model = 'purchase_order' and po.id = p.origin_id
+    -- Die aktive Verfolgung der Bestellung (0112), sonst die jüngste.
+    left join lateral (
+      select * from sendungsverfolgung sv
+      where sv.modell = 'purchase_order' and sv.record_id = po.id
+      order by sv.aktiv desc, sv.created_at desc limit 1) v on true
     where p.state not in ('done', 'cancel')
     order by termin nulls last, p.number`
 

@@ -101,6 +101,7 @@ export default async function VersandPage({
       customer_id: string | null
       shopify_fulfillment_id: string | null
       last_event: { description?: string } | null
+      last_tracking_check: string | null
       ersatz_moeglich: boolean
     }[]
   >`
@@ -111,6 +112,7 @@ export default async function VersandPage({
            coalesce(part.name, rpart.name) as customer, coalesce(part.id, rpart.id) as customer_id,
            s.shopify_fulfillment_id,
            s.last_tracking_event as last_event,
+           s.last_tracking_check,
            -- Ersatz-Label (2026-10-01): jüngste stornierte Sendung einer
            -- ausgebuchten Lieferung, die keine gültige Sendung mehr hat.
            (s.state = 'cancelled' and p.state = 'done'
@@ -557,7 +559,15 @@ export default async function VersandPage({
                         (s.customer ?? '—')
                       )}
                     </td>
-                    <td><Badge state={s.state} kind="shipment" /></td>
+                    <td>
+                      <Badge state={s.state} kind="shipment" />
+                      {/* Wann DHL zuletzt gefragt wurde — sonst sieht niemand, ob der Sync läuft. */}
+                      {s.state !== 'cancelled' && (
+                        <div className="muted small nowrap">
+                          {s.last_tracking_check ? `geprüft ${dateTime(s.last_tracking_check)}` : 'noch nicht geprüft'}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       {/* Beide Zustände sind beschriftet — „nicht gemeldet" ist auch ein Zustand. */}
                       <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>

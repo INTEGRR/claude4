@@ -212,6 +212,22 @@ export const EINKAUF = {
     revalidate: ['/einkauf/:id', '/lager/zulauf'],
   },
 
+  'einkauf.zulauf_verfolgen': {
+    label: 'Sendung jetzt abfragen',
+    bereich: 'einkauf',
+    ki: true,
+    beschreibung:
+      'Fragt den Stand der Zulauf-Sendung (Carrier + Tracking-Nummer der Bestellung) sofort bei 17TRACK ab — ' +
+      'meldet sie notfalls erst an. Sonst kommen Statuswechsel per Webhook und stündlichem Abruf; ' +
+      '„zuletzt abgefragt" steht an der Sendung.',
+    bindung: 'beleg',
+    modell: 'purchase_order',
+    // Ein Abfragewerkzeug ohne Zustandswechsel der Bestellung (wie versand.adresse_pruefen).
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/einkauf/:id', '/lager/zulauf'],
+  },
+
   'einkauf.bestellung_freigeben': {
     label: 'Bestellung freigeben',
     bereich: 'einkauf',

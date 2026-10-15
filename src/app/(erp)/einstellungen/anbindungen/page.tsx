@@ -12,6 +12,7 @@ import { dateTime, qty } from '@/modules/shared/format'
 import { madeToOrderEinstellung, madeToOrderVorschau } from '@/modules/integrationen/made-to-order'
 import { POSTFACH_SCHLUESSEL, type PostfachStand } from '@/modules/einkauf/postfach-abgleich'
 import { postfachKonfiguriert } from '@/modules/google/auth'
+import { type Kontingent, kontingentLesen } from '@/modules/versand/track17'
 import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
@@ -153,6 +154,16 @@ export default async function SchnittstellenPage() {
       webhooks = await fetchWebhooks()
     } catch {
       webhooks = null
+    }
+  }
+
+  // 17TRACK-Kontingent — best effort, ein Aufruf je Seitenansicht (Admin).
+  let kontingent: Kontingent | null = null
+  if (stand.track17.vollstaendig) {
+    try {
+      kontingent = await kontingentLesen()
+    } catch {
+      kontingent = null
     }
   }
 
@@ -358,6 +369,39 @@ export default async function SchnittstellenPage() {
           <Link href="/einstellungen/versandregeln">Versandregeln</Link>.
         </p>
         <Variablen stand={stand.dhl} />
+      </Card>
+
+      <Card title="17TRACK (Zulauf-Sendungsverfolgung)" actions={<Link className="btn small" href="/lager/zulauf">Zulauf</Link>}>
+        <Stand stand={stand.track17} wache={wache.track17} />
+        <p className="small muted" style={{ margin: '0 0 10px' }}>
+          Sendungen des Einkaufs — Tracking-Nummer der Bestellung, HBL/AWB der Eingangssendung — meldet KRNL
+          bei 17TRACK an, einem Dienst für alle Carrier. Statuswechsel kommen per Webhook, stündlich fragt
+          KRNL nach; „zuletzt abgefragt" steht an jeder Sendung. Das Kontingent zählt angemeldete
+          Sendungen, nicht Abfragen — jede Sendung kostet einmalig eine Anmeldung, Abrufe laufen
+          sparsam (je Sendung höchstens alle sechs Stunden, gebündelt); ein erschöpftes Kontingent
+          meldet der Dienste-Wächter.
+        </p>
+        <p className="small" style={{ margin: '0 0 10px' }}>
+          Kontingent:{' '}
+          {kontingent ? (
+            <>
+              <span className="mono">{qty(kontingent.quota_remain)}</span> von{' '}
+              <span className="mono">{qty(kontingent.quota_total)}</span> Sendungen übrig
+              {kontingent.today_used > 0 ? ` · heute ${qty(kontingent.today_used)} angemeldet` : ''}
+            </>
+          ) : stand.track17.vollstaendig ? (
+            <span className="muted">gerade nicht abrufbar</span>
+          ) : (
+            <span className="muted">— (nicht angebunden)</span>
+          )}
+        </p>
+        <p className="small" style={{ margin: '0 0 10px' }}>
+          Webhook-Adresse im 17TRACK-Dashboard (Settings → Webhook) eintragen:{' '}
+          <span className="mono">
+            {(process.env.ERP_PUBLIC_URL ?? 'https://<erp-adresse>').replace(/\/+$/, '')}/api/webhooks/17track
+          </span>
+        </p>
+        <Variablen stand={stand.track17} />
       </Card>
 
       <div className="grid-2">

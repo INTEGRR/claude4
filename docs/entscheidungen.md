@@ -9,6 +9,52 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Zulauf-Sendungsverfolgung über 17TRACK, „zuletzt abgefragt" immer sichtbar
+
+**Anlass (Betreiber):** „Wo sehe ich, dass das Tracking von Sendungen
+abgefragt wurde? Habe eine Bestellung angelegt und einen Eingang, aber
+keine Ahnung, ob das jetzt gecheckt wurde." Befund: Carrier, Tracking-
+Nummer und Link wurden an Bestellung und Eingangssendung nur gespeichert
+und verlinkt — abgefragt hat sie niemand; nur eigene DHL-Ausgangssendungen
+liefen über den Tracking-Sync, und selbst dort war der Zeitpunkt der
+letzten Prüfung nirgends zu sehen. Ein früher begonnener 17TRACK-Zweig war
+nie gepusht worden und mit dem Container verloren.
+
+**Entschieden:**
+- **Ein Dienst für alle Zulauf-Carrier: 17TRACK** (API v2.2) statt je
+  Carrier eine Anbindung (DHL, DHL Express, DPD, UPS, FedEx, Spediteure,
+  chinesische Kuriere). Anmeldung kostet je Sendung einmalig Kontingent —
+  bei zweistelligen Bestellungen im Monat ist das der Free-Plan; der
+  Dienste-Wächter meldet ein erschöpftes Kontingent als Störung.
+- **Push vor Poll:** Statuswechsel kommen per Webhook
+  (`/api/webhooks/17track`, SHA-256-Signatur mit dem Security Key); der
+  stündliche Cron `tracking` ist das Sicherheitsnetz (je Sendung höchstens
+  alle sechs Stunden, Stapel 40) — nicht die Hauptquelle.
+- **Eigene Tabelle `sendungsverfolgung`** (0112), eine Zeile je Beleg und
+  Nummer, statt Spalten an `purchase_orders`/`eingangs_sendungen`: eine
+  geänderte Nummer legt die alte Zeile still (Historie bleibt), dieselbe
+  AWB kann an Eingangssendung und Bestellung hängen, und das Modell ist
+  offen für weitere Belege. Der Belegstatus bleibt unberührt — die
+  Verfolgung ist Information, kein zweiter Zustand.
+- **„Zuletzt abgefragt" (wann, wie) ist Pflichtanzeige** an Bestellung,
+  Eingangssendung, Zulauf-Kalender und Wareneingang; die Versandliste
+  zeigt für DHL-Sendungen „geprüft <Zeit>". Nie wieder soll die Frage
+  „wurde das überhaupt geprüft?" ohne Antwort in der Oberfläche bleiben.
+- **Ehrlich statt still:** nicht angebundener Dienst oder abgelehnte Nummer
+  stehen als „Nicht verfolgbar" mit Grund an der Sendung; Anmeldung läuft
+  als Outbox-Job (`track17_registrieren`) mit Retry und Monitor-Sicht.
+- **Prozess First:** „Jetzt abfragen" sind Registry-Aktionen
+  (`einkauf.zulauf_verfolgen`, `einkauf.sendung_verfolgen`, prozessfrei
+  wie `versand.adresse_pruefen`, auch für den KI-Chat); die Anmeldung
+  hängt an den bestehenden Pflege-Aktionen, kein freier Pfad.
+
+**Wo:** `src/modules/versand/track17*.ts`, `zulauf-verfolgung.ts`,
+Migration 0112, Webhook-Route, Cron `tracking`, Komponente
+`sendungsverfolgung.tsx`; Tests `tests/track17.test.ts`,
+`tests/prozesse/zulauf-verfolgung.test.ts`; Doku
+[module/einkauf.md](module/einkauf.md), [module/integrationen.md](module/integrationen.md),
+[module/versand.md](module/versand.md), [betrieb.md](betrieb.md), [go-live.md](go-live.md).
+
 ## 2026-10-15 — Versand außerhalb von KRNL: der Shop meldet, KRNL zieht nach
 
 **Anlass (Betreiber):** „Aus Shopify werden keine Updates an die

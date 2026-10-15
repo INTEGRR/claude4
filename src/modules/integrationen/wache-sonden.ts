@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { sql } from '@/db/client'
 import { dhlConfigured, dhlErreichbar } from '@/modules/versand/dhl'
+import { kontingentLesen, track17Konfiguriert } from '@/modules/versand/track17'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
 import { aktiveDruckerVorhanden, stilleDrucker } from '@/modules/druck/abholen'
 import { kiConfigured } from '@/modules/ki/agent'
@@ -32,6 +33,25 @@ export function standardSonden(): Sonde[] {
       dienst: 'dhl',
       konfiguriert: dhlConfigured(),
       pruefen: () => dhlErreichbar(),
+    },
+    {
+      dienst: 'track17',
+      konfiguriert: track17Konfiguriert(),
+      pruefen: async () => {
+        // Kein Fünf-Minuten-Takt gegen 17TRACK: hat KRNL in der letzten
+        // Stunde erfolgreich mit dem Dienst gesprochen (Anmeldung, Abruf,
+        // Webhook), ist er erreichbar — ohne neuen Aufruf. Sonst einmal
+        // das Kontingent lesen; erschöpft ist eine Störung (keine neue
+        // Zulauf-Sendung ließe sich anmelden).
+        if (process.env.TRACK17_FAKE === '1') return
+        const [juengst] = await sql<{ ok: boolean }[]>`
+          select true as ok from api_transactions
+          where system = 'track17' and ok and created_at > now() - interval '55 minutes'
+          limit 1`
+        if (juengst) return
+        const k = await kontingentLesen()
+        if (k.quota_remain <= 0) throw new Error('Kontingent erschöpft — keine Sendung lässt sich mehr anmelden')
+      },
     },
     {
       dienst: 'shopify',

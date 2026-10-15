@@ -24,6 +24,11 @@ export async function updatePoHeader(orderId: string, formData: FormData): Promi
   return serverAktion('einkauf.kopf_aendern', { recordId: orderId, formData })
 }
 
+/** Zulauf-Sendung sofort bei 17TRACK abfragen (0112). */
+export async function zulaufAbfragen(orderId: string): Promise<ActionResult> {
+  return serverAktion('einkauf.zulauf_verfolgen', { recordId: orderId })
+}
+
 export async function removePoLine(orderId: string, lineId: string): Promise<ActionResult> {
   return serverAktion('einkauf.position_entfernen', {
     recordId: orderId,

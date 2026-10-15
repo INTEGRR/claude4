@@ -292,6 +292,12 @@ const handlers = {
     return ezbKurseAbrufen()
   },
 
+  /** Zulauf-Sendung bei 17TRACK anmelden und ersten Stand holen (versand/zulauf-verfolgung.ts, 0112). */
+  async track17_registrieren(payload) {
+    const { verfolgungRegistrieren } = await import('@/modules/versand/zulauf-verfolgung')
+    return verfolgungRegistrieren(String(payload.verfolgung_id))
+  },
+
   /** Tägliche Einkaufs-Zusammenfassung in den Telegram-Kanal (einkauf/digest.ts, 0108). */
   async einkauf_digest(payload) {
     const { einkaufDigestEinreihen } = await import('@/modules/einkauf/digest')

@@ -8,6 +8,7 @@ import { DokumenteKarte } from '@/components/dokumente'
 import { WiedervorlagenKarte } from '@/components/mail-threads'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { RecordComments } from '@/components/record-comments'
+import { Sendungsverfolgung } from '@/components/sendungsverfolgung'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { KOSTEN_ARTEN, type KostenArt, SENDUNG_MODI, type SendungModus, zollsatz } from '@/modules/einkauf/sendungen'
 import { date, dateTime, money } from '@/modules/shared/format'
@@ -22,6 +23,7 @@ import {
   sendungKostenErfassen,
   sendungSchaetzen,
   sendungStornieren,
+  sendungVerfolgen,
   sendungVerschiffen,
   sendungVerteilen,
   sendungVerzollen,
@@ -386,6 +388,13 @@ export default async function SendungPage({ params }: { params: Promise<{ id: st
             </>
           )}
         </dl>
+        {/* Was 17TRACK zur HBL/AWB weiß — und wann KRNL zuletzt gefragt hat (0112). */}
+        <Sendungsverfolgung
+          modell="eingangs_sendung"
+          recordId={id}
+          nummer={s.hbl_awb}
+          abfragen={sendungVerfolgen.bind(null, id)}
+        />
         {darf && s.status !== 'storniert' && (
           <details style={{ marginTop: 10 }}>
             <summary className="small">Daten nachtragen</summary>

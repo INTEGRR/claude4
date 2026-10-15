@@ -20,6 +20,11 @@ export async function sendungAendern(id: string, formData: FormData): Promise<Ac
   return serverAktion('einkauf.sendung_aendern', { recordId: id, formData })
 }
 
+/** HBL/AWB sofort bei 17TRACK abfragen (0112). */
+export async function sendungVerfolgen(id: string): Promise<ActionResult> {
+  return serverAktion('einkauf.sendung_verfolgen', { recordId: id })
+}
+
 export async function sendungBestellungZuordnen(id: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('einkauf.sendung_bestellung_zuordnen', { recordId: id, formData })
 }

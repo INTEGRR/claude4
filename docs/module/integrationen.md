@@ -89,6 +89,41 @@ Die Rückmeldung, die bei Sendcloud die Integration übernommen hätte, machen w
 - Fehlerbilder (Out-of-Stock `nonFulfillableQuantity`, fehlende Location, Rate-Limits) ⇒ Retry mit Backoff, nach 10 Versuchen Fehler-Aktivität am Auftrag.
 - Der frühere `ready-to-ship`-Tag entfällt als Trigger (war nur für Sendcloud nötig); optional konfigurierbarer Info-Tag, Default aus.
 
+## 17TRACK — Zulauf-Sendungsverfolgung (seit 2026-10-15)
+
+Eingehende Sendungen des Einkaufs (Tracking-Nummer der Bestellung, HBL/AWB
+der Eingangssendung) verfolgt KRNL über 17TRACK, einen Dienst für alle
+Carrier — Fachlogik und Oberfläche im [Einkauf](einkauf.md#sendungsverfolgung-im-zulauf-17track-seit-2026-10-15).
+
+- **Zugang:** `TRACK17_API_KEY` = Security Key aus dem 17TRACK-API-Dashboard
+  (api.17track.net/admin → Settings). Derselbe Schlüssel signiert die
+  Webhooks. Attrappe `TRACK17_FAKE=1`.
+- **Webhook:** im Dashboard unter Settings → Webhook die Adresse
+  `<ERP_PUBLIC_URL>/api/webhooks/17track` eintragen (die Schnittstellen-
+  Seite zeigt sie fertig). Signatur: Header `sign` = SHA-256 hex von
+  „`<Rohtext>/<Security Key>`"; nur HTTP 200 gilt als zugestellt, sonst
+  wiederholt 17TRACK dreimal (10, 30, 60 Minuten). Ereignisse
+  `TRACKING_UPDATED` (Stand) und `TRACKING_STOPPED` (Verfolgung beendet).
+  Jeder Push steht im Transaktionsprotokoll (System `track17`, Art `webhook`).
+- **API-Aufrufe** (v2.2, Header `17token`): `register` (bis 40 Nummern,
+  kostet je Nummer einmalig Kontingent — das Kontingent zählt angemeldete
+  Sendungen, nicht Abfragen; den Stand zeigt die Schnittstellen-Seite),
+  `gettrackinfo` (Stapel bis 40, stündlich für aktive Sendungen, die länger
+  als sechs Stunden nicht abgefragt wurden), `getquota` (Dienste-Wächter,
+  höchstens stündlich: erschöpftes Kontingent = Störung). Rate-Limit 3
+  Aufrufe je Sekunde.
+- **Aufrufbudget (bewusst sparsam):** je Sendung eine Anmeldung; der
+  stündliche Abruf stellt höchstens einen Aufruf je 40 aktive Sendungen,
+  jede Sendung höchstens alle sechs Stunden (zehn offene Sendungen ≈ vier
+  Aufrufe am Tag); Webhooks kosten nichts; der Wächter fragt das Kontingent
+  nur, wenn in der letzten Stunde kein anderer erfolgreicher Aufruf lief;
+  „Jetzt abfragen" ist ein Aufruf je Klick.
+- **Jobs:** `track17_registrieren` (Fähigkeit `tracking:anmelden`) —
+  Anmeldung mit erstem Stand; Limit-Ablehnungen werfen und laufen mit
+  Backoff erneut, endgültige Ablehnungen enden als „nicht verfolgbar".
+  Liegengebliebene Anmeldungen (Job endgültig gescheitert) reiht der
+  Tracking-Cron nach einer Stunde erneut ein.
+
 ## Shopify — Bestandsabgleich (Inventar-Push)
 
 Das ERP ist die Quelle der Wahrheit für Bestände; der Shop bekommt

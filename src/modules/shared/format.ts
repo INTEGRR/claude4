@@ -1,4 +1,5 @@
 /** Deutsche Formatierung für Zahlen, Mengen, Preise und Daten. */
+import { VERFOLGUNG_LABELS } from '../versand/track17-logik.ts'
 
 const numberFormat = new Intl.NumberFormat('de-DE', {
   minimumFractionDigits: 0,
@@ -182,6 +183,8 @@ export const LABELS = {
     failure: 'Problem',
     cancelled: 'Storniert',
   },
+  // Zulauf-Sendungsverfolgung über 17TRACK (0112).
+  sendungsverfolgung: VERFOLGUNG_LABELS,
   mail_thread: {
     offen: 'Offen',
     erledigt: 'Erledigt',
@@ -270,6 +273,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'abgerechnet':
     case 'uebergeben':
     case 'angenommen':
+    case 'zugestellt':
       return 'success'
     case 'assigned':
     case 'confirmed':
@@ -288,6 +292,10 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'verzollt':
     case 'angekommen':
     case 'bereit':
+    case 'unterwegs':
+    case 'in_zustellung':
+    case 'angekuendigt':
+    case 'abholbereit':
       return 'info'
     case 'cancel':
     case 'cancelled':
@@ -299,6 +307,9 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'abgelaufen':
     case 'storniert':
     case 'fehler':
+    case 'problem':
+    case 'zustellung_fehlgeschlagen':
+    case 'nicht_verfolgbar':
       return 'danger'
     case 'waiting':
     case 'started':
@@ -316,6 +327,8 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'gekuendigt':
     case 'geplant':
     case 'fehlt_beleg':
+    case 'registriert':
+    case 'nicht_gefunden':
       return 'warn'
     default:
       return 'neutral'

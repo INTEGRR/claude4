@@ -2,6 +2,7 @@ import type { Sql, TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
 import { dokumenteListe, type PflichtModell } from '@/modules/einkauf/pflichtdokumente'
 import { KOSTEN_ARTEN, type KostenArt, SENDUNG_STATUS, type SendungModus, type SendungStatus } from '@/modules/einkauf/sendungen'
+import { verfolgungAnmelden, verfolgungJetztAbfragen } from '@/modules/versand/zulauf-verfolgung'
 import { entwurfAnlegen } from './einkauf-mailversand-ausfuehren.ts'
 import { type AktionsErgebnis, type AktionsKontext, UUID_MUSTER } from './typen.ts'
 
@@ -124,6 +125,9 @@ export async function sendungAnlegen(p: KopfFelder & { bestellungen: string[] },
     await t`select eingangs_sendung_synchronisieren(${s.id}, ${ctx.actor})`
     await t`select log_event('eingangs_sendung', ${s.id}, 'state',
                              ${`Angelegt${bestellungen.length ? ` mit ${bestellungen.map((b) => b.number).join(', ')}` : ''}`}, ${ctx.actor})`
+    // HBL/AWB wird bei 17TRACK angemeldet (0112) — Luft- und Kuriersendungen
+    // liefern Stände, Seefracht meist nicht (dann „nicht verfolgbar").
+    await verfolgungAnmelden(t, 'eingangs_sendung', s.id, p.hbl_awb, p.traeger, ctx.actor)
     return { ...s, anzahl: bestellungen.length }
   })
   return {
@@ -164,8 +168,20 @@ export async function sendungAendern(
       where id = ${s.id}`
     await t`select eingangs_sendung_synchronisieren(${s.id}, ${ctx.actor})`
     await t`select log_event('eingangs_sendung', ${s.id}, 'info', 'Daten der Sendung geändert', ${ctx.actor})`
+    await sendungVerfolgungNachziehen(t, s.id, ctx.actor)
   })
   return { text: `${s.nummer} gespeichert.`, recordId: s.id }
+}
+
+/** Nach jeder Änderung von Träger/HBL/AWB: die Verfolgung (0112) folgt dem gespeicherten Stand. */
+async function sendungVerfolgungNachziehen(t: Db, sendungId: string, actor: string): Promise<void> {
+  const [s] = await t<{ hbl_awb: string | null; traeger: string | null }[]>`
+    select hbl_awb, traeger from eingangs_sendungen where id = ${sendungId}`
+  await verfolgungAnmelden(t, 'eingangs_sendung', sendungId, s?.hbl_awb, s?.traeger, actor)
+}
+
+export async function sendungVerfolgen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  return verfolgungJetztAbfragen('eingangs_sendung', ctx.recordId!, ctx.actor)
 }
 
 export async function sendungBestellungZuordnen(p: { bestellungen: string[] }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
@@ -237,6 +253,7 @@ export async function sendungVerschiffen(
       where id = ${s.id}`
     await t`select eingangs_sendung_synchronisieren(${s.id}, ${ctx.actor})`
     await t`select log_event('eingangs_sendung', ${s.id}, 'state', 'Verschifft', ${ctx.actor})`
+    await sendungVerfolgungNachziehen(t, s.id, ctx.actor)
     return t<{ number: string }[]>`
       select distinct po.number from zahlplan_raten r
       join eingangs_sendung_bestellungen b on b.purchase_order_id = r.purchase_order_id and b.sendung_id = ${s.id}

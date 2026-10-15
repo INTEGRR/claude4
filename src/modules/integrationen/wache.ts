@@ -14,10 +14,11 @@ import { einreihen, textDienst } from './benachrichtigungen.ts'
 
 type Db = Sql | TransactionSql
 
-export type Dienst = 'dhl' | 'shopify' | 'mail' | 'ki' | 'sprache' | 'druckbruecke' | 'telegram' | 'google'
+export type Dienst = 'dhl' | 'track17' | 'shopify' | 'mail' | 'ki' | 'sprache' | 'druckbruecke' | 'telegram' | 'google'
 
 export const DIENST_LABELS: Record<Dienst, string> = {
   dhl: 'DHL Parcel DE',
+  track17: '17TRACK (Zulauf)',
   shopify: 'Shopify',
   mail: 'E-Mail (Resend)',
   ki: 'KI (Anthropic)',

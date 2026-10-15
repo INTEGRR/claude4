@@ -122,7 +122,7 @@ des `db`-Dienstes.
 | Einkaufspostfach abgleichen (Gmail, nur wenn angebunden) | minütlich | `/api/cron?task=mail` |
 | KI-Spur: eingehende Mails sichten, Dokumente lesen (Einkaufs-Agent, nur Entwürfe; ohne eingeschaltete Ebene „Einkauf" übersprungen) | minütlich | `/api/cron?task=ki` |
 | Bestellabgleich mit Shopify | Variante A: minütlich · B: alle 15 Min | `/api/cron?task=reconcile` |
-| DHL-Sendungsverfolgung | stündlich | `/api/cron?task=tracking` |
+| Sendungsverfolgung: DHL (Ausgang) und Zulauf über 17TRACK | stündlich | `/api/cron?task=tracking` |
 | Dienste-Wächter (Störungen → Telegram) | alle 5 Min | `/api/cron?task=wache` |
 | Aufräumen (Sitzungen, Geräte, Trackingdaten, Benachrichtigungen) | täglich | `/api/cron?task=housekeeping` |
 | Finanz-Tageslauf (Verträge, USt-Vorschlag) | täglich | `/api/cron?task=finanzen` |
@@ -140,6 +140,12 @@ Weitere Punkte:
   bei stündlichem Sync reicht das für rund 2.000 offene Sendungen.
   Nur der Rückfall `DHL_TRACKING_API=unified` hat die enge Grenze von
   250 Abfragen pro Tag.
+- **17TRACK (Zulauf):** `TRACK17_API_KEY` setzen und im 17TRACK-Dashboard
+  die Webhook-Adresse `<ERP_PUBLIC_URL>/api/webhooks/17track` eintragen —
+  ohne Webhook kommen Stände nur über den stündlichen Abruf. Jede
+  angemeldete Sendung kostet einmalig Kontingent (es zählt die Sendung,
+  nicht die Abfrage; Stand auf der Schnittstellen-Seite); ein erschöpftes
+  Kontingent meldet der Dienste-Wächter.
 - **Shopify-Zugriff:** Per Schnittstelle kommen nur Orders der letzten 60 Tage
   (`read_all_orders` ist ein geschützter Scope, den Shopify erst nach Antrag
   freigibt). Die ältere Historie kommt aus dem CSV-Export: Integrationen →

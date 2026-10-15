@@ -71,6 +71,15 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
     einen Anmeldefehler im Ergebnis und sonst nichts.
   - *Stand 2026-10-01: Wächter grün, erstes echtes Label (WH/OUT/00003)
     erstellt, storniert und neu erstellt. Tracking-Freigabe noch prüfen.*
+- [ ] **17TRACK** (Zulauf-Sendungsverfolgung, seit 2026-10-15):
+  - `TRACK17_API_KEY` — Security Key aus dem 17TRACK-API-Dashboard
+    (api.17track.net/admin → Settings); Konto mit passendem Kontingent
+    (jede Zulauf-Sendung kostet einmalig eine Anmeldung).
+  - Im Dashboard unter Settings → Webhook die Adresse
+    `https://<erp>/api/webhooks/17track` eintragen und den Test-Push
+    auslösen — Einstellungen → Schnittstellen zeigt die Adresse fertig.
+  - Danach an einer Bestellung mit Tracking-Nummer „Jetzt abfragen"
+    drücken: der Stand und „zuletzt abgefragt" müssen erscheinen.
 - [x] **Shopify**: App im Live-Shop anlegen (Dev Dashboard, Scopes laut
       [lokal-starten.md](lokal-starten.md)), dann `SHOPIFY_SHOP_DOMAIN`,
       `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`,

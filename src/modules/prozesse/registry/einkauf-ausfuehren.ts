@@ -2,6 +2,7 @@ import { sql, tx } from '@/db/client'
 import { money, qty } from '@/modules/shared/format'
 import { htmlSicher } from '@/modules/integrationen/mail'
 import { produktAnlegen } from '@/modules/ki/produkt-anlegen'
+import { verfolgungAnmelden, verfolgungJetztAbfragen } from '@/modules/versand/zulauf-verfolgung'
 import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
 import { type BelegBestellung, belegPositionenPruefen } from './einkauf.ts'
 import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
@@ -307,7 +308,14 @@ export async function kopfAendern(
   // Der Termin ist EINMAL gepflegt und wandert an die offenen
   // Wareneingangs-Transfers — der Lagerist plant nach scheduled_date.
   await sql`select purchase_order_eta_sync(${ctx.recordId!})`
+  // Die Sendungsnummer wird bei 17TRACK angemeldet (0112) — eine geänderte
+  // Nummer legt die alte Verfolgung still, ohne Nummer wird nichts verfolgt.
+  await verfolgungAnmelden(sql, 'purchase_order', ctx.recordId!, p.tracking_nummer, p.carrier, ctx.actor)
   return { recordId: ctx.recordId }
+}
+
+export async function zulaufVerfolgen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  return verfolgungJetztAbfragen('purchase_order', ctx.recordId!, ctx.actor)
 }
 
 export async function bestellungFreigeben(

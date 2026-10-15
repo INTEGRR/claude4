@@ -17,7 +17,7 @@ export interface Variable {
 }
 
 export interface Anbindung {
-  schluessel: 'shopify' | 'dhl' | 'mail' | 'ki' | 'sprache' | 'telegram' | 'odoo' | 'google' | 'system'
+  schluessel: 'shopify' | 'dhl' | 'track17' | 'mail' | 'ki' | 'sprache' | 'telegram' | 'odoo' | 'google' | 'system'
   titel: string
   /** Umgebungsvariable, die die Anbindung durch eine Attrappe ersetzt (Tests, Staging). */
   fake?: string
@@ -60,6 +60,23 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
       { name: 'DHL_BILLING_NUMBER', pflicht: true, zweck: '14-stellige Abrechnungsnummer (Paket national)' },
       { name: 'DHL_RETURN_RECEIVER_ID', pflicht: false, zweck: 'Empfänger-ID für Retourenlabels (Standard deu)' },
       { name: 'DHL_TRACKING_USER', pflicht: false, zweck: 'nur für die Tracking-Sandbox' },
+    ],
+  },
+  {
+    schluessel: 'track17',
+    titel: '17TRACK (Zulauf-Sendungsverfolgung)',
+    fake: 'TRACK17_FAKE',
+    variablen: [
+      {
+        name: 'TRACK17_API_KEY',
+        pflicht: true,
+        zweck: 'Security Key aus dem 17TRACK-API-Dashboard (Settings) — zugleich das Salz der Webhook-Signatur',
+      },
+      {
+        name: 'TRACK17_API_BASE',
+        pflicht: false,
+        zweck: 'anderer Endpunkt nur zum Testen (Standard https://api.17track.net/track/v2.2)',
+      },
     ],
   },
   {

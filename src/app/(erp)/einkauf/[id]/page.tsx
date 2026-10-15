@@ -10,6 +10,7 @@ import { DokumenteKarte } from '@/components/dokumente'
 import { KiVorschlaegeKarte } from '@/components/ki-vorschlaege'
 import { MailThreadsKarte, WiedervorlagenKarte } from '@/components/mail-threads'
 import { SendungenKarte } from '@/components/sendungen-karte'
+import { Sendungsverfolgung } from '@/components/sendungsverfolgung'
 import { date, isoDatum, money, qty, stueckpreis } from '@/modules/shared/format'
 import {
   addPoLine,
@@ -21,6 +22,7 @@ import {
   removePoLine,
   sendPoEmail,
   updatePoHeader,
+  zulaufAbfragen,
 } from '../actions'
 import {
   poZahlplanSetzen,
@@ -376,6 +378,13 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
             </div>
           </div>
         </ActionForm>
+        {/* Was 17TRACK zur Sendung weiß — und wann KRNL zuletzt gefragt hat (0112). */}
+        <Sendungsverfolgung
+          modell="purchase_order"
+          recordId={id}
+          nummer={kopf.tracking_number}
+          abfragen={zulaufAbfragen.bind(null, id)}
+        />
       </Card>
 
       <Card title="Positionen" tight>

@@ -83,6 +83,54 @@ Schema und Zeilenregel in `tests/ki-anhaenge.test.ts`.
 - **Stornieren**: Entwurf ⇒ `cancel`. Gebuchte Rechnung ⇒ **Gutschrift** (`is_credit_note`, `reversed_bill_id`), die `qty_billed` wieder reduziert.
 - `billing_status` auf der Bestellung: `nothing` / `waiting` / `fully_billed` gemäß Odoo-Tabelle (siehe Referenz).
 
+## Sendungsverfolgung im Zulauf (17TRACK, seit 2026-10-15)
+
+Bis 0111 wurden Carrier, Tracking-Nummer und Link an Bestellung und
+Eingangssendung nur gespeichert und verlinkt — abgefragt hat sie niemand.
+Seit 0112 verfolgt KRNL jede Zulauf-Sendung über **17TRACK** (ein Dienst
+für alle Carrier; Entscheidungslog 2026-10-15), Tabelle
+`sendungsverfolgung`, eine Zeile je Beleg und Sendungsnummer:
+
+- **Anmelden:** `einkauf.kopf_aendern` (Tracking-Nummer der Bestellung) und
+  `einkauf.sendung_anlegen/aendern/verschiffen` (HBL/AWB der
+  Eingangssendung) legen die Zeile an („Angemeldet") und reihen den
+  Outbox-Job `track17_registrieren` ein; der meldet die Nummer an (kostet
+  einmalig Kontingent) und holt den ersten Stand. Der Carrier-Text wird auf
+  den 17TRACK-Code abgebildet (`track17-logik.ts`: DHL, DHL Express, DPD,
+  GLS, UPS, FedEx, K+N, Schenker, Maersk, …), sonst erkennt 17TRACK ihn
+  selbst. Abgelehnte Nummern (Format, Carrier nicht erkennbar) stehen als
+  **„Nicht verfolgbar"** mit Grund — Seefracht-HBLs sind meist nicht
+  verfolgbar, Luft- und Kuriersendungen schon. Limit-Ablehnungen wiederholt
+  die Outbox mit Backoff.
+- **Stand:** Statuswechsel schiebt 17TRACK per Webhook
+  (`/api/webhooks/17track`, Signatur SHA-256 „Rohtext/Key"), stündlich
+  fragt der Cron `tracking` nach (je Sendung höchstens alle sechs Stunden,
+  Stapel 40). Status: Angemeldet, Noch nicht im Tracking, Angekündigt,
+  Unterwegs (Unterstatus „in der Zollabfertigung" u. a.), Abholbereit, In
+  Zustellung, Zustellung fehlgeschlagen, Zugestellt, Problem, Abgelaufen.
+  Zugestellt/abgelaufen beendet die Verfolgung. Jede Änderung ist ein
+  Protokolleintrag am Beleg (Actor `track17`).
+- **„Zuletzt abgefragt" ist immer sichtbar** — wann und wie (Anmeldung,
+  stündlicher Abruf, Meldung von 17TRACK, von Hand): an der Bestellung
+  (Karte „Details", unter den Tracking-Feldern), an der Eingangssendung
+  (Karte „Sendung"), im Zulauf-Kalender und am Wareneingang (Panel
+  „Zulauf"). Dazu der Verlauf der Ereignisse.
+- **Jetzt abfragen:** Registry-Aktionen `einkauf.zulauf_verfolgen`
+  (Bestellung) und `einkauf.sendung_verfolgen` (Eingangssendung),
+  prozessfrei (Abfragewerkzeug ohne Zustandswechsel), auch für den KI-Chat
+  („Wo ist die Sendung zu P00012?"). Melden die Nummer notfalls sofort an.
+- **Geänderte Nummer** legt die alte Verfolgung still; ohne Nummer wird
+  nichts verfolgt. Ist 17TRACK nicht angebunden (`TRACK17_API_KEY`), steht
+  die Zeile ehrlich auf „Nicht verfolgbar — 17TRACK nicht angebunden" und
+  bekommt beim nächsten Speichern mit angebundenem Dienst eine neue Chance.
+- **Betrieb:** Einstellungen → Schnittstellen zeigt Stand, Variablen,
+  Kontingent und die Webhook-Adresse; der Dienste-Wächter prüft das
+  Kontingent höchstens stündlich (erschöpft = Störung). Aufrufe stehen im
+  Transaktionsprotokoll (System `track17`). Das Kontingent zählt
+  angemeldete Sendungen, nicht Abfragen — KRNL fragt sparsam (Budget in
+  [integrationen.md](integrationen.md#17track--zulauf-sendungsverfolgung-seit-2026-10-15)).
+  Attrappe `TRACK17_FAKE=1` (Prozesstests, Staging).
+
 ## UI
 
 - **Liste** mit Filter-Kacheln wie Odoo: **Zu senden**, **Wartend** (gesendet), **Verspätet** (Liefertermin überschritten); Status- und Lieferanten-Filter.

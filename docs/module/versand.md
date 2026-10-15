@@ -517,6 +517,8 @@ lassen sich wie beim Label überschreiben.
 - **Cron (stündlich):** alle Sendungen mit Status `created/manifested/transit` (älteste Prüfung zuerst, je Sendung höchstens alle zwei Stunden) über die **Parcel DE Tracking API** als Sammelabfrage holen — 20 Sendungen je Aufruf, bis 100 je Lauf —, Status + letztes Ereignis speichern; `delivered` beendet den Sync. XML-Bau, Antwort-Parser und Statusableitung liegen rein und getestet in `dhl-tracking-xml.ts`, der HTTP-Aufruf in `trackShipments()` (dhl.ts).
 - **Rate-Limit-Budget:** 1.000 Aufrufe und 10.000 Sendungen je Tag, 3 Aufrufe je Sekunde (Sync pausiert 400 ms zwischen Stapeln) — bei stündlichem Lauf reicht das für rund 2.000 offene Sendungen ohne Erhöhung. Bricht DHL eine Abfrage ab (Limit, Anmeldung), gilt der ganze Stapel als geprüft und der Grund steht im Ergebnis des Laufs (`fehler`) bzw. im Aktionstext „Tracking aktualisieren". Rückfall auf die Unified Tracking API per `DHL_TRACKING_API=unified` (250 Aufrufe/Tag, 1 alle 5 s, Stapel 20). Erweiterung: Unified **Push API** (Webhooks je Sendung) statt Polling.
 - **Datenschutz-Auflage:** Trackingdaten 30 Tage nach Zustellung löschen (Cron bereinigt `last_tracking_event`).
+- **Sichtbar seit 2026-10-15:** die Versandliste zeigt unter dem Status „geprüft <Zeit>" bzw. „noch nicht geprüft" (`last_tracking_check`) — ob der Sync läuft, sieht man so an der Sendung, nicht erst im Cron-Protokoll.
+- **Zulauf** (eingehende Sendungen des Einkaufs) läuft nicht über DHL, sondern über 17TRACK — derselbe Cron `tracking`, Fachlogik im [Einkauf](einkauf.md#sendungsverfolgung-im-zulauf-17track-seit-2026-10-15).
 
 ## Shopify-Rückmeldung
 
