@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — 17TRACK-Webhook braucht eine eigene Domain; bis dahin trägt der Abruf
+
+**Anlass:** Der Webhook-Test aus dem 17TRACK-Dashboard gegen
+`https://claude4-one.vercel.app/api/webhooks/17track` endete zweimal mit
+504 — auch nachdem die Route auf „sofort 200, danach verarbeiten"
+umgestellt war. Befund: Die Route antwortet aus aller Welt in unter einer
+Sekunde (Prüfung von 40 Standorten, alle Header-Varianten), aber im
+Transaktionsprotokoll der Produktion steht **kein einziger Request von
+17TRACK** — der Push kommt gar nicht bis Vercel. 17TRACK sendet aus China;
+chinesische DNS-Server liefern für `*.vercel.app` eine fremde IP (Twitter-
+Adressraum, typische Fälschung der Großen Firewall), Vercel selbst rät für
+China zu eigenen Domains.
+
+**Entschieden:**
+- Die Webhook-Adresse bekommt eine **eigene Domain des ERP** (Vercel →
+  Domains, `ERP_PUBLIC_URL` umstellen) — nicht `*.vercel.app`. Welche,
+  entscheidet der Betreiber.
+- **Bis dahin ist der stündliche Abruf die Quelle** (je Sendung höchstens
+  alle sechs Stunden, gebündelt) — die Verfolgung funktioniert, nur
+  langsamer. Der Rhythmus bleibt bewusst sparsam (Aufrufbudget,
+  integrationen.md); ein engerer Takt wäre eine eigene Entscheidung.
+- **Sichtbar statt vermutet:** Die Schnittstellen-Seite zeigt „Letzter
+  Webhook-Eingang" und erklärt bei „noch keiner" den Grund — niemand soll
+  einen funktionierenden Push annehmen, der nie ankommt.
+
+**Wo:** Schnittstellen-Seite, [module/integrationen.md](module/integrationen.md),
+[betrieb.md](betrieb.md), [go-live.md](go-live.md).
+
 ## 2026-10-15 — Zulauf-Sendungsverfolgung über 17TRACK, „zuletzt abgefragt" immer sichtbar
 
 **Anlass (Betreiber):** „Wo sehe ich, dass das Tracking von Sendungen

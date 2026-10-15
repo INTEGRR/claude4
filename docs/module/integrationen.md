@@ -110,6 +110,15 @@ Carrier — Fachlogik und Oberfläche im [Einkauf](einkauf.md#sendungsverfolgung
   im Zeitüberlauf (Webhook-Test: 504). Jeder Push steht im
   Transaktionsprotokoll (System `track17`, Art `webhook`); scheitert die
   Verarbeitung, holt der stündliche Abruf den Stand nach.
+- **Erreichbarkeit (Befund 2026-10-15):** 17TRACK pusht aus China, und
+  `*.vercel.app` wird dort per DNS gefälscht (chinesische Resolver liefern
+  eine fremde IP) — der Webhook-Test endet dann mit 504, ohne dass ein
+  Request bei Vercel ankommt. Die Webhook-Adresse braucht eine **eigene
+  Domain** des ERP (Vercel → Domains, danach `ERP_PUBLIC_URL` umstellen).
+  Die Schnittstellen-Seite zeigt „Letzter Webhook-Eingang"; solange dort
+  „noch keiner" steht, kommen alle Stände über den stündlichen Abruf
+  (je Sendung höchstens alle sechs Stunden) — die Verfolgung funktioniert,
+  nur langsamer.
 - **API-Aufrufe** (v2.2, Header `17token`): `register` (bis 40 Nummern,
   kostet je Nummer einmalig Kontingent — das Kontingent zählt angemeldete
   Sendungen, nicht Abfragen; den Stand zeigt die Schnittstellen-Seite),

@@ -166,6 +166,11 @@ export default async function SchnittstellenPage() {
       kontingent = null
     }
   }
+  // Kommt der Push überhaupt an? Ohne diese Zeile sähe niemand, dass der
+  // Stand nur über den stündlichen Abruf kommt (Entscheidungslog 2026-10-15).
+  const [letzterPush] = await sql<{ am: string | null }[]>`
+    select max(created_at)::text as am from api_transactions
+    where system = 'track17' and kind = 'webhook' and ok`
 
   return (
     <>
@@ -394,7 +399,21 @@ export default async function SchnittstellenPage() {
           ) : (
             <span className="muted">— (nicht angebunden)</span>
           )}
+          {' · '}Letzter Webhook-Eingang:{' '}
+          {letzterPush?.am ? (
+            <span className="mono">{dateTime(letzterPush.am)}</span>
+          ) : (
+            <span className="muted">noch keiner — Stände kommen über den stündlichen Abruf</span>
+          )}
         </p>
+        {!letzterPush?.am && (
+          <p className="small muted" style={{ margin: '0 0 10px' }}>
+            Kommt auch der Webhook-Test aus dem 17TRACK-Dashboard nicht an (504): 17TRACK sendet aus
+            China, und <span className="mono">*.vercel.app</span> wird dort per DNS gefälscht. Die
+            Webhook-Adresse braucht dann eine eigene Domain des ERP (Vercel → Domains); bis dahin
+            trägt der Abruf.
+          </p>
+        )}
         <p className="small" style={{ margin: '0 0 10px' }}>
           Webhook-Adresse im 17TRACK-Dashboard (Settings → Webhook) eintragen:{' '}
           <span className="mono">

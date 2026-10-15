@@ -78,6 +78,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
   - Im Dashboard unter Settings → Webhook die Adresse
     `https://<erp>/api/webhooks/17track` eintragen und den Test-Push
     auslösen — Einstellungen → Schnittstellen zeigt die Adresse fertig.
+    **Voraussetzung: eigene Domain** — auf `claude4-one.vercel.app`
+    endet der Test mit 504, weil 17TRACK aus China sendet und
+    `*.vercel.app` dort per DNS gefälscht wird (Befund 2026-10-15). Bis
+    dahin kommen Stände über den stündlichen Abruf.
   - Danach an einer Bestellung mit Tracking-Nummer „Jetzt abfragen"
     drücken: der Stand und „zuletzt abgefragt" müssen erscheinen.
 - [x] **Shopify**: App im Live-Shop anlegen (Dev Dashboard, Scopes laut

@@ -145,7 +145,10 @@ Weitere Punkte:
   ohne Webhook kommen Stände nur über den stündlichen Abruf. Jede
   angemeldete Sendung kostet einmalig Kontingent (es zählt die Sendung,
   nicht die Abfrage; Stand auf der Schnittstellen-Seite); ein erschöpftes
-  Kontingent meldet der Dienste-Wächter.
+  Kontingent meldet der Dienste-Wächter. **Achtung:** auf `*.vercel.app`
+  kommt der Push nicht an (17TRACK sendet aus China, die Domain wird dort
+  per DNS gefälscht) — Webhook erst mit eigener Domain; die Schnittstellen-
+  Seite zeigt „Letzter Webhook-Eingang".
 - **Shopify-Zugriff:** Per Schnittstelle kommen nur Orders der letzten 60 Tage
   (`read_all_orders` ist ein geschützter Scope, den Shopify erst nach Antrag
   freigibt). Die ältere Historie kommt aus dem CSV-Export: Integrationen →
