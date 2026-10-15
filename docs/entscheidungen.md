@@ -9,6 +9,23 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Übersicht: Aufgaben als Kachel mit Zahl, nicht als Liste
+
+**Anlass (Betreiber):** „In der Übersicht bitte die Aufgaben nur als Anzahl
+anzeigen wie die anderen Kacheln, dann bei Klick reingehen — das ist mir
+zu unübersichtlich." Revidiert damit den Teil der Entscheidung 0104
+(2026-10-0x), der „Deine Aufgaben" als Liste über die Systemsignale stellte.
+
+**Entschieden:** „Deine Aufgaben" ist die **erste Kachel** unter „Heute
+anstehend" — Anzahl der eigenen offenen Aufgaben, dazu „n fällig" (heute
+oder früher), violett (ein Mensch wartet), gelb sobald etwas überfällig
+ist; Klick führt auf `/aufgaben`, wo abgehakt wird. Die Übersicht bleibt
+eine Zeile Zahlen, kein Listen-Moloch; Zähler am Menüpunkt und Seite
+`/aufgaben` bleiben wie sie sind.
+
+**Wo:** `src/app/(erp)/page.tsx`; [module/personal.md](module/personal.md),
+[prozesse.md](prozesse.md).
+
 ## 2026-10-15 — Ungespeicherte Eingaben sind sichtbar; „Speichern & bestätigen" an der Bestellung
 
 **Anlass (Betreiber):** „Neue Bestellung angelegt, UPS Carrier und Tracking,

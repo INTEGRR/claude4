@@ -97,10 +97,13 @@ einzige Wahrheit (Entscheidungslog 2026-10-01, „Aufgaben für Mitarbeiter").
   oder Zusatzrolle), **Termin** = Tag plus optionale Uhrzeit (ohne Uhrzeit
   gilt das Tagesende; `faellig_um` rechnet in Berliner Ortszeit), geschätzte
   Dauer in Minuten, beim Abhaken eine Rückmeldung (`notiz`).
-- **Wo sie erscheinen:** in der Übersicht als „Deine Aufgaben" (über den
-  Systemsignalen, Überfälliges gelb), als Zähler am Menüpunkt „Aufgaben"
-  (meine, heute oder früher fällig) und auf `/aufgaben` (Meine · Alle offenen ·
-  Erledigt der letzten 14 Tage) mit dem Formular „Neue Aufgabe".
+- **Wo sie erscheinen:** in der Übersicht als Kachel „Deine Aufgaben"
+  (erste Kachel unter „Heute anstehend": Anzahl, dazu „n fällig"; gelb,
+  sobald etwas überfällig ist — seit 2026-10-15 nur die Zahl, die Liste
+  war dort zu unübersichtlich), als Zähler am Menüpunkt „Aufgaben" (meine,
+  heute oder früher fällig) und auf `/aufgaben` (Meine · Alle offenen ·
+  Erledigt der letzten 14 Tage) mit dem Formular „Neue Aufgabe" und dem
+  Abhaken.
 - **Aktionen** (Registry `aufgaben.*`, Bereich `aufgaben`, den jede Rolle hat):
   `aufgaben.anlegen` (KI/Sprechen), `aufgaben.erledigen` (KI/Sprechen, per ID
   oder Stichwort aus dem Titel der eigenen offenen Aufgaben),

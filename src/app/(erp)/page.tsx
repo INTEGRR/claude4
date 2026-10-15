@@ -7,7 +7,6 @@ import { Befehlsfeld } from '@/components/befehlsfeld'
 import { money } from '@/modules/shared/format'
 import { offeneVorgaenge } from '@/modules/prozesse/offene-vorgaenge'
 import { aufgabenListe } from '@/modules/aufgaben/liste'
-import { AufgabenListe } from '@/components/aufgaben-liste'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,9 +135,28 @@ export default async function Dashboard({
       wichtig: true,
     }))
 
+  // Aufgaben (0104): was jemand dir (oder deinem Team) aufgetragen hat — als
+  // erste Kachel, nur die Zahl (Betreiber 2026-10-15: die Liste war zu
+  // unübersichtlich); die Liste selbst wohnt auf /aufgaben.
+  const meineAufgaben = sees('aufgaben') ? await aufgabenListe(user, 'meine', 500) : []
+  const aufgabenFaellig = meineAufgaben.filter((a) => a.ueberfaellig || a.heute).length
+  const aufgabenUeberfaellig = meineAufgaben.some((a) => a.ueberfaellig)
+
   // wichtig = Entscheidungssignal (Violett): hier wartet eine Freigabe auf
   // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
   const aufgaben: { label: string; wert: number; anzeige?: string; href: string; warn?: boolean; wichtig?: boolean }[] = [
+    ...(meineAufgaben.length > 0
+      ? [
+          {
+            label: 'Deine Aufgaben',
+            wert: meineAufgaben.length,
+            anzeige: aufgabenFaellig > 0 ? `${meineAufgaben.length} · ${aufgabenFaellig} fällig` : undefined,
+            href: '/aufgaben',
+            warn: aufgabenUeberfaellig,
+            wichtig: !aufgabenUeberfaellig,
+          },
+        ]
+      : []),
     ...vorgangsKarten,
     ...(sees('reparatur') && prozessAktiv('reparatur') && s.reparaturen_erwartet > 0
       ? [{ label: 'Reparaturen erwartet', wert: s.reparaturen_erwartet, href: '/reparatur' }]
@@ -234,10 +252,6 @@ export default async function Dashboard({
 
   const vorname = user.name.split(' ')[0]
 
-  // Aufgaben (0104): was jemand dir (oder deinem Team) aufgetragen hat —
-  // steht über den Systemsignalen, denn hier wartet ein Mensch auf dich.
-  const meineAufgaben = sees('aufgaben') ? await aufgabenListe(user, 'meine', 8) : []
-
   return (
     <>
       {verweigert && (
@@ -268,17 +282,6 @@ export default async function Dashboard({
           </div>
         )}
       </div>
-
-      {meineAufgaben.length > 0 && (
-        <div style={{ maxWidth: 760, margin: '32px auto 0' }}>
-          <div className="mono-label" style={{ marginBottom: 8 }}>
-            Deine Aufgaben · <Link href="/aufgaben">alle</Link>
-          </div>
-          <div className="card" style={{ marginBottom: 0, padding: '2px 14px' }}>
-            <AufgabenListe aufgaben={meineAufgaben} nutzer={{ id: user.id, rollen: user.rollen }} />
-          </div>
-        </div>
-      )}
 
       {/* Was das System heute von dir braucht — nur echte Aufgaben. */}
       <div style={{ maxWidth: 760, margin: '32px auto 0' }}>

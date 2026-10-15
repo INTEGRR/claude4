@@ -29,7 +29,7 @@ export function AufgabenListe({
 }: {
   aufgaben: AufgabeZeile[]
   nutzer: NutzerSicht
-  /** Auf /aufgaben (alle offenen) — in „Deine Aufgaben" ist es klar. */
+  /** Auf /aufgaben (alle offenen) — unter „Meine" ist es klar. */
   zeigeZustaendig?: boolean
   verwerfen?: boolean
 }) {
