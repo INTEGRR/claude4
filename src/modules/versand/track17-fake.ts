@@ -108,7 +108,13 @@ export async function fakeNummernAnmelden(
 export async function fakeStaendeAbfragen(
   eintraege: { nummer: string; carrier: number | null }[],
 ): Promise<Map<string, Track17Eintrag>> {
-  return new Map(eintraege.map((e) => [e.nummer, fakeEintrag(e.nummer, e.carrier)]))
+  // Nummern mit „NEU" haben — wie bei 17TRACK direkt nach der Anmeldung —
+  // noch keine Daten, bis ein Stand hinterlegt wird (-18019909).
+  return new Map(
+    eintraege
+      .filter((e) => !e.nummer.includes('NEU') || STAENDE.has(e.nummer))
+      .map((e) => [e.nummer, fakeEintrag(e.nummer, e.carrier)]),
+  )
 }
 
 export async function fakeKontingent(): Promise<Kontingent> {

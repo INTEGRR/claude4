@@ -101,7 +101,17 @@ für alle Carrier; Entscheidungslog 2026-10-15), Tabelle
   selbst. Abgelehnte Nummern (Format, Carrier nicht erkennbar) stehen als
   **„Nicht verfolgbar"** mit Grund — Seefracht-HBLs sind meist nicht
   verfolgbar, Luft- und Kuriersendungen schon. Limit-Ablehnungen wiederholt
-  die Outbox mit Backoff.
+  die Outbox mit Backoff. Angemeldet wird mit `lang: de` — DHL, DPD & Co.
+  liefern ihre Ereignisse dann auf Deutsch (dieselben Texte wie auf der
+  Carrier-Seite).
+- **Erster Stand — Nachfassen:** direkt nach der Anmeldung hat 17TRACK
+  meist noch nichts („No tracking information at this time",
+  -18019909) und sammelt erst. Die Zeile steht dann auf **„Angemeldet ·
+  17TRACK sammelt noch"** und nennt die nächste Abfrage: der Job
+  `track17_nachfassen` fragt nach 5, 15 und 45 Minuten nach; danach nimmt
+  der stündliche Abruf frische Sendungen (noch ohne Stand) **jede Stunde**
+  mit, nicht erst nach sechs. „Noch nicht im Tracking" heißt dagegen: der
+  Carrier selbst kennt die Nummer noch nicht (oft erst nach der Abholung).
 - **Stand:** Statuswechsel schiebt 17TRACK per Webhook
   (`/api/webhooks/17track`, Signatur SHA-256 „Rohtext/Key"), stündlich
   fragt der Cron `tracking` nach (je Sendung höchstens alle sechs Stunden,

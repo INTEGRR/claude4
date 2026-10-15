@@ -126,12 +126,14 @@ Carrier — Fachlogik und Oberfläche im [Einkauf](einkauf.md#sendungsverfolgung
   als sechs Stunden nicht abgefragt wurden), `getquota` (Dienste-Wächter,
   höchstens stündlich: erschöpftes Kontingent = Störung). Rate-Limit 3
   Aufrufe je Sekunde.
-- **Aufrufbudget (bewusst sparsam):** je Sendung eine Anmeldung; der
-  stündliche Abruf stellt höchstens einen Aufruf je 40 aktive Sendungen,
-  jede Sendung höchstens alle sechs Stunden (zehn offene Sendungen ≈ vier
-  Aufrufe am Tag); Webhooks kosten nichts; der Wächter fragt das Kontingent
-  nur, wenn in der letzten Stunde kein anderer erfolgreicher Aufruf lief;
-  „Jetzt abfragen" ist ein Aufruf je Klick.
+- **Aufrufbudget (bewusst sparsam):** je Sendung eine Anmeldung plus bis
+  zu drei Nachfass-Abrufe (5/15/45 Minuten, solange 17TRACK noch sammelt);
+  der stündliche Abruf stellt höchstens einen Aufruf je 40 aktive
+  Sendungen, jede Sendung höchstens alle sechs Stunden — frische ohne Stand
+  jede Stunde (zehn offene Sendungen ≈ vier Aufrufe am Tag); Webhooks
+  kosten nichts; der Wächter fragt das Kontingent nur, wenn in der letzten
+  Stunde kein anderer erfolgreicher Aufruf lief; „Jetzt abfragen" ist ein
+  Aufruf je Klick.
 - **Jobs:** `track17_registrieren` (Fähigkeit `tracking:anmelden`) —
   Anmeldung mit erstem Stand; Limit-Ablehnungen werfen und laufen mit
   Backoff erneut, endgültige Ablehnungen enden als „nicht verfolgbar".

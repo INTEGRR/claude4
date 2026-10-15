@@ -9,6 +9,37 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Erster Stand nach der Anmeldung: nachfassen statt sechs Stunden warten
+
+**Anlass (Betreiber):** Erste echte Sendung (DHL, liegt laut DHL in der
+Packstation): KRNL zeigte nur „Angemeldet · zuletzt abgefragt 11:47 (bei
+der Anmeldung)" — „mit der Aussage kann ich nix anfangen". Befund im
+Transaktionsprotokoll: `register` ok, der `gettrackinfo` 250 ms später
+antwortet mit -18019909 „No tracking information at this time" — 17TRACK
+sammelt nach der Anmeldung erst; Minuten später steht der Stand im
+17TRACK-Portal. Der nächste Abruf wäre aber erst nach sechs Stunden gekommen.
+
+**Entschieden:**
+- **Nachfassen** (Job `track17_nachfassen`) nach 5, 15 und 45 Minuten,
+  solange noch kein Stand da ist; der stündliche Abruf nimmt frische
+  Sendungen (ohne Stand) **jede Stunde** mit. Das Budget bleibt klein
+  (höchstens drei Zusatzaufrufe je neuer Sendung), der erste Stand ist
+  in Minuten da statt in Stunden.
+- **Sagen, was los ist:** „Angemeldet" allein ist keine Aussage. Die
+  Zeile heißt jetzt „Angemeldet · 17TRACK sammelt noch" und nennt die
+  nächste Abfrage (Uhrzeit des Nachfassens, sonst „spätestens in einer
+  Stunde"); „Jetzt abfragen" ohne Daten antwortet „noch keine Daten —
+  KRNL fasst in 5 Minuten nach" statt „kennt die Nummer nicht".
+- **Deutsche Ereignistexte:** Anmeldung mit `lang: de` — Carrier mit
+  offizieller deutscher Sprache (DHL, DPD, …) liefern die Texte, die der
+  Betreiber auch auf der Carrier-Seite liest („Die Sendung liegt in der
+  Packstation zur Abholung bereit") statt der englischen Übersetzung.
+
+**Wo:** `zulauf-verfolgung.ts` (nachfassenEinreihen, verfolgungNachfassen,
+Abruf-Regel), Jobkatalog, `track17.ts` (lang), Komponente
+`sendungsverfolgung.tsx`; Test `tests/prozesse/zulauf-verfolgung.test.ts`;
+[module/einkauf.md](module/einkauf.md), [module/integrationen.md](module/integrationen.md).
+
 ## 2026-10-15 — 17TRACK-Webhook braucht eine eigene Domain; bis dahin trägt der Abruf
 
 **Anlass:** Der Webhook-Test aus dem 17TRACK-Dashboard gegen

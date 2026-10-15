@@ -223,4 +223,60 @@ describe('Zulauf-Sendungsverfolgung (17TRACK)', () => {
     assert.equal(z2.aktiv, true)
     assert.equal(z2.registrierung_fehler, null)
   })
+  test('noch keine Daten nach der Anmeldung: Nachfassen nach 5/15/45 Minuten, dann stündlich', async () => {
+    const sql = h.sql
+    const [v] = await sql<{ id: string }[]>`
+      insert into partners (name, is_vendor, is_company, country_code) values ('Zulauf Lieferant 3', true, true, 'DE') returning id`
+    const po = await aktion('einkauf.bestellung_anlegen', undefined, { vendor_id: v.id })
+    await aktion('einkauf.kopf_aendern', po.recordId!, { ...KOPF, carrier: 'DHL', tracking_nummer: 'DHLNEU0001' })
+    await runDueJobs()
+    let [z] = await zeile('purchase_order', po.recordId!)
+    assert.ok(z.registriert_am, 'angemeldet')
+    assert.equal(z.status, 'registriert', '17TRACK hat direkt nach der Anmeldung noch nichts (-18019909)')
+    const offen = () => sql<{ id: string; payload: { versuch: number }; min: number }[]>`
+      select id, payload, round(extract(epoch from (next_run_at - now())) / 60)::int as min from integration_jobs
+      where kind = 'track17_nachfassen' and payload ->> 'verfolgung_id' = ${z.id} and status = 'pending'
+      order by created_at desc`
+    let [j] = await offen()
+    assert.equal(j?.payload.versuch, 0)
+    assert.equal(Number(j.min), 5, 'erster Versuch in fünf Minuten')
+    const log = await protokoll('purchase_order', po.recordId!)
+    assert.ok(log.some((l) => /angemeldet — 17TRACK sammelt noch, KRNL fasst in 5 Minuten nach/.test(l.message)), JSON.stringify(log))
+
+    // Fällig machen → immer noch nichts → zweiter Versuch in 15 Minuten.
+    await sql`update integration_jobs set next_run_at = now() where id = ${j.id}`
+    assert.equal((await runDueJobs()).failed, 0)
+    ;[j] = await offen()
+    assert.equal(j?.payload.versuch, 1)
+    assert.equal(Number(j.min), 15)
+    ;[z] = await zeile('purchase_order', po.recordId!)
+    assert.equal(z.zuletzt_abgefragt_via, 'abruf')
+
+    // Jetzt liefert 17TRACK → Stand übernommen, keine weitere Nachfassung.
+    fakeStandSetzen('DHLNEU0001', {
+      status: 'AvailableForPickup',
+      text: 'Die Sendung liegt in der Packstation zur Abholung bereit.',
+      ort: 'Berlin',
+      zeit: '2026-10-14T15:38:00+02:00',
+    })
+    await sql`update integration_jobs set next_run_at = now() where id = ${j.id}`
+    assert.equal((await runDueJobs()).failed, 0)
+    ;[z] = await zeile('purchase_order', po.recordId!)
+    assert.equal(z.status, 'abholbereit')
+    assert.equal(z.letztes_ereignis?.text, 'Die Sendung liegt in der Packstation zur Abholung bereit.')
+    assert.equal((await offen()).length, 0, 'keine weitere Nachfassung')
+    const log2 = await protokoll('purchase_order', po.recordId!)
+    assert.ok(log2.some((l) => /Abholbereit — Berlin, 14.10. 15:38: Die Sendung liegt in der Packstation/.test(l.message)))
+
+    // Frische Sendung ohne Stand: der stündliche Abruf nimmt sie jede Stunde mit, nicht erst nach sechs.
+    const po2 = await aktion('einkauf.bestellung_anlegen', undefined, { vendor_id: v.id })
+    await aktion('einkauf.kopf_aendern', po2.recordId!, { ...KOPF, carrier: 'DHL', tracking_nummer: 'DHLNEU0002' })
+    await runDueJobs()
+    await sql`update sendungsverfolgung set zuletzt_abgefragt_am = now() - interval '55 minutes' where nummer = 'DHLNEU0002'`
+    const r = await verfolgungAbrufen()
+    assert.equal(r.checked, 1, 'frische Sendung nach 55 Minuten wieder dran')
+    // „Jetzt abfragen" ohne Daten: ehrlicher Text statt „kennt die Nummer nicht".
+    const m = await aktion('einkauf.zulauf_verfolgen', po2.recordId!)
+    assert.match(m.text ?? '', /noch keine Daten — 17TRACK sammelt noch/)
+  })
 })

@@ -259,5 +259,16 @@ export function registrierungWiederholen(code: number | null | undefined): boole
 
 /** Abfragerhythmus des Cron: aktive Sendungen, je höchstens alle sechs Stunden (Webhook liefert dazwischen). */
 export const ABRUF_ABSTAND_STUNDEN = 6
+/** Frische Sendungen (noch ohne Stand) fragt der stündliche Cron jedes Mal — nicht erst nach sechs Stunden. */
+export const ABRUF_ABSTAND_FRISCH_MINUTEN = 50
+/**
+ * Nachfassen nach der Anmeldung: 17TRACK liefert direkt nach `register`
+ * meist „No tracking information at this time" (-18019909) und sammelt
+ * erst — KRNL fragt deshalb nach 5, 15 und 45 Minuten nach, danach trägt
+ * der stündliche Abruf.
+ */
+export const NACHFASSEN_MINUTEN = [5, 15, 45] as const
+/** 17TRACK: „noch keine Daten" — kein Fehler, nur zu früh. */
+export const NOCH_KEINE_DATEN = -18019909
 /** 17TRACK nimmt je Aufruf bis zu 40 Nummern. */
 export const STAPEL_MAX = 40

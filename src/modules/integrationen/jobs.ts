@@ -298,6 +298,12 @@ const handlers = {
     return verfolgungRegistrieren(String(payload.verfolgung_id))
   },
 
+  /** Ersten Stand holen, solange 17TRACK noch sammelt (5/15/45 Minuten nach der Anmeldung). */
+  async track17_nachfassen(payload) {
+    const { verfolgungNachfassen } = await import('@/modules/versand/zulauf-verfolgung')
+    return verfolgungNachfassen(String(payload.verfolgung_id), Number(payload.versuch ?? 0))
+  },
+
   /** Tägliche Einkaufs-Zusammenfassung in den Telegram-Kanal (einkauf/digest.ts, 0108). */
   async einkauf_digest(payload) {
     const { einkaufDigestEinreihen } = await import('@/modules/einkauf/digest')

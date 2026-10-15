@@ -45,6 +45,7 @@ export function VerfolgungKurz({
     <div className="small">
       <Badge state={v.status} kind="sendungsverfolgung" led />
       {zusatz && <span className="muted"> {zusatz}</span>}
+      {v.status === 'registriert' && <span className="muted"> · 17TRACK sammelt noch</span>}
       {v.letztes_ereignis && <span className="muted"> · {ereignisText(v.letztes_ereignis)}</span>}
       {v.registrierung_fehler && <span style={{ color: 'var(--danger)' }}> · {v.registrierung_fehler}</span>}
       <div className="muted small">{abgefragtText(v)}</div>
@@ -69,6 +70,17 @@ export async function Sendungsverfolgung({
   const zeilen = alle.some((v) => v.aktiv) ? alle.filter((v) => v.aktiv) : alle.slice(0, 1)
   if (zeilen.length === 0 && !nummer?.trim()) return null
   const angebunden = track17Konfiguriert()
+  // Noch ohne Stand: wann fasst KRNL nach? (Job track17_nachfassen, sonst der stündliche Abruf)
+  const frisch = zeilen.filter((v) => v.status === 'registriert' || v.status === 'nicht_gefunden').map((v) => v.id)
+  const nachfassen = new Map<string, string>()
+  if (frisch.length > 0) {
+    const jobs = await sql<{ verfolgung_id: string; am: string }[]>`
+      select payload ->> 'verfolgung_id' as verfolgung_id, min(next_run_at)::text as am
+      from integration_jobs
+      where kind = 'track17_nachfassen' and status = 'pending' and payload ->> 'verfolgung_id' in ${sql(frisch)}
+      group by 1`
+    for (const j of jobs) nachfassen.set(j.verfolgung_id, j.am)
+  }
 
   return (
     <div className="display-panel" style={{ marginTop: 10 }}>
@@ -92,6 +104,18 @@ export async function Sendungsverfolgung({
               <span className="muted"> · wird nicht mehr abgefragt</span>
             )}
             {v.letztes_ereignis && <div className="muted">{ereignisText(v.letztes_ereignis)}</div>}
+            {v.aktiv && (v.status === 'registriert' || v.status === 'nicht_gefunden') && (
+              <div className="muted">
+                {v.status === 'registriert'
+                  ? '17TRACK sammelt noch — nach der Anmeldung dauert das meist wenige Minuten.'
+                  : 'Der Carrier kennt die Nummer noch nicht — oft erst, wenn das Paket abgeholt ist.'}{' '}
+                Nächste Abfrage{' '}
+                {nachfassen.get(v.id)
+                  ? `um ${dateTime(nachfassen.get(v.id))}`
+                  : 'spätestens in einer Stunde (stündlicher Abruf)'}
+                {' — oder „Jetzt abfragen".'}
+              </div>
+            )}
             {v.registrierung_fehler && <div style={{ color: 'var(--danger)' }}>{v.registrierung_fehler}</div>}
             {v.registriert_am && (
               <div className="muted small">

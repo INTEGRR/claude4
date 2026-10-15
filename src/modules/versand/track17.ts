@@ -134,8 +134,12 @@ export async function nummernAnmelden(
   if (process.env.TRACK17_FAKE === '1') {
     return (await import('./track17-fake')).fakeNummernAnmelden(eintraege)
   }
+  // lang „de": Carrier mit offizieller deutscher Sprache (DHL, DPD, …)
+  // liefern ihre Ereignisse auf Deutsch — die Texte, die auch die
+  // DHL-Seite zeigt. Andere bleiben in ihrer Standardsprache.
   const body = eintraege.map((e) => ({
     number: e.nummer,
+    lang: 'de',
     ...(e.carrier ? { carrier: e.carrier } : { auto_detection: true }),
     ...(e.tag ? { tag: e.tag.slice(0, 100) } : {}),
   }))

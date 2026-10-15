@@ -124,6 +124,13 @@ export const JOB_KATALOG = {
       'und holt den ersten Stand; danach kommen Statuswechsel per Webhook und stündlichem Abruf (0112).',
     faehigkeit: 'tracking:anmelden',
   },
+  track17_nachfassen: {
+    label: 'Zulauf-Sendung nachfassen',
+    beschreibung:
+      'Holt den ersten Stand, solange 17TRACK nach der Anmeldung noch sammelt — nach 5, 15 und 45 Minuten; ' +
+      'danach fragt der stündliche Abruf weiter (0112).',
+    faehigkeit: 'tracking:nachfassen',
+  },
   ki_mail_triage: {
     label: 'Eingehende Mail sichten (KI)',
     beschreibung:

@@ -2,8 +2,10 @@ import type { Sql, TransactionSql } from 'postgres'
 import { sql } from '@/db/client'
 import type { AktionsErgebnis } from '@/modules/prozesse/registry/typen'
 import {
+  ABRUF_ABSTAND_FRISCH_MINUTEN,
   ABRUF_ABSTAND_STUNDEN,
   BEREITS_ANGEMELDET,
+  NACHFASSEN_MINUTEN,
   type Ereignis,
   STAPEL_MAX,
   type Track17Eintrag,
@@ -239,10 +241,53 @@ async function anmelden(v: Verfolgung): Promise<Anmeldung> {
   const [frisch] = await sql<Verfolgung[]>`select ${spalten(sql)} from sendungsverfolgung where id = ${v.id}`
   const staende = await staendeAbfragen([{ nummer: v.nummer, carrier: frisch.carrier_code }])
   const eintrag = staende.get(v.nummer)
+  // Direkt nach der Anmeldung hat 17TRACK meist noch nichts (-18019909) —
+  // dann wird nachgefasst, statt sechs Stunden auf den Cron zu warten.
   const stand = eintrag ? await standUebernehmen(sql, frisch, eintrag, 'registrierung') : null
+  const nachfassen = eintrag ? null : await nachfassenEinreihen(sql, v.id, 0)
+  const zusatz = stand ? ` — ${stand.text}` : ` — ${sammeltNochText(nachfassen)}`
   await sql`select log_event(${v.modell}, ${v.record_id}, 'info',
-    ${`Sendung ${bezeichnung(frisch)} bei 17TRACK angemeldet${stand ? ` — ${stand.text}` : ''}`}, 'track17')`
-  return { text: `${v.nummer} angemeldet${stand ? ` — ${stand.text}` : ''}`, ergebnis: 'angemeldet' }
+    ${`Sendung ${bezeichnung(frisch)} bei 17TRACK angemeldet${zusatz}`}, 'track17')`
+  return { text: `${v.nummer} angemeldet${zusatz}`, ergebnis: 'angemeldet' }
+}
+
+function sammeltNochText(nachfassenInMinuten: number | null): string {
+  return nachfassenInMinuten
+    ? `17TRACK sammelt noch, KRNL fasst in ${nachfassenInMinuten} Minuten nach`
+    : '17TRACK sammelt noch, der stündliche Abruf fragt weiter'
+}
+
+/**
+ * Nachfassen einreihen (Versuch 0, 1, 2 → nach 5, 15, 45 Minuten). Liefert
+ * die Minuten bis zum Versuch oder null, wenn die Reihe erschöpft ist —
+ * dann trägt der stündliche Abruf (frische Sendungen jede Stunde).
+ */
+export async function nachfassenEinreihen(db: Db, verfolgungId: string, versuch: number): Promise<number | null> {
+  const minuten = NACHFASSEN_MINUTEN[versuch]
+  if (!minuten) return null
+  await db`
+    insert into integration_jobs (kind, payload, dedupe_key, next_run_at)
+    values ('track17_nachfassen', ${db.json({ verfolgung_id: verfolgungId, versuch })},
+            ${`track17-nachfassen:${verfolgungId}:${versuch}`}, now() + make_interval(mins => ${minuten}))
+    on conflict (dedupe_key) do nothing`
+  return minuten
+}
+
+/** Job `track17_nachfassen`: den ersten Stand holen, solange 17TRACK noch sammelt. */
+export async function verfolgungNachfassen(verfolgungId: string, versuch: number): Promise<string> {
+  const [v] = await sql<Verfolgung[]>`select ${spalten(sql)} from sendungsverfolgung where id = ${verfolgungId}`
+  if (!v) return 'Verfolgung nicht mehr vorhanden'
+  if (!v.aktiv) return `${v.nummer}: nicht mehr aktiv`
+  if (v.status !== 'registriert' && v.status !== 'nicht_gefunden') return `${v.nummer}: Stand liegt vor (${v.status})`
+  const staende = await staendeAbfragen([{ nummer: v.nummer, carrier: v.carrier_code }])
+  const eintrag = staende.get(v.nummer)
+  if (eintrag) {
+    const stand = await standUebernehmen(sql, v, eintrag, 'abruf')
+    return `${v.nummer}: ${stand.text}`
+  }
+  await sql`update sendungsverfolgung set zuletzt_abgefragt_am = now(), zuletzt_abgefragt_via = 'abruf' where id = ${v.id}`
+  const naechster = await nachfassenEinreihen(sql, v.id, versuch + 1)
+  return `${v.nummer}: noch keine Daten — ${naechster ? `nächster Versuch in ${naechster} Minuten` : 'weiter im stündlichen Abruf'}`
 }
 
 /**
@@ -280,7 +325,11 @@ export async function verfolgungAbrufen(
   const rows = await sql<Verfolgung[]>`
     select ${spalten(sql)} from sendungsverfolgung
     where aktiv and registriert_am is not null
-      and (zuletzt_abgefragt_am is null or zuletzt_abgefragt_am < now() - make_interval(hours => ${ABRUF_ABSTAND_STUNDEN}))
+      and (zuletzt_abgefragt_am is null
+           or zuletzt_abgefragt_am < now() - make_interval(hours => ${ABRUF_ABSTAND_STUNDEN})
+           -- noch ohne Stand: jede Stunde, nicht erst nach sechs
+           or (status in ('registriert', 'nicht_gefunden')
+               and zuletzt_abgefragt_am < now() - make_interval(mins => ${ABRUF_ABSTAND_FRISCH_MINUTEN})))
     order by zuletzt_abgefragt_am nulls first
     limit ${Math.min(limit, STAPEL_MAX)}`
   if (rows.length === 0) return { checked: 0, updated: 0, nachgemeldet: nachzumelden.length }
@@ -386,7 +435,8 @@ export async function verfolgungJetztAbfragen(
     const eintrag = staende.get(aktuell.nummer)
     if (!eintrag) {
       await sql`update sendungsverfolgung set zuletzt_abgefragt_am = now(), zuletzt_abgefragt_via = 'manuell' where id = ${aktuell.id}`
-      text = `${bezeichnung(aktuell)}: 17TRACK kennt die Nummer (noch) nicht`
+      const nachfassen = await nachfassenEinreihen(sql, aktuell.id, 0)
+      text = `${bezeichnung(aktuell)}: noch keine Daten — ${sammeltNochText(nachfassen)}`
     } else {
       const stand = await standUebernehmen(sql, aktuell, eintrag, 'manuell')
       text = `${bezeichnung(aktuell)}: ${stand.text}`
