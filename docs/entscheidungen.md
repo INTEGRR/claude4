@@ -9,6 +9,37 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Abnahmetest: drei Monate vorher gerechnet, live wiederholt, Feld für Feld verglichen
+
+**Anlass (Betreiber):** „Das ist der letzte Test" — für jeden Beleg und
+Prozessschritt über mehrere Monate vorher ausrechnen, wo welcher Wert
+stehen muss (Bestand, Kosten, Umsätze, Cashflow, Verträge, die an Shopify
+übergebenen Mengen), dann live im System wiederholen und vergleichen.
+
+**Entschieden:** Der Abnahmetest besteht aus zwei unabhängigen
+Rechnungen über denselben Plan. `tests/abnahme/szenario.ts` ist der Plan
+als Daten (97 Schritte, Monate relativ zum Lauftag); `modell.ts`
+rechnet ihn ohne Datenbank durch — mit den Rundungen der SQL-Funktionen
+nachgebaut, nicht importiert; `tests/prozesse/abnahme.test.ts` spielt ihn
+über Registry und Torwächter gegen eine frische Datenbank samt Shopify-,
+DHL- und 17TRACK-Attrappe nach und vergleicht am Ende jedes Monats jeden
+Wert des `Stand`-Objekts (`ist.ts` liest ihn über dieselben Funktionen wie
+die Oberfläche). Eine Abweichung macht die Suite rot und nennt Pfad, Soll
+und Ist für alle Felder zugleich. Teil des `npm run check`, dauert ~1 Min.
+
+**Was der erste Lauf fand (Modell korrigiert, Verhalten dokumentiert):**
+die Live-Reservierung (0086) gibt frei gewordene Ware auch an wartende
+MTO-Lieferungen, deren eigener Fertigungsauftrag trotzdem baut;
+Frachtzeilen werden nach Bestellmenge abgerechnet (0092); die Demontage
+prüft nur den Bestand, nicht die Reservierung; die Vorkasse der
+„Bestellung aus Beleg" steht ohne Bankkonto unter „Ohne Konto". Keine
+dieser Beobachtungen ist falsch gerechnet — ob die MTO-Reservierung und
+die Demontage-Prüfung so bleiben, ist eine Produktentscheidung (offen).
+
+**Wo:** `tests/abnahme/`, `tests/abnahme-modell.test.ts`,
+`tests/prozesse/abnahme.test.ts`; [abnahmetest.md](abnahmetest.md),
+[entwicklung.md](entwicklung.md) (Wächter-Tabelle).
+
 ## 2026-10-15 — Nachfragen an die Fertigung sind eine Projektion: der Abgleich legt sie nach
 
 **Anlass (Betreiber):** „Hab auf Abhaken geklickt, jetzt sind alle externen

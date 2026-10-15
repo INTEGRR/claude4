@@ -23,6 +23,10 @@ der [AGENTS.md](../AGENTS.md).
   `npm run check`, wie man eine Aktion hinzufügt, wie man eine Migration
   schreibt, wo die aktuelle Fassung einer SQL-Funktion steht, welche Wächter
   es gibt.
+- [abnahmetest.md](abnahmetest.md) — **der Abnahmetest**: Drei-Monats-Plan
+  über alle Belege, vorher im Modell gerechnet, live über die Registry
+  wiederholt, Feld für Feld verglichen (Bestand, Bewertung, Umsatz,
+  Cashflow, Verträge, Shopify-Mengen).
 - [code-review.md](code-review.md) — Zustand der Codebasis (08/2026):
   was gut ist, was behoben wurde, was zur Entscheidung ansteht.
 
