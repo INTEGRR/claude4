@@ -329,6 +329,7 @@ export const AUSFUEHRUNG = {
   'integrationen.historie_pruefen': integrationen.historiePruefenAktion,
   'integrationen.historie_importieren': integrationen.historieImportierenAktion,
   'integrationen.shopify_preise_nachziehen': integrationen.shopifyPreiseNachziehen,
+  'integrationen.versand_abgleichen': integrationen.versandAbgleichenAktion,
   'integrationen.odoo_vorschau': integrationen.odooVorschau,
   'integrationen.odoo_stuecklisten_uebernehmen': integrationen.odooStuecklistenUebernehmen,
   'integrationen.odoo_fertigbestand_zuruecknehmen': integrationen.odooFertigbestandZuruecknehmen,

@@ -58,6 +58,11 @@ async function runReconcile() {
   revalidatePath('/integrationen')
 }
 
+async function versandAbgleichenJetzt() {
+  'use server'
+  return serverAktion('integrationen.versand_abgleichen', {})
+}
+
 async function pushInventarJetzt() {
   'use server'
   await requireAdmin()
@@ -384,6 +389,7 @@ export default async function IntegrationenPage() {
             <ActionButton action={processWebhooks}>Webhooks verarbeiten</ActionButton>
             <ActionButton action={runJobs}>Jobs ausführen</ActionButton>
             <ActionButton action={runReconcile}>Mit Shopify abgleichen</ActionButton>
+            <ActionButton action={versandAbgleichenJetzt} linkOeffnen>Versand offener Shop-Aufträge prüfen</ActionButton>
           </>
         }
       />

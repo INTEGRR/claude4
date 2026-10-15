@@ -6,6 +6,11 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { createMo } from './actions'
 import { FertigungBulk } from './bulk'
 import { Auswahl } from '@/components/auswahl'
+import { ActionButton } from '@/components/action-button'
+import { aufgabeErledigen } from '@/app/(erp)/aufgaben/actions'
+import { aufgabenListe } from '@/modules/aufgaben/liste'
+import { NACHFRAGE_PRAEFIX, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
+import { date } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +21,7 @@ export default async function FertigungPage({
 }: {
   searchParams: Promise<{ status?: string; produkt?: string; material?: string; auftrag?: string }>
 }) {
-  await requireArea('fertigung')
+  const user = await requireArea('fertigung')
   const { status, produkt: produktRoh, material, auftrag: auftragRoh } = await searchParams
   // Das GET-Formular schickt produkt= auch leer mit — ''::uuid wäre ein 500.
   const produkt = produktRoh || undefined
@@ -99,6 +104,21 @@ export default async function FertigungPage({
     return query ? `/fertigung?${query}` : '/fertigung'
   }
 
+  // Versand außerhalb von KRNL (2026-10-15): der Shop hat versendet, der
+  // Fertigungsauftrag ist noch offen — die Nachfragen ans Team Fertigung,
+  // hier, wo entschieden wird (Fertig melden oder stornieren hakt sie ab).
+  const nachfragen = (await aufgabenListe(user, 'offen', 500)).filter(
+    (a) => a.rolle === 'fertigung' && a.titel.startsWith(NACHFRAGE_PRAEFIX),
+  )
+  const nachfrageNrn = [...new Set(nachfragen.flatMap((a) => nachfrageNummern(a.titel)))]
+  const nachfrageMos = nachfrageNrn.length
+    ? await sql<{ id: string; number: string; state: string; sales_order_id: string | null; auftrag: string | null }[]>`
+        select m.id, m.number, m.state, m.sales_order_id, so.number as auftrag
+        from manufacturing_orders m left join sales_orders so on so.id = m.sales_order_id
+        where m.number = any(${nachfrageNrn})`
+    : []
+  const moJeNummer = new Map(nachfrageMos.map((m) => [m.number, m]))
+
   const filters = [
     { key: undefined, label: 'Alle' },
     { key: 'confirmed', label: 'Bestätigt' },
@@ -113,6 +133,61 @@ export default async function FertigungPage({
         subtitle="Aufträge aus dem Verkauf (MTO) und manuell angelegte Aufträge"
         actions={<Link className="btn" href="/fertigung/demontage">Demontage</Link>}
       />
+
+      {nachfragen.length > 0 && (
+        <Card
+          title={`Extern versendet — Fertigung noch durchführen? (${nachfragen.length})`}
+          tight
+          actions={<Link className="btn small" href="/aufgaben?filter=offen">Alle Aufgaben</Link>}
+        >
+          <p className="small muted" style={{ margin: '10px 12px 6px' }}>
+            Der Shop meldet diese Aufträge als versendet (Sendcloud), KRNL hat den Warenausgang gebucht — der
+            Fertigungsauftrag ist aber noch offen. Wurde gebaut: <strong>Fertig melden</strong> (Material wird
+            verbraucht, Bestand des Erzeugnisses geht auf null). Nicht gebaut: <strong>stornieren</strong> und den
+            Bestand per Inventur korrigieren. Beides hakt die Nachfrage von selbst ab.
+          </p>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fertigungsauftrag</th>
+                  <th>Status</th>
+                  <th>Verkaufsauftrag</th>
+                  <th>Gemeldet</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {nachfragen.map((a) => {
+                  const mos = nachfrageNummern(a.titel).map((n) => moJeNummer.get(n) ?? { id: null, number: n, state: '?', sales_order_id: null, auftrag: null })
+                  return (
+                    <tr key={a.id}>
+                      <td className="mono">
+                        {mos.map((m, i) => (
+                          <span key={m.number}>
+                            {i > 0 ? ', ' : ''}
+                            {m.id ? <Link href={`/fertigung/${m.id}`}>{m.number}</Link> : m.number}
+                          </span>
+                        ))}
+                      </td>
+                      <td>{mos.map((m) => m.state).join(', ')}</td>
+                      <td className="mono">
+                        {mos[0]?.sales_order_id ? <Link href={`/verkauf/${mos[0].sales_order_id}`}>{mos[0].auftrag}</Link> : '—'}
+                      </td>
+                      <td className="small mono nowrap">{date(a.faellig_am)}</td>
+                      <td className="num">
+                        <ActionButton className="small" action={aufgabeErledigen.bind(null, a.id)} title="Nachfrage ohne Buchung schließen — z. B. wenn schon anders erledigt">
+                          Abhaken
+                        </ActionButton>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
 
       <Card title="Neuer Fertigungsauftrag">
         <ActionForm action={createMo}>

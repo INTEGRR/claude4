@@ -122,6 +122,21 @@ export const INTEGRATIONEN = {
     revalidate: ['/verkauf', '/auswertungen', '/integrationen'],
   },
 
+  'integrationen.versand_abgleichen': {
+    label: 'Versand offener Shop-Aufträge prüfen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Holt jeden Shop-Auftrag mit offener Lieferung und ohne eigene Sendung frisch aus dem Shop (lesend). ' +
+      'Hat der Shop ihn inzwischen versendet (Sendcloud), bucht KRNL den Warenausgang nach und legt bei ' +
+      'offenem Fertigungsauftrag die Nachfrage ans Team Fertigung an. Der Abgleich-Cron macht dasselbe ' +
+      'reihum mit zehn je Lauf — hier alle auf einmal (bis 200).',
+    bindung: 'frei',
+    schema: z.object({}),
+    revalidate: ['/integrationen', '/verkauf', '/fertigung', '/aufgaben'],
+  },
+
   // --- Odoo-Stücklisten (0090) ------------------------------------------------
 
   'integrationen.odoo_vorschau': {

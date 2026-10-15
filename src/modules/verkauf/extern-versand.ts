@@ -1,6 +1,7 @@
 import type { TransactionSql } from 'postgres'
 import type { ShopifyOrder } from '../integrationen/shopify.ts'
-import { externVersandAusShop, externVersandText, fertigungsNachfrage } from './extern-versand-logik.ts'
+import { NACHFRAGE_PRAEFIX, externVersandAusShop, externVersandText, fertigungsNachfrage, nachfrageNummern } from './extern-versand-logik.ts'
+import type { Sql } from 'postgres'
 
 /**
  * Versand außerhalb von KRNL nachziehen (2026-10-15): Sendcloud läuft
@@ -76,4 +77,42 @@ export async function externVersandNachziehen(
     nachfrage = `; Fertigung ${nummern} offen — Nachfrage als Aufgabe`
   }
   return `${auftrag.number}: im Shop versendet (${spur}) — ${lieferungen} gebucht${nachfrage}`
+}
+
+/**
+ * Fertigungsauftrag fertig gemeldet oder storniert: die Nachfrage „Extern
+ * versendet: Fertigung … noch durchführen?" ist damit beantwortet — sie
+ * wird abgehakt, sobald ALLE darin genannten Aufträge fertig oder
+ * storniert sind (die Antwort steht als Notiz). Niemand muss die Aufgabe
+ * zusätzlich von Hand schließen.
+ */
+export async function fertigungsNachfrageAbhaken(
+  db: Sql | TransactionSql,
+  moId: string,
+  actor: string,
+  antwort: 'fertig gemeldet' | 'storniert',
+): Promise<string[]> {
+  const [mo] = await db<{ number: string }[]>`select number from manufacturing_orders where id = ${moId}`
+  if (!mo) return []
+  const offen = await db<{ id: string; titel: string }[]>`
+    select id, titel from aufgaben
+    where status = 'offen' and rolle = 'fertigung' and titel like ${`${NACHFRAGE_PRAEFIX}%`}
+      and titel like ${`%${mo.number}%`}`
+  const erledigt: string[] = []
+  for (const a of offen) {
+    const nummern = nachfrageNummern(a.titel)
+    if (!nummern.includes(mo.number)) continue
+    const [{ offen: nochOffen }] = await db<{ offen: number }[]>`
+      select count(*)::int as offen from manufacturing_orders
+      where number = any(${nummern}) and state not in ('done', 'cancel')`
+    if (Number(nochOffen) > 0) continue
+    const notiz = `Fertigungsauftrag ${mo.number} ${antwort}`
+    const [fertig] = await db<{ id: string }[]>`
+      update aufgaben set status = 'erledigt', erledigt_am = now(), erledigt_von = ${actor}, notiz = ${notiz}
+      where id = ${a.id} and status = 'offen' returning id`
+    if (!fertig) continue
+    await db`select log_event('aufgabe', ${a.id}, 'info', ${`Erledigt: ${a.titel} — ${notiz}`}, ${actor})`
+    erledigt.push(a.titel)
+  }
+  return erledigt
 }

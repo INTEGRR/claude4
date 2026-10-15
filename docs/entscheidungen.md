@@ -9,6 +9,52 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Extern versendete Shop-Aufträge: alle offenen prüfen, Nachfragen dort, wo entschieden wird
+
+**Anlass (Betreiber):** „Wo sehe ich jetzt die Fertigungsaufträge, die ich
+abhaken kann? Ich bin Admin, sehe aber nicht die, die aus Shopify erledigt
+sein müssten." Befund in Produktion: drei Nachfragen lagen unter Aufgaben →
+„Alle offenen" (Team Fertigung — „Meine" zeigt nur eigene Teams), 18
+weitere Shop-Aufträge waren **vor** der Umstellung versendet worden, und
+der Abgleich nach `updated_at` sieht sie nie wieder.
+
+**Entschieden:**
+- **Versand-Abgleich offener Shop-Aufträge** (`versandAbgleichen`): jeder
+  Shop-Auftrag mit offener Lieferung und ohne eigene Sendung wird einzeln
+  frisch aus dem Shop geholt; der Cron nimmt reihum zehn je Lauf (Cursor),
+  der Monitor-Knopf alle. Das ist das Sicherheitsnetz, das `updated_at`
+  nicht sein kann.
+- **Nachfragen stehen auf `/fertigung`**, nicht nur unter Aufgaben: Karte
+  „Extern versendet — Fertigung noch durchführen?" mit Fertigungsauftrag,
+  Status, Verkaufsauftrag — dort, wo die Entscheidung fällt.
+- **Fertig melden / Stornieren hakt die Nachfrage ab** (mit Notiz, sobald
+  alle genannten Aufträge fertig oder storniert sind) — eine Entscheidung,
+  kein zweiter Klick.
+
+**Wo:** `integrationen/import.ts`, Registry `integrationen.versand_abgleichen`,
+`verkauf/extern-versand.ts` (fertigungsNachfrageAbhaken), Fertigungsseite,
+Fixture `shopify-versand.ts`; [module/integrationen.md](module/integrationen.md),
+[module/fertigung.md](module/fertigung.md), [module/verkauf.md](module/verkauf.md).
+
+## 2026-10-15 — Zulauf meldet sich per Telegram, wenn jemand handeln muss
+
+**Anlass (Betreiber):** „Das Paket ist heute angekommen bzw. abholbereit —
+warum keine Telegram-Nachricht?" Die Verfolgung stand nur in KRNL; wer
+nicht hinschaut, erfährt nichts.
+
+**Entschieden:** Die Zulauf-Sendungsverfolgung reiht bei den Zuständen,
+auf die jemand reagieren muss — **abholbereit, zugestellt, Zustellung
+fehlgeschlagen, Problem, abgelaufen** — eine Telegram-Meldung in die
+Benachrichtigungs-Outbox (Art `zulauf`, Migration 0114, Schalter unter
+Einstellungen → Benachrichtigungen, Standard an): Sendung, Beleg mit
+Lieferant, letztes Ereignis, Link. Genau einmal je Zustand (Schlüssel
+`zulauf:<verfolgung>:<status>`); Zwischenstände („unterwegs") bleiben
+stumm — das wäre Rauschen.
+
+**Wo:** `zulauf-verfolgung.ts` (standUebernehmen), `benachrichtigungen.ts`
+(textZulauf, Schalter), [module/integrationen.md](module/integrationen.md),
+[module/einkauf.md](module/einkauf.md).
+
 ## 2026-10-15 — 17TRACK-Kontingent schonen: Anmeldung von Hand als Standard
 
 **Anlass (Betreiber):** „200 sind free, ich will die erst nächstes Jahr

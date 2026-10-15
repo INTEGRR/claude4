@@ -397,6 +397,39 @@ async function belegNachKlaerung(ctx: FixtureKontext, sql: Sql): Promise<string>
   return picking.id
 }
 
+/**
+ * Versand VOR der Umstellung (2026-10-15): der Shop meldet erfüllt, aber kein
+ * Webhook kommt und der Abgleich nach updated_at sieht nichts — nur der
+ * Versand-Abgleich offener Shop-Aufträge (versandAbgleichen) holt es nach.
+ */
+export async function shopVersandNachholen(sql: Sql, auftragId: string): Promise<void> {
+  const [auftrag] = await sql<{ shopify_order_id: string }[]>`
+    select shopify_order_id from sales_orders where id = ${auftragId}`
+  assert.ok(auftrag?.shopify_order_id, 'kein Shop-Auftrag')
+  const gid = auftrag.shopify_order_id
+  const nummer = gid.split('/').pop()
+  const { fakeOrderHolen, fakeOrderHinterlegen } = await import('../../integrationen/shopify-fake.ts')
+  const bestellung = fakeOrderHolen(gid)
+  assert.ok(bestellung, `keine hinterlegte Fake-Bestellung ${gid}`)
+  fakeOrderHinterlegen({
+    ...bestellung,
+    displayFulfillmentStatus: 'FULFILLED',
+    fulfillments: [
+      {
+        id: `gid://shopify/Fulfillment/${nummer}`,
+        status: 'SUCCESS',
+        createdAt: '2026-10-10T09:00:00Z',
+        trackingInfo: [{ company: 'DHL', number: `JJD0146000031${nummer}`, url: null }],
+      },
+    ],
+  } as { id: string })
+  const { versandAbgleichen } = await import('../../integrationen/import.ts')
+  const r = await versandAbgleichen(10)
+  assert.ok(r.geprueft >= 1, 'der Abgleich muss den offenen Shop-Auftrag prüfen')
+  assert.ok(r.nachgezogen >= 1, `der Abgleich muss den Versand nachziehen: ${JSON.stringify(r)}`)
+  assert.equal(r.fehler, 0)
+}
+
 export const SHOPIFY_VERSAND: ProzessFixture = {
   prozess: 'shopify_bestellung_versand',
   benoetigt: ['basis'],
@@ -693,6 +726,50 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
           select coalesce(sum(qty_kommissioniert), 0)::float as gesammelt
           from stock_moves where picking_id = ${pickingId}`
         assert.equal(Number(gesammelt), 2)
+      },
+    },
+    {
+      name: 'vor der Umstellung versendet: der Versand-Abgleich holt nach, Fertig melden hakt die Nachfrage ab',
+      pfad: ['bestellung', 'shop_versendet'],
+      ereignisse: {
+        bestellung: mtoBestellungEinspeisen,
+        shop_versendet: (ctx, sql) => shopVersandNachholen(sql, ctx.p4MtoAuftragId),
+      },
+      pruefen: async (sql, ctx, pickingId) => {
+        const [picking] = await sql<{ state: string; extern_versand: { nummer: string } | null }[]>`
+          select state, extern_versand from stock_pickings where id = ${pickingId}`
+        assert.equal(picking.state, 'done', 'der Abgleich bucht den Warenausgang')
+        assert.match(picking.extern_versand?.nummer ?? '', /^JJD0146000031/)
+        const [mo] = await sql<{ number: string; state: string }[]>`
+          select number, state from manufacturing_orders where id = ${ctx.p4MtoMoId}`
+        assert.equal(mo.state, 'confirmed', 'der Fertigungsauftrag bleibt offen — Nachfrage')
+        const nachfrage = () => sql<{ id: string; status: string; notiz: string | null; erledigt_von: string | null }[]>`
+          select id, status::text as status, notiz, erledigt_von from aufgaben
+          where rolle = 'fertigung' and titel like ${`Extern versendet: Fertigung ${mo.number} zu %`}`
+        let [a] = await nachfrage()
+        assert.equal(a?.status, 'offen', 'die Nachfrage ans Team Fertigung muss offen sein')
+
+        // Zweiter Abgleich: nichts mehr offen → nichts nachzuziehen, keine zweite Nachfrage.
+        const { versandAbgleichen } = await import('../../integrationen/import.ts')
+        const r2 = await versandAbgleichen(10)
+        assert.equal(r2.nachgezogen, 0)
+        assert.equal((await nachfrage()).length, 1)
+
+        // Fertig melden beantwortet die Nachfrage — abgehakt mit Notiz, von selbst.
+        const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+        const f = await aktionAusfuehrenGeprueft(
+          'fertigung.fertig_melden',
+          { parameter: { mengen: {}, backorder: true }, recordId: ctx.p4MtoMoId },
+          { name: 'prozesstest', role: 'admin' },
+        )
+        assert.match(f.text ?? '', /ist abgehakt/)
+        ;[a] = await nachfrage()
+        assert.equal(a.status, 'erledigt')
+        assert.equal(a.erledigt_von, 'prozesstest')
+        assert.equal(a.notiz, `Fertigungsauftrag ${mo.number} fertig gemeldet`)
+        const [{ on_hand }] = await sql<{ on_hand: number }[]>`
+          select on_hand_qty(pv.id) as on_hand from product_variants pv where pv.sku = ${ctx.p4MtoSku}`
+        assert.equal(Number(on_hand), 0, 'Erzeugnis: extern raus (−1) und gebaut (+1) = 0')
       },
     },
   ],

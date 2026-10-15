@@ -267,3 +267,19 @@ export async function odooArtikelZusammenfuehren(
     daten: { ...b },
   }
 }
+
+/** Versand-Abgleich aller offenen Shop-Aufträge (2026-10-15) — Logik in integrationen/import.ts. */
+export async function versandAbgleichenAktion(): Promise<AktionsErgebnis> {
+  const { versandAbgleichen } = await import('@/modules/integrationen/import')
+  const r = await versandAbgleichen(200)
+  if (r.geprueft === 0) return { text: 'Kein offener Shop-Auftrag ohne eigene Sendung — nichts zu prüfen.' }
+  const teile = [
+    `${r.geprueft} offene Shop-Aufträge geprüft`,
+    r.nachgezogen ? `${r.nachgezogen} im Shop versendet → nachgezogen` : 'keiner im Shop versendet',
+    r.fehler ? `${r.fehler} Fehler` : null,
+  ].filter(Boolean)
+  return {
+    text: `${teile.join(', ')}.${r.meldungen.length ? ` ${r.meldungen.slice(0, 8).join(' · ')}${r.meldungen.length > 8 ? ' · …' : ''}` : ''}`,
+    link: r.nachgezogen ? '/fertigung' : undefined,
+  }
+}

@@ -16,9 +16,11 @@ import {
   standText,
   trackStandLesen,
   verfolgungAktiv,
+  zeitKurz,
 } from './track17-logik'
 import { type Abgelehnt, type Angemeldet, Track17Error, nummernAnmelden, staendeAbfragen, track17Konfiguriert } from './track17'
 import { automatischAnmelden, kontingentMerken, kontingentStandLesen } from './track17-einstellung'
+import { einreihen, textZulauf } from '@/modules/integrationen/benachrichtigungen'
 
 type Db = Sql | TransactionSql
 
@@ -186,8 +188,46 @@ export async function standUebernehmen(
     const name = bezeichnung({ carrier: stand.carrierName ?? v.carrier, nummer: v.nummer })
     await db`select log_event(${v.modell}, ${v.record_id}, ${protokollArt(stand.status)},
       ${`Sendung ${name}: ${text}`}, 'track17')`
+    // Telegram (0114): die Zustände, auf die jemand reagieren muss — Paket
+    // holen, Wareneingang buchen, beim Carrier nachhaken. Einmal je Zustand.
+    if (stand.status !== v.status && MELDEN.has(stand.status)) {
+      const beleg = await belegBezeichnung(db, v)
+      await einreihen(
+        db,
+        'zulauf',
+        `zulauf:${v.id}:${stand.status}`,
+        textZulauf({
+          status: stand.status as Parameters<typeof textZulauf>[0]['status'],
+          sendung: name,
+          beleg: beleg.text,
+          lieferant: beleg.lieferant,
+          ereignis: neu ? [neu.ort, neu.zeit ? zeitKurz(neu.zeit) : null].filter(Boolean).join(', ') + (neu.text ? `: ${neu.text}` : '') : null,
+          link: beleg.link,
+        }),
+      )
+    }
   }
   return { geaendert, text }
+}
+
+const MELDEN = new Set<VerfolgungStatus>(['abholbereit', 'zugestellt', 'zustellung_fehlgeschlagen', 'problem', 'abgelaufen'])
+
+/** „P00032 (Shenzhen DingShuo)" bzw. „ES/00003 Luftfracht Oktober" samt Link für die Meldung. */
+async function belegBezeichnung(db: Db, v: Verfolgung): Promise<{ text: string; lieferant: string | null; link: string | null }> {
+  const basis = process.env.ERP_PUBLIC_URL?.replace(/\/+$/, '') ?? null
+  if (v.modell === 'purchase_order') {
+    const [po] = await db<{ number: string; lieferant: string | null }[]>`
+      select po.number, p.name as lieferant from purchase_orders po left join partners p on p.id = po.vendor_id
+      where po.id = ${v.record_id}`
+    return { text: po?.number ?? 'Bestellung', lieferant: po?.lieferant ?? null, link: basis ? `${basis}/einkauf/${v.record_id}` : null }
+  }
+  const [es] = await db<{ nummer: string; bezeichnung: string | null }[]>`
+    select nummer, bezeichnung from eingangs_sendungen where id = ${v.record_id}`
+  return {
+    text: es ? `${es.nummer}${es.bezeichnung ? ` ${es.bezeichnung}` : ''}` : 'Eingangssendung',
+    lieferant: null,
+    link: basis ? `${basis}/einkauf/sendungen/${v.record_id}` : null,
+  }
 }
 
 interface Anmeldung {

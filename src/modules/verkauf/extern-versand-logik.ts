@@ -69,3 +69,12 @@ export function fertigungsNachfrage(
       `Fertigung: ${mos.map((m) => `/fertigung/${m.id}`).join(', ')} · Auftrag: /verkauf/${auftrag.id}`,
   }
 }
+
+/** Titel-Präfix der Nachfrage — zugleich der Schlüssel, um sie wiederzufinden. */
+export const NACHFRAGE_PRAEFIX = 'Extern versendet: Fertigung '
+
+/** „Extern versendet: Fertigung FA/0418, FA/0419 zu S00042 (#5012) noch durchführen?" → ['FA/0418', 'FA/0419'] */
+export function nachfrageNummern(titel: string): string[] {
+  const m = /^Extern versendet: Fertigung (.+?) zu \S+/.exec(titel)
+  return m ? m[1].split(',').map((n) => n.trim()).filter(Boolean) : []
+}

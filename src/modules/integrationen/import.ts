@@ -586,7 +586,12 @@ export async function retryWebhookEvent(eventId: string): Promise<void> {
  * Abgleich mit Shopify als Sicherheitsnetz: holt geänderte Orders und legt
  * fehlende an. Fängt Webhooks ab, die nie ankamen.
  */
-export async function reconcileOrders(): Promise<{ checked: number; imported: number; mehr: boolean }> {
+export async function reconcileOrders(): Promise<{
+  checked: number
+  imported: number
+  mehr: boolean
+  versand: Awaited<ReturnType<typeof versandAbgleichen>>
+}> {
   const [state] = await sql<{ value: string }[]>`
     select value #>> '{}' as value from shopify_sync_state where key = 'last_reconciliation_at'`
   const since = new Date(state?.value ?? Date.now() - 24 * 60 * 60 * 1000)
@@ -611,7 +616,68 @@ export async function reconcileOrders(): Promise<{ checked: number; imported: nu
     values ('last_reconciliation_at', to_jsonb(${marke}::text))
     on conflict (key) do update set value = excluded.value, updated_at = now()`
 
-  return { checked: orders.length, imported, mehr }
+  // Sicherheitsnetz für den Versand außerhalb von KRNL (2026-10-15): ein
+  // Stapel offener Shop-Aufträge je Lauf, reihum — fängt alles, was der
+  // Abgleich nach updated_at nie sieht (vor der Umstellung versendet).
+  const versand = await versandAbgleichen(10)
+
+  return { checked: orders.length, imported, mehr, versand }
+}
+
+/**
+ * Versand-Abgleich offener Shop-Aufträge (2026-10-15): jeder Auftrag mit
+ * offener Lieferung und ohne eigene Sendung wird einzeln frisch aus dem
+ * Shop geholt — hat der Shop ihn inzwischen versendet (Sendcloud), zieht
+ * importShopifyOrder nach (Warenausgang, Nachfrage an die Fertigung).
+ * Reihum über einen Cursor (shopify_sync_state 'versand_abgleich_cursor'),
+ * damit der Cron mit kleinem Stapel alle erreicht; „Versand offener
+ * Shop-Aufträge prüfen" im Monitor nimmt alle auf einmal.
+ */
+export async function versandAbgleichen(
+  limit = 10,
+): Promise<{ geprueft: number; nachgezogen: number; fehler: number; meldungen: string[] }> {
+  const [cursorRow] = await sql<{ value: string | null }[]>`
+    select value #>> '{}' as value from shopify_sync_state where key = 'versand_abgleich_cursor'`
+  const cursor = cursorRow?.value ?? ''
+  const offene = (ab: string) => sql<{ id: string; number: string; shopify_order_id: string }[]>`
+    select so.id, so.number, so.shopify_order_id
+    from sales_orders so
+    where so.shopify_order_id is not null and so.state not in ('draft', 'cancel')
+      and exists (select 1 from stock_pickings p
+                  where p.origin_model = 'sales_order' and p.origin_id = so.id and p.state not in ('done', 'cancel'))
+      and not exists (select 1 from shipments s join stock_pickings sp on sp.id = s.picking_id
+                      where sp.origin_model = 'sales_order' and sp.origin_id = so.id and s.state <> 'cancelled')
+      and so.number > ${ab}
+    order by so.number
+    limit ${limit}`
+  let stapel = await offene(cursor)
+  // Ende der Runde erreicht: von vorn — derselbe Lauf nimmt den Anfang mit.
+  if (stapel.length === 0 && cursor) stapel = await offene('')
+
+  const { fetchOrder } = await import('./shopify')
+  let nachgezogen = 0
+  let fehler = 0
+  const meldungen: string[] = []
+  for (const so of stapel) {
+    try {
+      const order = await fetchOrder(so.shopify_order_id)
+      if (!order) continue
+      const r = await importShopifyOrder(order)
+      if (/im Shop versendet/.test(r.message)) {
+        nachgezogen++
+        meldungen.push(r.message)
+      }
+    } catch (err) {
+      fehler++
+      meldungen.push(`${so.number}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  const neuerCursor = stapel.length < limit ? '' : (stapel.at(-1)?.number ?? '')
+  await sql`
+    insert into shopify_sync_state (key, value)
+    values ('versand_abgleich_cursor', to_jsonb(${neuerCursor}::text))
+    on conflict (key) do update set value = excluded.value, updated_at = now()`
+  return { geprueft: stapel.length, nachgezogen, fehler, meldungen }
 }
 
 /** Holt genau eine Bestellung frisch von Shopify und importiert sie. */

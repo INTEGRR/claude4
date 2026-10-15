@@ -140,6 +140,16 @@ describe('Zulauf-Sendungsverfolgung (17TRACK)', () => {
     assert.ok(v.zugestellt_am)
     const log = await protokoll('purchase_order', poId)
     assert.ok(log.some((l) => l.kind === 'state' && /Zugestellt — Berlin, 15.10. 09:30/.test(l.message)))
+    // Telegram (0114): genau eine Meldung je Zustand, mit Beleg und Ereignis.
+    const [tg] = await h.sql<{ art: string; text: string; status: string }[]>`
+      select art, text, status from benachrichtigungen where schluessel = ${`zulauf:${v.id}:zugestellt`}`
+    assert.equal(tg?.art, 'zulauf')
+    assert.match(tg.text, /Zulauf zugestellt/)
+    assert.match(tg.text, new RegExp(`${NR} zu P\\d+ \\(Zulauf Lieferant\\)`))
+    assert.match(tg.text, /Berlin, 15.10. 09:30: Zugestellt/)
+    assert.equal(await webhookVerarbeiten(payload), '1 Sendung(en) aktualisiert', 'derselbe Push noch einmal')
+    const [{ n: tgN }] = await h.sql<{ n: number }[]>`select count(*)::int as n from benachrichtigungen where art = 'zulauf' and schluessel like ${`zulauf:${v.id}:%`}`
+    assert.equal(Number(tgN), 1, 'kein zweites Telegram für denselben Zustand')
 
     assert.equal(await webhookVerarbeiten({ event: 'TRACKING_UPDATED', data: fakeEintrag('UNBEKANNT1', null) }), '1 Nummer(n) unbekannt — ignoriert')
     assert.equal(await webhookVerarbeiten({ event: 'TRACKING_UPDATED', data: {} }), 'ohne Sendungsnummer — ignoriert')
@@ -267,6 +277,8 @@ describe('Zulauf-Sendungsverfolgung (17TRACK)', () => {
     assert.equal(z.status, 'abholbereit')
     assert.equal(z.letztes_ereignis?.text, 'Die Sendung liegt in der Packstation zur Abholung bereit.')
     assert.equal((await offen()).length, 0, 'keine weitere Nachfassung')
+    const [tgAbhol] = await sql<{ text: string }[]>`select text from benachrichtigungen where schluessel = ${`zulauf:${z.id}:abholbereit`}`
+    assert.match(tgAbhol?.text ?? '', /Zulauf abholbereit.*DHLNEU0001/s)
     const log2 = await protokoll('purchase_order', po.recordId!)
     assert.ok(log2.some((l) => /Abholbereit — Berlin, 14.10. 15:38: Die Sendung liegt in der Packstation/.test(l.message)))
 

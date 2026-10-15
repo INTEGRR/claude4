@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { externVersandAusShop, externVersandText, fertigungsNachfrage } from '../src/modules/verkauf/extern-versand-logik.ts'
+import { externVersandAusShop, externVersandText, fertigungsNachfrage, nachfrageNummern } from '../src/modules/verkauf/extern-versand-logik.ts'
 import { EREIGNISSE } from '../src/modules/prozesse/ereignisse.ts'
 
 /**
@@ -70,5 +70,7 @@ describe('Versand außerhalb von KRNL: Nachfrage an die Fertigung', () => {
     assert.match(n.beschreibung, /\/fertigung\/m1, \/fertigung\/m2/)
     assert.match(n.beschreibung, /\/verkauf\/a1/)
     assert.ok(n.titel.length <= 200, 'Aufgaben-Titel sind auf 200 Zeichen begrenzt')
+    assert.deepEqual(nachfrageNummern(n.titel), ['FA/0418', 'FA/0419'], 'der Titel ist der Schlüssel zum Abhaken')
+    assert.deepEqual(nachfrageNummern('Lager fegen'), [])
   })
 })

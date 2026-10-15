@@ -11,7 +11,7 @@ import { telegramSicher } from './telegram.ts'
 
 type Db = Sql | TransactionSql
 
-export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf'
+export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf'
 
 export interface Schalter {
   logins: boolean
@@ -20,14 +20,17 @@ export interface Schalter {
   dienste: boolean
   /** Tägliche Einkaufs-Zusammenfassung je Einkäufer (0108). */
   einkauf: boolean
+  /** Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen, Problem (0114). */
+  zulauf: boolean
 }
-export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true }
+export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true }
 export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   logins: 'Jede erfolgreiche Anmeldung (wer, wann, IP, Gerät, Methode)',
   fehlversuche: 'Fehlversuche und Kontosperren (gebündelt je Konto und Viertelstunde)',
   jobs: 'Endgültig fehlgeschlagene Jobs der Outbox',
   dienste: 'Störungen und Entstörungen externer Dienste (Dienste-Wächter)',
   einkauf: 'Tägliche Einkaufs-Zusammenfassung je Einkäufer (Überfälliges, fehlende Dokumente und Rechnungen, Raten, ETA)',
+  zulauf: 'Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen oder Problem (17TRACK)',
 }
 
 /** Fehlversuche desselben Kontos werden je Viertelstunde zu einer Nachricht. */
@@ -51,6 +54,7 @@ export async function schalter(db: Db): Promise<Schalter> {
     jobs: v.jobs !== false,
     dienste: v.dienste !== false,
     einkauf: v.einkauf !== false,
+    zulauf: v.zulauf !== false,
   }
 }
 
@@ -67,6 +71,8 @@ export function artErlaubt(art: BenachrichtigungsArt, s: Schalter): boolean {
       return s.dienste
     case 'einkauf':
       return s.einkauf
+    case 'zulauf':
+      return s.zulauf
     default:
       return true
   }
@@ -173,6 +179,34 @@ export function textDienst(p: {
     )
   }
   return `🟢 <b>${telegramSicher(p.label)} wieder erreichbar</b> — Störung ${p.dauerMinuten ?? 0} min (seit ${zeitFormat(p.seit)})`
+}
+
+/** Zulauf-Sendung (0114): „📦 Abholbereit — DHL 0034… zu P00032 (Shenzhen DingShuo): Packstation Berlin, 14.10. 15:38". */
+export function textZulauf(p: {
+  status: 'abholbereit' | 'zugestellt' | 'zustellung_fehlgeschlagen' | 'problem' | 'abgelaufen'
+  sendung: string
+  beleg: string
+  lieferant?: string | null
+  ereignis?: string | null
+  link?: string | null
+}): string {
+  const symbol = p.status === 'zugestellt' ? '📦' : p.status === 'abholbereit' ? '📬' : '⚠️'
+  const titel =
+    p.status === 'zugestellt'
+      ? 'Zulauf zugestellt'
+      : p.status === 'abholbereit'
+        ? 'Zulauf abholbereit'
+        : p.status === 'zustellung_fehlgeschlagen'
+          ? 'Zulauf: Zustellung fehlgeschlagen'
+          : p.status === 'abgelaufen'
+            ? 'Zulauf: Verfolgung abgelaufen'
+            : 'Zulauf: Problem mit der Sendung'
+  const wer = p.lieferant ? ` (${telegramSicher(p.lieferant)})` : ''
+  return (
+    `${symbol} <b>${titel}</b> — ${telegramSicher(p.sendung)} zu ${telegramSicher(p.beleg)}${wer}` +
+    (p.ereignis ? `\n${telegramSicher(p.ereignis.slice(0, 300))}` : '') +
+    (p.link ? `\n${p.link}` : '')
+  )
 }
 
 export function textTest(): string {

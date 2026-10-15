@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { varianteAufloesen } from './aufloesen.ts'
+import { fertigungsNachfrageAbhaken } from '@/modules/verkauf/extern-versand'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 
 /** Ausführung der Fertigungs-Aktionen — Fachlogik unverändert aus fertigung/actions.ts. */
@@ -188,12 +189,16 @@ export async function fertigMelden(
 ): Promise<AktionsErgebnis> {
   await sql`select mo_produce(${ctx.recordId!}, ${p.qty ?? null}, ${sql.json(p.mengen)},
     ${p.backorder}, ${ctx.actor}, ${p.lot ?? null})`
-  return { recordId: ctx.recordId }
+  // Versand außerhalb von KRNL (2026-10-15): die Nachfrage ans Team Fertigung
+  // ist damit beantwortet — sie wird abgehakt, keiner muss sie extra schließen.
+  const nachfragen = await fertigungsNachfrageAbhaken(sql, ctx.recordId!, ctx.actor, 'fertig gemeldet')
+  return { recordId: ctx.recordId, text: nachfragen.length ? 'Fertig gemeldet — die Nachfrage „Extern versendet" ist abgehakt.' : undefined }
 }
 
 export async function stornieren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select mo_cancel(${ctx.recordId!}, ${ctx.actor})`
-  return { recordId: ctx.recordId }
+  const nachfragen = await fertigungsNachfrageAbhaken(sql, ctx.recordId!, ctx.actor, 'storniert')
+  return { recordId: ctx.recordId, text: nachfragen.length ? 'Storniert — die Nachfrage „Extern versendet" ist abgehakt; Bestand des Erzeugnisses per Inventur prüfen.' : undefined }
 }
 
 // --- Arbeitsgänge am Auftrag ------------------------------------------------

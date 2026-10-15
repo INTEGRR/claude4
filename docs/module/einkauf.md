@@ -135,6 +135,11 @@ für alle Carrier; Entscheidungslog 2026-10-15), Tabelle
   Zustellung, Zustellung fehlgeschlagen, Zugestellt, Problem, Abgelaufen.
   Zugestellt/abgelaufen beendet die Verfolgung. Jede Änderung ist ein
   Protokolleintrag am Beleg (Actor `track17`).
+- **Telegram (0114):** abholbereit, zugestellt, Zustellung fehlgeschlagen,
+  Problem und abgelaufen gehen als Nachricht an den Betreiber-Kanal
+  (Benachrichtigungsart `zulauf`, Schalter unter Einstellungen →
+  Benachrichtigungen) — mit Sendung, Beleg, Lieferant, letztem Ereignis
+  und Link, genau einmal je Zustand.
 - **„Zuletzt abgefragt" ist immer sichtbar** — wann und wie (Anmeldung,
   stündlicher Abruf, Meldung von 17TRACK, von Hand): an der Bestellung
   (Karte „Details", unter den Tracking-Feldern), an der Eingangssendung
