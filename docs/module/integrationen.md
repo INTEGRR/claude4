@@ -104,7 +104,12 @@ Carrier — Fachlogik und Oberfläche im [Einkauf](einkauf.md#sendungsverfolgung
   „`<Rohtext>/<Security Key>`"; nur HTTP 200 gilt als zugestellt, sonst
   wiederholt 17TRACK dreimal (10, 30, 60 Minuten). Ereignisse
   `TRACKING_UPDATED` (Stand) und `TRACKING_STOPPED` (Verfolgung beendet).
-  Jeder Push steht im Transaktionsprotokoll (System `track17`, Art `webhook`).
+  Die Route prüft die Signatur, antwortet **sofort** mit 200 und
+  verarbeitet danach (`after()`, wie der Shopify-Webhook) — 17TRACK wartet
+  nur kurz, ein Kaltstart plus Datenbankarbeit vor der Antwort endet sonst
+  im Zeitüberlauf (Webhook-Test: 504). Jeder Push steht im
+  Transaktionsprotokoll (System `track17`, Art `webhook`); scheitert die
+  Verarbeitung, holt der stündliche Abruf den Stand nach.
 - **API-Aufrufe** (v2.2, Header `17token`): `register` (bis 40 Nummern,
   kostet je Nummer einmalig Kontingent — das Kontingent zählt angemeldete
   Sendungen, nicht Abfragen; den Stand zeigt die Schnittstellen-Seite),
