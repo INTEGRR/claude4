@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { sql, tx } from '@/db/client'
 import { canAccess } from '@/modules/auth/permissions'
 import {
@@ -37,6 +38,69 @@ export async function ablageEinrichtenAusfuehren(_p: object, _ctx: AktionsKontex
   ablageBereit()
   const namen = await ablageEinrichten()
   return { text: `Einkaufsablage bereit: ${namen.join(', ')}.` }
+}
+
+/** Belege aus dem KI-Chat kommen base64 im Aufruf — größer als die Anfragegrenze dort geht ohnehin nicht. */
+const BELEG_MAX_BYTES = 4 * 1024 * 1024
+
+/**
+ * Beleg aus dem KI-Chat an der Bestellung ablegen (2026-10-15): Upload in
+ * einem Stück, Dublettenprüfung über md5 je Lieferant wie bei Mail-Anhängen
+ * (anhang-ablage.ts), Verweise auf Bestellung und Lieferant, danach liest
+ * der Dokument-Leser des Einkaufs die Datei.
+ */
+export async function belegAblegen(
+  p: { name: string; mime: string; daten: string; art?: DokumentArt },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  ablageBereit()
+  const orderId = ctx.recordId!
+  await belegPruefen('purchase_order', orderId, ctx)
+  const bytes = Buffer.from(p.daten.replace(/\s+/g, ''), 'base64')
+  if (bytes.byteLength === 0) throw new Error('Der Beleg ist leer.')
+  if (bytes.byteLength > BELEG_MAX_BYTES) {
+    throw new Error('Der Beleg ist größer als 4 MB — bitte über „Dokumente" an der Bestellung hochladen.')
+  }
+  const [po] = await sql<{ vendor_id: string }[]>`select vendor_id from purchase_orders where id = ${orderId}`
+  const md5 = createHash('md5').update(bytes).digest('hex')
+  const [vorhanden] = await sql<{ id: string }[]>`
+    select id from dokumente
+    where md5 = ${md5} and partner_id is not distinct from ${po.vendor_id}
+    order by created_at limit 1`
+
+  let dokumentId: string
+  let text: string
+  if (vorhanden) {
+    dokumentId = vorhanden.id
+    text = `„${p.name}" war schon abgelegt — mit der Bestellung verknüpft`
+  } else {
+    const ordner = await zielOrdner('purchase_order', orderId)
+    const datei = await (await drive()).dateiHochladen({ name: p.name, mime: p.mime, bytes, elternId: ordner })
+    const [d] = await sql<{ id: string }[]>`
+      insert into dokumente (drive_file_id, name, mime, groesse, md5, art, quelle, partner_id, hochgeladen_von)
+      values (${datei.id}, ${p.name}, ${p.mime}, ${bytes.byteLength}, ${datei.md5Checksum ?? md5},
+              ${p.art ?? artAusDateiname(p.name)}, 'upload', ${po.vendor_id}, ${ctx.actor})
+      on conflict (drive_file_id) do update set updated_at = now()
+      returning id`
+    dokumentId = d.id
+    text = `„${p.name}" an der Bestellung abgelegt`
+  }
+
+  await tx(async (t) => {
+    const ziele: [DokumentModell, string][] = [
+      ['purchase_order', orderId],
+      ['partner', po.vendor_id],
+    ]
+    for (const [modell, id] of ziele) {
+      await t`insert into dokument_verweise (dokument_id, modell, record_id, verknuepft_von)
+              values (${dokumentId}, ${modell}, ${id}, ${ctx.actor})
+              on conflict do nothing`
+    }
+    if (dokumentLesbarkeit(p.mime, p.name) !== 'nicht_lesbar') {
+      await t`select enqueue_job('ki_dokument_lesen', ${t.json({ dokument_id: dokumentId })}, ${`ki-dokument:${dokumentId}`})`
+    }
+  })
+  return { text: `${text}.`, recordId: orderId, link: `/einkauf/${orderId}`, daten: { dokument_id: dokumentId } }
 }
 
 export async function uploadVorbereiten(

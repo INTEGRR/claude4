@@ -1,7 +1,9 @@
-import { sql } from '@/db/client'
+import { sql, tx } from '@/db/client'
 import { money, qty } from '@/modules/shared/format'
 import { htmlSicher } from '@/modules/integrationen/mail'
+import { produktAnlegen } from '@/modules/ki/produkt-anlegen'
 import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
+import { type BelegBestellung, belegPositionenPruefen } from './einkauf.ts'
 import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
 
 /** Ausführung der Einkaufs-Aktionen — Fachlogik unverändert aus einkauf/actions.ts. */
@@ -89,6 +91,177 @@ export async function bestellungMitPositionen(
     link: `/einkauf/${orderId}`,
     recordId: orderId,
   }
+}
+
+/** Dienstleistungs-Artikel für Fracht laut Beleg (einmal angelegt, danach wiederverwendet). */
+async function frachtArtikel(t: typeof sql): Promise<string> {
+  const name = 'Fracht laut Beleg (Einkauf)'
+  const [da] = await t<{ id: string }[]>`
+    select pv.id from product_variants pv join product_templates pt on pt.id = pv.template_id
+    where pt.name = ${name} and pt.type = 'service' and pv.active
+    order by pv.created_at limit 1`
+  if (da) return da.id
+  const [tpl] = await t<{ id: string }[]>`
+    insert into product_templates (name, type, uom_id, can_be_sold, can_be_purchased)
+    values (${name}, 'service', (select id from uoms where name = 'Stück' limit 1), false, true)
+    returning id`
+  await t`select generate_variants(${tpl.id})`
+  const [v] = await t<{ id: string }[]>`select id from product_variants where template_id = ${tpl.id} limit 1`
+  return v.id
+}
+
+/**
+ * Bestellung aus einem Beleg (KI-Chat, 2026-10-15): eine außerhalb von KRNL
+ * schon getätigte Bestellung nachträglich erfassen — Lieferant und Artikel
+ * bei Bedarf mit anlegen, Fracht als Dienstleistungszeile, gleich bestätigen
+ * (der Wareneingang entsteht) und die Vorkasse als bezahlt vermerken. Alles
+ * in EINER Transaktion: scheitert ein Schritt, entsteht kein halber Beleg.
+ */
+export async function bestellungErfassen(p: BelegBestellung, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const zeilenFehler = belegPositionenPruefen(p.positionen)
+  if (zeilenFehler) throw new Error(zeilenFehler)
+  const waehrung = p.waehrung.toUpperCase()
+  const incoterm = p.incoterm_code?.trim().toUpperCase() || null
+
+  const erfasst = await tx(async (tr) => {
+    const t = tr as unknown as typeof sql
+    const [cur] = await t<{ code: string }[]>`select code from currencies where code = ${waehrung}`
+    if (!cur) throw new Error(`Währung ${waehrung} ist nicht angelegt (Einstellungen → Währungen).`)
+    if (incoterm) {
+      const [ic] = await t<{ code: string }[]>`select code from incoterms where code = ${incoterm}`
+      if (!ic) throw new Error(`Incoterm ${incoterm} ist unbekannt.`)
+    }
+    // Ohne hinterlegten Kurs rechnet KRNL 1:1 (exchange_rate_at) — das soll
+    // niemand still übersehen, deshalb ein Hinweis im Ergebnis.
+    const [kurs] = waehrung === 'EUR'
+      ? [{ da: true }]
+      : await t<{ da: boolean }[]>`select exists (select 1 from exchange_rates where currency = ${waehrung}) as da`
+    const hinweise: string[] = []
+    if (!kurs?.da) hinweise.push(`kein ${waehrung}-Kurs hinterlegt — Beträge zählen vorerst 1:1 in Euro (EZB-Kurse holen)`)
+
+    // Lieferant: vorhandener gewinnt, neu nur wenn erlaubt und noch nicht da.
+    let lieferant: { id: string; name: string }
+    let neuerLieferant = false
+    try {
+      lieferant = await partnerAufloesen(t, p.lieferant, 'lieferant')
+    } catch (err) {
+      if (!p.lieferant_neu || !/nicht gefunden/.test(err instanceof Error ? err.message : '')) throw err
+      const land = p.lieferant_land?.toUpperCase()
+      if (!land) throw new Error('Für einen neuen Lieferanten bitte lieferant_land (ISO-2, z. B. CN) angeben.')
+      const [neu] = await t<{ id: string; name: string }[]>`
+        insert into partners (name, is_company, is_vendor, is_customer, email, country_code, standard_waehrung, standard_incoterm)
+        values (${p.lieferant.trim()}, true, true, false, ${p.lieferant_email ?? null}, ${land}, ${waehrung}, ${incoterm})
+        returning id, name`
+      lieferant = neu
+      neuerLieferant = true
+      await t`select log_event('partner', ${neu.id}, 'note', 'Aus Beleg angelegt (KI-Chat)', ${ctx.actor})`
+    }
+
+    // Artikel: vorhandene auflösen, neue Kaufteile anlegen (SKU zuerst prüfen —
+    // ein Beleg zum zweiten Mal darf keinen zweiten Artikel erzeugen).
+    const zeilen: { variantId: string; menge: number; preis: number }[] = []
+    const neueArtikel: string[] = []
+    for (const pos of p.positionen) {
+      const preis = pos.preis ?? 0
+      if (pos.produkt?.trim()) {
+        const v = await varianteAufloesen(t, pos.produkt.trim())
+        zeilen.push({ variantId: v.id, menge: pos.menge, preis })
+        continue
+      }
+      const sku = pos.sku_neu?.trim() || undefined
+      const [da] = sku
+        ? await t<{ id: string }[]>`select id from product_variants where lower(sku) = lower(${sku}) and active limit 1`
+        : []
+      if (da) {
+        zeilen.push({ variantId: da.id, menge: pos.menge, preis })
+        continue
+      }
+      const [k] = await t<{ kurs: number }[]>`select exchange_rate_at(${waehrung}, current_date) as kurs`
+      const neu = await produktAnlegen(
+        t,
+        {
+          name: pos.artikel_neu!.trim(),
+          sku,
+          einkaufbar: true,
+          verkaufbar: false,
+          route: 'kaufen',
+          einstandspreis: Math.round(preis * Number(k?.kurs ?? 1) * 100) / 100,
+        },
+        ctx.actor,
+      )
+      const [v] = await t<{ id: string }[]>`
+        select id from product_variants where template_id = ${neu.templateId} order by created_at limit 1`
+      zeilen.push({ variantId: v.id, menge: pos.menge, preis })
+      neueArtikel.push(pos.artikel_neu!.trim())
+    }
+
+    const note = [p.hinweis?.trim(), p.referenz ? `Beleg: ${p.referenz.trim()}` : null, 'Aus Beleg erfasst (KI-Chat)']
+      .filter(Boolean)
+      .join('\n')
+    const [po] = await t<{ id: string; number: string }[]>`
+      insert into purchase_orders (number, vendor_id, currency, incoterm_code, vendor_reference, note, expected_arrival, user_id)
+      values (next_sequence('purchase'), ${lieferant.id}, ${waehrung}, ${incoterm}, ${p.referenz?.trim() || null}, ${note},
+              ${p.eta ? t`${p.eta}::date` : null}, ${ctx.userId ?? null})
+      returning id, number`
+
+    let sequence = 10
+    const zeile = async (variantId: string, menge: number, preis: number, name?: string) => {
+      await t`
+        insert into purchase_order_lines
+          (order_id, sequence, variant_id, name, qty, uom_id, price_unit, discount, tax_id, tax_rate)
+        select ${po.id}, ${sequence}, ${variantId}, ${name ?? t`variant_display_name(pv.id)`}, ${menge},
+               coalesce(pt.purchase_uom_id, pt.uom_id), ${preis}, 0,
+               pt.purchase_tax_id, coalesce((select amount from taxes where id = pt.purchase_tax_id), 19)
+        from product_variants pv join product_templates pt on pt.id = pv.template_id
+        where pv.id = ${variantId}`
+      sequence += 10
+    }
+    for (const z of zeilen) await zeile(z.variantId, z.menge, z.preis)
+    if (p.versandkosten && p.versandkosten > 0) {
+      await zeile(await frachtArtikel(t), 1, p.versandkosten, `Fracht laut Beleg${incoterm ? ` (${incoterm})` : ''}`)
+    }
+
+    if (p.bestaetigen) {
+      await t`select confirm_purchase_order(${po.id}, ${ctx.actor})`
+      if (p.bestelldatum) {
+        await t`update purchase_orders set confirmed_at = ${p.bestelldatum}::date where id = ${po.id}`
+      }
+    } else if (p.bestelldatum) {
+      await t`update purchase_orders set order_deadline = ${p.bestelldatum}::date where id = ${po.id}`
+    }
+
+    let zahlung: string | null = null
+    if (p.bezahlt) {
+      const [rate] = await t<{ id: string }[]>`
+        insert into zahlplan_raten (purchase_order_id, sequence, bezeichnung, anteil_pct, betrag, ausloeser)
+        values (${po.id}, 10, 'Vorkasse 100 %', ${p.bezahlt_betrag ? null : 100}, ${p.bezahlt_betrag ?? null}, 'bestellung')
+        returning id`
+      const [summe] = await t<{ betrag: number }[]>`
+        select round(coalesce(${p.bezahlt_betrag ?? null}::numeric, (select gross from purchase_order_total(${po.id}))), 2) as betrag`
+      const betrag = Number(summe.betrag)
+      if (!(betrag > 0)) throw new Error('Die Bestellsumme ist 0 — bezahlt_betrag angeben.')
+      await t`
+        select zahlung_erfassen('aus', ${betrag}, ${waehrung},
+                                ${p.bezahlt_am ? t`${p.bezahlt_am}::date` : t`current_date`}, null,
+                                'po_rate', ${rate.id}, ${`Vorkasse ${po.number}${p.referenz ? ` · ${p.referenz.trim()}` : ''}`}, ${ctx.actor})`
+      zahlung = `${betrag.toFixed(2)} ${waehrung}${p.bezahlt_am ? ` am ${p.bezahlt_am}` : ''}`
+    }
+
+    await t`select log_event('purchase_order', ${po.id}, 'note',
+      ${`Aus Beleg erfasst (KI-Chat)${p.referenz ? ` — ${p.referenz.trim()}` : ''}`}, ${ctx.actor})`
+    return { po, lieferant, neuerLieferant, neueArtikel, zahlung, hinweise }
+  })
+
+  const { po, lieferant, neuerLieferant, neueArtikel, zahlung, hinweise } = erfasst
+  const teile = [
+    `Bestellung ${po.number} bei ${lieferant.name} erfasst (${p.positionen.length} Position(en), ${waehrung})`,
+    p.bestaetigen ? 'bestätigt — der Wareneingang wird erwartet' : 'als Entwurf',
+    zahlung ? `Vorkasse ${zahlung} vermerkt` : null,
+    neuerLieferant ? `Lieferant neu angelegt` : null,
+    neueArtikel.length ? `neue Artikel: ${neueArtikel.join(', ')}` : null,
+    ...hinweise,
+  ].filter(Boolean)
+  return { text: `${teile.join('; ')}.`, link: `/einkauf/${po.id}`, recordId: po.id }
 }
 
 export async function positionEntfernen(

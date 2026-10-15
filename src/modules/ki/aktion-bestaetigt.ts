@@ -18,7 +18,7 @@ export async function bestaetigteAktionAusfuehren(
   name: string,
   parameter: unknown,
   user: User,
-): Promise<{ text: string; link?: string }> {
+): Promise<{ text: string; link?: string; recordId?: string }> {
   const p = (parameter && typeof parameter === 'object' ? parameter : {}) as Record<
     string,
     unknown
@@ -34,5 +34,6 @@ export async function bestaetigteAktionAusfuehren(
   return {
     text: ergebnis.text ?? 'Ausgeführt.',
     ...(ergebnis.link ? { link: ergebnis.link } : {}),
+    ...(ergebnis.recordId ? { recordId: ergebnis.recordId } : {}),
   }
 }

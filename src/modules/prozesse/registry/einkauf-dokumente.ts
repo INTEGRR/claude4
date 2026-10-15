@@ -55,6 +55,27 @@ export const EINKAUF_DOKUMENTE = {
     zusammenfassung: (p) => `Upload „${p.name}"`,
   },
 
+  'einkauf.beleg_ablegen': {
+    label: 'Beleg ablegen',
+    bereich: 'einkauf',
+    prozessfrei: true,
+    beschreibung:
+      'Legt eine Datei, die im KI-Chat mit der Frage kam (Bild oder PDF, Inhalt base64), in der ' +
+      'Google-Ablage ab und verknüpft sie mit der Bestellung — der dritte Upload-Weg neben dem ' +
+      'Stück-Upload aus dem Browser und dem Mail-Anhang. Gleicher Inhalt beim selben Lieferanten ' +
+      'wird verknüpft, nicht kopiert.',
+    bindung: 'beleg',
+    modell: 'purchase_order',
+    schema: z.object({
+      name: z.string().min(1).max(200),
+      mime: z.string().min(1).max(100),
+      daten: z.string().min(1).max(6_000_000).describe('Inhalt base64 (höchstens 4 MB roh)'),
+      art: z.enum(DOKUMENT_ART_NAMEN).optional(),
+    }),
+    zusammenfassung: (p) => `„${p.name}" an der Bestellung ablegen`,
+    revalidate: ['/einkauf/:id'],
+  },
+
   'einkauf.dokument_registrieren': {
     label: 'Hochgeladene Datei übernehmen',
     bereich: 'einkauf',

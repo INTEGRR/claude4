@@ -8,6 +8,7 @@ import { gruppenSpalten, gruppiereVorschlaege } from '@/modules/ki/vorschlag-gru
 import { MikrofonKnopf, SendenSymbol } from '@/components/spracheingabe'
 import { HexcoreMark } from '@/components/marke'
 import { SprechenLog, useGespraech, ZUSTAND_TEXT } from '@/components/nutze-gespraech'
+import { type ChatAnhang, MAX_ANHAENGE_JE_NACHRICHT, MAX_ANHANG_BYTES } from '@/modules/ki/anhaenge'
 import { VorschlagEditor, Zelle } from './vorschlag-editor'
 
 /**
@@ -32,6 +33,8 @@ interface Vorschlag {
   parameter: Record<string, unknown>
   /** null = offen, sonst das Ergebnis der Entscheidung */
   ergebnis?: { ok: boolean; text: string; link?: string } | 'verworfen'
+  /** Der Beleg, aus dem der Vorschlag entstand — wird nach dem Anlegen am Datensatz abgelegt. */
+  belegAnhaenge?: ChatAnhang[]
 }
 
 interface Msg {
@@ -40,6 +43,124 @@ interface Msg {
   sqls: string[]
   charts: Diagramm[]
   aktionen: Vorschlag[]
+  /** Bilder und PDFs zur Frage (nur Benutzer-Nachrichten). */
+  anhaenge?: ChatAnhang[]
+}
+
+/** Aktionen, bei denen der Beleg aus dem Chat mit zum Anlegen geschickt wird. */
+const MIT_BELEG = new Set(['einkauf.bestellung_erfassen'])
+
+/** Anhänge gehen nur für die letzten Benutzer-Nachrichten mit — sonst wächst jede Anfrage mit dem Verlauf. */
+const ANHAENGE_IM_VERLAUF = 4
+
+// --- Anhänge: Datei → base64, Bilder vorab verkleinern ----------------------
+
+const BILD_MAX_PX = 2000
+const BILD_DIREKT_BYTES = 1.5 * 1024 * 1024
+
+function dateiAlsBase64(blob: Blob): Promise<string> {
+  return new Promise((res, rej) => {
+    const leser = new FileReader()
+    leser.onload = () => res(String(leser.result).split(',')[1] ?? '')
+    leser.onerror = () => rej(new Error('Datei konnte nicht gelesen werden'))
+    leser.readAsDataURL(blob)
+  })
+}
+
+/**
+ * Fotos vom Handy sind 4000 px und 5 MB — fürs Lesen eines Belegs reichen
+ * 2000 px als JPEG. Kleine JPEG/PNG/WebP gehen unverändert (Screenshots
+ * bleiben scharf).
+ */
+async function bildVerkleinern(file: File): Promise<{ blob: Blob; mime: ChatAnhang['mime'] }> {
+  let bmp: ImageBitmap
+  try {
+    bmp = await createImageBitmap(file)
+  } catch {
+    throw new Error(`„${file.name}": Bild kann nicht gelesen werden (HEIC? bitte als JPEG oder PNG)`)
+  }
+  const skala = Math.min(1, BILD_MAX_PX / Math.max(bmp.width, bmp.height))
+  const direkt = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp'
+  if (skala === 1 && direkt && file.size <= BILD_DIREKT_BYTES) {
+    bmp.close()
+    return { blob: file, mime: file.type as ChatAnhang['mime'] }
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bmp.width * skala))
+  canvas.height = Math.max(1, Math.round(bmp.height * skala))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Bild konnte nicht verarbeitet werden')
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+  bmp.close()
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.85))
+  if (!blob) throw new Error('Bild konnte nicht verarbeitet werden')
+  return { blob, mime: 'image/jpeg' }
+}
+
+async function anhangAusDatei(file: File): Promise<ChatAnhang> {
+  const istPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+  const istBild = file.type.startsWith('image/')
+  if (!istPdf && !istBild) throw new Error(`„${file.name}": nur Bilder und PDFs`)
+  const { blob, mime } = istPdf ? { blob: file as Blob, mime: 'application/pdf' as const } : await bildVerkleinern(file)
+  if (blob.size > MAX_ANHANG_BYTES) {
+    throw new Error(
+      `„${file.name}" ist zu groß (${(blob.size / 1024 / 1024).toFixed(1)} MB, höchstens ` +
+        `${MAX_ANHANG_BYTES / 1024 / 1024} MB)${istPdf ? ' — als Bild oder kleineres PDF schicken' : ''}`,
+    )
+  }
+  return { name: file.name || (istPdf ? 'beleg.pdf' : 'bild.jpg'), mime, data: await dateiAlsBase64(blob) }
+}
+
+function KlammerSymbol() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 11.5 12.2 20.3a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1L15.5 7.5" />
+    </svg>
+  )
+}
+
+/** Anhänge in der Nachricht: Bild aufklappbar, PDF als Kachel. */
+function AnhangListe({ anhaenge, onEntfernen }: { anhaenge: ChatAnhang[]; onEntfernen?: (index: number) => void }) {
+  const [gross, setGross] = useState<number | null>(null)
+  return (
+    <div className="ki-anhaenge">
+      {anhaenge.map((a, i) => {
+        const bild = a.mime !== 'application/pdf' && a.data
+        return (
+          <span
+            key={`${a.name}-${i}`}
+            className={`ki-anhang${gross === i ? ' gross' : ''}`}
+            onClick={bild && !onEntfernen ? () => setGross(gross === i ? null : i) : undefined}
+            title={a.name}
+          >
+            {bild ? (
+              <img src={`data:${a.mime};base64,${a.data}`} alt={a.name} />
+            ) : (
+              <span className="ki-anhang-pdf">{a.mime === 'application/pdf' ? 'PDF' : 'BILD'}</span>
+            )}
+            {gross !== i && <span className="ki-anhang-name">{a.name}</span>}
+            {onEntfernen && (
+              <button type="button" className="small" title="Entfernen" aria-label={`${a.name} entfernen`} onClick={() => onEntfernen(i)}>
+                ×
+              </button>
+            )}
+          </span>
+        )
+      })}
+    </div>
+  )
 }
 
 const BEISPIELE = [
@@ -396,7 +517,12 @@ async function vorschlagAusfuehren(
     const res = await fetch('/api/ki/aktion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ aktion: v.aktion, parameter }),
+      body: JSON.stringify({
+        aktion: v.aktion,
+        parameter,
+        // Der Beleg wandert mit und wird nach dem Anlegen am Datensatz abgelegt.
+        ...(v.belegAnhaenge?.length ? { anhaenge: v.belegAnhaenge.filter((a) => a.data) } : {}),
+      }),
     })
     const data = (await res.json()) as { text?: string; link?: string; error?: string }
     return res.ok
@@ -718,6 +844,36 @@ function SammelCard({
 
 // --- Chat ------------------------------------------------------------------
 
+/** Welche Benutzer-Nachrichten ihre Anhänge noch mitschicken: die letzten ANHAENGE_IM_VERLAUF. */
+function mitAnhaengenImVerlauf(history: Msg[]): Msg[] {
+  let uebrig = ANHAENGE_IM_VERLAUF
+  const ergebnis = [...history]
+  for (let i = ergebnis.length - 1; i >= 0; i--) {
+    const m = ergebnis[i]
+    if (m.role !== 'user' || !m.anhaenge?.length) continue
+    if (uebrig > 0) {
+      uebrig--
+      ergebnis[i] = { ...m, anhaenge: m.anhaenge.filter((a) => a.data) }
+    } else {
+      // Nur noch der Name — das Modell weiß, dass es den Beleg gab.
+      ergebnis[i] = { ...m, text: `${m.anhaenge.map((a) => `[Anhang: ${a.name}]`).join(' ')} ${m.text}`.trim(), anhaenge: [] }
+    }
+  }
+  return ergebnis
+}
+
+/**
+ * Ablage je Tab (sessionStorage, ~5 MB): Bilddaten nur für die letzten
+ * Anhänge und nur für offene Vorschläge — ältere behalten den Namen.
+ */
+function fuerAblage(msgs: Msg[]): Msg[] {
+  return mitAnhaengenImVerlauf(msgs).map((m) => ({
+    ...m,
+    anhaenge: m.anhaenge?.map((a) => (a.data ? a : { ...a, data: '' })),
+    aktionen: m.aktionen.map((a) => (a.ergebnis === undefined ? a : { ...a, belegAnhaenge: undefined })),
+  }))
+}
+
 export function KiChat({
   startFrage,
   sprechen,
@@ -727,6 +883,12 @@ export function KiChat({
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  /** Belege, die mit der nächsten Frage gehen (Büroklammer, Ziehen, Einfügen). */
+  const [anhaenge, setAnhaenge] = useState<ChatAnhang[]>([])
+  const [anhangFehler, setAnhangFehler] = useState<string | null>(null)
+  const [ziehen, setZiehen] = useState(false)
+  const dateiRef = useRef<HTMLInputElement>(null)
+  const letzteAnhaenge = useRef<ChatAnhang[]>([])
   /** Stream abgerissen (BUG/00010) — mit Merker, ob es im Hintergrund geschah. */
   const [abbruch, setAbbruch] = useState<{ imHintergrund: boolean } | null>(null)
   /** Buddy-Modus: die Sprachsitzung als Vollfläche statt des Textverlaufs. */
@@ -758,11 +920,30 @@ export function KiChat({
     if (busy) return
     try {
       if (msgs.length === 0) sessionStorage.removeItem(ablage)
-      else sessionStorage.setItem(ablage, JSON.stringify(msgs.slice(-40)))
+      else sessionStorage.setItem(ablage, JSON.stringify(fuerAblage(msgs.slice(-40))))
     } catch {
       // Speichergrenze erreicht — der Chat läuft ohne Ablage weiter.
     }
   }, [msgs, busy, ablage])
+
+  /** Dateien aufnehmen — jede für sich, ein kaputtes Foto hält die anderen nicht auf. */
+  async function dateienAufnehmen(dateien: Iterable<File>) {
+    const fehler: string[] = []
+    const neu: ChatAnhang[] = []
+    for (const datei of dateien) {
+      if (anhaenge.length + neu.length >= MAX_ANHAENGE_JE_NACHRICHT) {
+        fehler.push(`Höchstens ${MAX_ANHAENGE_JE_NACHRICHT} Anhänge je Nachricht`)
+        break
+      }
+      try {
+        neu.push(await anhangAusDatei(datei))
+      } catch (err) {
+        fehler.push(err instanceof Error ? err.message : String(err))
+      }
+    }
+    if (neu.length) setAnhaenge((cur) => [...cur, ...neu])
+    setAnhangFehler(fehler.length ? fehler.join(' · ') : null)
+  }
 
   /** Bewusster Neuanfang: Verlauf UND Ablage leeren. */
   function neuesGespraech() {
@@ -816,15 +997,22 @@ export function KiChat({
     }
   }, [busy])
 
-  async function send(frage: string, basis?: Msg[]) {
+  async function send(frage: string, basis?: Msg[], mitAnhaengen?: ChatAnhang[]) {
     const text = frage.trim()
-    if (!text || busy) return
+    const dateien = mitAnhaengen ?? anhaenge
+    if ((!text && dateien.length === 0) || busy) return
     setInput('')
+    setAnhaenge([])
+    setAnhangFehler(null)
     setBusy(true)
     setAbbruch(null)
     letzteFrage.current = text
+    letzteAnhaenge.current = dateien
     const leer = { sqls: [], charts: [], aktionen: [] }
-    const history = [...(basis ?? msgs), { role: 'user' as const, text, ...leer }]
+    const history = [
+      ...(basis ?? msgs),
+      { role: 'user' as const, text, ...leer, ...(dateien.length ? { anhaenge: dateien } : {}) },
+    ]
     setMsgs([...history, { role: 'assistant', text: '', ...leer }])
     // Zur eigenen Frage springen — ab da entscheidet amEnde().
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }))
@@ -837,7 +1025,11 @@ export function KiChat({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: history.map((m) => ({ role: m.role, text: m.text })),
+          messages: mitAnhaengenImVerlauf(history).map((m) => ({
+            role: m.role,
+            text: m.text,
+            ...(m.anhaenge?.length ? { anhaenge: m.anhaenge } : {}),
+          })),
           ...(kontext ? { kontext } : {}),
         }),
       })
@@ -872,7 +1064,9 @@ export function KiChat({
           if (ev.type === 'chart') patchLast((m) => ({ ...m, charts: [...m.charts, ev.chart] }))
           if (ev.type === 'aktion') {
             const { type: _t, ...vorschlag } = ev
-            patchLast((m) => ({ ...m, aktionen: [...m.aktionen, vorschlag] }))
+            // Vorschlag aus einem Beleg: der Beleg geht beim Anlegen mit.
+            const beleg = MIT_BELEG.has(vorschlag.aktion) && dateien.length ? { belegAnhaenge: dateien } : {}
+            patchLast((m) => ({ ...m, aktionen: [...m.aktionen, { ...vorschlag, ...beleg }] }))
           }
           if (ev.type === 'status') setStatus(ev.text)
           if (ev.type === 'error') patchLast((m) => ({ ...m, text: m.text + '\n\n' + ev.text }))
@@ -900,7 +1094,7 @@ export function KiChat({
     const basis = [...msgs]
     if (basis.at(-1)?.role === 'assistant') basis.pop()
     if (basis.at(-1)?.role === 'user') basis.pop()
-    void send(frage, basis)
+    void send(frage, basis, letzteAnhaenge.current)
   }
 
   // Kam der Abriss, während die App im Hintergrund war, holt die Rückkehr
@@ -1003,7 +1197,10 @@ export function KiChat({
                   'Version erst nach Sichtprüfung des Diagramms, per Hand. Zum Beispiel:'
                 : 'Fragen zu allen ERP-Daten — der Agent liest die Datenbank, bereitet die ' +
                   'Antwort auf und zeichnet bei Bedarf ein Diagramm. Anlegen kann er auch, aber ' +
-                  'nur als Vorschlag: gespeichert wird erst nach Ihrer Bestätigung. Zum Beispiel:'}
+                  'nur als Vorschlag: gespeichert wird erst nach Ihrer Bestätigung. Belege (Rechnung, ' +
+                  'Pro-forma, Foto) hängen Sie über die Büroklammer an, ziehen sie ins Feld oder fügen ' +
+                  'sie aus der Zwischenablage ein — etwa: „Diese Bestellung ist bezahlt, die Ware ' +
+                  'kommt — erfass sie." Zum Beispiel:'}
             </p>
             <div className="ki-beispiele">
               {(kontext === 'werkstatt' ? WERKSTATT_BEISPIELE : BEISPIELE).map((b) => (
@@ -1037,7 +1234,12 @@ export function KiChat({
                 ))}
               </details>
             )}
-            {m.role === 'user' ? <p style={{ margin: 0 }}>{m.text}</p> : <Markdown text={m.text} />}
+            {m.role === 'user' && m.anhaenge && m.anhaenge.length > 0 && <AnhangListe anhaenge={m.anhaenge} />}
+            {m.role === 'user' ? (
+              m.text ? <p style={{ margin: 0 }}>{m.text}</p> : null
+            ) : (
+              <Markdown text={m.text} />
+            )}
             {m.charts.map((d, j) => (
               <ChartCard key={j} d={d} />
             ))}
@@ -1127,12 +1329,33 @@ export function KiChat({
       {/* Composer im Claude-App-Stil: Frage tippen oder diktieren, Pfeil
           sendet — und das Hexcore öffnet den Buddy-Modus (Sprachsitzung). */}
       <form
-        className="ki-input"
+        className={`ki-input${ziehen ? ' ziehen' : ''}`}
         onSubmit={(e) => {
           e.preventDefault()
           void send(input)
         }}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('Files')) {
+            e.preventDefault()
+            setZiehen(true)
+          }
+        }}
+        onDragLeave={() => setZiehen(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setZiehen(false)
+          if (!busy) void dateienAufnehmen(e.dataTransfer.files)
+        }}
       >
+        {anhaenge.length > 0 && (
+          <AnhangListe anhaenge={anhaenge} onEntfernen={(i) => setAnhaenge((cur) => cur.filter((_, j) => j !== i))} />
+        )}
+        {anhangFehler && (
+          <div className="notice danger" style={{ marginBottom: 8 }}>
+            <span className="led warn" style={{ marginRight: 6 }} />
+            {anhangFehler}
+          </div>
+        )}
         {gesammelt > 0 && (
           <div className="notice info" style={{ marginBottom: 8 }}>
             <span className="led wichtig" style={{ marginRight: 6 }} />
@@ -1152,9 +1375,37 @@ export function KiChat({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Frage an die Daten stellen …"
+            onPaste={(e) => {
+              // Screenshot aus der Zwischenablage: Bild statt Text einfügen.
+              const dateien = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf')
+              if (dateien.length === 0 || busy) return
+              e.preventDefault()
+              void dateienAufnehmen(dateien)
+            }}
+            placeholder={ziehen ? 'Beleg hier ablegen …' : anhaenge.length ? 'Was soll mit dem Beleg passieren?' : 'Frage an die Daten stellen …'}
             disabled={busy}
           />
+          <input
+            ref={dateiRef}
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) void dateienAufnehmen(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            className="composer-knopf"
+            title="Beleg anhängen (Bild oder PDF)"
+            aria-label="Beleg anhängen (Bild oder PDF)"
+            disabled={busy}
+            onClick={() => dateiRef.current?.click()}
+          >
+            <KlammerSymbol />
+          </button>
           <MikrofonKnopf onText={(text) => setInput(text)} titel="Frage diktieren (Deutsch)" />
           {sprechen && (
             <button
@@ -1170,7 +1421,7 @@ export function KiChat({
           <button
             className="composer-knopf senden"
             type="submit"
-            disabled={busy || !input.trim()}
+            disabled={busy || (!input.trim() && anhaenge.length === 0)}
             title="Fragen"
             aria-label="Fragen"
           >

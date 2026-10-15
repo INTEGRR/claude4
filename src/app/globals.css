@@ -2132,3 +2132,32 @@ label.field > span.auswahl {
   /* Fingergerecht: größere Zeilen in der Liste. */
   .auswahl-option { padding: 10px 14px; }
 }
+
+/* --- KI-Chat: Anhänge (Belege als Bild oder PDF) -------------------------- */
+.ki-anhaenge { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ki-anhang {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  max-width: 100%;
+}
+.ki-anhang img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; display: block; background: #fff; }
+.ki-anhang .ki-anhang-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ki-anhang .ki-anhang-pdf {
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: 4px;
+  background: var(--surface-2); font-family: var(--font-mono), monospace; font-size: 10px; letter-spacing: 0.08em;
+}
+.ki-anhang button.small { padding: 0 7px; height: 22px; min-height: 0; font-size: 13px; line-height: 1; }
+/* In der Nachricht: größer, zum Nachschauen aufklappbar. */
+.ki-msg .ki-anhaenge { margin: 0 0 6px; }
+.ki-msg .ki-anhang { cursor: zoom-in; }
+.ki-msg .ki-anhang img { width: 120px; height: 120px; }
+.ki-msg .ki-anhang.gross { cursor: zoom-out; display: block; padding: 4px; }
+.ki-msg .ki-anhang.gross img { width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
+.ki-input.ziehen .composer { border-color: var(--accent); box-shadow: var(--shadow-lift); }
+.ki-input.ziehen .composer input::placeholder { color: var(--accent-text); }

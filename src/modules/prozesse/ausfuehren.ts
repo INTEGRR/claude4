@@ -108,6 +108,8 @@ export const AUSFUEHRUNG = {
   'einkauf.vorschlag_aendern': einkaufKi.vorschlagAendern,
   'einkauf.bestellung_anlegen': einkauf.bestellungAnlegen,
   'einkauf.bestellung_mit_positionen': einkauf.bestellungMitPositionen,
+  'einkauf.bestellung_erfassen': einkauf.bestellungErfassen,
+  'einkauf.beleg_ablegen': einkaufDokumente.belegAblegen,
   'einkauf.position_hinzufuegen': einkauf.positionHinzufuegen,
   'einkauf.position_entfernen': einkauf.positionEntfernen,
   'einkauf.kopf_aendern': einkauf.kopfAendern,

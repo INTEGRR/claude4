@@ -9,6 +9,43 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — KI-Chat liest Belege; Bestellung aus Beleg in einem Zug
+
+**Anlass (Betreiber):** „Ich brauche im KI-Modus die Möglichkeit, Bilder
+hochzuladen, z. B. Commercial Invoices, sodass Bestellungen im Einkauf
+angelegt werden können. In diesem Fall wurden die Schrauben bereits bestellt
+und bezahlt, und wir warten auf Lieferung."
+
+**Entschieden:**
+- **Anhänge im Chat** (Bild, PDF): Büroklammer, Ziehen, Einfügen. Der
+  Browser verkleinert Fotos auf 2000 px; Grenzen 3 MB je Datei, 4 MB je
+  Anfrage (Vercel-Anfragegrenze), fünf je Nachricht. Die Dateien gehen als
+  Bild-/Dokument-Block an das Modell und bleiben für die letzten vier
+  Benutzer-Nachrichten im Verlauf (Rückfragen sehen den Beleg).
+- **Eine Aktion statt einer Kette:** Der Chat führt Vorschläge einzeln aus
+  und kennt keine Abhängigkeit „erst anlegen, dann bestätigen, dann
+  zahlen". Deshalb erfasst `einkauf.bestellung_erfassen` die nachträgliche
+  Bestellung komplett in einer Transaktion: Lieferant und Artikel bei
+  Bedarf mit anlegen, Fracht als Dienstleistungszeile, bestätigen
+  (Wareneingang wird erwartet), Vorkasse als Zahlplan-Rate und Zahlung in
+  Belegwährung. Scheitert ein Schritt, entsteht kein halber Beleg.
+  Prozessfrei als alternativer Einstieg (draft oder purchase), kein
+  eigener Prozessschritt.
+- **Der Beleg hängt an der Bestellung:** Nach „Anlegen" schickt der
+  Browser den Anhang mit; der Server legt ihn über die Registry-Aktion
+  `einkauf.beleg_ablegen` (base64 im Aufruf, Dublettenprüfung je
+  Lieferant) ab — am Torwächter vorbei wird nichts geschrieben. Ohne
+  angebundene Google-Ablage steht ein Hinweis im Ergebnis.
+- **Beträge bleiben in der Belegwährung**, der Kurs kommt beim Bestätigen
+  aus `exchange_rate_at`; fehlt er, rechnet KRNL 1:1 und sagt es (kein
+  stiller Fehler, kein Abbruch).
+- Nicht gemacht: Excel-Anhänge (kein Tabellen-Parser, Entscheidungslog
+  2026-10-01) und HEIC-Fotos (der Browser decodiert sie nicht — als JPEG
+  schicken).
+
+Doku: [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md)
+(Anhänge), [module/einkauf.md](module/einkauf.md) (Bestellung aus Beleg).
+
 ## 2026-10-05 — Startseite: Trailer als Held
 
 **Anlass (Betreiber):** Den 15-Sekunden-Werbetrailer „muss natürlich auf die

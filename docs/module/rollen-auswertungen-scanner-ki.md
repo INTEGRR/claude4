@@ -239,6 +239,30 @@ Drei Werkzeuge:
   zu aggregieren — sonst hängt ein Riesenergebnis in jeder Folgerunde
   erneut im Kontext.
 
+### Anhänge: Belege lesen und daraus anlegen (seit 2026-10-15)
+
+Die **Büroklammer** im Composer hängt Bilder (JPEG, PNG, WebP, GIF) und
+PDFs an — ebenso Ziehen auf das Eingabefeld und Einfügen aus der
+Zwischenablage (Screenshot). Der Browser verkleinert Fotos vorab auf
+2000 px (JPEG); je Datei gelten 3 MB, je Anfrage 4 MB, höchstens fünf
+Anhänge je Nachricht ([`src/modules/ki/anhaenge.ts`](../../src/modules/ki/anhaenge.ts)).
+Die Dateien gehen als Bild- bzw. Dokument-Block **vor** dem Text an das
+Modell — derselbe Aufrufweg wie beim Dokument-Leser des Einkaufs — und
+bleiben für die letzten vier Benutzer-Nachrichten im Verlauf, damit
+Rückfragen („die Menge in Zeile 2 stimmt nicht") den Beleg noch sehen.
+Ältere Anhänge schrumpfen auf ihren Dateinamen.
+
+Der typische Fall: eine **Commercial Invoice** eines Lieferanten, Ware
+schon bezahlt und unterwegs. Der Agent liest Lieferant, Positionen,
+Währung, Incoterm und Fracht, gleicht Lieferant und Artikel per SQL ab und
+schlägt **eine** Aktion `einkauf.bestellung_erfassen` vor (Abschnitt
+„Bestellung aus Beleg erfassen" in [einkauf.md](einkauf.md)) — fehlende
+Lieferanten und Artikel legt sie mit an. Nach dem Klick auf „Anlegen"
+schickt der Chat die Datei mit; der Server legt sie über
+`einkauf.beleg_ablegen` am neuen Datensatz ab (nur mit angebundener
+Google-Ablage, sonst steht ein Hinweis im Ergebnis). Beide Wege laufen
+über den Torwächter.
+
 ### Kosten
 
 Der Agent nutzt **Prompt-Caching** (`cache_control: ephemeral`, zwei

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { currentUser } from '@/modules/auth'
 import { canAccess } from '@/modules/auth/permissions'
 import { type ChatTurn, type KiEvent, kiConfigured, runAgent } from '@/modules/ki/agent'
+import { MAX_ANFRAGE_BYTES, anhaengeLesen, anhangBytesGesamt } from '@/modules/ki/anhaenge'
 import { sql } from '@/db/client'
 
 /**
@@ -32,15 +33,27 @@ export async function POST(request: Request) {
     if (body.kontext === 'werkstatt' && user.role === 'admin') kontext = 'werkstatt'
     if (!Array.isArray(body.messages) || body.messages.length === 0) throw new Error()
     turns = body.messages.slice(-30).map((m) => {
-      const turn = m as { role?: unknown; text?: unknown }
+      const turn = m as { role?: unknown; text?: unknown; anhaenge?: unknown }
       if ((turn.role !== 'user' && turn.role !== 'assistant') || typeof turn.text !== 'string') {
         throw new Error()
       }
-      return { role: turn.role, text: turn.text.slice(0, 8000) }
+      // Anhänge (Bilder, PDFs) nur an Benutzer-Nachrichten; alles
+      // Unbekannte oder zu Große weist anhaengeLesen mit Grund ab.
+      const anhaenge = turn.role === 'user' ? anhaengeLesen(turn.anhaenge) : { ok: true as const, wert: [] }
+      if (!anhaenge.ok) throw new Error(anhaenge.fehler)
+      return {
+        role: turn.role,
+        text: turn.text.slice(0, 8000),
+        ...(anhaenge.wert.length ? { anhaenge: anhaenge.wert } : {}),
+      }
     })
     if (turns.at(-1)?.role !== 'user') throw new Error()
-  } catch {
-    return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 })
+    if (anhangBytesGesamt(turns) > MAX_ANFRAGE_BYTES) {
+      throw new Error(`Die Anhänge sind zusammen größer als ${MAX_ANFRAGE_BYTES / 1024 / 1024} MB`)
+    }
+  } catch (err) {
+    const grund = err instanceof Error && err.message ? err.message : 'Ungültige Anfrage'
+    return NextResponse.json({ error: grund }, { status: 400 })
   }
 
   // Zählpunkt für den Nutzungsbericht (nutzungsbericht(), ki_fragen):

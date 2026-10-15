@@ -10,6 +10,7 @@ import { registrierteAktion } from '@/modules/prozesse/registry'
 import { kiKatalog } from '@/modules/prozesse/introspektion'
 import { kiModell } from './modelle'
 import { werkstattSystemZusatz } from './wissen'
+import { type ChatAnhang, nachrichtInhalt } from './anhaenge'
 
 /**
  * KI-Agent für Ad-hoc-Auswertungen: Claude mit genau einem Werkzeug —
@@ -57,6 +58,21 @@ Regeln:
 - Nutze die dokumentierten Hilfsfunktionen (on_hand_qty, variant_display_name, sales_order_total, …) statt Bestände selbst zusammenzurechnen.
 - Runde Geldwerte auf 2 Nachkommastellen; nenne die Kostenbasis, wenn du Werte bewertest.
 - Wenn eine Frage nicht aus den Daten beantwortbar ist, sage das ehrlich.
+
+Anhänge (Bilder, PDFs — etwa Commercial Invoice, Pro-forma-Rechnung, Lieferschein, Foto):
+- Lies den Beleg vollständig und nenne, was du erkennst: Lieferant, Belegnummer, Datum,
+  Positionen mit Bezeichnung, Maßen und Material, Menge, Einzelpreis, Währung, Incoterm,
+  Fracht, Zahlungsstand. Unleserliches sagst du als unleserlich — nicht raten.
+- Gleiche vor einem Vorschlag ab, was es schon gibt: den Lieferanten (partners mit
+  is_vendor, Name/Website/E-Mail) und die Artikel (product_variants: sku, Name, Maße)
+  per sql_abfrage. Gibt es den Lieferanten oder einen Artikel nicht, legt
+  einkauf.bestellung_erfassen ihn mit an (lieferant_neu bzw. artikel_neu/sku_neu je
+  Position) — kein getrennter Vorschlag nötig.
+- Eine bereits getätigte Bestellung (bezahlt, Ware unterwegs) erfasst du mit GENAU EINEM
+  Vorschlag einkauf.bestellung_erfassen: Preise in der Belegwährung, Fracht als
+  versandkosten, bestaetigen = true (der Wareneingang wird erwartet), bezahlt = true mit
+  bezahlt_betrag und bezahlt_am, referenz = Belegnummer. Rechne keine Beträge in Euro um.
+- Ist der Lieferant oder eine Zuordnung unklar, frag nach, statt zu raten.
 ${SCHEMA_DOKU}${finanzen ? SCHEMA_DOKU_FINANZEN : ''}${kontext === 'werkstatt' ? werkstattSystemZusatz() : ''}`
 
 /**
@@ -154,6 +170,8 @@ export type KiEvent =
 export interface ChatTurn {
   role: 'user' | 'assistant'
   text: string
+  /** Bilder und PDFs zur Nachricht (nur Benutzer-Nachrichten). */
+  anhaenge?: ChatAnhang[]
 }
 
 /**
@@ -177,14 +195,19 @@ export async function runAgent(
   // Modellwahl je Ebene aus den Einstellungen (modelle.ts) — Betreiber-Sache.
   const model = await kiModell(sql, 'auswertung')
 
-  const frage = history.at(-1)?.text ?? ''
-  await sql`select log_event('ki', ${requestId}, 'note', ${'Frage: ' + frage.slice(0, 500)}, ${actor})`
+  const letzte = history.at(-1)
+  const frage = letzte?.text ?? ''
+  const anhangNamen = (letzte?.anhaenge ?? []).map((a) => a.name)
+  await sql`select log_event('ki', ${requestId}, 'note',
+    ${'Frage: ' + frage.slice(0, 500) + (anhangNamen.length ? ` [Anhänge: ${anhangNamen.join(', ')}]` : '')},
+    ${actor})`
 
-  // Ältere Runden als reiner Text; die Tool-/Denk-Blöcke der laufenden
-  // Anfrage werden innerhalb der Schleife vollständig mitgeführt.
+  // Ältere Runden als reiner Text (plus ihre Anhänge, solange der Browser
+  // sie mitschickt); die Tool-/Denk-Blöcke der laufenden Anfrage werden
+  // innerhalb der Schleife vollständig mitgeführt.
   const messages: Anthropic.Messages.MessageParam[] = history.map((t) => ({
     role: t.role,
-    content: t.text,
+    content: t.role === 'user' ? nachrichtInhalt(t.text, t.anhaenge) : t.text,
   }))
 
   // Prompt-Caching, zwei Anker: ein fester auf dem Systemprompt (deckt als

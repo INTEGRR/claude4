@@ -32,6 +32,44 @@ draft/sent/purchase ──(Stornieren)──▶ cancel ──(Auf Entwurf setzen
 
 Variante, Beschreibung, **Menge + Einkaufs-Maßeinheit**, Einzelpreis, Steuersatz; berechnete Spalten **Erhalten** (`qty_received`, aus validierten Eingängen, in Einkaufs-UoM zurückgerechnet) und **Abgerechnet** (`qty_billed`, aus gebuchten Rechnungen).
 
+## Bestellung aus Beleg erfassen (`einkauf.bestellung_erfassen`)
+
+Für Bestellungen, die außerhalb von KRNL schon liefen: per Alibaba
+bestellt und bezahlt, die Commercial Invoice liegt vor, die Ware ist
+unterwegs. Eine Aktion (`ki`, prozessfrei als alternativer Einstieg wie
+`bestellung_mit_positionen`) macht in **einer** Transaktion:
+
+- **Lieferant** auflösen (Name, Referenz, ID); mit `lieferant_neu` und
+  `lieferant_land` anlegen (Firma, Lieferant, Standardwährung und
+  -Incoterm aus dem Beleg). Ein vorhandener gewinnt immer — es entsteht
+  kein Doppelter.
+- **Positionen**: `produkt` (vorhanden) oder `artikel_neu` + `sku_neu`
+  (neues Kaufteil, einkaufbar, Route kaufen; eine schon vergebene SKU wird
+  wiederverwendet statt verdoppelt). Preise bleiben in der Belegwährung —
+  `purchase_order_lines.price_unit` hat sechs Nachkommastellen, 0,011 USD
+  passt.
+- **Kopf**: `waehrung`, `incoterm_code`, `referenz` → `vendor_reference`,
+  `eta` → `expected_arrival`, Notiz mit Belegnummer.
+- `versandkosten` → Dienstleistungszeile „Fracht laut Beleg" (der Artikel
+  wird einmal angelegt); Dienstleistungen kommen nicht in den Wareneingang.
+- `bestaetigen` (Vorgabe) → `confirm_purchase_order`: Kurs eingefroren,
+  Wareneingang entsteht; `bestelldatum` setzt `confirmed_at` auf den
+  Belegtag zurück (im Entwurf wird es `order_deadline`).
+- `bezahlt` → Zahlplan-Rate „Vorkasse 100 %" (fester `betrag` =
+  `bezahlt_betrag`, sonst 100 % der Bestellsumme) und
+  `zahlung_erfassen(… 'po_rate' …)` in Belegwährung am `bezahlt_am` — die
+  Zahlung steht damit im Register (Finanzen) und die Rate ist bezahlt.
+- Fehlt ein Kurs für die Währung, rechnet KRNL 1:1 und sagt es im Ergebnis
+  (EZB-Kurse holen).
+
+Der Beleg selbst wird vom KI-Chat über **`einkauf.beleg_ablegen`**
+(beleggebunden, nicht `ki`) an der Bestellung abgelegt: Inhalt base64 im
+Aufruf, Drive-Upload in einem Stück, Dublettenprüfung über md5 je
+Lieferant wie bei Mail-Anhängen, Verweise auf Bestellung und Lieferant,
+danach liest der Dokument-Leser des Einkaufs die Datei. Nachweis:
+[`tests/prozesse/bestellung-erfassen.test.ts`](../../tests/prozesse/bestellung-erfassen.test.ts),
+Schema und Zeilenregel in `tests/ki-anhaenge.test.ts`.
+
 ## Wareneingang & Rückstände
 
 - Eingang wird im Lager-Modul abgearbeitet (Liste „Wareneingänge"). Validieren bucht `Partner/Lieferanten → WH/Stock`, aktualisiert `qty_received` und den Bestand.

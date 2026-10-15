@@ -1,6 +1,55 @@
 import { z } from 'zod'
 import { positionenSchema, type PositionsZeile, type RegistrierteAktion } from './typen.ts'
 
+const DATUM = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum als JJJJ-MM-TT')
+
+/**
+ * Position eines Belegs (Commercial Invoice, Pro-forma): entweder ein
+ * vorhandener Artikel (`produkt`) oder ein neues Kaufteil (`artikel_neu`,
+ * optional `sku_neu`). Flach gehalten, damit der Vorschlagseditor im KI-Chat
+ * sie als Tabelle mit editierbaren Zellen zeigt.
+ */
+export const belegPositionSchema = z.object({
+  produkt: z.string().max(200).optional().describe('SKU, Barcode, Name oder ID eines VORHANDENEN Artikels'),
+  artikel_neu: z.string().max(200).optional().describe('Name eines NEUEN Kaufteils — wenn produkt fehlt'),
+  sku_neu: z.string().max(60).optional().describe('Artikelnummer des neuen Kaufteils'),
+  menge: z.number().positive(),
+  preis: z.number().nonnegative().optional().describe('Netto je Einheit in der Belegwährung'),
+})
+export type BelegPosition = z.infer<typeof belegPositionSchema>
+
+/** Jede Zeile braucht genau einen Weg zum Artikel — die Meldung nennt die Zeile. */
+export function belegPositionenPruefen(positionen: BelegPosition[]): string | null {
+  for (const [i, pos] of positionen.entries()) {
+    const produkt = pos.produkt?.trim()
+    const neu = pos.artikel_neu?.trim()
+    if (!produkt && !neu) return `Position ${i + 1}: produkt (vorhanden) oder artikel_neu (anlegen) angeben`
+    if (produkt && neu) return `Position ${i + 1}: entweder produkt oder artikel_neu — nicht beides`
+  }
+  return null
+}
+
+export const belegBestellungSchema = z.object({
+  lieferant: z.string().min(1).max(200).describe('Name, Referenz oder ID des Lieferanten; mit lieferant_neu der Name des neuen'),
+  lieferant_neu: z.boolean().default(false).describe('Lieferanten anlegen, wenn es ihn noch nicht gibt'),
+  lieferant_land: z.string().length(2).optional().describe('Land des neuen Lieferanten, ISO-2 (z. B. CN)'),
+  lieferant_email: z.string().email().max(200).optional(),
+  positionen: z.array(belegPositionSchema).min(1).max(50),
+  waehrung: z.string().length(3).default('EUR').describe('ISO-Code der Belegwährung, z. B. USD'),
+  incoterm_code: z.string().max(10).optional().describe('z. B. DDP, FOB, EXW'),
+  referenz: z.string().max(80).optional().describe('Belegnummer des Lieferanten (Rechnung, PI)'),
+  bestelldatum: DATUM.optional(),
+  eta: DATUM.optional().describe('Erwartete Ankunft'),
+  versandkosten: z.number().nonnegative().optional().describe('Fracht laut Beleg in der Belegwährung — wird eine Dienstleistungszeile'),
+  hinweis: z.string().max(500).optional(),
+  bestaetigen: z.boolean().default(true).describe('Gleich bestätigen — die Ware ist bestellt, der Wareneingang wird erwartet'),
+  bezahlt: z.boolean().default(false).describe('Schon bezahlt — Vorkasse 100 % wird als bezahlt vermerkt'),
+  bezahlt_betrag: z.number().positive().optional().describe('Gezahlter Betrag in der Belegwährung (leer = Bestellsumme)'),
+  bezahlt_am: DATUM.optional(),
+  beleg_art: z.enum(['ci', 'pi', 'rechnung', 'sonstiges']).optional().describe('Art des angehängten Belegs: ci = Commercial Invoice, pi = Pro-forma'),
+})
+export type BelegBestellung = z.infer<typeof belegBestellungSchema>
+
 /**
  * Aktionen des Einkaufs: Bestellung, Lieferantenrechnung,
  * Einstandsnebenkosten und Wechselkurse. Die Statusübergänge stehen auf
@@ -46,6 +95,42 @@ export const EINKAUF = {
       `Bestellung bei ${p.lieferant} mit ${p.positionen.length} Position(en): ` +
       p.positionen.map((pos: PositionsZeile) => `${pos.menge} × ${pos.produkt}`).join(', '),
     revalidate: ['/einkauf'],
+  },
+
+  'einkauf.bestellung_erfassen': {
+    label: 'Bestellung aus Beleg erfassen',
+    bereich: 'einkauf',
+    ki: true,
+    beschreibung:
+      'Erfasst eine bereits außerhalb getätigte Bestellung aus einem Beleg (Commercial Invoice, ' +
+      'Pro-forma, Auftragsbestätigung) in EINEM Zug. lieferant: Name/Referenz/ID — oder mit ' +
+      'lieferant_neu = true neu anlegen (dann lieferant_land ISO-2, optional lieferant_email). ' +
+      'positionen je Zeile: produkt (SKU/Barcode/Name/ID eines vorhandenen Artikels) ODER ' +
+      'artikel_neu (Name eines neuen Kaufteils) + sku_neu; menge; preis netto je Einheit in der ' +
+      'Belegwährung. waehrung (ISO, z. B. USD), incoterm_code (DDP, FOB …), referenz = Belegnummer, ' +
+      'versandkosten = Fracht laut Beleg (Dienstleistungszeile), eta. bestaetigen = true bestätigt ' +
+      'sofort (Wareneingang wird erwartet); bezahlt = true vermerkt Vorkasse 100 % als bezahlt ' +
+      '(bezahlt_betrag in Belegwährung, bezahlt_am). beleg_art benennt den Anhang (ci, pi, rechnung). ' +
+      'Beträge bleiben in der Belegwährung — nichts in Euro umrechnen.',
+    bindung: 'frei',
+    modell: 'purchase_order',
+    uebergang: { von: [], nach: ['draft', 'purchase'] },
+    // Alternativer Einstieg wie bestellung_mit_positionen: die nachträgliche
+    // Erfassung einer Bestellung, die außerhalb von KRNL schon lief (Beleg
+    // im KI-Chat). Landet je nach `bestaetigen` in draft oder purchase —
+    // deshalb kein eigener Prozessschritt (Entscheidungslog 2026-10-15).
+    prozessfrei: true,
+    schema: belegBestellungSchema,
+    zusammenfassung: (p) =>
+      `Bestellung bei ${p.lieferant}${p.lieferant_neu ? ' (neu)' : ''} in ${p.waehrung}` +
+      `${p.referenz ? `, Beleg ${p.referenz}` : ''}: ` +
+      p.positionen
+        .map((pos: BelegPosition) => `${pos.menge} × ${pos.produkt?.trim() || `${pos.artikel_neu ?? '?'} (neu)`}`)
+        .join(', ') +
+      (p.versandkosten ? ` + Fracht ${p.versandkosten}` : '') +
+      (p.bestaetigen ? ' — bestätigt' : ' — Entwurf') +
+      (p.bezahlt ? `, bezahlt${p.bezahlt_betrag ? ` ${p.bezahlt_betrag} ${p.waehrung}` : ''}` : ''),
+    revalidate: ['/einkauf', '/lager/zulauf', '/finanzen'],
   },
 
   'einkauf.position_hinzufuegen': {
