@@ -280,6 +280,13 @@ export interface ShopifyOrder {
   tags: string[]
   displayFinancialStatus: string | null
   displayFulfillmentStatus: string | null
+  /** Fulfillments des Shops — bei Versand außerhalb von KRNL (Sendcloud) die einzige Spur mit Tracking. */
+  fulfillments?: {
+    id: string
+    status: string
+    createdAt: string
+    trackingInfo: { company: string | null; number: string | null; url: string | null }[]
+  }[]
   cancelledAt: string | null
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } }
   customer: {
@@ -323,6 +330,10 @@ const ORDER_FIELDS = `
   tags
   displayFinancialStatus
   displayFulfillmentStatus
+  fulfillments(first: 10) {
+    id status createdAt
+    trackingInfo(first: 5) { company number url }
+  }
   cancelledAt
   totalPriceSet { shopMoney { amount currencyCode } }
   customer { id firstName lastName defaultEmailAddress { emailAddress } }

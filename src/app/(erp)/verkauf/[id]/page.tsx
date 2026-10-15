@@ -111,9 +111,18 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     order by l.sequence`
 
   const pickings = await sql<
-    { id: string; number: string; state: string; kind: string; type_name: string; date_done: string | null }[]
+    {
+      id: string
+      number: string
+      state: string
+      kind: string
+      type_name: string
+      date_done: string | null
+      extern: string | null
+    }[]
   >`
-    select p.id, p.number, p.state, ot.kind, ot.name as type_name, p.date_done
+    select p.id, p.number, p.state, ot.kind, ot.name as type_name, p.date_done,
+           nullif(concat_ws(' ', p.extern_versand ->> 'carrier', p.extern_versand ->> 'nummer'), '') as extern
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
     where p.origin_model = 'sales_order' and p.origin_id = ${id} order by p.created_at`
@@ -579,7 +588,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <tr key={p.id}>
                       <td className="mono"><Link href={`/lager/${p.id}`}>{p.number}</Link></td>
                       <td className="small">{p.type_name}</td>
-                      <td><Badge state={p.state} kind="picking" href={`/lager/${p.id}`} /></td>
+                      <td>
+                        <Badge state={p.state} kind="picking" href={`/lager/${p.id}`} />
+                        {p.extern !== null && (
+                          <span className="small muted" title="Versand außerhalb von KRNL — der Shop meldet das Fulfillment">
+                            {' '}extern{p.extern ? ` · ${p.extern}` : ''}
+                          </span>
+                        )}
+                      </td>
                       <td className="mono nowrap">{date(p.date_done)}</td>
                     </tr>
                   ))}

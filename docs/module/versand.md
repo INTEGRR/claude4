@@ -524,6 +524,7 @@ lassen sich wie beim Label überschreiben.
 - Fehlerbilder behandeln (aus der Sendcloud-Praxis bekannt): `nonFulfillableQuantity > 0`, fehlende Location, Rate-Limits → Retry mit Backoff, nach 10 Versuchen Fehler-Aktivität am Auftrag.
 - Tracking-Korrektur (z. B. Label storniert + neu erstellt): `fulfillmentTrackingInfoUpdate`.
 - Der `ready-to-ship`-Tag entfällt als Versand-Trigger (das machte nur für Sendcloud Sinn). Optional bleibt ein konfigurierbarer Status-Tag (z. B. `in-fertigung`) als Info im Shopify-Admin — Default: aus.
+- **Umgekehrt** (seit 2026-10-15): meldet der Shop ein Fulfillment, zu dem KRNL keine Sendung hat (Versand noch über Sendcloud), bucht KRNL den Warenausgang nach und hängt die Trackingdaten des Shops an die Lieferung (`extern_versand`, auf der Lieferungsseite als Hinweis); eine eigene Rückmeldung entsteht dann nicht. Prozessschritt „Im Shop versendet (extern)" in `shopify_bestellung_versand` (0111).
 
 ## Retouren (DHL Returns API)
 

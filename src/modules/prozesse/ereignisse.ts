@@ -34,6 +34,14 @@ export const EREIGNISSE = {
     beschreibung: 'Handkorrektur im Shop-Admin; Abweichungen werden erkannt und überschrieben.',
     quelle: 'shopify webhook inventory_levels/update',
   },
+  'shop:bestellung_versendet': {
+    label: 'Bestellung im Shop versendet',
+    beschreibung:
+      'Der Shop meldet die Bestellung als erfüllt, ohne dass KRNL eine Sendung dazu hat (Versand ' +
+      'außerhalb, z. B. Sendcloud): der Warenausgang wird gebucht, die Trackingdaten stehen an der ' +
+      'Lieferung, eine noch offene Fertigung wird zur Nachfrage ans Team Fertigung.',
+    quelle: 'shopify webhook orders/updated (displayFulfillmentStatus FULFILLED) + Abgleich',
+  },
   'sendung:zugestellt': {
     label: 'Sendung zugestellt',
     beschreibung: 'Der Paketdienst meldet die Zustellung; die Sendung ist damit abgeschlossen.',

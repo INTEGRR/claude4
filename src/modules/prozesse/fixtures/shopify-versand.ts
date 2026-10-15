@@ -124,6 +124,54 @@ export async function shopStornoEinspeisen(sql: Sql, auftragId: string): Promise
 }
 
 /**
+ * Versand außerhalb von KRNL (2026-10-15): Sendcloud hat die Sendung
+ * erzeugt, Shopify meldet die Bestellung als erfüllt — als Webhook
+ * orders/updated, verarbeitet wie im Betrieb. KRNL zieht nach: Warenausgang,
+ * Trackingdaten an der Lieferung, Nachfrage an die Fertigung.
+ */
+export async function shopVersandEinspeisen(sql: Sql, auftragId: string): Promise<void> {
+  const [auftrag] = await sql<{ shopify_order_id: string }[]>`
+    select shopify_order_id from sales_orders where id = ${auftragId}`
+  assert.ok(auftrag?.shopify_order_id, 'kein Shop-Auftrag')
+  const gid = auftrag.shopify_order_id
+  const nummer = gid.split('/').pop()
+
+  const { fakeOrderHolen, fakeOrderHinterlegen } = await import('../../integrationen/shopify-fake.ts')
+  const bestellung = fakeOrderHolen(gid)
+  assert.ok(bestellung, `keine hinterlegte Fake-Bestellung ${gid}`)
+  fakeOrderHinterlegen({
+    ...bestellung,
+    displayFulfillmentStatus: 'FULFILLED',
+    fulfillments: [
+      {
+        id: `gid://shopify/Fulfillment/${nummer}`,
+        status: 'SUCCESS',
+        createdAt: '2026-10-15T09:00:00Z',
+        trackingInfo: [
+          {
+            company: 'DHL',
+            number: `JJD0146000030${nummer}`,
+            url: `https://tracking.sendcloud.sc/forward?carrier=dhl&code=JJD0146000030${nummer}`,
+          },
+        ],
+      },
+    ],
+  } as { id: string })
+
+  const webhook = `prozesstest-versand-${nummer}`
+  await sql`
+    insert into shopify_webhook_events (webhook_id, topic, shopify_order_id, payload)
+    values (${webhook}, 'orders/updated', ${gid}, ${sql.json({ id: gid })})
+    on conflict (webhook_id) do nothing`
+  const { processPendingWebhooks } = await import('../../integrationen/import.ts')
+  await processPendingWebhooks(10)
+  const [ev] = await sql<{ status: string; error: string | null }[]>`
+    select status, error from shopify_webhook_events where webhook_id = ${webhook}`
+  assert.equal(ev.status, 'done', `Versand-Webhook: ${ev.status}${ev.error ? ` — ${ev.error}` : ''}`)
+  assert.match(ev.error ?? '', /im Shop versendet/, 'der Import muss den externen Versand nachziehen')
+}
+
+/**
  * Klärfall provozieren: eine bezahlte Bestellung mit UNBEKANNTER SKU. Der
  * Import legt den Auftrag OHNE die Position an (Entwurf, kein Picking) und
  * schreibt die Klärzeile — der Prozess wartet am matching-Schritt. Liefert
@@ -515,6 +563,104 @@ export const SHOPIFY_VERSAND: ProzessFixture = {
           where s.picking_id = ${pickingId}`
         assert.ok(druck, 'der Druckauftrag muss eingereiht sein')
         assert.equal(druck.status, 'offen')
+      },
+    },
+    {
+      // Sendcloud läuft parallel (2026-10-15): die Sendung entsteht dort,
+      // Shopify meldet FULFILLED — KRNL bucht den Warenausgang nach, ohne
+      // eigene Rückmeldung an den Shop.
+      name: 'Versand außerhalb von KRNL: der Shop meldet Fulfillment, KRNL bucht nach',
+      pfad: ['bestellung', 'shop_versendet'],
+      ereignisse: {
+        bestellung: bestellungEinspeisen,
+        shop_versendet: (ctx, sql) => shopVersandEinspeisen(sql, ctx.p4AuftragId),
+      },
+      pruefen: async (sql, ctx, pickingId) => {
+        const [picking] = await sql<{ state: string; extern: { carrier: string; nummer: string; url: string } | null }[]>`
+          select state, extern_versand as extern from stock_pickings where id = ${pickingId}`
+        assert.equal(picking.state, 'done', 'der Warenausgang ist gebucht')
+        assert.equal(picking.extern?.carrier, 'DHL')
+        assert.match(picking.extern?.nummer ?? '', /^JJD0146000030/)
+        assert.match(picking.extern?.url ?? '', /sendcloud/)
+
+        const [auftrag] = await sql<{ delivery_status: string | null }[]>`
+          select delivery_status from sales_orders where id = ${ctx.p4AuftragId}`
+        assert.equal(auftrag.delivery_status, 'full', 'der Auftrag ist geliefert')
+
+        // Keine eigene Sendung, keine eigene Shop-Rückmeldung — der Shop hat sie schon.
+        const [{ sendungen }] = await sql<{ sendungen: number }[]>`
+          select count(*)::int as sendungen from shipments where picking_id = ${pickingId}`
+        assert.equal(sendungen, 0)
+        const [{ jobs }] = await sql<{ jobs: number }[]>`
+          select count(*)::int as jobs from integration_jobs
+          where kind = 'shopify_fulfillment_create' and status = 'pending'`
+        assert.equal(jobs, 0, 'keine Rückmeldung an den Shop eingereiht')
+
+        // Ohne Fertigung keine Nachfrage.
+        const [{ aufgaben }] = await sql<{ aufgaben: number }[]>`
+          select count(*)::int as aufgaben from aufgaben
+          where titel like 'Extern versendet:%' and beschreibung like ${`%/verkauf/${ctx.p4AuftragId}%`}`
+        assert.equal(aufgaben, 0)
+
+        // Der Prozess bietet nichts mehr an — die Lieferung ist am Ende.
+        const naechste = await sql<{ code: string }[]>`
+          select code from prozess_naechste_schritte('shopify_bestellung_versand', ${pickingId})`
+        assert.deepEqual(naechste.map((n) => n.code), [])
+      },
+    },
+    {
+      // Dieselbe Meldung bei einem Produktionsartikel: die Tastatur ging raus,
+      // der Fertigungsauftrag ist noch offen — KRNL bucht und fragt nach.
+      name: 'Versand außerhalb von KRNL bei offener Fertigung: Nachfrage ans Team Fertigung',
+      pfad: ['bestellung', 'shop_versendet'],
+      ereignisse: {
+        bestellung: mtoBestellungEinspeisen,
+        shop_versendet: (ctx, sql) => shopVersandEinspeisen(sql, ctx.p4MtoAuftragId),
+      },
+      pruefen: async (sql, ctx, pickingId) => {
+        const [picking] = await sql<{ state: string }[]>`
+          select state from stock_pickings where id = ${pickingId}`
+        assert.equal(picking.state, 'done', 'gebucht trotz fehlender Reservierung')
+
+        // Der Fertigungsauftrag bleibt offen — entscheidet der Mensch.
+        const [mo] = await sql<{ state: string; variant_id: string; number: string }[]>`
+          select state, variant_id, number from manufacturing_orders where id = ${ctx.p4MtoMoId}`
+        assert.equal(mo.state, 'confirmed')
+
+        // Das Erzeugnis steht sichtbar im Minus, bis die Fertigung nachgezogen ist.
+        const [{ bestand }] = await sql<{ bestand: number }[]>`
+          select on_hand_qty(${mo.variant_id}) as bestand`
+        assert.equal(Number(bestand), -1)
+
+        // Die Nachfrage als Aufgabe fürs Team Fertigung — einmal je Auftrag.
+        const aufgaben = await sql<{ titel: string; rolle: string; beschreibung: string; status: string }[]>`
+          select titel, rolle::text as rolle, beschreibung, status::text as status from aufgaben
+          where titel like 'Extern versendet:%' and beschreibung like ${`%/verkauf/${ctx.p4MtoAuftragId}%`}`
+        assert.equal(aufgaben.length, 1, 'genau eine Nachfrage')
+        assert.equal(aufgaben[0].rolle, 'fertigung')
+        assert.equal(aufgaben[0].status, 'offen')
+        assert.ok(aufgaben[0].titel.includes(mo.number), 'der Titel nennt den Fertigungsauftrag')
+        assert.match(aufgaben[0].beschreibung, /Fertig melden/)
+        assert.match(aufgaben[0].beschreibung, /stornieren/)
+
+        // Entscheidung „ja, gebaut": Fertig melden verbraucht das Material,
+        // das Erzeugnis geht ins Lager — der Bestand ist wieder bei null.
+        const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+        await aktionAusfuehrenGeprueft(
+          'fertigung.fertig_melden',
+          { parameter: { mengen: {}, backorder: true }, recordId: ctx.p4MtoMoId },
+          { name: 'prozesstest', role: 'admin' },
+        )
+        const [{ danach }] = await sql<{ danach: number }[]>`
+          select on_hand_qty(${mo.variant_id}) as danach`
+        assert.equal(Number(danach), 0)
+
+        // Ein zweiter Webhook legt keine zweite Nachfrage an.
+        await shopVersandEinspeisen(sql, ctx.p4MtoAuftragId).catch(() => undefined)
+        const [{ n }] = await sql<{ n: number }[]>`
+          select count(*)::int as n from aufgaben
+          where titel like 'Extern versendet:%' and beschreibung like ${`%/verkauf/${ctx.p4MtoAuftragId}%`}`
+        assert.equal(n, 1)
       },
     },
     {

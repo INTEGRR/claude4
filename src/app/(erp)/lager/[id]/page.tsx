@@ -60,12 +60,13 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       note: string | null
       user_id: string | null
       priority: string
+      extern_versand: { carrier: string | null; nummer: string | null; url: string | null; am: string } | null
     }[]
   >`
     select p.id, p.number, ot.kind, ot.name as type_name, p.state, part.name as partner,
            p.partner_id, p.origin_model, p.origin_id, p.origin_label, p.scheduled_date, p.date_done,
            bo.number as backorder_of, p.backorder_of_id, ro.number as return_of, p.return_of_id, p.note,
-           p.user_id, p.priority
+           p.user_id, p.priority, p.extern_versand
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
     left join partners part on part.id = p.partner_id
@@ -294,6 +295,29 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
           <span className="led ok" />{' '}
           Validiert am {date(picking.date_done)}. Erledigte Transfers sind unveränderlich — Korrekturen
           laufen über eine Retoure.
+        </div>
+      )}
+      {/* Versand außerhalb von KRNL (Sendcloud → Shopify, 2026-10-15): der Shop
+          hat das Fulfillment, KRNL hat nur nachgebucht — die Spur steht hier. */}
+      {picking.extern_versand && (
+        <div className="notice info">
+          <span className="led wichtig" />{' '}
+          Außerhalb von KRNL versendet — der Shop meldet das Fulfillment
+          {picking.extern_versand.carrier || picking.extern_versand.nummer ? (
+            <>
+              {' '}({[picking.extern_versand.carrier, picking.extern_versand.nummer].filter(Boolean).join(' ')}
+              {picking.extern_versand.url && (
+                <>
+                  {' · '}
+                  <a href={picking.extern_versand.url} target="_blank" rel="noreferrer">Sendung verfolgen</a>
+                </>
+              )}
+              )
+            </>
+          ) : (
+            ' (ohne Trackingdaten)'
+          )}
+          , gemeldet am {date(picking.extern_versand.am)}. Keine eigene Shop-Rückmeldung.
         </div>
       )}
 

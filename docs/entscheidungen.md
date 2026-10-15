@@ -9,6 +9,46 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-15 — Versand außerhalb von KRNL: der Shop meldet, KRNL zieht nach
+
+**Anlass (Betreiber):** „Aus Shopify werden keine Updates an die
+Verkaufsaufträge zum Thema Versand gemacht. Aktuell shippen wir parallel
+noch via Sendcloud, d. h. Versand-Updates werden aus Sendcloud in Shopify
+abgelegt, aber in KRNL stehen diese Aufträge dann noch auf unfertig. Das
+muss geupdated werden: Statusänderung, Lieferauftrag abgeschlossen und eine
+Nachfrage an uns, ob die Fertigung bereits durchgeführt wurde — als Todo
+oder Liste für den User."
+
+**Entschieden:**
+- **Der Shop führt beim Versand, solange Sendcloud läuft** — wie beim
+  Storno (2026-10-02). Meldet Shopify eine Order als `FULFILLED` und KRNL
+  hat selbst keine Sendung dazu, bucht der Import den Warenausgang der
+  offenen Lieferungen (`picking_validate`, kein Rückstand): Lieferung
+  erledigt, Auftrag geliefert, Trackingdaten des Shops an der Lieferung
+  (`stock_pickings.extern_versand`). Keine eigene Shop-Rückmeldung.
+- **Hat KRNL selbst versendet, passiert nichts** — Shopify meldet dann nur
+  unsere eigene Rückmeldung zurück. Erkennung: Sendung (`shipments`) zur
+  Lieferung des Auftrags.
+- **Die Fertigung entscheidet ein Mensch.** Ein noch offener
+  Fertigungsauftrag wird nicht stillschweigend fertig gemeldet oder
+  storniert, sondern zur Aufgabe fürs Team Fertigung (eine je Auftrag,
+  Doppel-Schutz über den Titel): „Fertig melden" verbraucht Material und
+  bucht das Erzeugnis, „stornieren" heißt Bestand per Inventur korrigieren.
+  Bis dahin steht das Erzeugnis sichtbar im Minus — ehrlicher als ein
+  stiller Verbrauch.
+- **Prozess als Daten:** neue Version von `shopify_bestellung_versand` mit
+  dem optionalen Ereignisschritt „Im Shop versendet (extern)"
+  (`shop:bestellung_versendet`); die Shop-Rückmeldung bleibt nur auf dem
+  eigenen Versandweg. Kein zweites Zustandsmodell — der Belegstatus
+  (`done`) bleibt die Wahrheit, `extern_versand` ist eine Tatsache am Beleg.
+- Nicht gemacht: Teil-Fulfillments (erst wenn der Shop alles erfüllt
+  meldet, wird gebucht) und das Rückschreiben von Sendcloud-Tracking in
+  KRNL-Sendungen (es gibt keine).
+
+Doku: [module/integrationen.md](module/integrationen.md) (Order-Import),
+[module/verkauf.md](module/verkauf.md), [module/versand.md](module/versand.md),
+[prozesse.md](prozesse.md) (Phase 5b).
+
 ## 2026-10-15 — KI-Chat liest Belege; Bestellung aus Beleg in einem Zug
 
 **Anlass (Betreiber):** „Ich brauche im KI-Modus die Möglichkeit, Bilder

@@ -2,6 +2,7 @@ import 'server-only'
 import type { TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
 import { splitStreet } from '@/modules/shared/address'
+import { externVersandNachziehen } from '@/modules/verkauf/extern-versand'
 import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { fetchOrder, type ShopifyOrder } from './shopify'
 import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
@@ -185,11 +186,14 @@ export async function importShopifyOrder(
       // der Bestellung) und — wenn nichts mehr offen ist und bezahlt wurde —
       // bestätigen. Deckt auch „erst importiert, später bezahlt" ab.
       if (existing.state !== 'draft') {
+        // Versand außerhalb von KRNL (Sendcloud → Shopify, 2026-10-15): der
+        // Shop meldet FULFILLED, KRNL hat keine Sendung — nachziehen.
+        const extern = await externVersandNachziehen(t, existing.id, order)
         return {
           salesOrderId: existing.id,
           created: false,
           unmatched: 0,
-          message: `${order.name} war bereits importiert`,
+          message: extern ?? `${order.name} war bereits importiert`,
         }
       }
 

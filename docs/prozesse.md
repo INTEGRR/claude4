@@ -292,6 +292,14 @@ start → ereignis „Bestellung eingegangen" (shop:bestellung_eingegangen, conf
   (regeln.ts, Versicherungswert jetzt über `select gross from …`).
 - Noch offen für später: der matching-Schritt (Klärliste als Prozessschritt,
   sobald die Auflöse-Aktion registriert ist) und ein Storno-Zweig.
+- **Versand außerhalb von KRNL** (0111, Entscheidungslog 2026-10-15): der
+  optionale Ereignisschritt „Im Shop versendet (extern)"
+  (`shop:bestellung_versendet`) hängt an Bestellung, Fertigung,
+  Verfügbarkeit und Kommissionieren (nur Shop-Aufträge) und führt zum
+  gebuchten Warenausgang; die Kante Buchen → Shop-Rückmeldung gilt nur noch
+  ohne `extern_versand`, sonst geht es direkt zum Ende. Die Fixture spielt
+  beide Fälle (mit und ohne offene Fertigung) über den künstlichen
+  `orders/updated`-Webhook durch.
 
 ## Phase 6a — Laufzeit-Overrides mit Verwaltung (umgesetzt)
 
