@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Reparaturauftrag druckbar: ein Blatt für Werkstatt und Kunde, Rahmen mit der Rechnung geteilt
+
+**Entschieden:** Jeder Reparaturauftrag hat einen Ausdruck (PDF, Knopf im
+Kopf der Reparaturseite): vor dem Abschluss „Reparaturauftrag" (Gerät
+annehmen, Fehlerbild, Teile, Befund-Linien, Unterschriften), danach
+„Reparaturbericht" (gebuchte Teile mit Preisen bei kostenpflichtigen
+Aufträgen, Verlauf). Die RMA-Nummer steht als Barcode darauf.
+
+**Warum:** Die Werkstatt braucht ein Blatt am Gerät, der Kunde eine
+Bestätigung bei Übergabe und Rückgabe. Ein Dokument mit statusabhängigem
+Titel statt zweier Vorlagen — der Belegstatus bleibt die Zustandswahrheit.
+
+**Umsetzung:** Der Belegrahmen der Kundenrechnung (Firmendaten,
+Anschriftblock, Stile, Fuß mit Pflichtangaben, Seitenzahl) ist nach
+`src/modules/shared/beleg-pdf.ts` gezogen; Rechnung und Reparaturauftrag
+teilen ihn, künftige Belege (Lieferschein, Angebot) auch.
+`src/modules/reparatur/auftrag-pdf.ts`, Route `/api/reparatur/[id]/pdf`
+(lesend, Bereich Reparatur), Doku Modul Reparatur, Fixture-Lauf prüft das
+Rendern.
+
 ## 2026-10-16 — Kundenrechnungen aus KRNL: Rechnung mit der Lieferung, Korrektur nur per Gutschrift, Shop-Änderungen folgen
 
 **Entschieden:** Rechnungen an Kunden stellt KRNL aus, nicht mehr die

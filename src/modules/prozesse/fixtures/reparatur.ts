@@ -50,6 +50,13 @@ export const REPARATUR: ProzessFixture = {
           where rp.repair_id = ${recordId} and rp.variant_id = ${ctx.teilId}`
         assert.equal(teil.state, 'done')
         assert.equal(Number(teil.qty_done), 2)
+
+        // Der Ausdruck (2026-10-16): nach dem Abschluss ein Reparaturbericht mit Teilen und Preisen.
+        const { reparaturPdf, reparaturTitel } = await import('../../reparatur/auftrag-pdf.ts')
+        const pdf = await reparaturPdf(recordId)
+        assert.equal(pdf.bytes.subarray(0, 4).toString(), '%PDF')
+        assert.match(pdf.dateiname, /\.pdf$/)
+        assert.equal(reparaturTitel(pdf.daten.state), 'Reparaturbericht')
       },
     },
     {

@@ -1,6 +1,21 @@
 import { createElement as h, type ReactElement } from 'react'
-import { Document, Page, StyleSheet, Text, View, renderToBuffer } from '@react-pdf/renderer'
+import { Document, Page, Text, View, renderToBuffer } from '@react-pdf/renderer'
 import { sql } from '@/db/client'
+import {
+  type Anschrift,
+  type Firma,
+  absenderZeile,
+  anschriftZeilen,
+  belegFuss,
+  belegStile as s,
+  datenZeile,
+  datum,
+  firmaLaden,
+  geld,
+  menge,
+  r2,
+  seitenzahl,
+} from '@/modules/shared/beleg-pdf'
 
 /**
  * Kundenrechnung, Gutschrift und Mahnung als PDF (0115, Entscheidungslog
@@ -14,38 +29,6 @@ import { sql } from '@/db/client'
  * Aufträge Nettopreise mit „zzgl. USt" (Firmenkunde). Bewusst ohne JSX
  * (createElement), damit die Prozesstests dasselbe unter blankem Node rendern.
  */
-
-interface Firma {
-  name?: string
-  street?: string
-  house?: string
-  zip?: string
-  city?: string
-  country?: string
-  email?: string
-  phone?: string
-  web?: string
-  ust_id?: string
-  steuernummer?: string
-  registergericht?: string
-  handelsregister?: string
-  geschaeftsfuehrung?: string
-  iban?: string
-  bic?: string
-  bank?: string
-}
-
-interface Anschrift {
-  name?: string | null
-  company?: string | null
-  street?: string | null
-  house?: string | null
-  street2?: string | null
-  zip?: string | null
-  city?: string | null
-  country?: string | null
-  vat?: string | null
-}
 
 export interface RechnungKopf {
   id: string
@@ -86,66 +69,6 @@ export interface RechnungPosition {
   brutto: number
 }
 
-const LAENDER: Record<string, string> = {
-  DE: 'Deutschland', AT: 'Österreich', CH: 'Schweiz', NL: 'Niederlande', BE: 'Belgien', FR: 'Frankreich',
-  IT: 'Italien', ES: 'Spanien', PL: 'Polen', DK: 'Dänemark', SE: 'Schweden', FI: 'Finnland', NO: 'Norwegen',
-  LU: 'Luxemburg', CZ: 'Tschechien', GB: 'Vereinigtes Königreich', US: 'USA', IE: 'Irland', PT: 'Portugal',
-}
-
-const s = StyleSheet.create({
-  page: { paddingTop: 36, paddingBottom: 110, paddingHorizontal: 48, fontSize: 9.5, fontFamily: 'Helvetica', color: '#111' },
-  kopf: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 26 },
-  marke: { fontSize: 20, fontFamily: 'Helvetica-Bold', letterSpacing: 2 },
-  absender: { fontSize: 7, color: '#444', marginBottom: 8 },
-  anschriftBlock: { width: '55%' },
-  anschrift: { fontSize: 10.5, lineHeight: 1.35 },
-  daten: { width: '40%' },
-  datenZeile: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  datenLabel: { fontSize: 8, color: '#444' },
-  datenWert: { fontSize: 8.5, textAlign: 'right', maxWidth: '60%' },
-  nummerLabel: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  nummerWert: { fontSize: 12, fontFamily: 'Helvetica-Bold', textAlign: 'right' },
-  titel: { fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 10, marginBottom: 12 },
-  text: { fontSize: 9.5, lineHeight: 1.4, marginBottom: 8 },
-  kopfzeile: { flexDirection: 'row', backgroundColor: '#ececec', paddingVertical: 5, paddingHorizontal: 4, fontFamily: 'Helvetica-Bold' },
-  zeile: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#ddd' },
-  cPos: { width: 28 },
-  cText: { flex: 1, paddingRight: 8 },
-  cMenge: { width: 62, textAlign: 'right' },
-  cPreis: { width: 80, textAlign: 'right' },
-  cSumme: { width: 86, textAlign: 'right' },
-  fett: { fontFamily: 'Helvetica-Bold' },
-  klein: { fontSize: 7.5, color: '#555' },
-  summen: { marginTop: 10, alignItems: 'flex-end' },
-  summeZeile: { flexDirection: 'row', width: 300, paddingVertical: 4, paddingHorizontal: 6 },
-  summeGrau: { backgroundColor: '#ececec' },
-  summeLabel: { flex: 1 },
-  summeWert: { width: 110, textAlign: 'right' },
-  hinweis: { marginTop: 18, fontSize: 9, lineHeight: 1.4 },
-  fuss: { position: 'absolute', bottom: 34, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between', fontSize: 7, color: '#555', lineHeight: 1.35 },
-  fussSpalte: { width: '30%' },
-  seite: { position: 'absolute', bottom: 22, right: 48, fontSize: 7, color: '#555' },
-})
-
-const geld = (wert: number, waehrung = 'EUR') =>
-  `${Number(wert).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${waehrung}`
-const menge = (wert: number) => Number(wert).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const datum = (iso: string | null | undefined) =>
-  iso ? new Date(iso.slice(0, 10)).toLocaleDateString('de-DE', { timeZone: 'UTC' }) : '—'
-const r2 = (x: number) => Math.round((x + Number.EPSILON) * 100) / 100
-
-function anschriftZeilen(a: Anschrift): string[] {
-  const land = a.country && a.country !== 'DE' ? (LAENDER[a.country] ?? a.country) : a.country === 'DE' ? 'Deutschland' : null
-  return [
-    a.company && a.company !== a.name ? a.company : null,
-    a.name,
-    [a.street, a.house].filter(Boolean).join(' ') || null,
-    a.street2,
-    [a.zip, a.city].filter(Boolean).join(' ') || null,
-    land,
-  ].filter((z): z is string => Boolean(z))
-}
-
 /** Belegtitel nach Art und Mahnstufe. */
 export function belegTitel(k: Pick<RechnungKopf, 'art' | 'storno_nummer'>, mahnung?: number): string {
   if (mahnung) return ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung'][mahnung - 1] ?? `${mahnung}. Mahnung`
@@ -180,15 +103,6 @@ export function zahlungsHinweis(k: RechnungKopf, firma: Firma): string {
   return `Bitte überweisen Sie den Gesamtbetrag bis zum ${datum(k.faellig_am)} ohne Abzug${bank ? ` auf ${bank}` : ''}. Verwendungszweck: ${k.nummer}.`
 }
 
-function datenZeile(label: string, wert: string | null | undefined, fett = false) {
-  return h(
-    View,
-    { style: s.datenZeile },
-    h(Text, { style: fett ? s.nummerLabel : s.datenLabel }, label),
-    h(Text, { style: fett ? s.nummerWert : s.datenWert }, wert ?? '—'),
-  )
-}
-
 export function rechnungDokument(
   k: RechnungKopf,
   positionen: RechnungPosition[],
@@ -197,9 +111,7 @@ export function rechnungDokument(
 ): ReactElement {
   const brutto = k.quelle === 'shopify'
   const titel = belegTitel(k, optionen.mahnung)
-  const absender = [firma.name, [firma.street, firma.house].filter(Boolean).join(' '), [firma.zip, firma.city].filter(Boolean).join(' ')]
-    .filter(Boolean)
-    .join('  ·  ')
+  const absender = absenderZeile(firma)
   const gruppen = steuerGruppen(positionen)
   const steuerfrei = gruppen.length > 0 && gruppen.every((g) => g.satz === 0)
 
@@ -315,27 +227,7 @@ export function rechnungDokument(
         k.notiz ? h(Text, { style: { ...s.hinweis, color: '#333' } }, k.notiz) : null,
       ]
 
-  const fuss = h(
-    View,
-    { style: s.fuss, fixed: true },
-    h(View, { style: s.fussSpalte },
-      h(Text, null, firma.name ?? ''),
-      h(Text, null, [firma.street, firma.house].filter(Boolean).join(' ')),
-      h(Text, null, [firma.zip, firma.city].filter(Boolean).join(' ')),
-      h(Text, null, firma.country === 'DEU' || !firma.country ? 'Deutschland' : firma.country)),
-    h(View, { style: s.fussSpalte },
-      firma.email ? h(Text, null, `E-Mail: ${firma.email}`) : null,
-      firma.phone ? h(Text, null, `Telefon: ${firma.phone}`) : null,
-      firma.web ? h(Text, null, `Web: ${firma.web}`) : null,
-      firma.iban ? h(Text, null, `IBAN: ${firma.iban}${firma.bic ? ` · BIC: ${firma.bic}` : ''}`) : null,
-      firma.bank ? h(Text, null, firma.bank) : null),
-    h(View, { style: s.fussSpalte },
-      firma.registergericht ? h(Text, null, `Amtsgericht ${firma.registergericht}`) : null,
-      firma.handelsregister ? h(Text, null, `HR-Nr.: ${firma.handelsregister}`) : null,
-      firma.ust_id ? h(Text, null, `USt-ID: ${firma.ust_id}`) : null,
-      firma.steuernummer ? h(Text, null, `Steuer-Nr.: ${firma.steuernummer}`) : null,
-      firma.geschaeftsfuehrung ? h(Text, null, `Geschäftsführung: ${firma.geschaeftsfuehrung}`) : null),
-  )
+  const fuss = belegFuss(firma)
 
   const seite = h(
     Page,
@@ -343,11 +235,7 @@ export function rechnungDokument(
     kopf,
     ...inhalt.filter(Boolean),
     fuss,
-    h(Text, {
-      style: s.seite,
-      fixed: true,
-      render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `Seite ${pageNumber} von ${totalPages}`,
-    }),
+    seitenzahl(),
   )
   return h(Document, { title: `${titel} ${k.nummer}`, author: firma.name ?? 'KRNL' }, seite) as ReactElement
 }
@@ -373,11 +261,11 @@ export async function rechnungPdf(
   const positionen = await sql<RechnungPosition[]>`
     select bezeichnung, menge, einheit, einzelpreis, listenpreis, rabatt_pct, steuersatz, netto, steuer, brutto
     from kundenrechnung_positionen where rechnung_id = ${id} order by sequence`
-  const [firmaZeile] = await sql<{ value: Firma | null }[]>`select value from settings where key = 'company'`
+  const firma = await firmaLaden()
   const [einst] = await sql<{ mahnfrist: number | null }[]>`
     select (value ->> 'mahnfrist_tage')::int as mahnfrist from settings where key = 'rechnung'`
   const mahnung = art === 'mahnung' ? Math.max(1, Number(k.mahnstufe) || 1) : undefined
-  const dokument = rechnungDokument(k, positionen, firmaZeile?.value ?? {}, { mahnung, mahnfristTage: einst?.mahnfrist ?? 7 })
+  const dokument = rechnungDokument(k, positionen, firma, { mahnung, mahnfristTage: einst?.mahnfrist ?? 7 })
   const bytes = await renderToBuffer(dokument as Parameters<typeof renderToBuffer>[0])
   const dateiname = mahnung ? `${k.nummer}-Mahnung-${mahnung}.pdf` : `${k.nummer}.pdf`
   return { bytes, dateiname, kopf: k }

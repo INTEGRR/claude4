@@ -187,6 +187,10 @@ export default async function RepairPage({
         }
         actions={
           <>
+            {/* Ausdruck für Werkstatt und Kunde (2026-10-16): Auftrag vor, Bericht nach dem Abschluss. */}
+            <a className="btn" href={`/api/reparatur/${id}/pdf`} target="_blank" rel="noreferrer">
+              {['repaired', 'shipped'].includes(repair.state) ? 'Bericht (PDF)' : 'Auftrag (PDF)'}
+            </a>
             <Badge state={repair.state} kind="repair" />
             {/* Abrechnung immer zeigen — vorher war „kostenpflichtig“ unsichtbar. */}
             <span className="nowrap">

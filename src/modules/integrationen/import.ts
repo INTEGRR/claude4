@@ -172,10 +172,12 @@ export async function importShopifyOrder(
       for (const k of await t<{ id: string; nummer: string }[]>`
         select id, nummer from kundenrechnungen
         where sales_order_id = ${existing.id} and art = 'rechnung' and status <> 'storniert' order by created_at`) {
-        const [g] = await t<{ nummer: string }[]>`
-          select nummer from kundenrechnungen
-          where id = kundenrechnung_stornieren(${k.id}, ${`Bestellung ${order.name} im Shop ${grund}`}, 'shopify')`
-        gutgeschrieben.push(`${k.nummer} → ${g.nummer}`)
+        // Erst stornieren, dann lesen — eine volatile Funktion im WHERE
+        // liefe je gelesener Zeile und sähe die neue Gutschrift nicht.
+        const [{ gutschrift }] = await t<{ gutschrift: string }[]>`
+          select kundenrechnung_stornieren(${k.id}, ${`Bestellung ${order.name} im Shop ${grund}`}, 'shopify') as gutschrift`
+        const [g] = await t<{ nummer: string }[]>`select nummer from kundenrechnungen where id = ${gutschrift}`
+        gutgeschrieben.push(`${k.nummer} → ${g?.nummer ?? '?'}`)
       }
       // partial/full = Ware (teilweise) beim Kunden. Der frühere Vergleich
       // mit 'none' (kein Enum-Wert) war immer wahr und warnte bei jedem

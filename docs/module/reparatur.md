@@ -102,6 +102,32 @@ Zustandswahrheit). `repair_confirm` wirft im falschen Status (bis 0081 kehrte
 es still zurück). Ein Reparaturauftrag zählt als offen, bis er `shipped`
 oder `cancel` ist — auch ein reparierter, noch nicht zurückgegebener.
 
+## Druck: Reparaturauftrag und Reparaturbericht als PDF (seit 2026-10-16)
+
+Knopf **Auftrag (PDF)** bzw. nach dem Abschluss **Bericht (PDF)** im Kopf
+des Reparaturauftrags (`/api/reparatur/[id]/pdf`, Bereich Reparatur; Modul
+`src/modules/reparatur/auftrag-pdf.ts`, Rahmen aus
+`src/modules/shared/beleg-pdf.ts` wie die Kundenrechnung). Ein Blatt für
+Werkstatt und Kunde:
+
+- Kopf im Haus-Layout: Kundenanschrift, RMA-Nummer als **Code-128-Barcode**
+  (der Scanner im Kopf-Scanfeld führt zum Auftrag), Datum, Status, Anfrage,
+  Geräteeingang, Angebot, Kundennummer, Ansprechpartner.
+- **Gerät:** Produkt, Artikelnummer, Menge, Seriennummer/Los, Abrechnung
+  (Garantie / kostenpflichtig), Priorität, Retourenlabel, Rücksendung.
+- **Fehlerbild** (Notiz des Auftrags, bei Anfragen der Kundentext).
+- **Teile:** Art (Einbau, Ausbau entsorgt, Ausbau wiederverwendet), Menge —
+  nach dem Abschluss die gebuchte; bei kostenpflichtigen Aufträgen mit
+  Einzelpreis und Summe netto (Listenpreis der Teile, Hinweis „zzgl.
+  Arbeitszeit und Umsatzsteuer — verbindlich ist das Angebot").
+- **Verlauf** (Statusereignisse) im Bericht, Linien für Befund und
+  durchgeführte Arbeiten, Unterschriftsfelder Werkstatt/Kunde, Hinweis zur
+  Abrechnung, Fuß mit den Pflichtangaben der Firma.
+
+Der Titel folgt dem Status: „Reparaturauftrag" bis `under_repair`,
+„Reparaturbericht" ab `repaired`, „— storniert" bei `cancel`. Geprüft im
+Fixture-Lauf „kostenpflichtig" (PDF rendert, Titel Bericht).
+
 ## Mails
 
 - Eingangsbestätigung der Anfrage (Outbox, `mail:anfrage_bestaetigung`).
