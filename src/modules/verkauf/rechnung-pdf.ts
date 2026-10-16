@@ -205,7 +205,7 @@ export function rechnungDokument(
   const probeBanner = k.probe
     ? h(Text, { style: s.probe },
         'TESTBELEG — Probelauf der Rechnung aus KRNL. Kein gültiger Rechnungsbeleg, keine Zahlungsaufforderung; ' +
-        'die gültige Rechnung kommt weiterhin aus dem Shop.')
+        'die gültige Rechnung kommt weiterhin aus sevDesk.')
     : null
 
   const inhalt = mahnung

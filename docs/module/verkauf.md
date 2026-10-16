@@ -166,7 +166,7 @@ Zahlungen im Register, rechnet `qty_invoiced` der betroffenen Auftragszeilen
 aus den verbliebenen echten Belegen neu, bestimmt den Auftragsstatus neu und
 setzt die Probe-Nummernkreise auf 1. Echte Belege bleiben unberührt. Danach:
 Nummernkreise `RE-`/`GU-` und Firmendaten prüfen, Modus `scharf`,
-Shopify-Rechnungs-App abschalten (Einrichtungsaufgabe `rechnung_probelauf`).
+sevDesk-Rechnungsausgang abschalten (Einrichtungsaufgabe `rechnung_probelauf`; Korrektur 0118: die heutigen Rechnungen kommen aus sevDesk, nicht aus einer Shopify-App).
 
 Nachweis: `tests/prozesse/kundenrechnungen.test.ts` („Rechnungs-Probelauf
 (0117)"): Testrechnung und -gutschrift mit PROBE-Nummern, berechnete Mengen

@@ -145,7 +145,7 @@ export default async function BelegePage() {
             Im Probelauf entsteht mit jeder Lieferung eine <strong>Testrechnung</strong> (eigener Nummernkreis PROBE-RE-/PROBE-GU-,
             Banner im PDF) — nicht in DATEV, Fälligkeiten und Umsatz, aber mit Gutschriften bei Shop-Änderungen wie im
             Ernstfall. Scharf schalten geht erst, wenn der Probelauf gelöscht ist; vorher Nummernkreise RE-/GU- und
-            Firmendaten prüfen und die Shopify-Rechnungs-App abschalten.
+            Firmendaten prüfen und den Rechnungsausgang in sevDesk abschalten.
           </p>
           <div className="row">
             <label className="field">

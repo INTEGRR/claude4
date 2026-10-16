@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Korrektur: Rechnungsausgang heute aus sevDesk, Transaktionen über Pathway
+
+**Befund (Betreiber):** Die Einträge zu Kundenrechnungen und Probelauf
+(0115–0117, oben) gingen von einer „Shopify-Rechnungs-App" aus. Richtig
+ist: ANVIL stellt Ausgangsrechnungen heute mit **sevDesk** (nur dafür), die
+übrigen Transaktionen laufen über **Pathway**. Die bekannten Nummern
+RE-7812/GU-1416 stammen aus sevDesk.
+
+**Entschieden:** Schlüssel der Einrichtungsaufgaben bleiben (sie hängen an
+bestehenden Aufgaben), Titel und Beschreibungen werden berichtigt
+(Migration 0118, offene Aufgaben spiegeln den Text): Nummernkreise
+schließen an sevDesk an, abgeschaltet wird der sevDesk-Rechnungsausgang,
+der Probelauf vergleicht gegen den Shop-Gesamtbetrag und stichprobenartig
+gegen die sevDesk-Rechnung. Neu in der DATEV-Aufgabe: Vor dem ersten
+Buchungsstapel mit der Steuerberatung klären, wer die Ausgangsrechnungen
+künftig an DATEV liefert (KRNL oder weiterhin Pathway), damit nichts doppelt
+gebucht wird. Offen: ob ein lesender sevDesk-Abgleich (API) den Vergleich
+je Rechnung automatisieren soll — Entscheidung des Betreibers.
+
 ## 2026-10-16 — Kundenrechnung erst im Probelauf: Testbelege parallel zum Shop, scharf erst nach Vergleich und Löschung
 
 **Entschieden (Betreiber):** Die Rechnung aus KRNL (0115) geht nicht sofort

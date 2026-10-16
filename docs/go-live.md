@@ -347,12 +347,15 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
       Kundenrechnungen). Die Betreiber-Punkte dazu stehen seit 0116 als
       **Einrichtungsaufgaben** in KRNL (Übersicht → Aufgaben, Team
       Verwaltung) und kommen nach jedem Daten-Reset wieder: Nummernkreis
-      RE-/GU- auf die nächste freie Shopify-Nummer setzen, Firmendaten für
-      den Rechnungsfuß prüfen, Shopify-Rechnungs-App abschalten, DATEV-Konten
+      RE-/GU- auf die nächste freie sevDesk-Nummer setzen, Firmendaten für
+      den Rechnungsfuß prüfen, sevDesk-Rechnungsausgang abschalten (Korrektur
+      0118: Rechnungen kommen heute aus sevDesk, die übrigen Transaktionen
+      laufen über Pathway — wer künftig an DATEV liefert, ist mit der
+      Steuerberatung zu klären), DATEV-Konten
       (SKR03/04) mit der Steuerberatung abstimmen, Rechnungsversand per Mail
       festlegen (noch nicht gebaut).
       **Seit 0117 läuft die Rechnung im Probelauf** (Entscheidungslog
-      2026-10-16): Testrechnungen PROBE-RE-… parallel zur Shopify-App, zählen
+      2026-10-16): Testrechnungen PROBE-RE-… parallel zu sevDesk, zählen
       nirgends; Vergleich unter Verkauf → Rechnungen → Probelauf, danach
       „Probelauf löschen" und Modus „scharf" (Einstellungen → Belege).
 - [ ] KI-Region (Einstellungen → KI-Modelle, seit 2026-10-16): Standard

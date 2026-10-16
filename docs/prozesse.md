@@ -1679,7 +1679,7 @@ der Übersicht und auf `/aufgaben`, mit Knopf **Öffnen** zur Seite
 - Neue Betreiber-Todos = neue Zeilen per Migration plus der Funktionsaufruf;
   keine freie Server Action, kein zweiter Aufgabentyp.
 - Erste Liste (Kundenrechnungen aus KRNL, 0115): Nummernkreise RE-/GU-
-  setzen, Firmendaten für den Rechnungsfuß, Shopify-Rechnungs-App
+  setzen, Firmendaten für den Rechnungsfuß, sevDesk-Rechnungsausgang
   abschalten, DATEV-Konten abstimmen, Rechnungsversand per Mail festlegen.
 - Geprüft in `tests/demodaten.test.ts`: nach dem Reset vollständig offen,
   kein Doppel beim zweiten Aufruf, erledigt bleibt bis zum Reset erledigt.

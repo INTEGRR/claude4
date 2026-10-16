@@ -132,7 +132,7 @@ export default async function KundenrechnungenPage({
             {lage.modus === 'test' ? (
               <>
                 <strong>Probelauf läuft:</strong> Mit jeder gebuchten Lieferung entsteht eine <em>Testrechnung</em> (PROBE-RE-…)
-                parallel zur Rechnung aus dem Shop. Testbelege zählen nicht in DATEV, Fälligkeiten und Umsatz; die echten Filter
+                parallel zur Rechnung aus sevDesk. Testbelege zählen nicht in DATEV, Fälligkeiten und Umsatz; die echten Filter
                 hier bleiben leer, bis scharf geschaltet ist. Vergleich und Aufräumen:{' '}
                 <Link href="/verkauf/rechnungen?filter=probelauf">Probelauf</Link> · scharf schalten unter{' '}
                 <Link href="/einstellungen/belege">Einstellungen → Belege</Link>.
@@ -176,7 +176,7 @@ export default async function KundenrechnungenPage({
           <div style={{ padding: '0 12px 12px' }}>
             <p className="small muted" style={{ margin: '0 0 8px' }}>
               Vergleich je Bestellung: Summe der Testbelege (Rechnungen minus Gutschriften) gegen den Gesamtbetrag laut Shop
-              (brutto inkl. Versand, nach Änderungen der aktuelle Stand). Bestellungen von vor dem Probelauf tragen den
+              (brutto inkl. Versand, nach Änderungen der aktuelle Stand) — die sevDesk-Rechnung dazu stichprobenartig von Hand. Bestellungen von vor dem Probelauf tragen den
               Shop-Betrag erst nach dem nächsten Abgleich.
               {' '}{lage.testbelege} Testbeleg(e) · {vergleichSumme.gleich} gleich · {vergleichSumme.abweichend} abweichend ·{' '}
               {vergleichSumme.ohne} ohne Shop-Betrag.

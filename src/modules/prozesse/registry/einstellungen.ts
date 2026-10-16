@@ -272,7 +272,7 @@ export const EINSTELLUNGEN = {
     prozessfrei: true,
     beschreibung:
       'Einstellungen der Kundenrechnungen (settings.rechnung): Modus „aus" (keine Automatik), „test" (Probelauf: ' +
-      'Testrechnungen PROBE-RE-… parallel zur Shopify-Rechnungs-App, zählen nirgends) oder „scharf" (echte ' +
+      'Testrechnungen PROBE-RE-… parallel zum Rechnungsausgang in sevDesk, zählen nirgends) oder „scharf" (echte ' +
       'Rechnungen RE-… mit jeder Lieferung; nur möglich, wenn kein Probelauf mehr in der Datenbank steht), ' +
       'Zahlungsziel und Mahnfrist in Tagen, Kontenrahmen und Konten für den DATEV-Buchungsstapel.',
     bindung: 'frei',

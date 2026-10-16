@@ -133,7 +133,7 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
               <> · zu Rechnung <Link className="mono" href={`/verkauf/rechnungen/${k.storno_von_id}`}>{k.storno_nummer}</Link></>
             )}
             {k.datev_uebergeben_am && <> · DATEV übergeben {date(k.datev_uebergeben_am)}</>}
-            {k.probe && <> · zählt nicht in DATEV, Fälligkeiten und Umsatz; die gültige Rechnung kommt aus dem Shop</>}
+            {k.probe && <> · zählt nicht in DATEV, Fälligkeiten und Umsatz; die gültige Rechnung kommt aus sevDesk</>}
           </>
         }
         actions={
