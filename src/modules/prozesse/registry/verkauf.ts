@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { positionenSchema, type PositionsZeile, type RegistrierteAktion } from './typen.ts'
 
+const DATUM = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum als JJJJ-MM-TT')
+
 /**
  * Aktionen des Verkaufs. Der Shop-Weg läuft über P4
  * (shopify_bestellung_versand); die Aktionen hier tragen den MANUELLEN
@@ -214,6 +216,140 @@ export const VERKAUF = {
     prozessfrei: true,
     schema: z.object({ line_id: z.string().min(1) }),
     revalidate: ['/verkauf/:id'],
+  },
+
+  // --- Kundenrechnungen (0115, Entscheidungslog 2026-10-16) -----------------
+  // Die Rechnung entsteht mit der Lieferung (Trigger, settings.rechnung.
+  // automatisch) — der Knopf ist der Weg von Hand, wenn die Automatik aus
+  // ist oder eine Lieferung nachgerechnet werden muss.
+
+  'verkauf.rechnung_erstellen': {
+    label: 'Rechnung aus Lieferung erstellen',
+    bereich: 'verkauf',
+    ki: true,
+    beschreibung:
+      'Erzeugt die Kundenrechnung zu einer gebuchten Lieferung (Warenausgang eines Verkaufsauftrags): ' +
+      'gelieferte Mengen zu den Auftragspreisen, Versand einmal je Auftrag; Shop-Aufträge gelten als ' +
+      'bezahlt. Mit eingeschalteter Automatik passiert das bei jeder Lieferung von selbst. Beleg = die Lieferung.',
+    bindung: 'beleg',
+    modell: 'stock_picking',
+    schema: z.object({}),
+    revalidate: ['/verkauf/rechnungen', '/verkauf/:id', '/lager/:id'],
+  },
+
+  'verkauf.rechnung_zahlen': {
+    label: 'Zahlung erfassen',
+    bereich: 'verkauf',
+    ki: true,
+    beschreibung:
+      'Erfasst den Zahlungseingang zu einer Kundenrechnung (bzw. die Erstattung einer Gutschrift). Mit ' +
+      'Bankkonto oder Betrag landet die Zahlung im Zahlungsregister (Teilzahlungen möglich), sonst wird ' +
+      'der Beleg nur als bezahlt markiert.',
+    bindung: 'beleg',
+    modell: 'kundenrechnung',
+    uebergang: { von: ['offen'], nach: ['bezahlt'] },
+    schema: z.object({
+      datum: DATUM.optional(),
+      betrag: z.number().positive().optional().describe('Teilbetrag in Euro; leer = offener Betrag'),
+      bankkonto_id: z.string().uuid().optional(),
+      zahlungsart: z.string().max(60).optional().describe('z. B. Überweisung, PayPal, bar'),
+    }),
+    formdata: (fd) => ({
+      datum: String(fd.get('datum') ?? '') || undefined,
+      betrag: fd.get('betrag') ? Number(fd.get('betrag')) : undefined,
+      bankkonto_id: String(fd.get('bankkonto_id') ?? '') || undefined,
+      zahlungsart: String(fd.get('zahlungsart') ?? '').trim() || undefined,
+    }),
+    revalidate: ['/verkauf/rechnungen/:id', '/verkauf/rechnungen', '/finanzen'],
+  },
+
+  'verkauf.rechnung_stornieren': {
+    label: 'Stornieren (Gutschrift)',
+    bereich: 'verkauf',
+    ki: true,
+    beschreibung:
+      'Storniert eine Kundenrechnung durch eine Gutschrift über alle Positionen — die Rechnung bleibt als ' +
+      'Beleg bestehen (storniert), die Gutschrift verweist auf sie. Bei bezahlten Überweisungsrechnungen ' +
+      'steht die Erstattung danach als offene Gutschrift im Zahlungsregister.',
+    bindung: 'beleg',
+    modell: 'kundenrechnung',
+    uebergang: { von: ['offen', 'bezahlt'], nach: ['storniert'] },
+    schema: z.object({ grund: z.string().max(300).optional() }),
+    formdata: (fd) => ({ grund: String(fd.get('grund') ?? '').trim() || undefined }),
+    revalidate: ['/verkauf/rechnungen/:id', '/verkauf/rechnungen'],
+  },
+
+  'verkauf.gutschrift_erstellen': {
+    label: 'Teilgutschrift erstellen',
+    bereich: 'verkauf',
+    beschreibung:
+      'Gutschrift über einzelne Positionen/Mengen einer Rechnung (Rücknahme, Preisnachlass) — die Rechnung ' +
+      'bleibt gültig, die Gutschrift verweist auf sie.',
+    bindung: 'beleg',
+    modell: 'kundenrechnung',
+    // Korrekturbeleg, kein Prozessschritt: die Rechnung wechselt ihren Zustand nicht.
+    prozessfrei: true,
+    schema: z.object({
+      positionen: z
+        .array(z.object({ position_id: z.string().uuid(), menge: z.number().positive() }))
+        .min(1, 'Bitte mindestens eine Position mit Menge angeben'),
+      grund: z.string().max(300).optional(),
+    }),
+    formdata: (fd) => {
+      const positionen: { position_id: string; menge: number }[] = []
+      for (const [key, value] of fd.entries()) {
+        if (!key.startsWith('gut_') || typeof value !== 'string' || value.trim() === '') continue
+        const menge = Number(value)
+        if (Number.isFinite(menge) && menge > 0) positionen.push({ position_id: key.slice(4), menge })
+      }
+      return { positionen, grund: String(fd.get('grund') ?? '').trim() || undefined }
+    },
+    revalidate: ['/verkauf/rechnungen/:id', '/verkauf/rechnungen'],
+  },
+
+  'verkauf.rechnung_mahnen': {
+    label: 'Mahnen',
+    bereich: 'verkauf',
+    beschreibung:
+      'Nächste Mahnstufe einer fälligen, offenen Rechnung (Zahlungserinnerung → 1. Mahnung → 2. Mahnung); ' +
+      'das Mahnschreiben liegt als PDF am Beleg.',
+    bindung: 'beleg',
+    modell: 'kundenrechnung',
+    // Werkzeug am offenen Beleg — der Zustand bleibt „offen".
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/verkauf/rechnungen/:id', '/verkauf/rechnungen'],
+  },
+
+  'verkauf.rechnung_details': {
+    label: 'Rechnungsdaten ändern',
+    bereich: 'verkauf',
+    beschreibung: 'Notiz auf dem Beleg und Fälligkeit (nur offene Belege).',
+    bindung: 'beleg',
+    modell: 'kundenrechnung',
+    prozessfrei: true,
+    schema: z.object({
+      notiz: z.string().max(500).optional(),
+      faellig_am: DATUM.optional(),
+    }),
+    formdata: (fd) => ({
+      notiz: String(fd.get('notiz') ?? '').trim() || undefined,
+      faellig_am: String(fd.get('faellig_am') ?? '') || undefined,
+    }),
+    revalidate: ['/verkauf/rechnungen/:id'],
+  },
+
+  'verkauf.datev_uebergeben': {
+    label: 'DATEV: Zeitraum als übergeben markieren',
+    bereich: 'verkauf',
+    beschreibung:
+      'Markiert alle Kundenrechnungen und Gutschriften eines Zeitraums als an die Buchhaltung übergeben ' +
+      '(nach dem Export des Buchungsstapels). Die Datei selbst liefert /api/verkauf/datev.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({ von: DATUM, bis: DATUM }),
+    formdata: (fd) => ({ von: String(fd.get('von') ?? ''), bis: String(fd.get('bis') ?? '') }),
+    revalidate: ['/verkauf/rechnungen'],
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

@@ -102,6 +102,15 @@ export const EINSTELLUNGEN = {
       // Einkauf/Zoll (0092): EORI-Nummer und USt-IdNr. für Spediteur und Zoll.
       eori: z.string().trim().max(17).regex(/^([A-Z]{2}[A-Z0-9]{1,15})?$/, 'EORI: Länderkürzel + bis zu 15 Zeichen, z. B. DE123456789012345').optional(),
       ust_id: z.string().trim().max(20).optional(),
+      // Kundenrechnungen (0115): Pflichtangaben im Rechnungsfuß und Bankverbindung.
+      registergericht: z.string().trim().max(80).optional(),
+      handelsregister: z.string().trim().max(40).optional(),
+      steuernummer: z.string().trim().max(30).optional(),
+      geschaeftsfuehrung: z.string().trim().max(200).optional(),
+      web: z.string().trim().max(120).optional(),
+      iban: z.string().trim().max(42).optional(),
+      bic: z.string().trim().max(16).optional(),
+      bank: z.string().trim().max(80).optional(),
     }),
     zusammenfassung: (p) => `Firma ${p.name}`,
     formdata: (fd) => ({
@@ -116,6 +125,14 @@ export const EINSTELLUNGEN = {
       // Nur mitsenden, wenn das Formular die Felder hat (die Einrichtung hat sie nicht).
       eori: fd.has('eori') ? String(fd.get('eori') ?? '').trim().toUpperCase() : undefined,
       ust_id: fd.has('ust_id') ? String(fd.get('ust_id') ?? '').trim().toUpperCase() : undefined,
+      registergericht: fd.has('registergericht') ? String(fd.get('registergericht') ?? '').trim() : undefined,
+      handelsregister: fd.has('handelsregister') ? String(fd.get('handelsregister') ?? '').trim() : undefined,
+      steuernummer: fd.has('steuernummer') ? String(fd.get('steuernummer') ?? '').trim() : undefined,
+      geschaeftsfuehrung: fd.has('geschaeftsfuehrung') ? String(fd.get('geschaeftsfuehrung') ?? '').trim() : undefined,
+      web: fd.has('web') ? String(fd.get('web') ?? '').trim() : undefined,
+      iban: fd.has('iban') ? String(fd.get('iban') ?? '').replace(/\s+/g, '').toUpperCase() : undefined,
+      bic: fd.has('bic') ? String(fd.get('bic') ?? '').trim().toUpperCase() : undefined,
+      bank: fd.has('bank') ? String(fd.get('bank') ?? '').trim() : undefined,
     }),
     revalidate: ['/einstellungen', '/'],
   },
@@ -243,6 +260,63 @@ export const EINSTELLUNGEN = {
     formdata: (fd) => ({
       sales_lock: fd.get('sales_lock') === 'on',
       purchase_lock: fd.get('purchase_lock') === 'on',
+    }),
+    revalidate: ['/einstellungen/belege'],
+  },
+
+  'einstellungen.rechnungen_setzen': {
+    label: 'Kundenrechnungen: Automatik, Zahlungsziel, Konten',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Einstellungen der Kundenrechnungen (settings.rechnung): Rechnung bei jeder Lieferung von selbst, ' +
+      'Zahlungsziel und Mahnfrist in Tagen, Kontenrahmen und Konten für den DATEV-Buchungsstapel.',
+    bindung: 'frei',
+    schema: z.object({
+      automatisch: z.boolean(),
+      zahlungsziel_tage: z.number().int().min(0).max(120),
+      mahnfrist_tage: z.number().int().min(0).max(60),
+      kontenrahmen: z.enum(['SKR03', 'SKR04']),
+      debitorenkonto: z.string().trim().min(1).max(10),
+      erloeskonto_19: z.string().trim().min(1).max(10),
+      erloeskonto_7: z.string().trim().min(1).max(10),
+      erloeskonto_0: z.string().trim().min(1).max(10),
+    }),
+    zusammenfassung: (p) =>
+      `Rechnung ${p.automatisch ? 'bei jeder Lieferung' : 'von Hand'}, Zahlungsziel ${p.zahlungsziel_tage} Tage`,
+    formdata: (fd) => ({
+      automatisch: fd.get('automatisch') === 'on',
+      zahlungsziel_tage: Number(fd.get('zahlungsziel_tage') ?? 14),
+      mahnfrist_tage: Number(fd.get('mahnfrist_tage') ?? 7),
+      kontenrahmen: String(fd.get('kontenrahmen') ?? 'SKR03'),
+      debitorenkonto: String(fd.get('debitorenkonto') ?? '10000'),
+      erloeskonto_19: String(fd.get('erloeskonto_19') ?? '8400'),
+      erloeskonto_7: String(fd.get('erloeskonto_7') ?? '8300'),
+      erloeskonto_0: String(fd.get('erloeskonto_0') ?? '8120'),
+    }),
+    revalidate: ['/einstellungen/belege'],
+  },
+
+  'einstellungen.nummernkreis_setzen': {
+    label: 'Nummernkreis: nächste Nummer setzen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Setzt die nächste Nummer (und optional das Präfix) eines Nummernkreises — für den Anschluss an eine ' +
+      'bisherige Nummerierung bei der Umstellung (z. B. Kundenrechnungen RE-7813).',
+    bindung: 'frei',
+    schema: z.object({
+      code: z.string().min(1).max(40),
+      naechste: z.number().int().positive(),
+      prefix: z.string().max(10).optional(),
+    }),
+    zusammenfassung: (p) => `${p.code}: nächste Nummer ${p.prefix ?? ''}${p.naechste}`,
+    formdata: (fd) => ({
+      code: String(fd.get('code') ?? ''),
+      naechste: Number(fd.get('naechste') ?? 0),
+      prefix: fd.has('prefix') && String(fd.get('prefix') ?? '') !== '' ? String(fd.get('prefix')) : undefined,
     }),
     revalidate: ['/einstellungen/belege'],
   },

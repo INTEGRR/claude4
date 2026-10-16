@@ -339,8 +339,13 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
 
 ## 7c. Entscheidungen, die der Betreiber treffen muss
 
-- [ ] Kundenrechnungen (Ausgangsrechnung, Zahlungseingang, Mahnwesen) aus
-      KRNL — oder weiter aus Shopify? Erst danach baut KRNL sie.
+- [x] Kundenrechnungen (Ausgangsrechnung, Zahlungseingang, Mahnwesen) aus
+      KRNL — entschieden 2026-10-16, gebaut (Migration 0115, Modul Verkauf →
+      Kundenrechnungen). Vor dem Stichtag: Nummernkreis RE-/GU- unter
+      Einstellungen → Belege auf die nächste freie Shopify-Nummer setzen,
+      Firmendaten (Registergericht, HRB, Steuernummer, Geschäftsführung,
+      Bank) unter Einstellungen → Firma prüfen, Shopify-Rechnungs-App
+      abschalten, DATEV-Konten (SKR03/04) mit der Steuerberatung abstimmen.
 - [ ] Stichtag festlegen; vorher einen frischen Odoo-Dump für den lokalen
       Probelauf bereitstellen.
 

@@ -210,3 +210,96 @@ export async function positionEntfernen(
   await sql`select sales_order_recompute_status(${orderId})`
   return { recordId: orderId }
 }
+
+// --- Kundenrechnungen (0115) ----------------------------------------------------
+
+export async function rechnungErstellen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [r] = await sql<{ id: string }[]>`
+    select kundenrechnung_aus_lieferung(${ctx.recordId!}, ${ctx.actor}) as id`
+  const [k] = await sql<{ nummer: string; brutto: number }[]>`
+    select nummer, brutto from kundenrechnungen where id = ${r.id}`
+  return {
+    text: `Rechnung ${k.nummer} über ${Number(k.brutto).toFixed(2)} € erstellt.`,
+    link: `/verkauf/rechnungen/${r.id}`,
+    recordId: r.id,
+  }
+}
+
+export async function rechnungZahlen(
+  p: { datum?: string; betrag?: number; bankkonto_id?: string; zahlungsart?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const id = ctx.recordId!
+  const [k] = await sql<{ art: string; nummer: string; offen: number }[]>`
+    select art::text as art, nummer, kundenrechnung_offen(id) as offen from kundenrechnungen where id = ${id}`
+  if (!k) throw new Error('Rechnung nicht gefunden')
+  if (p.bankkonto_id || p.betrag) {
+    // Über das Zahlungsregister: Teilbeträge möglich, bezahlt bei voller Deckung.
+    const betrag = p.betrag ?? Number(k.offen)
+    await sql`
+      select zahlung_erfassen(${k.art === 'rechnung' ? 'ein' : 'aus'}, ${betrag}, 'EUR',
+        ${p.datum ?? sql`current_date`}, ${p.bankkonto_id ?? null}, 'kundenrechnung', ${id},
+        ${k.art === 'rechnung' ? `Rechnung ${k.nummer}` : `Erstattung ${k.nummer}`}, ${ctx.actor})`
+  } else {
+    await sql`select kundenrechnung_zahlen(${id}, ${p.datum ?? sql`current_date`}, ${p.zahlungsart ?? null}, ${ctx.actor})`
+  }
+  const [nachher] = await sql<{ status: string; offen: number }[]>`
+    select status::text as status, kundenrechnung_offen(id) as offen from kundenrechnungen where id = ${id}`
+  return {
+    recordId: id,
+    text: nachher.status === 'bezahlt'
+      ? `${k.nummer} ist ${k.art === 'rechnung' ? 'bezahlt' : 'erstattet'}.`
+      : `Zahlung erfasst — offen bleiben ${Number(nachher.offen).toFixed(2)} €.`,
+  }
+}
+
+export async function rechnungStornieren(p: { grund?: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [g] = await sql<{ id: string }[]>`
+    select kundenrechnung_stornieren(${ctx.recordId!}, ${p.grund ?? null}, ${ctx.actor}) as id`
+  const [k] = await sql<{ nummer: string; status: string }[]>`
+    select nummer, status::text as status from kundenrechnungen where id = ${g.id}`
+  return {
+    recordId: ctx.recordId,
+    text: `Gutschrift ${k.nummer} erstellt${k.status === 'offen' ? ' — die Erstattung steht noch aus' : ''}.`,
+    link: `/verkauf/rechnungen/${g.id}`,
+  }
+}
+
+export async function gutschriftErstellen(
+  p: { positionen: { position_id: string; menge: number }[]; grund?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [g] = await sql<{ id: string }[]>`
+    select kundenrechnung_gutschrift(${ctx.recordId!}, ${sql.json(p.positionen as never)}, ${p.grund ?? null}, ${ctx.actor}) as id`
+  const [k] = await sql<{ nummer: string; brutto: number }[]>`select nummer, brutto from kundenrechnungen where id = ${g.id}`
+  return {
+    recordId: ctx.recordId,
+    text: `Teilgutschrift ${k.nummer} über ${Number(k.brutto).toFixed(2)} € erstellt.`,
+    link: `/verkauf/rechnungen/${g.id}`,
+  }
+}
+
+export async function rechnungMahnen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [r] = await sql<{ stufe: number }[]>`select kundenrechnung_mahnen(${ctx.recordId!}, ${ctx.actor}) as stufe`
+  const text = ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung'][Number(r.stufe) - 1] ?? `Mahnstufe ${r.stufe}`
+  return { recordId: ctx.recordId, text: `${text} erstellt — das Schreiben liegt als PDF am Beleg.`, link: `/api/verkauf/rechnung/${ctx.recordId}?art=mahnung` }
+}
+
+export async function rechnungDetails(p: { notiz?: string; faellig_am?: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  await sql`
+    update kundenrechnungen set
+      notiz = ${p.notiz ?? null},
+      faellig_am = coalesce(${p.faellig_am ?? null}::date, faellig_am)
+    where id = ${ctx.recordId!} and status = 'offen'`
+  return { recordId: ctx.recordId }
+}
+
+export async function datevUebergeben(p: { von: string; bis: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const r = await sql`
+    update kundenrechnungen set datev_uebergeben_am = now()
+    where rechnungsdatum between ${p.von}::date and ${p.bis}::date and datev_uebergeben_am is null`
+  await sql`select log_event('settings', gen_random_uuid(), 'note',
+    ${`DATEV: ${r.count} Kundenbeleg(e) ${p.von}–${p.bis} als übergeben markiert`}, ${ctx.actor})`
+  return { text: `${r.count} Beleg(e) als an DATEV übergeben markiert.` }
+}
+

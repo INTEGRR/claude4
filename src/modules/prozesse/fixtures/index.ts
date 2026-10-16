@@ -10,6 +10,7 @@ import { EINKAUFSPROJEKT_FIXTURE } from './einkaufsprojekt.ts'
 import { EINGANGS_SENDUNG_FIXTURE } from './eingangs-sendung.ts'
 import { FERTIGUNG_FIXTURE } from './fertigung.ts'
 import { INVENTUR_FIXTURE } from './inventur.ts'
+import { KUNDENRECHNUNG_FIXTURE } from './kundenrechnung.ts'
 import { REPARATUR } from './reparatur.ts'
 import { REPARATUR_ANFRAGE } from './reparatur-anfrage.ts'
 import { SHOPIFY_VERSAND } from './shopify-versand.ts'
@@ -37,6 +38,7 @@ export const FIXTURES = {
   eingangs_sendung: EINGANGS_SENDUNG_FIXTURE,
   fertigung: FERTIGUNG_FIXTURE,
   inventur: INVENTUR_FIXTURE,
+  kundenrechnung: KUNDENRECHNUNG_FIXTURE,
   lieferantenrechnung: LIEFERANTENRECHNUNG_FIXTURE,
   mail_versand: EINKAUF_MAIL,
   reparatur: REPARATUR,

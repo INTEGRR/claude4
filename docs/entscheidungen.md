@@ -9,6 +9,56 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Kundenrechnungen aus KRNL: Rechnung mit der Lieferung, Korrektur nur per Gutschrift, Shop-Änderungen folgen
+
+**Entschieden:** Rechnungen an Kunden stellt KRNL aus, nicht mehr die
+Shopify-Rechnungs-App (Migration 0115, Modul Verkauf → Kundenrechnungen).
+
+**Warum:** Der alte Weg hatte eine Lücke, die uns bei jeder
+Bestelländerung getroffen hat: Kunden tauschen nach der Bestellung
+Switches, wählen ein anderes Case oder legen einen Artikel dazu. Shopify
+änderte die Bestellung, die App erzeugte eine Gutschrift — und keine neue
+Rechnung. Rechtlich falsch, und jedes Mal Handarbeit. Mit eigenen Belegen
+hängt die Rechnung am einzigen Ereignis, das zählt: der Lieferung.
+
+**Regeln:**
+
+- **Die Rechnung entsteht mit der gebuchten Lieferung** (Trigger auf
+  `stock_pickings`, Einstellung `rechnung.automatisch`). Shop-Aufträge sind
+  damit bezahlt (Zahlung lief im Shop, Zahlungsart aus den Gateways);
+  Firmenkunden bekommen eine offene Rechnung mit Zahlungsziel.
+- **Vor dem Versand kostet eine Änderung nichts:** Shopify meldet
+  `orders/updated`, Soll je Variante ist `currentQuantity`; Positionen,
+  Lieferung und Fertigung ziehen nach (`sales_order_lieferung_angleichen`),
+  kein Beleg entsteht, nichts wird gutgeschrieben.
+- **Nach der Rechnung gibt es nur Gutschriften, nie Änderungen** (GoBD).
+  Menge zurück → Gutschrift auf der jüngsten gültigen Rechnung
+  (`kundenrechnung_aenderung_gutschreiben`); Ware dazu → zweite Lieferung
+  → zweite Rechnung ohne Versand; Shop-Storno nach dem Versand → volle
+  Storno-Gutschrift je Rechnung. Teilgutschrift lässt die Rechnung
+  bestehen, Storno setzt sie auf `storniert` und bleibt im Nummernkreis.
+- **Shopify führt weiterhin** bei Storno und Erstattung (0110); KRNL
+  schreibt keine Belege in den Shop. Rechnungs-PDF an den Kunden ist ein
+  späterer Schritt (Versand per Mail noch nicht gebaut).
+- **Zahlung, Mahnung, DATEV:** Zahlungsregister (`quelle = 'kundenrechnung'`,
+  Teilzahlungen), Mahnstufen 1–3 als PDF, offene Rechnungen und
+  Gutschriften in `finanz_faellig`; DATEV-Buchungsstapel EXTF gegen
+  Erlöskonten je Steuersatz, Kontenrahmen SKR03/SKR04 einstellbar.
+- **Eine Rechnungszeile je Variante** auch bei mehreren Lieferbewegungen
+  (nach einer Änderung sind es zwei Bewegungen 2 + 1 — der Kunde sieht
+  „3 × Deskmat").
+- Nummernkreise RE-/GU- sind setzbar (`sequence_setzen`), damit die
+  Nummern nach den Shopify-Belegen (RE-7812, GU-1416) lückenlos weitergehen.
+
+**Umgesetzt/dokumentiert:** `src/db/migrations/0115_kundenrechnungen.sql`,
+Registry `verkauf.rechnung_*`/`verkauf.gutschrift_erstellen`/
+`verkauf.datev_uebergeben`, `einstellungen.rechnungen_setzen`/
+`nummernkreis_setzen`, Import `bestellaenderungNachziehen`,
+`src/modules/verkauf/rechnung-pdf.ts`, `datev-export.ts`,
+`/verkauf/rechnungen`; Doku Modul Verkauf, Integrationen, Einstellungen,
+Abnahmetest (Modell um Rechnungen erweitert, Soll = Ist). Go-live-Punkt
+7c abgehakt.
+
 ## 2026-10-15 — Abnahmetest ×10: zufällig, seedbar, das Modell als Orakel
 
 **Anlass (Betreiber):** „Viel zu wenig Testdaten, ×10 mindestens, random."

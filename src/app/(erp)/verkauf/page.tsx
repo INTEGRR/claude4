@@ -87,9 +87,12 @@ export default async function VerkaufPage({
         title="Verkaufsaufträge"
         subtitle="Aufträge aus Shopify und manuell erfasste Aufträge"
         actions={
-          <Link className="btn primary" href="/verkauf/neu">
-            Neuer Auftrag
-          </Link>
+          <>
+            <Link className="btn" href="/verkauf/rechnungen">Rechnungen</Link>
+            <Link className="btn primary" href="/verkauf/neu">
+              Neuer Auftrag
+            </Link>
+          </>
         }
       />
 

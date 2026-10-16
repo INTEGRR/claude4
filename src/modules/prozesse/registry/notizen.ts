@@ -40,6 +40,7 @@ export const KOMMENTAR_MODELLE = {
   werkzeug: { tabelle: 'werkzeuge', bereich: 'einkauf' },
   lieferantenvertrag: { tabelle: 'lieferantenvertraege', bereich: 'einkauf' },
   eingangs_sendung: { tabelle: 'eingangs_sendungen', bereich: 'einkauf' },
+  kundenrechnung: { tabelle: 'kundenrechnungen', bereich: 'verkauf' },
 } satisfies Record<string, { tabelle: string; bereich: Area }>
 
 /**

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
+import { Auswahl } from '@/components/auswahl'
 import { Card, TableWrap, Zustand } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
@@ -19,11 +20,31 @@ async function freigabenSpeichern(formData: FormData) {
   return serverAktion('einstellungen.freigaben_setzen', { formData })
 }
 
+async function rechnungenSpeichern(formData: FormData) {
+  'use server'
+  return serverAktion('einstellungen.rechnungen_setzen', { formData })
+}
+
+async function nummernkreisSpeichern(formData: FormData) {
+  'use server'
+  return serverAktion('einstellungen.nummernkreis_setzen', { formData })
+}
+
 export default async function BelegePage() {
   await requireArea('einstellungen')
   const sales = await einstellung<{ lock_confirmed: boolean }>('sales')
   const purchase = await einstellung<{ lock_confirmed: boolean }>('purchase')
   const freigaben = await einstellung<{ einkauf_limit: number }>('freigaben')
+  const rechnung = await einstellung<{
+    automatisch: boolean
+    zahlungsziel_tage: number
+    mahnfrist_tage: number
+    kontenrahmen: string
+    debitorenkonto: string
+    erloeskonto_19: string
+    erloeskonto_7: string
+    erloeskonto_0: string
+  }>('rechnung')
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen.
   const nummernkreise = await sql<{ code: string; prefix: string; next_number: number }[]>`
     select code, prefix, next_number from sequence_state()`
@@ -91,6 +112,57 @@ export default async function BelegePage() {
         </p>
       </Card>
 
+      <Card title="Kundenrechnungen">
+        <ActionForm action={rechnungenSpeichern}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <input type="checkbox" name="automatisch" defaultChecked={rechnung.automatisch ?? true} />
+            <span>Rechnung bei jeder gebuchten Lieferung von selbst erstellen</span>
+            <Zustand ton={(rechnung.automatisch ?? true) ? 'ok' : 'off'}>{(rechnung.automatisch ?? true) ? 'automatisch' : 'von Hand'}</Zustand>
+          </label>
+          <div className="row">
+            <label className="field">
+              <span>Zahlungsziel (Tage, Firmenkunden)</span>
+              <input type="number" name="zahlungsziel_tage" min="0" max="120" defaultValue={rechnung.zahlungsziel_tage ?? 14} />
+            </label>
+            <label className="field">
+              <span>Mahnfrist (Tage)</span>
+              <input type="number" name="mahnfrist_tage" min="0" max="60" defaultValue={rechnung.mahnfrist_tage ?? 7} />
+            </label>
+            <label className="field">
+              <span>Kontenrahmen</span>
+              <Auswahl name="kontenrahmen" defaultValue={rechnung.kontenrahmen ?? 'SKR03'}>
+                <option value="SKR03">SKR03</option>
+                <option value="SKR04">SKR04</option>
+              </Auswahl>
+            </label>
+          </div>
+          <div className="row">
+            <label className="field">
+              <span>Debitorenkonto (Sammel)</span>
+              <input className="mono" name="debitorenkonto" defaultValue={rechnung.debitorenkonto ?? '10000'} />
+            </label>
+            <label className="field">
+              <span>Erlöskonto 19 %</span>
+              <input className="mono" name="erloeskonto_19" defaultValue={rechnung.erloeskonto_19 ?? '8400'} />
+            </label>
+            <label className="field">
+              <span>Erlöskonto 7 %</span>
+              <input className="mono" name="erloeskonto_7" defaultValue={rechnung.erloeskonto_7 ?? '8300'} />
+            </label>
+            <label className="field">
+              <span>Erlöskonto 0 % (steuerfrei)</span>
+              <input className="mono" name="erloeskonto_0" defaultValue={rechnung.erloeskonto_0 ?? '8120'} />
+            </label>
+          </div>
+          <button className="primary" type="submit">Speichern</button>
+        </ActionForm>
+        <p className="small muted" style={{ margin: '10px 0 0' }}>
+          Shop-Aufträge sind beim Versand bezahlt (Zahlungsart aus Shopify), Firmenkunden bekommen die Rechnung mit
+          Zahlungsziel. Die Konten füllen den DATEV-Buchungsstapel unter Verkauf → Rechnungen; die Pflichtangaben im
+          Rechnungsfuß stehen unter <Link href="/einstellungen">Firmendaten</Link>.
+        </p>
+      </Card>
+
       <Card title="Nummernkreise" tight>
         <TableWrap>
           <table>
@@ -112,6 +184,35 @@ export default async function BelegePage() {
             </tbody>
           </table>
         </TableWrap>
+        <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
+          <ActionForm action={nummernkreisSpeichern}>
+            <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <label className="field shrink">
+                <span>Nummernkreis</span>
+                <Auswahl name="code" defaultValue="kundenrechnung">
+                  {nummernkreise.map((n) => (
+                    <option key={n.code} value={n.code}>{n.code} ({n.prefix})</option>
+                  ))}
+                </Auswahl>
+              </label>
+              <label className="field shrink">
+                <span>Nächste Nummer</span>
+                <input type="number" name="naechste" min="1" required style={{ width: 120 }} placeholder="z. B. 7813" />
+              </label>
+              <label className="field shrink">
+                <span>Präfix (optional)</span>
+                <input name="prefix" className="mono" style={{ width: 100 }} placeholder="RE-" />
+              </label>
+              <div className="shrink field">
+                <button type="submit">Setzen</button>
+              </div>
+            </div>
+          </ActionForm>
+          <p className="small muted" style={{ margin: '8px 0 0' }}>
+            Für die Umstellung: Kundenrechnungen und Gutschriften an die bisherige Nummerierung anschließen (lückenlos
+            fortlaufend je Kreis).
+          </p>
+        </div>
       </Card>
     </>
   )

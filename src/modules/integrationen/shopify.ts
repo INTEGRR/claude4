@@ -304,10 +304,24 @@ export interface ShopifyOrder {
     countryCodeV2: string | null
     phone: string | null
   } | null
+  /** Rechnungsanschrift (0115) — steht auf der Kundenrechnung; fehlt sie, gilt die Lieferadresse. */
+  billingAddress?: {
+    name: string | null
+    company: string | null
+    address1: string | null
+    address2: string | null
+    zip: string | null
+    city: string | null
+    countryCodeV2: string | null
+  } | null
+  /** Zahlungsarten der Bestellung (0115), z. B. ['shopify_payments'] — lesbar auf der Rechnung. */
+  paymentGatewayNames?: string[]
   lineItems: {
     nodes: {
       id: string
       title: string
+      /** Variantenname (0115), z. B. „Standard / FR4 / Silent Red" — Teil der Belegzeile. */
+      variantTitle?: string | null
       sku: string | null
       currentQuantity: number
       quantity: number
@@ -338,10 +352,12 @@ const ORDER_FIELDS = `
   totalPriceSet { shopMoney { amount currencyCode } }
   customer { id firstName lastName defaultEmailAddress { emailAddress } }
   shippingAddress { name address1 address2 zip city countryCodeV2 phone }
+  billingAddress { name company address1 address2 zip city countryCodeV2 }
+  paymentGatewayNames
   shippingLine { discountedPriceSet { shopMoney { amount } } taxLines { rate } }
   lineItems(first: 100) {
     nodes {
-      id title sku currentQuantity quantity
+      id title variantTitle sku currentQuantity quantity
       variant { id }
       originalUnitPriceSet { shopMoney { amount } }
       discountedUnitPriceAfterAllDiscountsSet { shopMoney { amount } }

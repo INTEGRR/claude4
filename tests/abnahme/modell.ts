@@ -61,12 +61,16 @@ export interface Stand {
     lieferungen: Record<string, number>
     wareneingaenge: Record<string, number>
     rechnungen: Record<string, number>
+    /** Kundenbelege (0115) je „art:status" — rechnung:bezahlt, rechnung:offen, gutschrift:bezahlt … */
+    kundenrechnungen: Record<string, number>
     demontagen: number
   }
   umsatz: {
     je_monat: Record<string, { netto: number; steuer: number; brutto: number; auftraege: number }>
     shop_brutto: number
     b2b_netto: number
+    /** Summe der gültigen Kundenrechnungen brutto abzüglich Gutschriften. */
+    rechnungen_brutto: number
   }
   fertigung: { material: number; lohn: number; stueck: number }
   zahlungen: {
@@ -183,6 +187,15 @@ interface Rechnung {
   gezahltEur: number
 }
 
+/** Kundenbeleg (0115): entsteht mit der Lieferung — Shop bezahlt, B2B offen mit Zahlungsziel. */
+interface Kundenrechnung {
+  auftrag: string
+  art: 'rechnung' | 'gutschrift'
+  status: 'offen' | 'bezahlt' | 'storniert'
+  brutto: number
+  faellig: Datum
+}
+
 interface Zahlung {
   richtung: 'ein' | 'aus'
   betragEur: number
@@ -250,6 +263,7 @@ export class Modell {
   /** Gelieferte Mengen je Artikel samt Erlös — Basis des Deckungsbeitrags. */
   geliefert: { sku: Sku; menge: number; preis: number }[] = []
   faelligBis: Datum
+  kundenrechnungen: Kundenrechnung[] = []
   /** Laufende Nummer für Lieferungen und Fertigungsaufträge (Reihenfolge der Warteschlange). */
   reihe = 0
 
@@ -410,10 +424,12 @@ export class Modell {
     }
   }
 
-  /** picking_validate: Reservierung lösen, Abgang zum Durchschnitt, Erlös merken. */
+  /** picking_validate: Reservierung lösen, Abgang zum Durchschnitt, Erlös merken — und die Rechnung (0115). */
   liefern(a: Auftrag): void {
     const l = a.lieferung
     if (l.status !== 'assigned') throw new Error(`${a.id}: Lieferung ist nicht versandbereit (${l.status})`)
+    let netto = 0
+    let steuer = 0
     for (const z of l.zeilen) {
       this.freigeben(z.sku, z.reserviert)
       z.reserviert = 0
@@ -421,14 +437,39 @@ export class Modell {
       z.erledigt = true
       const preis = a.zeilen.find((x) => x.sku === z.sku)!.preis
       this.geliefert.push({ sku: z.sku, menge: z.menge, preis })
+      // kundenrechnung_aus_lieferung: je Position netto = round2(Menge × Preis), Steuer je Position gerundet.
+      const n = r2(z.menge * preis)
+      netto = r2(netto + n)
+      steuer = r2(steuer + r2((n * STEUERSATZ) / 100))
     }
     l.status = 'done'
-    if (a.quelle === 'shop') this.fulfillments++
+    if (a.quelle === 'shop') {
+      this.fulfillments++
+      // Versand einmal je Auftrag (netto aus dem Shop-Brutto), Steuer zum Satz der Positionen.
+      netto = r2(netto + SHOP_VERSAND_NETTO)
+      steuer = r2(steuer + r2((SHOP_VERSAND_NETTO * STEUERSATZ) / 100))
+    }
+    this.kundenrechnungen.push({
+      auftrag: a.id,
+      art: 'rechnung',
+      // Shop-Aufträge sind bezahlt (Zahlung lief im Shop), B2B offen mit Zahlungsziel 14 Tage.
+      status: a.quelle === 'shop' ? 'bezahlt' : 'offen',
+      brutto: r2(netto + steuer),
+      faellig: tageAddieren(this.heute, 14),
+    })
   }
 
   /** cancel_sales_order: offene Lieferung und nicht begonnene Fertigung stornieren, Reservierungen lösen. */
   stornieren(a: Auftrag): void {
     const l = a.lieferung
+    // Shop-Storno/Erstattung nach der Rechnung: der Import storniert jede
+    // gültige Rechnung mit Gutschrift — im Shop erstattet, also bezahlt.
+    if (a.quelle === 'shop') {
+      for (const k of this.kundenrechnungen.filter((k) => k.auftrag === a.id && k.art === 'rechnung' && k.status !== 'storniert')) {
+        k.status = 'storniert'
+        this.kundenrechnungen.push({ auftrag: a.id, art: 'gutschrift', status: 'bezahlt', brutto: k.brutto, faellig: this.heute })
+      }
+    }
     if (l.status !== 'done' && l.status !== 'cancel') {
       for (const z of l.zeilen) {
         this.freigeben(z.sku, z.reserviert)
@@ -867,9 +908,15 @@ export class Modell {
         lieferungen: zaehlen(auftraege, (a) => a.lieferung.status),
         wareneingaenge: zaehlen([...this.bestellungen.values()].flatMap((po) => po.eingaenge), (e) => e.status),
         rechnungen: zaehlen(this.rechnungen.values(), (r) => r.status),
+        kundenrechnungen: zaehlen(this.kundenrechnungen, (k) => `${k.art}:${k.status}`),
         demontagen: this.demontagen,
       },
-      umsatz: { je_monat: jeMonat, shop_brutto: shopBrutto, b2b_netto: b2bNetto },
+      umsatz: {
+        je_monat: jeMonat,
+        shop_brutto: shopBrutto,
+        b2b_netto: b2bNetto,
+        rechnungen_brutto: r2(this.kundenrechnungen.reduce((sum, k) => (k.status === 'storniert' ? sum : sum + (k.art === 'rechnung' ? k.brutto : -k.brutto)), 0)),
+      },
       fertigung,
       zahlungen: { je_monat: zahlungenJeMonat, saldo },
       verbindlichkeiten: { offen, rechnungen: offeneRechnungen },
@@ -921,6 +968,10 @@ export class Modell {
     }
     for (const st of this.steuern.values()) {
       if (!st.bezahlt && st.betrag !== 0 && st.faellig <= this.faelligBis) hinzu('steuer', Math.abs(st.betrag))
+    }
+    // Offene Kundenrechnungen (Forderung) und offene Gutschriften (Erstattung).
+    for (const k of this.kundenrechnungen) {
+      if (k.status === 'offen' && k.brutto > 0 && k.faellig <= this.faelligBis) hinzu('kundenrechnung', k.brutto)
     }
     return gruppen
   }

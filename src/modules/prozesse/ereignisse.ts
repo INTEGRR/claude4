@@ -19,6 +19,14 @@ export const EREIGNISSE = {
     beschreibung: 'Neue oder geänderte Shop-Bestellung; bezahlte werden sofort bestätigt.',
     quelle: 'shopify webhook orders/create + orders/updated',
   },
+  'shop:bestellung_geaendert': {
+    label: 'Bestellung im Shop geändert',
+    beschreibung:
+      'Der Kunde oder der Shop hat eine bestätigte Bestellung geändert (andere Variante, Menge, Zusatzartikel, ' +
+      'Teilerstattung): vor dem Versand folgen Auftrag, Lieferung und Fertigung; nach der Rechnung entstehen ' +
+      'Gutschrift (zurückgenommene Menge) bzw. eine neue Rechnung mit der Nachlieferung.',
+    quelle: 'shopify webhook orders/updated (lineItems.currentQuantity) + Abgleich',
+  },
   'shop:bestellung_storniert': {
     label: 'Bestellung storniert/erstattet',
     beschreibung: 'Storno oder Erstattung im Shop; der Auftrag wird nach den Storno-Regeln behandelt.',

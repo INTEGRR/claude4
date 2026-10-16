@@ -39,7 +39,7 @@ async function findeOderProdukt(sql: Sql, name: string, sku: string): Promise<st
 }
 
 /** Füllt den frei verwendbaren Bestand per Inventur auf mindestens `mindest` auf. */
-async function bestandAuffuellen(sql: Sql, variantId: string, mindest: number): Promise<void> {
+export async function bestandAuffuellen(sql: Sql, variantId: string, mindest: number): Promise<void> {
   const [frei] = await sql<{ qty: number }[]>`select free_to_use(${variantId}) as qty`
   const fehlt = mindest - Number(frei.qty)
   if (fehlt <= 0) return

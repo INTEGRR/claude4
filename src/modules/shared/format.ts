@@ -143,6 +143,11 @@ export const LABELS = {
     paid: 'Bezahlt',
     cancel: 'Storniert',
   },
+  kundenrechnung: {
+    offen: 'Offen',
+    bezahlt: 'Bezahlt',
+    storniert: 'Storniert',
+  },
   picking: {
     draft: 'Entwurf',
     waiting: 'Wartend',
@@ -271,6 +276,7 @@ export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | '
     case 'angebot':
     case 'aktiv':
     case 'abgerechnet':
+    case 'bezahlt':
     case 'uebergeben':
     case 'angenommen':
     case 'zugestellt':

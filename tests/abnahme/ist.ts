@@ -79,6 +79,8 @@ export async function istStandLesen(sql: Sql, k: Kennungen, faelligBis: Datum): 
       from stock_pickings p join operation_types ot on ot.id = p.operation_type_id
       where ot.kind = 'receipt' group by 1`),
     rechnungen: zaehlung(await sql`select state::text as schluessel, count(*)::int as n from vendor_bills group by 1`),
+    kundenrechnungen: zaehlung(await sql`
+      select art::text || ':' || status::text as schluessel, count(*)::int as n from kundenrechnungen group by 1`),
     demontagen: Number((await sql<{ n: number }[]>`select count(*)::int as n from unbuild_orders where state = 'done'`)[0].n),
   }
 
@@ -98,6 +100,10 @@ export async function istStandLesen(sql: Sql, k: Kennungen, faelligBis: Datum): 
     if (z.quelle === 'shopify') shopBrutto = r(shopBrutto + Number(z.gross), 2)
     else b2bNetto = r(b2bNetto + Number(z.net), 2)
   }
+
+  const [kr] = await sql<{ brutto: number }[]>`
+    select coalesce(sum(case art when 'rechnung' then brutto else -brutto end), 0) as brutto
+    from kundenrechnungen where status <> 'storniert'`
 
   const [f] = await sql<{ material: number; lohn: number; stueck: number }[]>`
     select coalesce(sum(material_cost), 0) as material, coalesce(sum(labor_cost), 0) as lohn,
@@ -167,7 +173,7 @@ export async function istStandLesen(sql: Sql, k: Kennungen, faelligBis: Datum): 
     baubar: Number(baubar),
     shopify: { soll, gemeldet, mto_eingerichtet: Boolean(mto.eingerichtet), fulfillments: Number(fulfillments) },
     belege,
-    umsatz: { je_monat: jeMonat, shop_brutto: shopBrutto, b2b_netto: b2bNetto },
+    umsatz: { je_monat: jeMonat, shop_brutto: shopBrutto, b2b_netto: b2bNetto, rechnungen_brutto: r(kr.brutto, 2) },
     fertigung: { material: r(f.material, 4), lohn: r(f.lohn, 4), stueck: Number(f.stueck) },
     zahlungen: { je_monat: zahlungenJeMonat, saldo },
     verbindlichkeiten: { offen: r(v.offen, 2), rechnungen: Number(v.rechnungen) },

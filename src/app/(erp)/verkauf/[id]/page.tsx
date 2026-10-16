@@ -157,6 +157,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   >`select variant_id, bezeichnung, grund from sales_order_fertigungslage(${id})
     where grund is not null`
 
+  // Kundenrechnungen (0115) zu diesem Auftrag — entstehen mit der Lieferung.
+  const rechnungen = await sql<
+    { id: string; nummer: string; art: string; status: string; rechnungsdatum: string; zahlungsart: string | null; brutto: number }[]
+  >`
+    select id, nummer, art::text as art, status::text as status, rechnungsdatum::text as rechnungsdatum, zahlungsart, brutto
+    from kundenrechnungen where sales_order_id = ${id} order by created_at`
+
   const shipments = await sql<
     {
       id: string
@@ -665,6 +672,44 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           )}
         </Card>
       </div>
+
+      {rechnungen.length > 0 && (
+        <Card title="Rechnungen" tight>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nummer</th>
+                  <th>Datum</th>
+                  <th>Zahlungsart</th>
+                  <th>Status</th>
+                  <th className="num">Betrag</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rechnungen.map((r) => (
+                  <tr key={r.id}>
+                    <td className="mono">
+                      <span className="actions" style={{ gap: 6 }}>
+                        <Link href={`/verkauf/rechnungen/${r.id}`}>{r.nummer}</Link>
+                        {r.art === 'gutschrift' && <span className="badge info">Gutschrift</span>}
+                      </span>
+                    </td>
+                    <td className="mono">{date(r.rechnungsdatum)}</td>
+                    <td className="muted">{r.zahlungsart ?? '—'}</td>
+                    <td><Badge state={r.status} kind="kundenrechnung" href={`/verkauf/rechnungen/${r.id}`} /></td>
+                    <td className="num">{r.art === 'gutschrift' ? `− ${money(r.brutto)}` : money(r.brutto)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <a className="btn small" href={`/api/verkauf/rechnung/${r.id}`} target="_blank" rel="noreferrer">PDF</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
 
       {shipments.length > 0 && (
         <Card title="Sendungen" tight>

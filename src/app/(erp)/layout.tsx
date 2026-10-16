@@ -55,6 +55,7 @@ async function badges() {
       einkaufsprojekte: number
       muster: number
       sendungen: number
+      rechnungen_ueberfaellig: number
     }[]
   >`
     select
@@ -66,6 +67,8 @@ async function badges() {
          join operation_types ot on ot.id = p.operation_type_id
         where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int as offene_eingaenge,
       (select count(*) from shipping_ready)::int as versandbereit,
+      (select count(*) from kundenrechnungen
+        where art = 'rechnung' and status = 'offen' and faellig_am < current_date)::int as rechnungen_ueberfaellig,
       (select count(*) from repair_orders
         where state not in ('shipped','cancel'))::int as offene_reparaturen,
       (select count(*) from orderpoint_suggestions())::int as beschaffung,
@@ -210,6 +213,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         ...(sees('verkauf')
           ? [
               { href: '/verkauf', label: 'Verkaufsaufträge', count: counts.offene_auftraege },
+              { href: '/verkauf/rechnungen', label: 'Rechnungen', count: counts.rechnungen_ueberfaellig },
               { href: '/vorgaenge', label: 'Vorgänge', count: offenGesamt },
               { href: '/verkauf/shop-verfuegbarkeit', label: 'Shop-Verfügbarkeit' },
             ]

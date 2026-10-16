@@ -1631,6 +1631,30 @@ auf dem Schritt mit Zustand `cancel` („Stornieren"). Das Ereignis ist der
 sichtbare Zweig, kein zweiter Zustand. Tests: Fixture `verkauf` (Lauf
 „Shop-Auftrag: Storno kommt aus Shopify"), `tests/prozesse/shop-storno.test.ts`.
 
+## Kundenrechnung: Prozess `kundenrechnung` (Migration 0115, umgesetzt)
+
+Beleg `kundenrechnung` (`kundenrechnungen`, RE-/GU-Nummern, Status
+offen → bezahlt / storniert, Route `/verkauf/rechnungen/:id`). Der Prozess
+beginnt meist mitten drin: die Rechnung entsteht von selbst mit der
+gebuchten Lieferung (Trigger), der Schritt `rechnung` gilt nur ohne
+Automatik (Knopf an der Lieferung).
+
+| Schritt | Art | Aktion | Bemerkung |
+|---|---|---|---|
+| rechnung | aktion | `verkauf.rechnung_erstellen` | aus der gebuchten Lieferung, `record_id` = Lieferung |
+| zahlen | aktion | `verkauf.rechnung_zahlen` | Bankkonto + Betrag (Register, Teilzahlung) oder ohne Konto (bar/Shop) |
+| stornieren | aktion | `verkauf.rechnung_stornieren` | volle Gutschrift mit Bezug; aus `rechnung` und `zahlen` erreichbar |
+| ende | ende | — | |
+
+Prozessfrei an der Rechnung: `verkauf.gutschrift_erstellen` (Teilgutschrift,
+Rechnung bleibt), `verkauf.rechnung_mahnen` (Stufen 1–3, nur fällig),
+`verkauf.rechnung_details`, `verkauf.datev_uebergeben`; Einstellungen
+`einstellungen.rechnungen_setzen`, `einstellungen.nummernkreis_setzen`.
+Fixture `kundenrechnung` (Shop-Lieferung → bezahlt → Storno mit
+Gutschrift; Firmenkunde → offen → Zahlung über das Register; Automatik aus
+→ Rechnung von Hand). Fachlich: [Modul Verkauf](module/verkauf.md),
+Entscheidungslog 2026-10-16.
+
 ## Noch offen (Kurzfassung)
 
 - **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:

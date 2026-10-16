@@ -5,9 +5,11 @@ import { splitStreet } from '@/modules/shared/address'
 import { externVersandNachziehen } from '@/modules/verkauf/extern-versand'
 import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { fetchOrder, type ShopifyOrder } from './shopify'
+import { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText } from './bestellung-felder'
 import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
 
 export { splitStreet }
+export { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText }
 
 /**
  * Import-Pipeline: aus einer Shopify-Order wird ein Verkaufsauftrag.
@@ -164,6 +166,17 @@ export async function importShopifyOrder(
         await t`select log_event('sales_order', ${existing.id}, 'note',
           'In Shopify erstattet — Auftrag storniert.', 'shopify')`
       }
+      // Rechnungen zum Auftrag (0115): der Shop hat erstattet — jede noch
+      // gültige Rechnung bekommt ihre Storno-Gutschrift, nichts bleibt offen.
+      const gutgeschrieben: string[] = []
+      for (const k of await t<{ id: string; nummer: string }[]>`
+        select id, nummer from kundenrechnungen
+        where sales_order_id = ${existing.id} and art = 'rechnung' and status <> 'storniert' order by created_at`) {
+        const [g] = await t<{ nummer: string }[]>`
+          select nummer from kundenrechnungen
+          where id = kundenrechnung_stornieren(${k.id}, ${`Bestellung ${order.name} im Shop ${grund}`}, 'shopify')`
+        gutgeschrieben.push(`${k.nummer} → ${g.nummer}`)
+      }
       // partial/full = Ware (teilweise) beim Kunden. Der frühere Vergleich
       // mit 'none' (kein Enum-Wert) war immer wahr und warnte bei jedem
       // Shop-Storno; 'started' heißt nur reserviert und ist unkritisch.
@@ -176,7 +189,8 @@ export async function importShopifyOrder(
         salesOrderId: existing.id,
         created: false,
         unmatched: 0,
-        message: `Auftrag zu ${order.name} ${erstattet ? 'wegen Erstattung ' : ''}storniert`,
+        message: `Auftrag zu ${order.name} ${erstattet ? 'wegen Erstattung ' : ''}storniert${
+          gutgeschrieben.length ? ` — Gutschrift ${gutgeschrieben.join(', ')}` : ''}`,
       }
     }
 
@@ -186,6 +200,9 @@ export async function importShopifyOrder(
       // der Bestellung) und — wenn nichts mehr offen ist und bezahlt wurde —
       // bestätigen. Deckt auch „erst importiert, später bezahlt" ab.
       if (existing.state !== 'draft') {
+        // Bestellung im Shop geändert (0115): Positionen, Lieferung und
+        // Fertigung folgen — nach der Rechnung mit Korrekturbelegen.
+        const geaendert = await bestellaenderungNachziehen(t, existing.id, order)
         // Versand außerhalb von KRNL (Sendcloud → Shopify, 2026-10-15): der
         // Shop meldet FULFILLED, KRNL hat keine Sendung — nachziehen.
         const extern = await externVersandNachziehen(t, existing.id, order)
@@ -193,7 +210,7 @@ export async function importShopifyOrder(
           salesOrderId: existing.id,
           created: false,
           unmatched: 0,
-          message: extern ?? `${order.name} war bereits importiert`,
+          message: [geaendert, extern].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
         }
       }
 
@@ -223,13 +240,13 @@ export async function importShopifyOrder(
         const preis = positionsPreis(item, order.taxesIncluded)
         await t`
           insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id,
-                                         price_unit, tax_rate)
+                                         price_unit, tax_rate, listenpreis)
           values (
             ${existing.id},
             coalesce((select max(sequence) + 10 from sales_order_lines
                       where order_id = ${existing.id}), 10),
-            ${zeile.resolved_variant}, ${item.title}, ${zeile.qty},
-            ${uomRow.uom_id}, ${preis.stueckNetto}, ${preis.steuersatz})`
+            ${zeile.resolved_variant}, ${positionsName(item)}, ${zeile.qty},
+            ${uomRow.uom_id}, ${preis.stueckNetto}, ${preis.steuersatz}, ${listenpreisNetto(item, order.taxesIncluded)})`
         await t`update shopify_unmatched_lines set attached_at = now() where id = ${zeile.id}`
         nachgezogen++
       }
@@ -270,13 +287,15 @@ export async function importShopifyOrder(
         number, partner_id, source, shopify_order_id, shopify_order_name,
         order_date, currency, versandkosten,
         ship_name, ship_street, ship_house_number, ship_street2,
-        ship_zip, ship_city, ship_country_code, ship_phone, ship_email)
+        ship_zip, ship_city, ship_country_code, ship_phone, ship_email,
+        rechnungsanschrift, zahlungsart)
       values (
         next_sequence('sale'), ${partnerId}, 'shopify', ${order.id}, ${order.name},
         ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode}, ${versandNetto(order)},
         ${addr?.name ?? null}, ${street}, ${houseNumber}, ${addr?.address2 ?? null},
         ${addr?.zip ?? null}, ${addr?.city ?? null}, ${addr?.countryCodeV2 ?? 'DE'},
-        ${addr?.phone ?? null}, ${order.email ?? null})
+        ${addr?.phone ?? null}, ${order.email ?? null},
+        ${rechnungsanschrift(order) ? t.json(rechnungsanschrift(order) as never) : null}, ${zahlungsartText(order)})
       returning id`
 
     let sequence = 10
@@ -305,9 +324,9 @@ export async function importShopifyOrder(
       const preis = positionsPreis(item, order.taxesIncluded)
       await t`
         insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id,
-                                       price_unit, tax_rate)
-        values (${created.id}, ${sequence}, ${variantId}, ${item.title}, ${qty},
-                ${uomRow.uom_id}, ${preis.stueckNetto}, ${preis.steuersatz})`
+                                       price_unit, tax_rate, listenpreis)
+        values (${created.id}, ${sequence}, ${variantId}, ${positionsName(item)}, ${qty},
+                ${uomRow.uom_id}, ${preis.stueckNetto}, ${preis.steuersatz}, ${listenpreisNetto(item, order.taxesIncluded)})`
       sequence += 10
     }
 
@@ -372,6 +391,118 @@ export async function importShopifyOrder(
   })
   if (storniert) await stornoNachlauf(storniert, 'shopify')
   return ergebnis
+}
+
+/**
+ * Bestellung im Shop geändert (0115, Entscheidungslog 2026-10-16): der Soll-
+ * Stand ist die Bestellung, wie Shopify sie JETZT liefert (currentQuantity
+ * zählt Änderungen und Erstattungen schon ab). Zeilen folgen: Menge und
+ * Preis angleichen, neue Artikel aufnehmen, entfernte Zeilen löschen — nie
+ * unter die gelieferte Menge. Danach zieht sales_order_lieferung_angleichen
+ * offene Lieferung und nicht begonnene Fertigung nach; was schon berechnet
+ * war und zurückgenommen wurde, bekommt eine Gutschrift. Rückgabe: Meldung
+ * für den Webhook, null wenn nichts zu tun war.
+ */
+export async function bestellaenderungNachziehen(
+  t: TransactionSql,
+  auftragId: string,
+  order: ShopifyOrder,
+): Promise<string | null> {
+  const [so] = await t<{ state: string; historisch: boolean; versandkosten: number }[]>`
+    select state::text as state, historisch, versandkosten from sales_orders where id = ${auftragId}`
+  if (!so || so.state !== 'sale' || so.historisch) return null
+
+  const soll = new Map<string, { qty: number; preis: number; steuer: number; name: string; listenpreis: number | null }>()
+  for (const item of order.lineItems.nodes) {
+    const qty = item.currentQuantity ?? item.quantity
+    if (qty <= 0) continue
+    const variantId = await matchVariant(t, item.sku, item.variant?.id ?? null)
+    if (!variantId) continue // nicht zuordenbare Zeilen bleiben Klärfälle des Imports
+    const preis = positionsPreis(item, order.taxesIncluded)
+    const bisher = soll.get(variantId)
+    soll.set(variantId, {
+      qty: (bisher?.qty ?? 0) + qty,
+      preis: preis.stueckNetto,
+      steuer: preis.steuersatz,
+      name: positionsName(item),
+      listenpreis: listenpreisNetto(item, order.taxesIncluded),
+    })
+  }
+
+  const ist = await t<
+    { id: string; variant_id: string; name: string; qty: number; qty_delivered: number; qty_invoiced: number; price_unit: number }[]
+  >`
+    select id, variant_id, name, qty, qty_delivered, qty_invoiced, price_unit
+    from sales_order_lines where order_id = ${auftragId} and variant_id is not null order by sequence`
+
+  const aenderungen: string[] = []
+  const gutschriften: { variant: string; menge: number }[] = []
+  for (const zeile of ist) {
+    const s = soll.get(zeile.variant_id)
+    const geliefert = Number(zeile.qty_delivered)
+    const berechnet = Number(zeile.qty_invoiced)
+    if (!s) {
+      if (geliefert > 0) {
+        // Geliefertes bleibt Auftragsmenge — der Shop nimmt nur die Forderung zurück.
+        const gekuerzt = Number(zeile.qty) !== geliefert
+        if (gekuerzt) await t`update sales_order_lines set qty = ${geliefert} where id = ${zeile.id}`
+        if (berechnet > 0) gutschriften.push({ variant: zeile.variant_id, menge: berechnet })
+        if (gekuerzt || berechnet > 0) {
+          aenderungen.push(`${zeile.name} im Shop zurückgenommen (${geliefert} bereits geliefert${berechnet > 0 ? ', berechnet → Gutschrift' : ''})`)
+        }
+      } else {
+        await t`delete from sales_order_lines where id = ${zeile.id}`
+        aenderungen.push(`${zeile.name} entfernt`)
+      }
+      continue
+    }
+    soll.delete(zeile.variant_id)
+    const neueMenge = Math.max(s.qty, geliefert)
+    const preisGeaendert = Math.abs(s.preis - Number(zeile.price_unit)) >= 0.005
+    if (neueMenge !== Number(zeile.qty) || preisGeaendert) {
+      await t`update sales_order_lines
+              set qty = ${neueMenge}, price_unit = ${s.preis}, listenpreis = ${s.listenpreis}
+              where id = ${zeile.id}`
+      aenderungen.push(
+        `${zeile.name}: ${Number(zeile.qty)} → ${neueMenge}${preisGeaendert ? ` (Preis ${Number(zeile.price_unit).toFixed(2)} → ${s.preis.toFixed(2)})` : ''}`,
+      )
+    }
+    if (s.qty < berechnet) {
+      // Weniger als berechnet: die Differenz wird gutgeschrieben (Rechnung bleibt).
+      gutschriften.push({ variant: zeile.variant_id, menge: berechnet - s.qty })
+      aenderungen.push(`${zeile.name}: im Shop auf ${s.qty} verringert, ${berechnet - s.qty} berechnet → Gutschrift`)
+    }
+  }
+  for (const [variantId, s] of soll) {
+    const [uomRow] = await t<{ uom_id: string }[]>`
+      select pt.uom_id from product_variants pv join product_templates pt on pt.id = pv.template_id where pv.id = ${variantId}`
+    await t`
+      insert into sales_order_lines (order_id, sequence, variant_id, name, qty, uom_id, price_unit, tax_rate, listenpreis)
+      values (${auftragId},
+              coalesce((select max(sequence) + 10 from sales_order_lines where order_id = ${auftragId}), 10),
+              ${variantId}, ${s.name}, ${s.qty}, ${uomRow.uom_id}, ${s.preis}, ${s.steuer}, ${s.listenpreis})`
+    aenderungen.push(`${s.name} neu (${s.qty})`)
+  }
+
+  const versand = versandNetto(order)
+  if (Math.abs(versand - Number(so.versandkosten)) >= 0.005) {
+    await t`update sales_orders set versandkosten = ${versand} where id = ${auftragId}`
+    aenderungen.push(`Versand ${Number(so.versandkosten).toFixed(2)} → ${versand.toFixed(2)}`)
+  }
+  if (aenderungen.length === 0) return null
+
+  await t`select sales_order_lieferung_angleichen(${auftragId}, 'shopify')`
+  let anzahlGutschriften = 0
+  for (const g of gutschriften) {
+    const [r] = await t<{ n: number }[]>`
+      select kundenrechnung_aenderung_gutschreiben(${auftragId}, ${g.variant}, ${g.menge},
+        ${`Bestellung ${order.name} im Shop geändert`}, 'shopify') as n`
+    anzahlGutschriften += Number(r.n)
+  }
+  await t`select log_event('sales_order', ${auftragId}, 'note',
+    ${`Bestellung im Shop geändert: ${aenderungen.join('; ')}${anzahlGutschriften ? ` — ${anzahlGutschriften} Gutschrift(en) erzeugt` : ''}`.slice(0, 1000)},
+    'shopify')`
+  return `${order.name}: Bestellung im Shop geändert (${aenderungen.join('; ')})`
 }
 
 // --- Erstübernahme -----------------------------------------------------------

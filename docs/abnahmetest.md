@@ -56,16 +56,21 @@ Ergebnis am Ende: 20 Aufträge (18 verkauft, 2 storniert), 4 Bestellungen,
   Fulfillments — und die Mengen im letzten `inventorySetQuantities`-Aufruf
   der Attrappe müssen den Soll-Mengen entsprechen.
 - **Belege nach Zustand:** Aufträge, Bestellungen, Fertigungsaufträge,
-  Lieferungen, Wareneingänge, Rechnungen, Demontagen.
+  Lieferungen, Wareneingänge, Rechnungen, Demontagen — und seit 0115 die
+  **Kundenrechnungen** je Art und Status (`rechnung:bezahlt` für Shop,
+  `rechnung:offen` für B2B, `gutschrift:…` nach Shop-Storno).
 - **Umsatz:** je Auftragsmonat netto/Steuer/brutto und Anzahl, Shop brutto,
-  B2B netto; Deckungsbeitrag-Sicht (Erlös der Lieferungen, Wareneinsatz zu
+  B2B netto, Summe der gültigen Kundenrechnungen brutto (Positionen ×
+  Preis, Steuer je Position gerundet, Shop-Versand einmal je Auftrag);
+  Deckungsbeitrag-Sicht (Erlös der Lieferungen, Wareneinsatz zu
   heutigen Einstandspreisen).
 - **Fertigung:** Material- und Lohnkosten, gefertigte Stück.
 - **Cashflow:** Zahlungen je Monat (ein/aus/Anzahl), Kontosaldo je Konto
   (`finanz_saldo`, inkl. „Ohne Konto" für die Vorkasse).
 - **Verbindlichkeiten:** offene Rechnungsbeträge; **Fälligkeiten** bis
   Ende Monat 5 (`finanz_faellig`) je Quelle: Rechnungen, Verträge,
-  Darlehensraten, Steuern.
+  Darlehensraten, Steuern, offene Kundenrechnungen (Forderungen der
+  B2B-Aufträge, fällig 14 Tage nach der Lieferung).
 - **Verträge** (Status, Kündigungsdatum, gezahlt), **Darlehen** (Status,
   Restschuld, bezahlte Raten, nächste Fälligkeit, Annuität), **Steuern**
   (offen/bezahlt).
@@ -179,6 +184,13 @@ Beides steht jetzt im Modell und in der Doku:
   Stellen, der Durchschnitt wird danach neu gerechnet (9,556510 →
   9,556513 nach drei Deskmat-Lieferungen). Das Modell rechnet es genauso;
   wer Preise von Hand nachrechnet, muss die Schichten nachvollziehen.
+
+**Kundenrechnungen (2026-10-16):** Nach Migration 0115 meldete der Lauf
+genau die erwartete Abweichung — `faellig.kundenrechnung` fehlte im Modell
+(B1: 809,20 € offen ab Monat 2). Das Modell bucht die Rechnung jetzt in
+`liefern()`; danach Soll = Ist im festen Szenario und im Zufallslauf
+(Seed 20261015, 903 Schritte, 196 Lieferungen → 196 Rechnungen, 12
+Shop-Stornos ohne Beleg, weil nur offene Lieferungen storniert werden).
 
 ## Erweitern
 

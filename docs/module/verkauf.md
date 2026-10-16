@@ -38,8 +38,104 @@ Produkt-Auswahl auf **Varianten-Ebene** (Suche über SKU/Name inkl. Attributwert
 - `source = 'shopify'`, `shopify_order_id`/`shopify_order_name` gesetzt, Kunde per `shopify_customer_id`-Upsert.
 - Bezahlte Shopify-Orders entstehen direkt in `sale` (Bestätigungslogik läuft identisch durch — Lieferung + MOs).
 - Auf dem Formular: Link zur Order im Shopify-Admin, Anzeige der gesetzten Tags, Fulfillment-/Zahlungsstatus aus Shopify (read-only Info).
-- Stornierte oder voll erstattete Shopify-Orders (`orders/cancelled`-Webhook) stornieren den Verkaufsauftrag samt allem Nachgelagerten (siehe Stornieren). Das ist der einzige Storno-Weg für Shop-Aufträge — Shopify führt.
+- Stornierte oder voll erstattete Shopify-Orders (`orders/cancelled`-Webhook) stornieren den Verkaufsauftrag samt allem Nachgelagerten (siehe Stornieren). Das ist der einzige Storno-Weg für Shop-Aufträge — Shopify führt. Gab es schon eine Rechnung (Ware versandt), bekommt jede gültige Rechnung ihre Storno-Gutschrift — bezahlt, weil der Shop erstattet hat (0115).
+- **Bestellung im Shop geändert** (seit 0115): Shopify-Bestelländerungen (anderes Case, Switches getauscht, Artikel dazu, Menge weniger) kommen über `orders/updated` an. Soll je Variante ist `currentQuantity`; Positionen, Lieferung und Fertigung folgen vor dem Versand ohne Beleg, nach der Rechnung entsteht die Gutschrift automatisch — Details unter **Kundenrechnungen** und im Modul Integrationen.
 - **Versand außerhalb von KRNL** (seit 2026-10-15): meldet Shopify die Order als erfüllt, ohne dass KRNL eine Sendung dazu hat (Sendcloud läuft parallel), bucht KRNL den Warenausgang der offenen Lieferungen nach — der Auftrag ist geliefert, die Lieferung trägt die Trackingdaten des Shops („extern · DHL …" in der Lieferungsliste). Ein noch offener Fertigungsauftrag bleibt stehen und wird zur Nachfrage ans Team Fertigung (Aufgabe): Fertig melden (Material verbrauchen, Erzeugnis buchen) oder stornieren und den Bestand korrigieren — die Nachfragen stehen als Karte auf `/fertigung` und haken sich mit der Entscheidung von selbst ab. Vor der Umstellung versendete Aufträge holt der Versand-Abgleich offener Shop-Aufträge nach (Monitor, Cron). Details im Modul Integrationen (Order-Import).
+
+## Kundenrechnungen (Migration 0115, seit 2026-10-16)
+
+Rechnungen an Kunden kommen aus KRNL, nicht mehr aus Shopify
+(Entscheidungslog 2026-10-16). Tabellen `kundenrechnungen` (RE-/GU-Nummern
+aus eigenen Nummernkreisen, Enum `kundenrechnung_status` offen → bezahlt /
+storniert) und `kundenrechnung_positionen`; Prozess `kundenrechnung`
+(Schritte rechnung → zahlen → ende, stornieren jederzeit).
+
+**Die Rechnung entsteht mit der Lieferung.** Der Trigger auf
+`stock_pickings` ruft beim Buchen eines Warenausgangs zu einem
+Verkaufsauftrag `kundenrechnung_aus_lieferung` (Einstellung
+`rechnung.automatisch`, Standard an; sonst Knopf „Rechnung erstellen" an
+der gebuchten Lieferung, Registry `verkauf.rechnung_erstellen`):
+
+- **Positionen** = gelieferte Menge je Variante (mehrere Bewegungen einer
+  Variante werden eine Zeile) × Netto-Stückpreis der Auftragszeile, Steuer
+  je Position gerundet; Bezeichnung mit Variantenname („NATIVE 75 -
+  Standard / FR4 / Silent Red"), Rabatt als Listenpreis vor Rabatt
+  (`sales_order_lines.listenpreis`, nur wenn der Shop einen Rabatt gab).
+- **Versand** einmal je Auftrag auf der ersten gültigen Rechnung
+  (`sales_orders.versandkosten` netto, Steuer zum Satz der Positionen).
+- **Shop-Aufträge sind sofort bezahlt** — die Zahlung lief im Shop;
+  Zahlungsart aus `paymentGatewayNames` („Shopify Payments", „PayPal",
+  „Klarna" …), Rechnungsanschrift aus `billingAddress`. **Firmenkunden
+  (manuelle Aufträge)** sind offen: Zahlungsart „Überweisung", fällig nach
+  Zahlungsbedingung des Kunden, sonst `rechnung.zahlungsziel_tage` (14).
+- Kopf: Rechnungs- und Leistungsdatum (Buchung der Lieferung),
+  Kundennummer (Kontakt-Ref, sonst Shopify-Kundennummer), Kundenreferenz
+  (Shop-Bestellnummer, sonst Auftragsnummer), Ansprechpartner.
+
+**Korrekturen nur per Gutschrift — nie durch Ändern.** Eine ausgestellte
+Rechnung wird nicht editiert (GoBD). `kundenrechnung_gutschrift(rechnung,
+positionen, grund)` erzeugt die GU-Nummer mit Bezug zur Rechnung
+(`storno_von_id`) und senkt `qty_invoiced` der Auftragszeilen:
+
+- **Teilgutschrift** (Registry `verkauf.gutschrift_erstellen`, Positionen
+  mit Menge wählen): die Rechnung bleibt gültig.
+- **Storno** (`verkauf.rechnung_stornieren`) = volle Gutschrift, die
+  Rechnung wird `storniert`. Bei Shop-Zahlung ist die Gutschrift sofort
+  bezahlt (der Shop erstattet); bei bezahlter Überweisungsrechnung ist sie
+  **offen** und steht als Erstattung (Auszahlung) in `finanz_faellig`.
+- **Änderung im Shop nach der Rechnung:** der Import ruft
+  `kundenrechnung_aenderung_gutschreiben(auftrag, variante, menge)` — die
+  Gutschrift über die zurückgenommene Menge entsteht auf der jüngsten
+  gültigen Rechnung, ohne Zutun. Kommt Ware dazu, entsteht die zweite
+  Lieferung und mit ihr die zweite Rechnung (ohne Versand). Das war der
+  Fehler des alten Weges: Gutschrift ohne neue Rechnung.
+
+**Zahlung, Mahnung, Forderungen.** `verkauf.rechnung_zahlen` bucht die
+Einzahlung ins Zahlungsregister (`zahlungen.quelle = 'kundenrechnung'`,
+mit Bankkonto und Betrag — Teilzahlungen erlaubt) oder markiert ohne Konto
+als bezahlt (Bar, Shop). `kundenrechnung_offen(id)` = brutto − Zahlungen;
+bei 0 kippt der Status auf `bezahlt`. Offene Rechnungen (Forderung, `ein`)
+und offene Gutschriften (Erstattung, `aus`) stehen in `finanz_faellig`
+und damit in der Cashflow-Sicht. **Mahnstufen 1–3** (`verkauf.rechnung_mahnen`,
+nur nach Fälligkeit): Zahlungserinnerung, 1. Mahnung, 2. Mahnung — je als
+PDF mit Frist `rechnung.mahnfrist_tage`; überfällige Rechnungen zählt die
+Navigation (`/verkauf/rechnungen`, rot).
+
+**PDF** (`/api/verkauf/rechnung/<id>`, `?art=mahnung`; `@react-pdf`,
+`src/modules/verkauf/rechnung-pdf.ts`): Shop-Rechnungen zeigen Bruttopreise
+mit „inkl. 19 % MwSt." wie die bisherigen Shopify-Belege, B2B-Rechnungen
+netto mit Steuerblock; Fuß mit Pflichtangaben der GmbH (Registergericht,
+HRB, Steuernummer/USt-IdNr., Geschäftsführung, Bank) aus
+`settings.company` (Einstellungen → Firma).
+
+**DATEV** (`/api/verkauf/datev?von&bis`, Finanzen-Recht): Buchungsstapel
+EXTF 700 — Rechnung im Soll Debitor (Kundennummer, sonst
+`rechnung.debitorenkonto`) gegen Erlöskonto je Steuersatz
+(`rechnung.erloeskonto_19/7/0`, SKR03 8400/8300/8120 oder SKR04
+4400/4300/4120), Gutschrift im Haben, Umlaute ASCII-sicher
+(`src/modules/verkauf/datev-export.ts`, reine Logik). „Zeitraum als übergeben
+markieren" (`verkauf.datev_uebergeben`) setzt `datev_uebergeben_am`.
+
+**Einstellungen** (Einstellungen → Belege): Automatik, Zahlungsziel,
+Mahnfrist, Kontenrahmen und Konten (`einstellungen.rechnungen_setzen`,
+`settings.rechnung`); **Nummernkreise** jetzt setzbar
+(`einstellungen.nummernkreis_setzen` → `sequence_setzen`, Prefix und
+nächste Nummer — z. B. RE- ab 7813, damit die Nummern nach Shopify
+lückenlos weitergehen).
+
+**UI:** `/verkauf/rechnungen` (Filter offen/überfällig/bezahlt/Gutschriften/
+storniert, Kacheln offene Forderungen, überfällig, Umsatz des Monats,
+DATEV-Karte), `/verkauf/rechnungen/<id>` (Positionen, Zahlungen,
+Gutschriften, Knöpfe aus dem Prozess, PDF, Mahnung, Notizen); am Auftrag
+die Karte **Rechnungen**.
+
+**Tests:** `tests/kundenrechnungen.test.ts` (reine Bausteine: Felder aus
+der Shop-Bestellung, DATEV-Zeilen), `tests/prozesse/kundenrechnungen.test.ts`
+(Shop-Änderung vor dem Versand, Rechnung aus Fertigung + Label,
+Teilerstattung → Gutschrift, Artikel dazu → zweite Rechnung, Firmenkunde
+mit Mahnung und Teilzahlung, Storno, DATEV), Fixture `kundenrechnung`
+(drei Läufe), Abnahmetest (Rechnungen je Status, Rechnungssumme,
+Forderungen in `finanz_faellig`).
 
 ## UI
 
@@ -54,3 +150,6 @@ Produkt-Auswahl auf **Varianten-Ebene** (Suche über SKU/Name inkl. Attributwert
 3. Stornieren storniert die offene Lieferung, MO bleibt mit Warnhinweis bestehen.
 4. Gesperrter Auftrag lässt sich weder in UI noch per API ändern, bis entsperrt.
 5. Validierte Teillieferung setzt `qty_delivered` der Positionen und `delivery_status = partial`.
+6. Gebuchte Lieferung eines Shop-Auftrags erzeugt genau eine bezahlte Rechnung (Positionen mit Variantenname, Versand einmal); die eines Firmenauftrags eine offene mit Fälligkeit — sie steht in `finanz_faellig`.
+7. Shop-Änderung vor dem Versand ändert Auftrag, Lieferung und Fertigung, aber keinen Beleg; nach der Rechnung entsteht die Gutschrift (Menge weniger) bzw. die zweite Rechnung (Ware dazu) von selbst.
+8. Storno = volle Gutschrift mit Bezug, Rechnung `storniert`; Teilgutschrift lässt die Rechnung bestehen; keine Rechnung wird je editiert.

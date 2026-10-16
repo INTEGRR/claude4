@@ -25,6 +25,14 @@ export async function firmaSpeichern(
     phone: string
     eori?: string
     ust_id?: string
+    registergericht?: string
+    handelsregister?: string
+    steuernummer?: string
+    geschaeftsfuehrung?: string
+    web?: string
+    iban?: string
+    bic?: string
+    bank?: string
   },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
@@ -171,6 +179,35 @@ export async function belegverhaltenSetzen(
   await einstellungMergen('sales', { lock_confirmed: p.sales_lock })
   await einstellungMergen('purchase', { lock_confirmed: p.purchase_lock })
   return { text: 'Belegverhalten gespeichert — gilt ab der nächsten Bestätigung.' }
+}
+
+export async function rechnungenSetzen(
+  p: {
+    automatisch: boolean
+    zahlungsziel_tage: number
+    mahnfrist_tage: number
+    kontenrahmen: 'SKR03' | 'SKR04'
+    debitorenkonto: string
+    erloeskonto_19: string
+    erloeskonto_7: string
+    erloeskonto_0: string
+  },
+  _ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await einstellungMergen('rechnung', p)
+  return {
+    text: `Kundenrechnungen: ${p.automatisch ? 'bei jeder Lieferung von selbst' : 'von Hand aus der Lieferung'}, Zahlungsziel ${p.zahlungsziel_tage} Tage.`,
+  }
+}
+
+export async function nummernkreisSetzen(
+  p: { code: string; naechste: number; prefix?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`select sequence_setzen(${p.code}, ${p.naechste}, ${p.prefix ?? null})`
+  await sql`select log_event('settings', gen_random_uuid(), 'note',
+    ${`Nummernkreis ${p.code}: nächste Nummer ${p.prefix ?? ''}${p.naechste}`}, ${ctx.actor})`
+  return { text: `Nummernkreis ${p.code}: die nächste Nummer ist ${p.naechste}.` }
 }
 
 export async function freigabenSetzen(

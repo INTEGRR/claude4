@@ -19,6 +19,14 @@ interface Firma {
   phone: string
   eori: string
   ust_id: string
+  registergericht: string
+  handelsregister: string
+  steuernummer: string
+  geschaeftsfuehrung: string
+  web: string
+  iban: string
+  bic: string
+  bank: string
 }
 
 async function firmaSpeichern(formData: FormData) {
@@ -90,10 +98,47 @@ export default async function FirmaPage() {
               <input className="mono" name="country" defaultValue={firma.country ?? 'DEU'} maxLength={3} required />
             </label>
           </div>
+          <div className="row">
+            <label className="field">
+              <span>Registergericht</span>
+              <input name="registergericht" defaultValue={firma.registergericht ?? ''} placeholder="Bad Oeynhausen" />
+            </label>
+            <label className="field">
+              <span>Handelsregister-Nr.</span>
+              <input name="handelsregister" className="mono" defaultValue={firma.handelsregister ?? ''} placeholder="HRB 12345" />
+            </label>
+            <label className="field">
+              <span>Steuernummer</span>
+              <input name="steuernummer" className="mono" defaultValue={firma.steuernummer ?? ''} />
+            </label>
+            <label className="field" style={{ flex: 2 }}>
+              <span>Geschäftsführung</span>
+              <input name="geschaeftsfuehrung" defaultValue={firma.geschaeftsfuehrung ?? ''} placeholder="Vorname Name, Vorname Name" />
+            </label>
+          </div>
+          <div className="row">
+            <label className="field">
+              <span>Website</span>
+              <input name="web" defaultValue={firma.web ?? ''} placeholder="www.…" />
+            </label>
+            <label className="field">
+              <span>IBAN</span>
+              <input name="iban" className="mono" defaultValue={firma.iban ?? ''} placeholder="DE…" />
+            </label>
+            <label className="field">
+              <span>BIC</span>
+              <input name="bic" className="mono" defaultValue={firma.bic ?? ''} />
+            </label>
+            <label className="field">
+              <span>Bank</span>
+              <input name="bank" defaultValue={firma.bank ?? ''} />
+            </label>
+          </div>
           <button className="primary" type="submit">Speichern</button>
         </ActionForm>
         <p className="small muted" style={{ margin: '10px 0 0' }}>
-          Steht als Absender auf jedem DHL-Label und Retourenlabel, im Kopf der Belege und in
+          Registergericht, Handelsregister, Steuernummer, Geschäftsführung und Bankverbindung stehen im Fuß jeder
+          Kundenrechnung (Pflichtangaben). Steht als Absender auf jedem DHL-Label und Retourenlabel, im Kopf der Belege und in
           ausgehenden Mails. Die E-Mail-Adresse erhält außerdem die Hinweise zu neuen
           Reparaturanfragen, solange <span className="mono">REPARATUR_MAIL</span> nicht gesetzt ist.
         </p>
