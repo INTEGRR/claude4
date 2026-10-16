@@ -36,10 +36,17 @@ async function main() {
 
   try {
     // --- Administrator ------------------------------------------------------
+    // Nur auf einer leeren Instanz (Erstinstallation). Sobald irgendein Konto
+    // existiert, legt der Seed nichts mehr an — sonst käme ein gelöschtes
+    // Seed-Konto mit bekanntem Standardpasswort bei jedem Deploy zurück
+    // (Entscheidungslog 2026-10-16).
+    const [{ anzahl }] = await sql<{ anzahl: number }[]>`select count(*)::int as anzahl from users`
     const [existing] = await sql<{ id: string }[]>`
       select id from users where lower(email) = lower(${ADMIN_EMAIL})`
     if (existing) {
       console.log(`Benutzer ${ADMIN_EMAIL} existiert bereits.`)
+    } else if (anzahl > 0) {
+      console.log(`Es gibt bereits ${anzahl} Benutzerkonten — kein Seed-Administrator angelegt.`)
     } else {
       await sql`
         insert into users (email, name, password_hash, role)

@@ -9,6 +9,21 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Seed-Administrator nur auf leerer Instanz
+
+**Befund (Prod):** Das Seed-Konto `admin@example.com` war gelöscht und
+stand wieder aktiv in der Datenbank. Ursache: `scripts/vorbereiten.ts` ruft
+bei jedem Vercel-Build `scripts/seed.ts` auf, und der legte den
+Administrator an, sobald genau diese Adresse fehlte — mit dem bekannten
+Standardpasswort. Jeder Deploy nach dem Löschen hat das Konto zurückgebracht.
+Benutzt wurde es nicht (keine Anmeldemeldung, keine Sitzung).
+
+**Entschieden:** Der Seed legt den Administrator nur an, wenn **kein**
+Benutzerkonto existiert (Erstinstallation). Sobald ein Konto da ist, tut der
+Build nichts an Benutzern. Das Löschen des Seed-Kontos unter Einstellungen →
+Benutzer ist damit endgültig. Umgesetzt in `scripts/seed.ts`; die
+Go-live-Checkliste (§4) verweist darauf.
+
 ## 2026-10-16 — KI-Region als Betreiber-Einstellung: Standard bleibt, EU ist ein Schalter ohne stillen Rückfall
 
 **Entschieden:** Wo die KI rechnet, ist eine Einstellung

@@ -155,7 +155,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       26.08.2026 geändert — bestätigen, dass das der Betreiber war.
       *Stand 2026-10-01: eigene Admin-Konten da, Seed-Konto deaktiviert.
       Löschen geht seit 2026-10-01 unter Einstellungen → Benutzer →
-      „Löschen" (nach dem Deploy).*
+      „Löschen" (nach dem Deploy).* *Stand 2026-10-16: gelöscht — bis
+      dahin legte der Build das Konto bei jedem Deploy neu an (Seed), seit
+      2026-10-16 nur noch auf einer Instanz ohne Benutzer
+      (Entscheidungslog 2026-10-16).*
 - [ ] Benutzerkonten je Rolle anlegen (Odoo-Konten werden nicht
       migriert); Rollenmodell in
       [module/rollen-auswertungen-scanner-ki.md](module/rollen-auswertungen-scanner-ki.md).
