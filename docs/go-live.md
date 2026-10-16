@@ -358,6 +358,10 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
       2026-10-16): Testrechnungen PROBE-RE-… parallel zu sevDesk, zählen
       nirgends; Vergleich unter Verkauf → Rechnungen → Probelauf, danach
       „Probelauf löschen" und Modus „scharf" (Einstellungen → Belege).
+      **Zurückgestellt (2026-10-16):** DATEV-Stapel aus KRNL, Debitorenkonten
+      je Zahlungsart und der Abgleich mit Pathway werden erst nach dem
+      Probelauf geklärt; sevDesk und Pathway laufen bis dahin unverändert
+      (Entscheidungslog 2026-10-16 „Buchhaltungsanbindung zurückgestellt").
 - [ ] KI-Region (Einstellungen → KI-Modelle, seit 2026-10-16): Standard
       (Anthropic direkt, OpenAI global — der heutige Weg) oder EU (Claude
       über Bedrock mit EU-Profil, OpenAI über eu.api.openai.com). Für EU

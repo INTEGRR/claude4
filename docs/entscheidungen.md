@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Buchhaltungsanbindung zurückgestellt: sevDesk und Pathway laufen unverändert, bis der Probelauf steht
+
+**Entschieden (Betreiber):** Die Frage, wie KRNL-Rechnungen in die
+Buchhaltung gelangen (DATEV-Buchungsstapel, Debitorenkonten je Zahlungsart,
+Abgleich mit Pathway, sevDesk-API für den Probelauf-Vergleich), wird
+**jetzt nicht** bearbeitet. sevDesk (Rechnungsausgang) und Pathway
+(Zahlungstransaktionen: Shopify-Auszahlungen, PayPal, Gebühren) laufen
+unverändert weiter; KRNL bleibt im Rechnungs-Probelauf. Der DATEV-Export
+aus KRNL wird bis zur Klärung nicht benutzt.
+
+**Festgehalten für später** (Rechercheergebnis, nicht geprüft am Konto):
+Pathway kann laut eigener Doku nicht nur Zahlungen, sondern auch
+Ausgangsrechnungen aus Shopify erzeugen und über den DATEV-
+Buchungsdatenservice übertragen (Rechnungsnummer in Belegfeld 1 bzw.
+Zusatzinformationen). Bevor KRNL die Rechnungsseite übernimmt, ist deshalb
+mit Steuerberatung und Pathway zu klären, welches System die
+Ausgangsrechnungen bucht und gegen welche Debitoren-/Verrechnungskonten
+Pathway die Auszahlungen ausgleicht — sonst wird doppelt gebucht oder es
+bleiben offene Posten. Das ist der eine Abstimmungspunkt; erst danach lohnt
+ein Debitorenkonto je Zahlungsart in KRNL. Betroffene Einrichtungsaufgabe:
+`datev_konten`.
+
 ## 2026-10-16 — Korrektur: Rechnungsausgang heute aus sevDesk, Transaktionen über Pathway
 
 **Befund (Betreiber):** Die Einträge zu Kundenrechnungen und Probelauf
