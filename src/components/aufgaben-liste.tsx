@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { ActionButton } from '@/components/action-button'
 import { aufgabeErledigen, aufgabeVerwerfen } from '@/app/(erp)/aufgaben/actions'
 import type { AufgabeZeile } from '@/modules/aufgaben/liste'
@@ -64,6 +65,12 @@ export function AufgabenListe({
             </div>
             {offen && (
               <div className="actions" style={{ flexWrap: 'nowrap' }}>
+                {/* Einrichtungsaufgaben (0116) tragen die Seite, auf der sie erledigt werden. */}
+                {a.link && (
+                  <Link className="btn small" href={a.link}>
+                    Öffnen
+                  </Link>
+                )}
                 {verwerfen && darfVerwerfen(a, nutzer) && (
                   <ActionButton
                     className="small danger"

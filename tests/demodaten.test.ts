@@ -153,6 +153,31 @@ describe('Neustart: demodaten_loeschen', () => {
     assert.ok(schritte > 0, 'Schritte der aktiven Versionen müssen erhalten bleiben')
   })
 
+  test('Einrichtungsaufgaben stehen nach jedem Neustart wieder offen', async () => {
+    // Die Betreiber-Todos (0116) sind Struktur: erledigt bleibt erledigt —
+    // bis der nächste Reset die Aufgaben leert, dann kommen sie neu.
+    const soll = await sql<{ schluessel: string }[]>`
+      select schluessel from einrichtungsaufgaben where aktiv order by schluessel`
+    assert.ok(soll.length >= 5, 'die Stichtagsliste der Kundenrechnungen ist drin')
+    const offen = async () =>
+      (await sql<{ s: string }[]>`
+        select einrichtung_schluessel as s from aufgaben
+        where status = 'offen' and einrichtung_schluessel is not null order by 1`).map((z) => z.s)
+    assert.deepEqual(await offen(), soll.map((z) => z.schluessel))
+    const [{ n }] = await sql<{ n: number }[]>`select einrichtungsaufgaben_anlegen() as n`
+    assert.equal(Number(n), 0, 'ein zweiter Aufruf legt nichts doppelt an')
+
+    await sql`update aufgaben set status = 'erledigt', erledigt_am = now(), erledigt_von = 'test'
+              where einrichtung_schluessel = ${soll[0].schluessel}`
+    assert.equal((await offen()).length, soll.length - 1, 'erledigt bleibt erledigt')
+    await sql`select demodaten_loeschen()`
+    assert.deepEqual(await offen(), soll.map((z) => z.schluessel), 'nach dem Reset wieder vollständig offen')
+    const [a] = await sql<{ rolle: string; link: string | null }[]>`
+      select rolle::text as rolle, link from aufgaben where einrichtung_schluessel = 'rechnung_nummernkreis'`
+    assert.equal(a.rolle, 'admin')
+    assert.equal(a.link, '/einstellungen/belege')
+  })
+
   test('Belegnummern starten wieder bei 1', async () => {
     const [{ nummer }] = await sql<{ nummer: string }[]>`
       select next_sequence('sale') as nummer`

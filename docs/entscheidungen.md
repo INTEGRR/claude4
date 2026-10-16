@@ -9,6 +9,29 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Einrichtungsaufgaben: Betreiber-Todos sind Struktur und überleben jeden Daten-Reset
+
+**Entschieden:** Was der Betreiber vor dem Stichtag erledigen muss, steht
+nicht mehr im Chat, sondern als Aufgabe in KRNL — und zwar aus einer
+Liste, die wie Prozesse oder Lagerorte zur Struktur gehört (Tabelle
+`einrichtungsaufgaben`, Migration 0116). Jede Zeile wird eine normale
+Aufgabe für das Team Verwaltung mit Link auf die Seite, auf der sie
+erledigt wird. Nach „Betriebsdaten löschen" oder dem Werkszustand legt der
+Reset sie neu an; vorher Erledigtes bleibt bis dahin erledigt.
+
+**Warum:** Der Betreiber setzt vor dem Livegang die Daten noch einmal
+zurück. Eine Todo-Liste, die dabei mit verschwindet, ist keine. Eine
+Liste im Code hätte beim Reset niemanden erreicht; eine Liste in der
+Doku liest vor dem Stichtag niemand. Aufgaben sind die Projektion, die
+alle schon sehen.
+
+**Regeln:** Neue Betreiber-Todos kommen per Migration (Zeile +
+`einrichtungsaufgaben_anlegen()`), nie als freie Server Action; abgehakt
+wird über `aufgaben.erledigen`. Die erste Liste sind die Punkte der
+Kundenrechnungen (Nummernkreise, Firmendaten, Shopify-Rechnungs-App,
+DATEV-Konten, Mailversand). Doku: Prozesse → Einrichtungsaufgaben,
+Go-Live-Plan 7c; Test in `tests/demodaten.test.ts`.
+
 ## 2026-10-16 — Reparaturauftrag druckbar: ein Blatt für Werkstatt und Kunde, Rahmen mit der Rechnung geteilt
 
 **Entschieden:** Jeder Reparaturauftrag hat einen Ausdruck (PDF, Knopf im

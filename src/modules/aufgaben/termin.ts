@@ -78,6 +78,8 @@ export const TEAMS = {
   lager: 'Lager',
   fertigung: 'Fertigung',
   mitarbeiter: 'Büro',
+  // Einrichtungsaufgaben (0116) gehen an die Administratoren.
+  admin: 'Verwaltung',
 } as const
 export type Team = keyof typeof TEAMS
 

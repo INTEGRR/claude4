@@ -341,11 +341,13 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
 
 - [x] Kundenrechnungen (Ausgangsrechnung, Zahlungseingang, Mahnwesen) aus
       KRNL — entschieden 2026-10-16, gebaut (Migration 0115, Modul Verkauf →
-      Kundenrechnungen). Vor dem Stichtag: Nummernkreis RE-/GU- unter
-      Einstellungen → Belege auf die nächste freie Shopify-Nummer setzen,
-      Firmendaten (Registergericht, HRB, Steuernummer, Geschäftsführung,
-      Bank) unter Einstellungen → Firma prüfen, Shopify-Rechnungs-App
-      abschalten, DATEV-Konten (SKR03/04) mit der Steuerberatung abstimmen.
+      Kundenrechnungen). Die Betreiber-Punkte dazu stehen seit 0116 als
+      **Einrichtungsaufgaben** in KRNL (Übersicht → Aufgaben, Team
+      Verwaltung) und kommen nach jedem Daten-Reset wieder: Nummernkreis
+      RE-/GU- auf die nächste freie Shopify-Nummer setzen, Firmendaten für
+      den Rechnungsfuß prüfen, Shopify-Rechnungs-App abschalten, DATEV-Konten
+      (SKR03/04) mit der Steuerberatung abstimmen, Rechnungsversand per Mail
+      festlegen (noch nicht gebaut).
 - [ ] Stichtag festlegen; vorher einen frischen Odoo-Dump für den lokalen
       Probelauf bereitstellen.
 

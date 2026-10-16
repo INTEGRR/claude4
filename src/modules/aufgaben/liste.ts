@@ -22,6 +22,9 @@ export interface AufgabeZeile {
   erledigt_am: string | null
   erledigt_von: string | null
   notiz: string | null
+  /** Seite in KRNL, auf der die Aufgabe erledigt wird (Einrichtungsaufgaben, 0116). */
+  link: string | null
+  einrichtung_schluessel: string | null
   ueberfaellig: boolean
   heute: boolean
 }
@@ -41,7 +44,7 @@ export async function aufgabenListe(u: Nutzer, filter: AufgabenFilter, limit = 2
     select a.id, a.titel, a.beschreibung, a.faellig_am::text as faellig_am,
            to_char(a.uhrzeit, 'HH24:MI') as uhrzeit, a.dauer_min, a.zustaendig_id, u.name as zustaendig,
            a.rolle::text as rolle, a.erstellt_von, a.erstellt_von_id, a.status::text as status,
-           a.erledigt_am::text as erledigt_am, a.erledigt_von, a.notiz,
+           a.erledigt_am::text as erledigt_am, a.erledigt_von, a.notiz, a.link, a.einrichtung_schluessel,
            a.status = 'offen' and a.faellig_um < now() as ueberfaellig,
            a.faellig_am = (now() at time zone 'Europe/Berlin')::date as heute
     from aufgaben a

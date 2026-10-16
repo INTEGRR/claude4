@@ -1655,6 +1655,29 @@ Gutschrift; Firmenkunde → offen → Zahlung über das Register; Automatik aus
 → Rechnung von Hand). Fachlich: [Modul Verkauf](module/verkauf.md),
 Entscheidungslog 2026-10-16.
 
+## Einrichtungsaufgaben: Betreiber-Todos, die den Reset überleben (Migration 0116, umgesetzt)
+
+Was der Betreiber vor dem Stichtag tun muss, stand im Chat und im
+Go-Live-Plan — und war nach „Betriebsdaten löschen" weg. Jetzt ist die Liste
+**Struktur** (Tabelle `einrichtungsaufgaben`: Schlüssel, Titel, Text, Link
+auf die Seite in KRNL, Rolle, Frist in Tagen) und jede Zeile wird eine
+normale **Aufgabe** für das Team Verwaltung (Rolle `admin`): sie steht in
+der Übersicht und auf `/aufgaben`, mit Knopf **Öffnen** zur Seite
+(`aufgaben.link`) und wird über `aufgaben.erledigen` abgehakt.
+
+- `einrichtungsaufgaben_anlegen()` legt für jede aktive Zeile ohne Aufgabe
+  eine offene an (idempotent; `aufgaben.einrichtung_schluessel` ist je
+  Datengeneration eindeutig, auch erledigte zählen). Läuft am Ende der
+  Migration, die Einträge bringt, und in `demodaten_loeschen()` — damit
+  stehen die Todos nach jedem Reset (Stufe 1 und Werkszustand) wieder offen.
+- Neue Betreiber-Todos = neue Zeilen per Migration plus der Funktionsaufruf;
+  keine freie Server Action, kein zweiter Aufgabentyp.
+- Erste Liste (Kundenrechnungen aus KRNL, 0115): Nummernkreise RE-/GU-
+  setzen, Firmendaten für den Rechnungsfuß, Shopify-Rechnungs-App
+  abschalten, DATEV-Konten abstimmen, Rechnungsversand per Mail festlegen.
+- Geprüft in `tests/demodaten.test.ts`: nach dem Reset vollständig offen,
+  kein Doppel beim zweiten Aufruf, erledigt bleibt bis zum Reset erledigt.
+
 ## Noch offen (Kurzfassung)
 
 - **Kundenrechnungen (AR)** — das einzige fehlende Glied der Verkaufskette:
