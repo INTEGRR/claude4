@@ -23,6 +23,7 @@
     "vercel-build": "node --experimental-strip-types scripts/vorbereiten.ts && next build"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.35.0",
     "@anthropic-ai/sdk": "^0.115.0",
     "@react-pdf/renderer": "^4.8.1",
     "@xyflow/react": "^12.11.3",

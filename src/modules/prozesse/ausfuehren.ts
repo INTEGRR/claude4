@@ -133,6 +133,7 @@ export const AUSFUEHRUNG = {
 
   'einstellungen.firma_speichern': einstellungen.firmaSpeichern,
   'einstellungen.ki_modelle_setzen': einstellungen.kiModelleSetzen,
+  'einstellungen.ki_region_setzen': einstellungen.kiRegionSetzen,
   'einstellungen.ki_einkauf_setzen': einstellungen.kiEinkaufSetzen,
   'einstellungen.druckbruecke_setzen': einstellungen.druckbrueckeSetzen,
   'einstellungen.shopify_modus_setzen': einstellungen.shopifyModusSetzen,

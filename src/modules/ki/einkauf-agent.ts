@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { apiStatus } from './client.ts'
+import { kiClientMitModell } from './client.ts'
 import { sql } from '@/db/client'
 import { zitatTrennen } from '../einkauf/mail-zerlegen.ts'
 import { einkaufKiBereit } from './einkauf-ki.ts'
@@ -10,7 +12,6 @@ import {
   triageAuftrag,
 } from './einkauf-prompt.ts'
 import { AGENT_AKTEUR, type AgentLauf, neuerLauf, werkzeugAusfuehren } from './einkauf-werkzeuge.ts'
-import { kiModell } from './modelle.ts'
 import { SCHEMA_DOKU } from './schema-doku.ts'
 import { kiFake } from './uebersetzen.ts'
 
@@ -201,7 +202,8 @@ export async function mailTriage(nachrichtId: string, budgetMs = TRIAGE_BUDGET_M
 
   const { kontext } = geladen
   const fake = kiFake()
-  const modell = fake ? 'fake' : await kiModell(sql, 'einkauf')
+  const ki = fake ? null : await kiClientMitModell(sql, 'einkauf', { timeout: 25_000, maxRetries: 0 })
+  const modell = ki?.modell ?? 'fake'
   const lauf: AgentLauf = neuerLauf({
     quelle: 'mail_nachricht',
     quelleId: nachrichtId,
@@ -215,7 +217,7 @@ export async function mailTriage(nachrichtId: string, budgetMs = TRIAGE_BUDGET_M
   })
 
   const verbrauch: Verbrauch = { input: 0, output: 0, cacheLesen: 0, cacheSchreiben: 0 }
-  const client = fake ? null : new Anthropic({ timeout: 25_000, maxRetries: 0 })
+  const client = ki?.client ?? null
   const system = systemPromptEinkauf(SCHEMA_DOKU)
   const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: triageAuftrag(kontext) }]
   let abschluss = ''
@@ -268,7 +270,7 @@ export async function mailTriage(nachrichtId: string, budgetMs = TRIAGE_BUDGET_M
     // Dauerhafte Fehler (Anfrage ungültig, Schlüssel falsch, Modell unbekannt)
     // nicht zehnmal wiederholen — sie kosten nur. Netz, Überlast und
     // Ratenlimit wirft der Job weiter: Backoff und neuer Versuch.
-    const status = err instanceof Anthropic.APIError ? err.status : undefined
+    const status = err instanceof Anthropic.APIError ? err.status : apiStatus(err)
     if (status !== undefined && [400, 401, 403, 404, 413, 422].includes(status)) {
       fehler = `${status}: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300)
     } else {

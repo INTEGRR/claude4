@@ -1,8 +1,8 @@
 import 'server-only'
 
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { kiClientMitModell } from './client.ts'
 import { sql } from '@/db/client'
-import { kiModell } from './modelle'
 import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
 
 /**
@@ -90,9 +90,9 @@ export async function interviewRunde(
     .map((r) => `Assistent: ${r.frage}\nKunde: ${r.antwort}`)
     .join('\n\n')
 
-  const client = new Anthropic()
+  const { client, modell } = await kiClientMitModell(sql, 'interview')
   const antwort = await client.messages.create({
-    model: await kiModell(sql, 'interview'),
+    model: modell,
     max_tokens: 700,
     // Prompt-Caching: derselbe Systemprompt über alle Interviewrunden —
     // ab der zweiten Runde nur noch Cache-Lesepreis.

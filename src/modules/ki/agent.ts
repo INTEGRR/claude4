@@ -1,5 +1,7 @@
 import 'server-only'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { kiClientMitModell } from './client.ts'
+import { kiKonfiguriert } from './region.ts'
 import { randomUUID } from 'node:crypto'
 import { sql } from '@/db/client'
 import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
@@ -8,7 +10,7 @@ import { DIAGRAMM_TOOL, type Diagramm, diagrammSchema } from './diagramm'
 import { aktionPruefen as registryPruefen } from '@/modules/prozesse/torwaechter'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { kiKatalog } from '@/modules/prozesse/introspektion'
-import { kiModell } from './modelle'
+
 import { werkstattSystemZusatz } from './wissen'
 import { type ChatAnhang, nachrichtInhalt } from './anhaenge'
 
@@ -23,7 +25,7 @@ import { type ChatAnhang, nachrichtInhalt } from './anhaenge'
 const MAX_ROUNDS = 15
 
 export function kiConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  return kiKonfiguriert()
 }
 
 // --- Agent -----------------------------------------------------------------
@@ -190,10 +192,9 @@ export async function runAgent(
   // Zusatzblöcke an den Systemprompt; nur diese Runden zahlen die Tokens.
   kontext?: KiKontext,
 ): Promise<void> {
-  const client = new Anthropic()
+  // Client und Modell je Region und Ebene aus den Einstellungen — Betreiber-Sache.
+  const { client, modell: model } = await kiClientMitModell(sql, 'auswertung')
   const requestId = randomUUID()
-  // Modellwahl je Ebene aus den Einstellungen (modelle.ts) — Betreiber-Sache.
-  const model = await kiModell(sql, 'auswertung')
 
   const letzte = history.at(-1)
   const frage = letzte?.text ?? ''

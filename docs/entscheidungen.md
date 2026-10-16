@@ -9,6 +9,53 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — KI-Region als Betreiber-Einstellung: Standard bleibt, EU ist ein Schalter ohne stillen Rückfall
+
+**Entschieden:** Wo die KI rechnet, ist eine Einstellung
+(`settings.ki_region`, Registry `einstellungen.ki_region_setzen`), kein
+Umbau je Kunde. **Standard** bleibt der bisherige Weg (Anthropic-API
+direkt, OpenAI global) und die Vorgabe jeder Instanz. **EU** schaltet
+Claude auf Amazon Bedrock mit EU-Inferenzprofil (`eu.`-Präfix,
+Irland/Stockholm) und OpenAI auf `eu.api.openai.com` — Diktat, Ansage,
+Realtime und den WebRTC-Aufbau eingeschlossen.
+
+**Warum:** Die Datenschutz-Frage kommt bei jedem Kunden und jedem
+öffentlichen Satz über KRNL. „Verarbeitung in der EU" muss ein Klick sein,
+den der Betreiber selbst setzt und zurücknimmt — ohne dass Code oder
+Deployment je Kunde auseinanderlaufen. Dieselben Modelle, dieselbe
+Qualität, andere Region.
+
+**Regeln:**
+
+- Eine Fabrik für alle Claude-Aufrufe (`src/modules/ki/client.ts`); die
+  Aufrufstellen kennen nur `client.messages` und das aufgelöste Modell.
+  Neue KI-Funktionen bauen keinen eigenen Client.
+- **Kein stiller Rückfall** von EU auf Standard: fehlt der AWS-Zugang,
+  wirft der Aufruf mit Hinweis auf die Einstellung. Zurückschalten ist ein
+  Klick; unbemerkt in eine andere Region zu wandern wäre ein Vertrauensbruch.
+  Bereitschaftsprüfungen (Einkaufs-Agent, Dienste-Wächter) prüfen den Weg
+  der eingestellten Region, nicht „irgendeinen Schlüssel" — ein fremder
+  AWS-Zugang in der Umgebung macht den Standard-Weg nicht bereit.
+- Katalogmodelle werden in Bedrock-Profile übersetzt (`BEDROCK_IDS`,
+  datumslos ab der 4.6-Generation, Haiku 4.5 datiert); einzelne Profile
+  und das Geo-Präfix sind per Env übersteuerbar, die Einstellungsseite zeigt
+  die aufgelösten IDs. Der Dienste-Wächter prüft region-bewusst.
+- Der Modellkatalog kennt jetzt auch Opus 5.5, Sonnet 5.5 und Haiku 5.5 —
+  als Option, nicht als neue Vorgabe (Betreiber-Entscheidung: der heutige
+  Stand bleibt, bis er bewusst geändert wird).
+- Offen bleibt die Vertragsseite (AVV mit AWS/Anthropic und OpenAI, beim
+  OpenAI-Projekt ZDR/MAM) — steht im Go-live-Plan, nicht im Code.
+- Der Bedrock-Client bringt eine eigene SDK-Fassung mit (Peer-Anforderung
+  neuer als das Haupt-SDK); die Aufrufstellen sind gegen das gemeinsame
+  Messages-Interface typisiert. Ein gemeinsames SDK-Update ist ein späterer,
+  getrennter Schritt.
+
+**Umgesetzt/dokumentiert:** `src/modules/ki/region.ts` (pur, getestet in
+`tests/ki-region.test.ts`), `src/modules/ki/client.ts`, alle Aufrufstellen
+unter `src/modules/ki/`, Dienste-Wächter, Einstellungen → KI-Modelle,
+Anbindungen (Variablen), Doku Modul KI (Region der Verarbeitung),
+Einstellungen-Landkarte, Vercel-Variablen, Go-live 7c.
+
 ## 2026-10-16 — Einrichtungsaufgaben: Betreiber-Todos sind Struktur und überleben jeden Daten-Reset
 
 **Entschieden:** Was der Betreiber vor dem Stichtag erledigen muss, steht

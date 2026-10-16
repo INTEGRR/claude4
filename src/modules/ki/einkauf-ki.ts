@@ -1,11 +1,13 @@
 import type { Sql, TransactionSql } from 'postgres'
+import { type KiRegion, kiPfadBereit, kiRegionAufloesen } from './region.ts'
 
 /**
  * KI-Ebene „Einkauf" (0109): Schalter, Monatsgrenze und Verbrauch.
  *
  * Der Agent läuft nur, wenn der Betreiber die Ebene eingeschaltet hat
- * (settings.ki_einkauf.aktiv, Standard aus), die KI erreichbar ist
- * (ANTHROPIC_API_KEY oder KI_FAKE=1) und die optionale Obergrenze in Token
+ * (settings.ki_einkauf.aktiv, Standard aus), der KI-Weg der eingestellten
+ * Region erreichbar ist (Standard: ANTHROPIC_API_KEY; EU: AWS-Zugang für
+ * Bedrock; oder KI_FAKE=1) und die optionale Obergrenze in Token
  * je Kalendermonat nicht erreicht ist. Sonst überspringt er — erledigt,
  * nicht gescheitert, also keine Fehlerschleife in der Outbox.
  *
@@ -44,14 +46,28 @@ export function einkaufKiStandLesen(wert: unknown): EinkaufKiStand {
 
 export type Bereitschaft = { ok: true } | { ok: false; grund: string }
 
-/** Pure Entscheidung: darf der Agent jetzt laufen? */
+/**
+ * Pure Entscheidung: darf der Agent jetzt laufen? Region-bewusst: geprüft
+ * wird der Weg der eingestellten Region, nicht irgendein Schlüssel — sonst
+ * würde ein fremder AWS-Zugang in der Umgebung den Lauf in eine
+ * Fehlerschleife schicken, obwohl „Standard" gewählt ist.
+ */
 export function bereitschaft(
   stand: EinkaufKiStand,
   env: Record<string, string | undefined>,
   verbrauch: Pick<Verbrauch, 'summe'>,
+  region: KiRegion = 'standard',
 ): Bereitschaft {
   if (!stand.aktiv) return { ok: false, grund: 'KI-Ebene „Einkauf" ist aus (Einstellungen → KI-Modelle)' }
-  if (env.KI_FAKE !== '1' && !env.ANTHROPIC_API_KEY) return { ok: false, grund: 'ANTHROPIC_API_KEY ist nicht gesetzt' }
+  if (env.KI_FAKE !== '1' && !kiPfadBereit(region, env)) {
+    return {
+      ok: false,
+      grund:
+        region === 'eu'
+          ? 'KI-Region „EU" gewählt, aber kein AWS-Zugang für Bedrock gesetzt (AWS_BEARER_TOKEN_BEDROCK oder Schlüsselpaar)'
+          : 'ANTHROPIC_API_KEY ist nicht gesetzt',
+    }
+  }
   if (stand.monats_tokens !== null && verbrauch.summe >= stand.monats_tokens) {
     return {
       ok: false,
@@ -100,5 +116,7 @@ export async function verbrauchJeEbene(
 export async function einkaufKiBereit(db: Db, env: Record<string, string | undefined> = process.env): Promise<Bereitschaft> {
   const stand = await einkaufKiStand(db)
   if (!stand.aktiv) return bereitschaft(stand, env, { summe: 0 })
-  return bereitschaft(stand, env, await verbrauchImMonat(db, 'einkauf'))
+  const [regionZeile] = await db<{ value: unknown }[]>`select value from settings where key = 'ki_region'`
+  const region = kiRegionAufloesen(regionZeile?.value, env)
+  return bereitschaft(stand, env, await verbrauchImMonat(db, 'einkauf'), region)
 }

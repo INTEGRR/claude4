@@ -1,11 +1,12 @@
 import 'server-only'
 
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { kiClientMitModell } from './client.ts'
+import { kiKonfiguriert } from './region.ts'
 import { sql } from '@/db/client'
 import type { User } from '@/modules/auth'
 import { REGISTRY } from '@/modules/prozesse/registry'
 import { bestaetigteAktionAusfuehren } from './aktion-bestaetigt'
-import { kiModell } from './modelle'
 import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
 
 /**
@@ -24,7 +25,7 @@ import { PROZESS_WISSEN, bausteineAlsText } from './wissen'
 const MAX_RUNDEN = 3
 
 export function aufnahmeKonfiguriert(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  return kiKonfiguriert()
 }
 
 /** System-Anleitung der Strukturierung — pur, damit der Test sie prüfen kann. */
@@ -114,7 +115,7 @@ export async function aufnahmeStrukturieren(
     }
   }
 
-  const client = new Anthropic()
+  const { client, modell } = await kiClientMitModell(sql, 'prozess')
   const messages: Anthropic.Messages.MessageParam[] = [
     {
       role: 'user',
@@ -137,7 +138,6 @@ export async function aufnahmeStrukturieren(
   // Abläufe erfassen wirklich nichts.
   let feldNachfrageGestellt = false
 
-  const modell = await kiModell(sql, 'prozess')
   for (let runde = 0; runde < MAX_RUNDEN; runde++) {
     let antwort: Anthropic.Messages.Message
     try {

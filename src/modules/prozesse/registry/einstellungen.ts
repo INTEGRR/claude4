@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MODELL_KATALOG, type ModellId } from '../../ki/modelle.ts'
+import { KI_REGIONEN, type KiRegion } from '../../ki/region.ts'
 import type { RegistrierteAktion } from './typen.ts'
 import { DRUCKFORMATE, FINANZ_FELDER, optionaleZahl, zahlAusFormular } from '../../einstellungen/finanz-parameter.ts'
 import { DRUCKART_LABELS, DRUCKARTEN, type Druckart } from '../../druck/routing.ts'
@@ -514,6 +515,25 @@ export const EINSTELLUNGEN = {
       einkauf: fd.has('einkauf') ? String(fd.get('einkauf') ?? '') : undefined,
     }),
     revalidate: ['/einstellungen/ki'],
+  },
+
+  'einstellungen.ki_region_setzen': {
+    label: 'Region der KI-Verarbeitung festlegen',
+    bereich: 'einstellungen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Legt fest, wo die KI rechnet (settings.ki_region): „standard" = Anthropic-API direkt und OpenAI global ' +
+      '(bisheriger Weg, Vorgabe); „eu" = Claude über Amazon Bedrock mit EU-Inferenzprofil (AWS-Zugang nötig) und ' +
+      'OpenAI über den EU-Endpunkt. Kein stiller Rückfall: fehlt der Zugang der gewählten Region, melden KI-Aufrufe ' +
+      'und der Dienste-Wächter den Fehler.',
+    bindung: 'frei',
+    schema: z.object({
+      region: z.enum(KI_REGIONEN.map((r) => r.id) as [KiRegion, ...KiRegion[]]),
+    }),
+    zusammenfassung: (p) => `KI-Region ${p.region === 'eu' ? 'EU (Bedrock + OpenAI-EU)' : 'Standard'}`,
+    formdata: (fd) => ({ region: String(fd.get('region') ?? '') }),
+    revalidate: ['/einstellungen/ki', '/integrationen'],
   },
 
   'einstellungen.ki_einkauf_setzen': {

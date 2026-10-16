@@ -91,13 +91,19 @@ export const ANBINDUNGEN: readonly Anbindung[] = [
   },
   {
     schluessel: 'ki',
-    titel: 'KI (Anthropic)',
-    variablen: [{ name: 'ANTHROPIC_API_KEY', pflicht: true, zweck: 'KI-Analyse, Prozess-Aufnahme, Interview' }],
+    titel: 'KI (Anthropic / Bedrock)',
+    variablen: [
+      { name: 'ANTHROPIC_API_KEY', pflicht: false, zweck: 'Region „Standard": KI-Analyse, Prozess-Aufnahme, Interview über die Anthropic-API' },
+      { name: 'AWS_BEARER_TOKEN_BEDROCK', pflicht: false, zweck: 'Region „EU": Bedrock-API-Key (alternativ AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY)' },
+      { name: 'AWS_ACCESS_KEY_ID', pflicht: false, zweck: 'Region „EU": AWS-Schlüsselpaar für Bedrock' },
+      { name: 'AWS_SECRET_ACCESS_KEY', pflicht: false, zweck: 'Region „EU": AWS-Schlüsselpaar für Bedrock' },
+      { name: 'BEDROCK_REGION', pflicht: false, zweck: 'Region „EU": AWS-Region der Bedrock-Laufzeit (Vorgabe eu-west-1, Irland)' },
+    ],
   },
   {
     schluessel: 'sprache',
     titel: 'Sprache (OpenAI)',
-    variablen: [{ name: 'OPENAI_API_KEY', pflicht: true, zweck: 'Spracheingabe (Whisper) und Sprachmodus (Realtime)' }],
+    variablen: [{ name: 'OPENAI_API_KEY', pflicht: true, zweck: 'Spracheingabe (Whisper) und Sprachmodus (Realtime) — in Region „EU" über eu.api.openai.com' }],
   },
   {
     schluessel: 'telegram',

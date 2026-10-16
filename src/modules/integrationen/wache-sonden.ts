@@ -1,5 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { sql } from '@/db/client'
+import { kiVerbindungPruefen, openaiBasisUrl } from '@/modules/ki/client'
 import { dhlConfigured, dhlErreichbar } from '@/modules/versand/dhl'
 import { track17Konfiguriert } from '@/modules/versand/track17'
 import { kontingentMerken } from '@/modules/versand/track17-einstellung'
@@ -77,14 +77,15 @@ export function standardSonden(): Sonde[] {
       dienst: 'ki',
       konfiguriert: kiConfigured(),
       pruefen: async () => {
-        await new Anthropic({ timeout: SONDEN_ZEITLIMIT_MS, maxRetries: 0 }).models.list({ limit: 1 })
+        // Region-bewusst: Standard listet Modelle, EU schickt eine Ein-Token-Nachricht über Bedrock.
+        await kiVerbindungPruefen(SONDEN_ZEITLIMIT_MS)
       },
     },
     {
       dienst: 'sprache',
       konfiguriert: sprechenKonfiguriert(),
-      pruefen: () =>
-        httpOk('https://api.openai.com/v1/models', {
+      pruefen: async () =>
+        httpOk(`${await openaiBasisUrl()}/v1/models`, {
           headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
         }),
     },

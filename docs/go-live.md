@@ -348,6 +348,12 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
       den Rechnungsfuß prüfen, Shopify-Rechnungs-App abschalten, DATEV-Konten
       (SKR03/04) mit der Steuerberatung abstimmen, Rechnungsversand per Mail
       festlegen (noch nicht gebaut).
+- [ ] KI-Region (Einstellungen → KI-Modelle, seit 2026-10-16): Standard
+      (Anthropic direkt, OpenAI global — der heutige Weg) oder EU (Claude
+      über Bedrock mit EU-Profil, OpenAI über eu.api.openai.com). Für EU
+      vorher AWS-Zugang in Vercel setzen und beim OpenAI-Projekt Zero Data
+      Retention bzw. Modified Abuse Monitoring beantragen; AVV mit beiden
+      Anbietern in jedem Fall.
 - [ ] Stichtag festlegen; vorher einen frischen Odoo-Dump für den lokalen
       Probelauf bereitstellen.
 

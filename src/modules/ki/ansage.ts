@@ -1,4 +1,5 @@
 import 'server-only'
+import { openaiBasisUrl } from './client.ts'
 
 import { ANSAGEN, type AnsageSchluessel } from '../scanner-ansagen.ts'
 
@@ -28,7 +29,7 @@ export async function ansageAudio(schluessel: AnsageSchluessel): Promise<ArrayBu
   const vorhanden = zwischenspeicher.get(schluessel)
   if (vorhanden) return vorhanden
 
-  const res = await fetch('https://api.openai.com/v1/audio/speech', {
+  const res = await fetch(`${await openaiBasisUrl()}/v1/audio/speech`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,

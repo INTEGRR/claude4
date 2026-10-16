@@ -6,6 +6,7 @@ import { sql } from '@/db/client'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { KI_EBENEN, MODELL_KATALOG, modellAufloesen } from '@/modules/ki/modelle'
+import { KI_REGIONEN, bedrockModellId, bedrockRegion, kiPfadBereit, kiRegionAufloesen, openaiBasis } from '@/modules/ki/region'
 import { kiConfigured } from '@/modules/ki/agent'
 import { kiFake, uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
 import { einkaufKiStandLesen, verbrauchImMonat, verbrauchJeEbene } from '@/modules/ki/einkauf-ki'
@@ -18,6 +19,11 @@ async function kiModelleSpeichern(formData: FormData) {
   return serverAktion('einstellungen.ki_modelle_setzen', { formData })
 }
 
+async function kiRegionSpeichern(formData: FormData) {
+  'use server'
+  return serverAktion('einstellungen.ki_region_setzen', { formData })
+}
+
 async function kiEinkaufSpeichern(formData: FormData) {
   'use server'
   return serverAktion('einstellungen.ki_einkauf_setzen', { formData })
@@ -28,6 +34,10 @@ const tausend = (n: number) => Math.round(n).toLocaleString('de-DE')
 export default async function KiModellePage() {
   await requireArea('einstellungen')
   const modelle = await einstellung<Record<string, unknown>>('ki_modelle')
+  const region = kiRegionAufloesen(await einstellung<Record<string, unknown>>('ki_region'))
+  const regionBereit = kiPfadBereit(region)
+  const standardBereit = kiPfadBereit('standard')
+  const euBereit = kiPfadBereit('eu')
   const einkauf = einkaufKiStandLesen(await einstellung<Record<string, unknown>>('ki_einkauf'))
   const verbunden = kiConfigured()
   // Der Agent läuft mit Schlüssel oder mit der Attrappe (KI_FAKE=1).
@@ -39,10 +49,49 @@ export default async function KiModellePage() {
     <>
       <EinstellungenKopf href="/einstellungen/ki" />
 
+      <Card title="Region der KI-Verarbeitung">
+        <div style={{ marginBottom: 12 }}>
+          <Zustand ton={regionBereit ? 'ok' : 'warn'}>
+            {region === 'eu'
+              ? regionBereit
+                ? `EU aktiv — Claude über Amazon Bedrock (${bedrockRegion()}, Profil-Präfix „eu."), OpenAI über ${openaiBasis('eu')}`
+                : 'EU gewählt, aber kein AWS-Zugang hinterlegt — KI-Aufrufe schlagen fehl, bis AWS_BEARER_TOKEN_BEDROCK oder AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY gesetzt sind (kein stiller Rückfall)'
+              : regionBereit
+                ? `Standard aktiv — Anthropic-API direkt, OpenAI über ${openaiBasis('standard')}`
+                : 'Standard gewählt, aber ANTHROPIC_API_KEY fehlt — die KI ist aus'}
+          </Zustand>
+        </div>
+        <ActionForm action={kiRegionSpeichern}>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field">
+              <span>Wo die KI rechnet</span>
+              <Auswahl name="region" defaultValue={region}>
+                {KI_REGIONEN.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label} — {r.hinweis}
+                    {r.id === 'standard' ? (standardBereit ? ' · Zugang vorhanden' : ' · ANTHROPIC_API_KEY fehlt') : euBereit ? ' · AWS-Zugang vorhanden' : ' · AWS-Zugang fehlt'}
+                  </option>
+                ))}
+              </Auswahl>
+            </label>
+            <div className="field shrink">
+              <button className="primary" type="submit">Speichern</button>
+            </div>
+          </div>
+        </ActionForm>
+        <p className="small muted" style={{ margin: '10px 0 0' }}>
+          EU heißt: Verarbeitung in europäischen Regionen bei US-Anbietern (AWS, OpenAI) — Auftragsverarbeitung
+          bleibt nötig. Für OpenAI muss das Projekt für Zero Data Retention oder Modified Abuse Monitoring
+          freigeschaltet sein, sonst lehnt der EU-Endpunkt ab. Bedrock-Profile dieser Instanz:{' '}
+          {MODELL_KATALOG.map((m) => `${m.label} → ${bedrockModellId(m.id)}`).join(' · ')} — prüfbar mit
+          „aws bedrock list-inference-profiles", abweichende IDs per BEDROCK_MODELL_… übersteuern.
+        </p>
+      </Card>
+
       <Card title="Modell je Ebene">
         <div style={{ marginBottom: 12 }}>
           <Zustand ton={verbunden ? 'ok' : 'off'}>
-            {verbunden ? 'Anthropic verbunden' : 'nicht konfiguriert — ANTHROPIC_API_KEY fehlt, die KI ist aus'}
+            {verbunden ? 'KI-Zugang vorhanden' : 'nicht konfiguriert — weder ANTHROPIC_API_KEY noch AWS-Zugang, die KI ist aus'}
           </Zustand>
         </div>
         <ActionForm action={kiModelleSpeichern}>

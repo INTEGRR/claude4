@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { apiStatus } from './client.ts'
+import { kiClientMitModell } from './client.ts'
 import { sql } from '@/db/client'
 import { drive } from '../google/drive.ts'
 import { einkaufKiBereit } from './einkauf-ki.ts'
@@ -12,7 +14,6 @@ import {
   vorschlagEingabeLesen,
 } from './einkauf-prompt.ts'
 import { type AgentLauf, neuerLauf, vorschlagSpeichern } from './einkauf-werkzeuge.ts'
-import { kiModell } from './modelle.ts'
 import { kiFake } from './uebersetzen.ts'
 
 /**
@@ -88,7 +89,8 @@ export async function dokumentKiLesen(dokumentId: string): Promise<string> {
 
   const bytes = await (await drive()).dateiInhalt(d.drive_file_id)
   const fake = kiFake()
-  const modell = fake ? 'fake' : await kiModell(sql, 'einkauf')
+  const ki = fake ? null : await kiClientMitModell(sql, 'einkauf', { timeout: 40_000, maxRetries: 0 })
+  const modell = ki?.modell ?? 'fake'
   let antwortText: string
   let input = 0
   let output = 0
@@ -111,7 +113,8 @@ export async function dokumentKiLesen(dokumentId: string): Promise<string> {
           }
     try {
       // Eine Anfrage, höchstens 40 s (Start in den ersten 15 s der KI-Spur → unter 60 s).
-      const antwort = await new Anthropic({ timeout: 40_000, maxRetries: 0 }).messages.create({
+      if (!ki) throw new Error('KI-Client fehlt')
+      const antwort = await ki.client.messages.create({
         model: modell,
         max_tokens: 8000,
         messages: [
@@ -130,7 +133,7 @@ export async function dokumentKiLesen(dokumentId: string): Promise<string> {
       cacheLesen = antwort.usage.cache_read_input_tokens ?? 0
       cacheSchreiben = antwort.usage.cache_creation_input_tokens ?? 0
     } catch (err) {
-      const status = err instanceof Anthropic.APIError ? err.status : undefined
+      const status = err instanceof Anthropic.APIError ? err.status : apiStatus(err)
       // Kaputtes oder abgelehntes PDF: als Fehler am Dokument, kein Endlos-Wiederholen.
       if (status !== undefined && [400, 413, 422].includes(status)) {
         await statusSetzen(d.id, 'fehler')

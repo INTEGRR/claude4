@@ -1,9 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
 import { kiConfigured } from '@/modules/ki/agent'
-import { kiModell } from '@/modules/ki/modelle'
+import { kiClientMitModell } from '@/modules/ki/client'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { aktionErlaubt, aktionPruefen } from '@/modules/prozesse/torwaechter'
 
@@ -71,8 +71,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const client = new Anthropic()
-  const modell = await kiModell(sql, 'auswertung')
+  const { client, modell } = await kiClientMitModell(sql, 'auswertung')
   const anfrage = (hinweis?: string) =>
     client.messages.create({
       model: modell,

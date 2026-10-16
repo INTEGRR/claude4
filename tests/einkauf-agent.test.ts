@@ -274,6 +274,10 @@ describe('Einkaufs-Agent: KI-Ebene „Einkauf" und Formulare', () => {
     assert.deepEqual(bereitschaft(an, { KI_FAKE: '1' }, { summe: 999 }), { ok: true })
     assert.deepEqual(bereitschaft(an, { ANTHROPIC_API_KEY: 'x' }, { summe: 10 }), { ok: true })
     assert.match((bereitschaft(an, { ANTHROPIC_API_KEY: 'x' }, { summe: 1000 }) as { grund: string }).grund, /Monatsgrenze/)
+    // Region-bewusst: in der EU zählt der AWS-Zugang, ein fremder AWS-Schlüssel reicht im Standard nicht.
+    assert.deepEqual(bereitschaft(an, { AWS_BEARER_TOKEN_BEDROCK: 't' }, { summe: 0 }, 'eu'), { ok: true })
+    assert.match((bereitschaft(an, { ANTHROPIC_API_KEY: 'x' }, { summe: 0 }, 'eu') as { grund: string }).grund, /AWS-Zugang/)
+    assert.match((bereitschaft(an, { AWS_ACCESS_KEY_ID: 'a', AWS_SECRET_ACCESS_KEY: 'b' }, { summe: 0 }) as { grund: string }).grund, /ANTHROPIC_API_KEY/)
   })
 
   test('Einstellungs-Adapter: Häkchen und Tausenderpunkte', () => {

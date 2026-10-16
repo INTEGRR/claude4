@@ -52,6 +52,19 @@ export async function kiModelleSetzen(
   return { text: 'KI-Modelle gespeichert — gilt ab der nächsten Anfrage.' }
 }
 
+/** Region der KI-Verarbeitung (2026-10-16): standard (Anthropic direkt) oder eu (Bedrock + OpenAI-EU). */
+export async function kiRegionSetzen(p: { region: string }, _ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value) values ('ki_region', ${sql.json({ region: p.region })})
+    on conflict (key) do update set value = excluded.value`
+  return {
+    text:
+      p.region === 'eu'
+        ? 'KI-Region EU gespeichert — Claude läuft über Bedrock (EU-Profil), OpenAI über eu.api.openai.com. Gilt ab der nächsten Anfrage; der Dienste-Wächter prüft den Zugang beim nächsten Lauf.'
+        : 'KI-Region Standard gespeichert — Anthropic-API direkt, OpenAI global. Gilt ab der nächsten Anfrage.',
+  }
+}
+
 /**
  * KI-Ebene „Einkauf" (0109): Schalter und Monatsgrenze in Token. Der Agent
  * liest beides vor jedem Lauf (ki/einkauf-ki.ts) — aus heißt „übersprungen",

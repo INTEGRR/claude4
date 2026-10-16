@@ -1,4 +1,5 @@
 import 'server-only'
+import { openaiBasisUrl } from './client.ts'
 
 import type { RealtimeWerkzeug } from './sprechen-katalog'
 
@@ -17,6 +18,11 @@ const STIMME = process.env.SPRECHEN_STIMME ?? 'marin'
 const TRANSKRIPTION =
   process.env.SPRECHEN_TRANSKRIPTION ?? process.env.TRANSKRIPTION_MODELL ?? 'whisper-1'
 
+let basisZuletzt = 'https://api.openai.com'
+export function sprechenBasis(): string {
+  return basisZuletzt
+}
+
 export function sprechenKonfiguriert(): boolean {
   return Boolean(process.env.OPENAI_API_KEY)
 }
@@ -28,7 +34,7 @@ export function sprechenModell(): string {
 export async function clientSecretErstellen(opts: {
   instructions: string
   tools: RealtimeWerkzeug[]
-}): Promise<{ wert: string; modell: string }> {
+}): Promise<{ wert: string; modell: string; basis: string }> {
   const session: Record<string, unknown> = {
     type: 'realtime',
     model: MODELL,
@@ -43,8 +49,9 @@ export async function clientSecretErstellen(opts: {
     reasoning: { effort: 'low' },
   }
 
+  const basis = await openaiBasisUrl()
   const minten = async (body: Record<string, unknown>) =>
-    fetch('https://api.openai.com/v1/realtime/client_secrets', {
+    fetch(`${basis}/v1/realtime/client_secrets`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -73,7 +80,8 @@ export async function clientSecretErstellen(opts: {
   // GA liefert { value }, ältere Stände { client_secret: { value } } — beides annehmen.
   const wert = daten.value ?? daten.client_secret?.value
   if (!wert) throw new Error('Realtime-Session ohne Client Secret beantwortet')
-  return { wert, modell: MODELL }
+  basisZuletzt = basis
+  return { wert, modell: MODELL, basis }
 }
 
 function fehlertext(detail: string): string {

@@ -315,6 +315,7 @@ export function useGespraech(opts?: {
       const daten = (await res.json()) as {
         client_secret?: string
         protokoll_id?: string
+        basis_url?: string
         error?: string
       }
       if (!res.ok || !daten.client_secret || !daten.protokoll_id) {
@@ -353,7 +354,7 @@ export function useGespraech(opts?: {
 
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
-      const sdpRes = await fetch('https://api.openai.com/v1/realtime/calls', {
+      const sdpRes = await fetch(`${daten.basis_url ?? 'https://api.openai.com'}/v1/realtime/calls`, {
         method: 'POST',
         body: offer.sdp,
         headers: {

@@ -15,6 +15,21 @@ import type { Sql, TransactionSql } from 'postgres'
 
 export const MODELL_KATALOG = [
   {
+    id: 'claude-opus-5-5',
+    label: 'Opus 5.5',
+    hinweis: 'aktuelle Spitzenklasse, günstiger als Opus 5 — für Prozess-Entwurf und knifflige Analysen',
+  },
+  {
+    id: 'claude-sonnet-5-5',
+    label: 'Sonnet 5.5',
+    hinweis: 'aktuelle Alltagsklasse — Tempo und Qualität für Auswertungen, Interview und Einkauf',
+  },
+  {
+    id: 'claude-haiku-5-5',
+    label: 'Haiku 5.5',
+    hinweis: 'schnellstes und günstigstes Modell — kurze Fragen, Sprachmodus, Übersetzung',
+  },
+  {
     id: 'claude-opus-5',
     label: 'Opus 5',
     hinweis: 'höchste Qualität, höchster Preis — für Prozess-Entwurf und knifflige Analysen',

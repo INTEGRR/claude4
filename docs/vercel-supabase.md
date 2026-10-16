@@ -131,7 +131,9 @@ Wert steht.
 
 ```
 ANTHROPIC_API_KEY        schaltet die Seite /ki frei (und den Einkaufs-Agenten, wenn eingeschaltet)
-OPENAI_API_KEY           schaltet die Mikrofon-Knöpfe frei (Whisper-Diktat)
+OPENAI_API_KEY           schaltet die Mikrofon-Knöpfe frei (Whisper-Diktat); in KI-Region „EU" über eu.api.openai.com
+AWS_BEARER_TOKEN_BEDROCK KI-Region „EU": Claude über Amazon Bedrock (alternativ AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY)
+BEDROCK_REGION           KI-Region „EU": AWS-Region der Bedrock-Laufzeit, Vorgabe eu-west-1 (Irland)
 SHOPIFY_SHOP_DOMAIN      meinshop.myshopify.com
 SHOPIFY_CLIENT_ID        Dev-Dashboard-App, Settings → Credentials
 SHOPIFY_CLIENT_SECRET    dito — Token holt und erneuert das ERP selbst

@@ -69,6 +69,8 @@ export async function POST(request: Request) {
       client_secret: secret.wert,
       protokoll_id: protokoll.id,
       modell: secret.modell,
+      // Region der KI-Verarbeitung: der WebRTC-Aufbau muss denselben Endpunkt nehmen wie das Secret.
+      basis_url: secret.basis,
     })
   } catch (err) {
     return NextResponse.json(

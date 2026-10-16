@@ -263,6 +263,39 @@ schickt der Chat die Datei mit; der Server legt sie über
 Google-Ablage, sonst steht ein Hinweis im Ergebnis). Beide Wege laufen
 über den Torwächter.
 
+### Region der Verarbeitung (seit 2026-10-16)
+
+Einstellungen → KI-Modelle, Karte **Region der KI-Verarbeitung**
+(Registry `einstellungen.ki_region_setzen`, settings-Schlüssel `ki_region`,
+Env-Notausgang `KI_REGION`). Zwei Wege, derselbe Code:
+
+- **Standard** (Vorgabe, der bisherige Weg): Claude über die Anthropic-API
+  (`ANTHROPIC_API_KEY`), OpenAI über `api.openai.com`.
+- **EU**: Claude über **Amazon Bedrock** mit EU-Inferenzprofil
+  (`eu.`-Präfix → Verarbeitung in EU-Regionen, Irland/Stockholm; AWS-Zugang
+  per `AWS_BEARER_TOKEN_BEDROCK` oder `AWS_ACCESS_KEY_ID` +
+  `AWS_SECRET_ACCESS_KEY`, Region `BEDROCK_REGION`, Vorgabe `eu-west-1`);
+  OpenAI über **`eu.api.openai.com`** (Speicherung und Verarbeitung in
+  EWR + Schweiz; das OpenAI-Projekt muss für Zero Data Retention oder
+  Modified Abuse Monitoring freigeschaltet sein). Betroffen sind Diktat,
+  Ansage, Realtime-Secrets und der WebRTC-Aufbau im Browser (die Session
+  liefert `basis_url` mit).
+
+Alle Claude-Aufrufe laufen über `src/modules/ki/client.ts`
+(`kiClientMitModell(sql, ebene)`): Region lesen, Client bauen, Katalogmodell
+in das Bedrock-Profil übersetzen (`src/modules/ki/region.ts`, Tabelle
+`BEDROCK_IDS`, einzeln per `BEDROCK_MODELL_<ID>` übersteuerbar). **Kein
+stiller Rückfall:** fehlt der Zugang der gewählten Region, wirft der Aufruf
+mit Hinweis auf die Einstellung — Daten wandern nicht unbemerkt in eine
+andere Region. Der Dienste-Wächter prüft region-bewusst (Standard:
+Modellliste, EU: Ein-Token-Nachricht über Bedrock, beweist Zugang, Region und
+Profil-ID). Die Seite Anbindungen listet die Variablen beider Wege.
+
+Der Bedrock-Client bringt eine eigene Fassung des Anthropic-SDK mit; die
+Aufrufstellen sehen nur `client.messages` (Typ `KiClient`), deshalb bleibt
+der Rest unverändert. Grenzen: Bedrock kennt keine Modellliste und keine
+Batches; beides nutzt KRNL nicht. Wächter: `tests/ki-region.test.ts`.
+
 ### Kosten
 
 Der Agent nutzt **Prompt-Caching** (`cache_control: ephemeral`, zwei

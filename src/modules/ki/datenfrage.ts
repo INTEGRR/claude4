@@ -1,11 +1,12 @@
 import 'server-only'
 
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { kiClientMitModell } from './client.ts'
+import { kiKonfiguriert } from './region.ts'
 import { sql } from '@/db/client'
 import type { Role } from '@/modules/auth/permissions'
 import { canAccess } from '@/modules/auth/permissions'
 import { SCHEMA_DOKU, SCHEMA_DOKU_FINANZEN } from './schema-doku'
-import { kiModell } from './modelle'
 import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 
 /**
@@ -19,7 +20,7 @@ import { FINANZ_SPERRE, MAX_ROWS, runReadOnlyQuery } from './sql-tool'
 const MAX_RUNDEN = 4
 
 export function datenfrageKonfiguriert(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  return kiKonfiguriert()
 }
 
 export async function datenfrageBeantworten(
@@ -33,8 +34,7 @@ export async function datenfrageBeantworten(
   // (Admin oder Befugnis finanzen:zugriff) — Schema-Doku UND SQL-Sperre.
   const finanzen = canAccess(nutzer.rollen ?? nutzer.role, 'finanzen', nutzer.befugnisse ?? [])
 
-  const client = new Anthropic()
-  const modell = await kiModell(sql, 'datenfrage')
+  const { client, modell } = await kiClientMitModell(sql, 'datenfrage')
   const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: frage }]
 
   for (let runde = 0; runde < MAX_RUNDEN; runde++) {

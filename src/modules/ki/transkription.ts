@@ -1,4 +1,5 @@
 import 'server-only'
+import { openaiBasisUrl } from './client.ts'
 
 /**
  * Diktat → Text über Whisper (OpenAI Audio API) statt der Browser-eigenen
@@ -24,7 +25,7 @@ export async function transkribieren(audio: File): Promise<string> {
   form.append('language', 'de')
   form.append('response_format', 'json')
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const res = await fetch(`${await openaiBasisUrl()}/v1/audio/transcriptions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: form,

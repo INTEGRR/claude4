@@ -42,7 +42,9 @@ const anlegen = (parameter: Record<string, unknown>, wer: Nutzer = n.chef) =>
 
 const meine = async (wer: Nutzer) => {
   const { aufgabenListe } = await import('../../src/modules/aufgaben/liste.ts')
-  return (await aufgabenListe(wer, 'meine')).map((a) => a.titel)
+  // Einrichtungsaufgaben (0116) hängen am Büro und überleben jeden Reset — hier
+  // zählen nur die im Test angelegten Aufgaben.
+  return (await aufgabenListe(wer, 'meine')).filter((a) => a.einrichtung_schluessel === null).map((a) => a.titel)
 }
 
 describe('Aufgaben: anlegen, sehen, abhaken', () => {

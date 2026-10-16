@@ -1,6 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import { kiClientMitModell } from './client.ts'
+import { kiKonfiguriert } from './region.ts'
 import { sql } from '@/db/client'
-import { kiModell } from './modelle.ts'
 
 /**
  * Übersetzung im Einkauf (0094) — kleine KI-Arbeit, aber mit Ansage: Zahlen,
@@ -23,7 +24,7 @@ export function kiFake(): boolean {
 }
 
 export function uebersetzungMoeglich(): boolean {
-  return kiFake() || Boolean(process.env.ANTHROPIC_API_KEY)
+  return kiFake() || kiKonfiguriert()
 }
 
 export interface Uebersetzung {
@@ -45,11 +46,11 @@ export async function uebersetzen(
   if (kiFake()) {
     ergebnis = { text: `[${ziel}] ${quelle}`, modell: 'fake', inputTokens: 0, outputTokens: 0 }
   } else {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('Übersetzen braucht die KI — ANTHROPIC_API_KEY ist nicht gesetzt.')
+    if (!kiKonfiguriert()) {
+      throw new Error('Übersetzen braucht die KI — weder ANTHROPIC_API_KEY noch ein AWS-Zugang für Bedrock ist gesetzt.')
     }
-    const modell = await kiModell(sql, 'uebersetzung')
-    const antwort = await new Anthropic().messages.create({
+    const { client, modell } = await kiClientMitModell(sql, 'uebersetzung')
+    const antwort = await client.messages.create({
       model: modell,
       max_tokens: 8000,
       system:
