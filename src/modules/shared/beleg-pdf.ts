@@ -62,6 +62,8 @@ export const belegStile = StyleSheet.create({
   nummerLabel: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
   nummerWert: { fontSize: 12, fontFamily: 'Helvetica-Bold', textAlign: 'right' },
   titel: { fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 10, marginBottom: 12 },
+  /** Banner für Testbelege (Rechnungs-Probelauf, 0117). */
+  probe: { marginTop: 10, padding: 6, fontSize: 9, lineHeight: 1.4, fontFamily: 'Helvetica-Bold', color: '#b00020', borderWidth: 1, borderColor: '#b00020' },
   text: { fontSize: 9.5, lineHeight: 1.4, marginBottom: 8 },
   kopfzeile: { flexDirection: 'row', backgroundColor: '#ececec', paddingVertical: 5, paddingHorizontal: 4, fontFamily: 'Helvetica-Bold' },
   zeile: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#ddd' },

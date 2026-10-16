@@ -1633,6 +1633,12 @@ sichtbare Zweig, kein zweiter Zustand. Tests: Fixture `verkauf` (Lauf
 
 ## Kundenrechnung: Prozess `kundenrechnung` (Migration 0115, umgesetzt)
 
+**Probelauf (0117):** Vorgabe jeder Instanz ist `settings.rechnung.modus =
+'test'` — Belege entstehen als Testrechnungen (`probe = true`,
+PROBE-Nummern) mit denselben Schritten und Übergängen, zählen aber nirgends
+und werden vor dem Scharfschalten gelöscht; Details in
+[module/verkauf.md](module/verkauf.md) „Probelauf".
+
 Beleg `kundenrechnung` (`kundenrechnungen`, RE-/GU-Nummern, Status
 offen → bezahlt / storniert, Route `/verkauf/rechnungen/:id`). Der Prozess
 beginnt meist mitten drin: die Rechnung entsteht von selbst mit der

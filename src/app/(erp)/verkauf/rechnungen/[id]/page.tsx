@@ -56,6 +56,7 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
       offen: number
       datev_uebergeben_am: string | null
       ueberfaellig: boolean
+      probe: boolean
     }[]
   >`
     select k.id, k.nummer, k.art::text as art, k.status::text as status, k.rechnungsdatum::text as rechnungsdatum,
@@ -65,7 +66,7 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
            k.notiz, k.grund, k.partner_id, p.name as kunde, k.sales_order_id, so.number as auftrag,
            k.picking_id, sp.number as lieferung, k.storno_von_id, st.nummer as storno_nummer,
            kundenrechnung_offen(k.id) as offen, k.datev_uebergeben_am::text as datev_uebergeben_am,
-           (k.status = 'offen' and k.art = 'rechnung' and k.faellig_am < current_date) as ueberfaellig
+           (k.status = 'offen' and k.art = 'rechnung' and k.faellig_am < current_date) as ueberfaellig, k.probe
     from kundenrechnungen k
     left join partners p on p.id = k.partner_id
     left join sales_orders so on so.id = k.sales_order_id
@@ -116,6 +117,7 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
         title={
           <span className="actions" style={{ gap: 8 }}>
             <span className="mono">{k.nummer}</span>
+            {k.probe && <span className="badge warn" title="Testbeleg des Rechnungs-Probelaufs">Testbeleg · Probelauf</span>}
             {!istRechnung && <span className="badge info">Gutschrift</span>}
             {k.ueberfaellig && <span className="badge danger">überfällig</span>}
           </span>
@@ -131,6 +133,7 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
               <> · zu Rechnung <Link className="mono" href={`/verkauf/rechnungen/${k.storno_von_id}`}>{k.storno_nummer}</Link></>
             )}
             {k.datev_uebergeben_am && <> · DATEV übergeben {date(k.datev_uebergeben_am)}</>}
+            {k.probe && <> · zählt nicht in DATEV, Fälligkeiten und Umsatz; die gültige Rechnung kommt aus dem Shop</>}
           </>
         }
         actions={

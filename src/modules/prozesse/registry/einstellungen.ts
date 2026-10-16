@@ -266,16 +266,18 @@ export const EINSTELLUNGEN = {
   },
 
   'einstellungen.rechnungen_setzen': {
-    label: 'Kundenrechnungen: Automatik, Zahlungsziel, Konten',
+    label: 'Kundenrechnungen: Modus, Zahlungsziel, Konten',
     bereich: 'einstellungen',
     nurAdmin: true,
     prozessfrei: true,
     beschreibung:
-      'Einstellungen der Kundenrechnungen (settings.rechnung): Rechnung bei jeder Lieferung von selbst, ' +
+      'Einstellungen der Kundenrechnungen (settings.rechnung): Modus „aus" (keine Automatik), „test" (Probelauf: ' +
+      'Testrechnungen PROBE-RE-… parallel zur Shopify-Rechnungs-App, zählen nirgends) oder „scharf" (echte ' +
+      'Rechnungen RE-… mit jeder Lieferung; nur möglich, wenn kein Probelauf mehr in der Datenbank steht), ' +
       'Zahlungsziel und Mahnfrist in Tagen, Kontenrahmen und Konten für den DATEV-Buchungsstapel.',
     bindung: 'frei',
     schema: z.object({
-      automatisch: z.boolean(),
+      modus: z.enum(['aus', 'test', 'scharf']),
       zahlungsziel_tage: z.number().int().min(0).max(120),
       mahnfrist_tage: z.number().int().min(0).max(60),
       kontenrahmen: z.enum(['SKR03', 'SKR04']),
@@ -285,9 +287,9 @@ export const EINSTELLUNGEN = {
       erloeskonto_0: z.string().trim().min(1).max(10),
     }),
     zusammenfassung: (p) =>
-      `Rechnung ${p.automatisch ? 'bei jeder Lieferung' : 'von Hand'}, Zahlungsziel ${p.zahlungsziel_tage} Tage`,
+      `Rechnung ${p.modus === 'scharf' ? 'scharf' : p.modus === 'test' ? 'im Probelauf' : 'von Hand'}, Zahlungsziel ${p.zahlungsziel_tage} Tage`,
     formdata: (fd) => ({
-      automatisch: fd.get('automatisch') === 'on',
+      modus: String(fd.get('modus') ?? 'test'),
       zahlungsziel_tage: Number(fd.get('zahlungsziel_tage') ?? 14),
       mahnfrist_tage: Number(fd.get('mahnfrist_tage') ?? 7),
       kontenrahmen: String(fd.get('kontenrahmen') ?? 'SKR03'),

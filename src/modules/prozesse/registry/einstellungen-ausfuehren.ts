@@ -196,7 +196,7 @@ export async function belegverhaltenSetzen(
 
 export async function rechnungenSetzen(
   p: {
-    automatisch: boolean
+    modus: 'aus' | 'test' | 'scharf'
     zahlungsziel_tage: number
     mahnfrist_tage: number
     kontenrahmen: 'SKR03' | 'SKR04'
@@ -207,10 +207,24 @@ export async function rechnungenSetzen(
   },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
-  await einstellungMergen('rechnung', p)
-  return {
-    text: `Kundenrechnungen: ${p.automatisch ? 'bei jeder Lieferung von selbst' : 'von Hand aus der Lieferung'}, Zahlungsziel ${p.zahlungsziel_tage} Tage.`,
+  // Scharf erst ohne Probelauf: Testbelege und echte Belege dürfen sich nie mischen (0117).
+  if (p.modus === 'scharf') {
+    const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where probe`
+    if (n > 0) {
+      throw new Error(
+        `Noch ${n} Testbeleg(e) aus dem Probelauf in der Datenbank — erst unter Verkauf → Rechnungen → Probelauf vergleichen und „Probelauf löschen", dann scharf schalten.`,
+      )
+    }
   }
+  // `automatisch` bleibt als Spiegel für ältere Leser (0115), der Modus ist die Wahrheit.
+  await einstellungMergen('rechnung', { ...p, automatisch: p.modus !== 'aus' })
+  const lage =
+    p.modus === 'scharf'
+      ? 'scharf — echte Rechnungen RE-… mit jeder Lieferung'
+      : p.modus === 'test'
+        ? 'Probelauf — Testrechnungen PROBE-RE-… parallel zum Shop, zählen nirgends'
+        : 'aus — Rechnung nur von Hand aus der Lieferung'
+  return { text: `Kundenrechnungen: ${lage}, Zahlungsziel ${p.zahlungsziel_tage} Tage.` }
 }
 
 export async function nummernkreisSetzen(

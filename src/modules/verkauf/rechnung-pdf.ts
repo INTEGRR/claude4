@@ -54,6 +54,8 @@ export interface RechnungKopf {
   auftrag_nummer: string | null
   quelle: string | null
   offen: number
+  /** Testbeleg des Probelaufs (0117) — Banner im PDF, kein gültiger Beleg. */
+  probe?: boolean
 }
 
 export interface RechnungPosition {
@@ -200,8 +202,15 @@ export function rechnungDokument(
       ].join(' ')
     : null
 
+  const probeBanner = k.probe
+    ? h(Text, { style: s.probe },
+        'TESTBELEG — Probelauf der Rechnung aus KRNL. Kein gültiger Rechnungsbeleg, keine Zahlungsaufforderung; ' +
+        'die gültige Rechnung kommt weiterhin aus dem Shop.')
+    : null
+
   const inhalt = mahnung
     ? [
+        probeBanner,
         h(Text, { style: s.titel }, titel),
         h(Text, { style: s.text }, `Sehr geehrte Damen und Herren,`),
         h(Text, { style: s.text }, mahnText),
@@ -219,6 +228,7 @@ export function rechnungDokument(
         h(Text, { style: { fontSize: 9.5 } }, firma.name ?? ''),
       ]
     : [
+        probeBanner,
         h(Text, { style: s.titel }, titel),
         tabelle,
         summen,
@@ -252,7 +262,7 @@ export async function rechnungPdf(
            k.mahnstufe, k.waehrung, k.netto, k.steuer, k.brutto, k.anschrift, k.kundennummer,
            k.kundenreferenz, k.ansprechpartner, k.notiz,
            st.nummer as storno_nummer, so.number as auftrag_nummer, so.source::text as quelle,
-           kundenrechnung_offen(k.id) as offen
+           kundenrechnung_offen(k.id) as offen, k.probe
     from kundenrechnungen k
     left join kundenrechnungen st on st.id = k.storno_von_id
     left join sales_orders so on so.id = k.sales_order_id

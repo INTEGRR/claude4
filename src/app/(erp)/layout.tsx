@@ -68,7 +68,7 @@ async function badges() {
         where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int as offene_eingaenge,
       (select count(*) from shipping_ready)::int as versandbereit,
       (select count(*) from kundenrechnungen
-        where art = 'rechnung' and status = 'offen' and faellig_am < current_date)::int as rechnungen_ueberfaellig,
+        where art = 'rechnung' and status = 'offen' and faellig_am < current_date and not probe)::int as rechnungen_ueberfaellig,
       (select count(*) from repair_orders
         where state not in ('shipped','cancel'))::int as offene_reparaturen,
       (select count(*) from orderpoint_suggestions())::int as beschaffung,

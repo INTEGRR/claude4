@@ -289,6 +289,8 @@ export interface ShopifyOrder {
   }[]
   cancelledAt: string | null
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } }
+  /** Gesamtbetrag nach Bestelländerungen (brutto inkl. Versand) — fehlt in älteren Antworten und Attrappen. */
+  currentTotalPriceSet?: { shopMoney: { amount: string } } | null
   customer: {
     id: string
     firstName: string | null
@@ -350,6 +352,7 @@ const ORDER_FIELDS = `
   }
   cancelledAt
   totalPriceSet { shopMoney { amount currencyCode } }
+  currentTotalPriceSet { shopMoney { amount } }
   customer { id firstName lastName defaultEmailAddress { emailAddress } }
   shippingAddress { name address1 address2 zip city countryCodeV2 phone }
   billingAddress { name company address1 address2 zip city countryCodeV2 }

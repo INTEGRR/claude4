@@ -339,12 +339,26 @@ export const VERKAUF = {
     revalidate: ['/verkauf/rechnungen/:id'],
   },
 
+  'verkauf.rechnung_probelauf_loeschen': {
+    label: 'Rechnungs-Probelauf löschen',
+    bereich: 'verkauf',
+    nurAdmin: true,
+    beschreibung:
+      'Löscht alle Testbelege des Rechnungs-Probelaufs (probe = true: Testrechnungen PROBE-RE-…, Testgutschriften ' +
+      'PROBE-GU-…, ihre Zahlungen im Register), rechnet die berechneten Mengen der Aufträge neu und setzt die ' +
+      'Probe-Nummernkreise zurück. Echte Belege bleiben unberührt. Voraussetzung, um die Rechnung scharf zu schalten.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/verkauf/rechnungen', '/einstellungen/belege', '/finanzen', '/verkauf'],
+  },
+
   'verkauf.datev_uebergeben': {
     label: 'DATEV: Zeitraum als übergeben markieren',
     bereich: 'verkauf',
     beschreibung:
       'Markiert alle Kundenrechnungen und Gutschriften eines Zeitraums als an die Buchhaltung übergeben ' +
-      '(nach dem Export des Buchungsstapels). Die Datei selbst liefert /api/verkauf/datev.',
+      '(nach dem Export des Buchungsstapels; Testbelege des Probelaufs ausgenommen). Die Datei selbst liefert /api/verkauf/datev.',
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({ von: DATUM, bis: DATUM }),

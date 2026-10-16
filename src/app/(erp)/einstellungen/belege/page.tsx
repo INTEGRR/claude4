@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
-import { ActionForm } from '@/components/action-button'
+import { ActionButton, ActionForm } from '@/components/action-button'
 import { Auswahl } from '@/components/auswahl'
 import { Card, TableWrap, Zustand } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
@@ -30,6 +30,11 @@ async function nummernkreisSpeichern(formData: FormData) {
   return serverAktion('einstellungen.nummernkreis_setzen', { formData })
 }
 
+async function probelaufLoeschen() {
+  'use server'
+  return serverAktion('verkauf.rechnung_probelauf_loeschen', { parameter: {} })
+}
+
 export default async function BelegePage() {
   await requireArea('einstellungen')
   const sales = await einstellung<{ lock_confirmed: boolean }>('sales')
@@ -37,6 +42,7 @@ export default async function BelegePage() {
   const freigaben = await einstellung<{ einkauf_limit: number }>('freigaben')
   const rechnung = await einstellung<{
     automatisch: boolean
+    modus?: 'aus' | 'test' | 'scharf'
     zahlungsziel_tage: number
     mahnfrist_tage: number
     kontenrahmen: string
@@ -48,6 +54,12 @@ export default async function BelegePage() {
   // Der laufende Stand steht seit Migration 0026 in echten Sequenzen.
   const nummernkreise = await sql<{ code: string; prefix: string; next_number: number }[]>`
     select code, prefix, next_number from sequence_state()`
+  // Probelauf (0117): der Modus aus der Datenbank (dieselbe Leseweise wie der Trigger) und die Testbelege.
+  const [probelauf] = await sql<{ modus: 'aus' | 'test' | 'scharf'; testbelege: number; seit: string | null }[]>`
+    select rechnung_modus() as modus,
+           (select count(*)::int from kundenrechnungen where probe) as testbelege,
+           (select min(created_at)::date::text from kundenrechnungen where probe) as seit`
+  const modus = probelauf.modus
 
   const verkaufSperrt = sales.lock_confirmed ?? false
   const einkaufSperrt = purchase.lock_confirmed ?? false
@@ -114,11 +126,27 @@ export default async function BelegePage() {
 
       <Card title="Kundenrechnungen">
         <ActionForm action={rechnungenSpeichern}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <input type="checkbox" name="automatisch" defaultChecked={rechnung.automatisch ?? true} />
-            <span>Rechnung bei jeder gebuchten Lieferung von selbst erstellen</span>
-            <Zustand ton={(rechnung.automatisch ?? true) ? 'ok' : 'off'}>{(rechnung.automatisch ?? true) ? 'automatisch' : 'von Hand'}</Zustand>
-          </label>
+          <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 10 }}>
+            <label className="field">
+              <span>Modus</span>
+              <Auswahl name="modus" defaultValue={modus}>
+                <option value="test">Probelauf — Testrechnungen PROBE-RE-… parallel zum Shop, zählen nirgends</option>
+                <option value="scharf">Scharf — echte Rechnungen RE-… mit jeder gebuchten Lieferung</option>
+                <option value="aus">Aus — Rechnung nur von Hand aus der Lieferung</option>
+              </Auswahl>
+            </label>
+            <div className="shrink field">
+              <Zustand ton={modus === 'scharf' ? 'ok' : modus === 'test' ? 'warn' : 'off'}>
+                {modus === 'scharf' ? 'scharf' : modus === 'test' ? 'Probelauf' : 'aus'}
+              </Zustand>
+            </div>
+          </div>
+          <p className="small muted" style={{ margin: '0 0 10px' }}>
+            Im Probelauf entsteht mit jeder Lieferung eine <strong>Testrechnung</strong> (eigener Nummernkreis PROBE-RE-/PROBE-GU-,
+            Banner im PDF) — nicht in DATEV, Fälligkeiten und Umsatz, aber mit Gutschriften bei Shop-Änderungen wie im
+            Ernstfall. Scharf schalten geht erst, wenn der Probelauf gelöscht ist; vorher Nummernkreise RE-/GU- und
+            Firmendaten prüfen und die Shopify-Rechnungs-App abschalten.
+          </p>
           <div className="row">
             <label className="field">
               <span>Zahlungsziel (Tage, Firmenkunden)</span>
@@ -161,6 +189,30 @@ export default async function BelegePage() {
           Zahlungsziel. Die Konten füllen den DATEV-Buchungsstapel unter Verkauf → Rechnungen; die Pflichtangaben im
           Rechnungsfuß stehen unter <Link href="/einstellungen">Firmendaten</Link>.
         </p>
+      </Card>
+
+      <Card title="Rechnungs-Probelauf" tight>
+        <div style={{ padding: 12 }}>
+          <p className="small" style={{ margin: '0 0 8px' }}>
+            {probelauf.testbelege > 0 ? (
+              <>
+                <strong>{probelauf.testbelege} Testbeleg(e)</strong>{probelauf.seit ? ` seit ${probelauf.seit}` : ''} in der Datenbank —{' '}
+                <Link href="/verkauf/rechnungen?filter=probelauf">Vergleich mit dem Shop ansehen</Link>. Löschen entfernt alle
+                Testbelege samt ihrer Zahlungen, rechnet die berechneten Mengen der Aufträge neu und setzt die Probe-Nummernkreise
+                zurück; echte Belege bleiben.
+              </>
+            ) : (
+              <>Kein Testbeleg in der Datenbank{modus === 'test' ? ' — der erste entsteht mit der nächsten gebuchten Lieferung' : ''}.</>
+            )}
+          </p>
+          <ActionButton
+            action={probelaufLoeschen}
+            disabled={probelauf.testbelege === 0}
+            confirm={`Alle ${probelauf.testbelege} Testbelege des Probelaufs unwiderruflich löschen? Echte Belege bleiben unberührt.`}
+          >
+            Probelauf löschen
+          </ActionButton>
+        </div>
       </Card>
 
       <Card title="Nummernkreise" tight>

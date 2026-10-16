@@ -13,6 +13,13 @@ import { bestellungEinspeisen } from './shopify-versand.ts'
  */
 
 const NUTZER = { name: 'prozesstest', role: 'admin' as const }
+const RECHNUNG_EINST = { zahlungsziel_tage: 14, mahnfrist_tage: 7, kontenrahmen: 'SKR03', debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120' }
+
+/** 0117: Vorgabe jeder Instanz ist der Probelauf — die Fixture prüft den Ernstfall und schaltet ausdrücklich scharf. */
+async function rechnungModus(modus: 'aus' | 'test' | 'scharf'): Promise<void> {
+  const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
+  await aktionAusfuehrenGeprueft('einstellungen.rechnungen_setzen', { parameter: { modus, ...RECHNUNG_EINST } }, NUTZER)
+}
 
 /** Lieferung des Auftrags über den Torwächter buchen (wie „Buchen" im Lager). */
 async function lieferungBuchen(sql: Sql, auftragId: string): Promise<string> {
@@ -57,6 +64,7 @@ export const KUNDENRECHNUNG_FIXTURE: ProzessFixture = {
     {
       name: 'Shop-Lieferung erzeugt die Rechnung (bezahlt), Storno im Shop → Gutschrift',
       beleg: async (ctx, sql) => {
+        await rechnungModus('scharf')
         // Der Bestand ist mit anderen Fixtures geteilt — was dieser Lauf
         // liefert, wird vorher aufgefüllt, damit spätere Läufe ihn vorfinden.
         await bestandAuffuellen(sql, ctx.teilId, 16)
@@ -88,6 +96,7 @@ export const KUNDENRECHNUNG_FIXTURE: ProzessFixture = {
     {
       name: 'Firmenkunde: Rechnung offen mit Zahlungsziel, Zahlung über das Register',
       beleg: async (ctx, sql) => {
+        await rechnungModus('scharf')
         const auftragId = await firmenauftrag(ctx)
         const pickingId = await lieferungBuchen(sql, auftragId)
         const rechnungId = await rechnungZurLieferung(sql, pickingId)
@@ -118,7 +127,7 @@ export const KUNDENRECHNUNG_FIXTURE: ProzessFixture = {
       },
     },
     {
-      name: 'Automatik aus: Rechnung von Hand aus der Lieferung, dann bezahlt',
+      name: 'Modus aus: Rechnung von Hand aus der Lieferung, dann bezahlt',
       // Der Anlage-Schritt hängt an der Lieferung (record_id in den Eingaben,
       // wie /api/aktion) — die Rechnung entsteht erst durch den Schritt.
       pfad: ['rechnung', 'zahlen'],
@@ -127,7 +136,7 @@ export const KUNDENRECHNUNG_FIXTURE: ProzessFixture = {
           const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
           await aktionAusfuehrenGeprueft(
             'einstellungen.rechnungen_setzen',
-            { parameter: { automatisch: false, zahlungsziel_tage: 30, mahnfrist_tage: 7, kontenrahmen: 'SKR03', debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120' } },
+            { parameter: { modus: 'aus', zahlungsziel_tage: 30, mahnfrist_tage: 7, kontenrahmen: 'SKR03', debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120' } },
             NUTZER,
           )
           const auftragId = await firmenauftrag(ctx)
@@ -142,11 +151,11 @@ export const KUNDENRECHNUNG_FIXTURE: ProzessFixture = {
           select status::text as status, zahlungsart from kundenrechnungen where id = ${rechnungId}`
         assert.equal(k.status, 'bezahlt')
         assert.equal(k.zahlungsart, 'bar')
-        // Automatik wieder an — Staging und Folgeläufe erwarten sie.
+        // Wieder scharf — Staging und Folgeläufe erwarten echte Rechnungen (0117: Vorgabe wäre der Probelauf).
         const { aktionAusfuehrenGeprueft } = await import('../torwaechter.ts')
         await aktionAusfuehrenGeprueft(
           'einstellungen.rechnungen_setzen',
-          { parameter: { automatisch: true, zahlungsziel_tage: 14, mahnfrist_tage: 7, kontenrahmen: 'SKR03', debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120' } },
+          { parameter: { modus: 'scharf', zahlungsziel_tage: 14, mahnfrist_tage: 7, kontenrahmen: 'SKR03', debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120' } },
           NUTZER,
         )
       },

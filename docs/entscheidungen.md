@@ -9,6 +9,47 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-16 — Kundenrechnung erst im Probelauf: Testbelege parallel zum Shop, scharf erst nach Vergleich und Löschung
+
+**Entschieden (Betreiber):** Die Rechnung aus KRNL (0115) geht nicht sofort
+scharf. Jede Instanz startet im **Probelauf** (`settings.rechnung.modus =
+'test'`): Mit jeder Lieferung entsteht eine Testrechnung, die sich exakt wie
+eine echte verhält (Gutschrift bei Shop-Änderung, berechnete Mengen,
+Zahlung, Mahnstufe), aber `probe = true` trägt, einen eigenen Nummernkreis
+`PROBE-RE-`/`PROBE-GU-` nutzt, ein Banner im PDF hat und nirgends zählt
+(DATEV, Fälligkeiten, Umsatz, Navigation). Die gültige Rechnung kommt
+derweil weiter aus der Shopify-Rechnungs-App.
+
+**Warum:** Nummernkreise sind lückenlos und DATEV bekommt, was einmal da
+ist — ein Fehler in der ersten echten Rechnung wäre nicht korrigierbar,
+sondern nur per Gutschrift reparierbar. Der Probelauf liefert den Beweis
+über Wochen echter Lieferungen (Vergleich je Bestellung gegen
+`sales_orders.shopify_brutto`, den Gesamtbetrag laut Shop), ohne einen
+einzigen echten Beleg zu erzeugen.
+
+**Regeln:**
+
+- Testbelege und echte Belege mischen sich nie: `scharf` ist erst
+  einstellbar, wenn `kundenrechnung_probelauf_loeschen()` den Probelauf
+  entfernt hat (samt Zahlungen, mit Rückrechnung von `qty_invoiced` und
+  Auftragsstatus, Probe-Kreise zurück auf 1). Echte Belege bleiben unberührt.
+- Jede Auswertung über `kundenrechnungen` filtert `not probe` (Schema-Doku
+  sagt es dem KI-Datenfrager); `finanz_faellig`, DATEV-Export und -Übergabe,
+  Rechnungsliste und Navigationszähler tun es bereits.
+- `rechnung_modus()` ist die eine Leseweise (Trigger, Seiten, Registry);
+  `automatisch` bleibt als Spiegel für ältere Leser.
+- Der Probelauf ist eine Einrichtungsaufgabe (`rechnung_probelauf`), die
+  jeden Daten-Reset überlebt; Fixtures, Abnahmetest und der Ernstfall-Test
+  setzen den Modus ausdrücklich auf `scharf`.
+
+Umgesetzt: Migration 0117, `verkauf.rechnung_probelauf_loeschen`,
+`einstellungen.rechnungen_setzen` (Modus statt Schalter), Importer
+(`shopify_brutto`), Seiten Rechnungen/Beleg/Belege-Einstellungen, PDF.
+Doku: [module/verkauf.md](module/verkauf.md) „Probelauf",
+[module/einstellungen.md](module/einstellungen.md), [go-live.md](go-live.md)
+§7c, [prozesse.md](prozesse.md). Nachweis:
+`tests/prozesse/kundenrechnungen.test.ts`.
+
 ## 2026-10-16 — Seed-Administrator nur auf leerer Instanz
 
 **Befund (Prod):** Das Seed-Konto `admin@example.com` war gelöscht und

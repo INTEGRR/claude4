@@ -294,10 +294,21 @@ export async function rechnungDetails(p: { notiz?: string; faellig_am?: string }
   return { recordId: ctx.recordId }
 }
 
+export async function rechnungProbelaufLoeschen(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const [r] = await sql<{ n: number }[]>`select kundenrechnung_probelauf_loeschen(${ctx.actor}) as n`
+  return {
+    text:
+      r.n > 0
+        ? `${r.n} Testbeleg(e) des Probelaufs gelöscht — Probe-Nummernkreise stehen wieder auf 1. Jetzt kann die Rechnung scharf geschaltet werden (Einstellungen → Belege).`
+        : 'Kein Testbeleg vorhanden — nichts zu löschen.',
+    link: '/einstellungen/belege',
+  }
+}
+
 export async function datevUebergeben(p: { von: string; bis: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   const r = await sql`
     update kundenrechnungen set datev_uebergeben_am = now()
-    where rechnungsdatum between ${p.von}::date and ${p.bis}::date and datev_uebergeben_am is null`
+    where rechnungsdatum between ${p.von}::date and ${p.bis}::date and datev_uebergeben_am is null and not probe`
   await sql`select log_event('settings', gen_random_uuid(), 'note',
     ${`DATEV: ${r.count} Kundenbeleg(e) ${p.von}–${p.bis} als übergeben markiert`}, ${ctx.actor})`
   return { text: `${r.count} Beleg(e) als an DATEV übergeben markiert.` }

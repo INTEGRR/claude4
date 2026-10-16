@@ -308,6 +308,7 @@ export const AUSFUEHRUNG = {
   'verkauf.gutschrift_erstellen': verkauf.gutschriftErstellen,
   'verkauf.rechnung_mahnen': verkauf.rechnungMahnen,
   'verkauf.rechnung_details': verkauf.rechnungDetails,
+  'verkauf.rechnung_probelauf_loeschen': verkauf.rechnungProbelaufLoeschen,
   'verkauf.datev_uebergeben': verkauf.datevUebergeben,
 
   'vorgang.anlegen': vorgang.anlegen,

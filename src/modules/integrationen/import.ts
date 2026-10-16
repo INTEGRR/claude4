@@ -111,6 +111,13 @@ export function positionsPreis(
   )
 }
 
+/** Gesamtbetrag der Bestellung laut Shop (brutto inkl. Versand), nach Änderungen der aktuelle Stand. */
+export function shopBrutto(order: Pick<ShopifyOrder, 'totalPriceSet' | 'currentTotalPriceSet'>): number | null {
+  const roh = order.currentTotalPriceSet?.shopMoney.amount ?? order.totalPriceSet?.shopMoney.amount
+  const wert = Number(roh)
+  return roh != null && Number.isFinite(wert) ? Math.round(wert * 100) / 100 : null
+}
+
 /** Versandkosten netto nach Rabatt (0 ohne Versandzeile). */
 export function versandNetto(order: ShopifyOrder): number {
   const zeile = order.shippingLine
@@ -287,13 +294,13 @@ export async function importShopifyOrder(
     const [created] = await t<{ id: string }[]>`
       insert into sales_orders (
         number, partner_id, source, shopify_order_id, shopify_order_name,
-        order_date, currency, versandkosten,
+        order_date, currency, versandkosten, shopify_brutto,
         ship_name, ship_street, ship_house_number, ship_street2,
         ship_zip, ship_city, ship_country_code, ship_phone, ship_email,
         rechnungsanschrift, zahlungsart)
       values (
         next_sequence('sale'), ${partnerId}, 'shopify', ${order.id}, ${order.name},
-        ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode}, ${versandNetto(order)},
+        ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode}, ${versandNetto(order)}, ${shopBrutto(order)},
         ${addr?.name ?? null}, ${street}, ${houseNumber}, ${addr?.address2 ?? null},
         ${addr?.zip ?? null}, ${addr?.city ?? null}, ${addr?.countryCodeV2 ?? 'DE'},
         ${addr?.phone ?? null}, ${order.email ?? null},
@@ -410,9 +417,14 @@ export async function bestellaenderungNachziehen(
   auftragId: string,
   order: ShopifyOrder,
 ): Promise<string | null> {
-  const [so] = await t<{ state: string; historisch: boolean; versandkosten: number }[]>`
-    select state::text as state, historisch, versandkosten from sales_orders where id = ${auftragId}`
+  const [so] = await t<{ state: string; historisch: boolean; versandkosten: number; shopify_brutto: number | null }[]>`
+    select state::text as state, historisch, versandkosten, shopify_brutto from sales_orders where id = ${auftragId}`
   if (!so || so.state !== 'sale' || so.historisch) return null
+  // Gesamtbetrag laut Shop immer nachführen (Vergleichsbasis des Rechnungs-Probelaufs, 0117) — auch ohne Positionsänderung.
+  const brutto = shopBrutto(order)
+  if (brutto !== null && (so.shopify_brutto === null || Math.abs(brutto - Number(so.shopify_brutto)) >= 0.005)) {
+    await t`update sales_orders set shopify_brutto = ${brutto} where id = ${auftragId}`
+  }
 
   const soll = new Map<string, { qty: number; preis: number; steuer: number; name: string; listenpreis: number | null }>()
   for (const item of order.lineItems.nodes) {

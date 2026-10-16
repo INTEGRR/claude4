@@ -75,6 +75,11 @@ export function abnahmeLauf(datenbank: Sql, szenario: Szenario, erwartung: Erwar
 
   async function stammdatenAnlegen(): Promise<void> {
     await aktion('einstellungen.shopify_modus_setzen', undefined, { modus: 'schreiben' })
+    // Abnahme = die scharfe Firma: echte Rechnungen, kein Probelauf (0117: Vorgabe 'test').
+    await aktion('einstellungen.rechnungen_setzen', undefined, {
+      modus: 'scharf', zahlungsziel_tage: 14, mahnfrist_tage: 7, kontenrahmen: 'SKR03',
+      debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120',
+    })
 
     const konto = await aktion('finanzen.bankkonto_anlegen', undefined, { name: BANKKONTO, waehrung: 'EUR' })
     k.bankkonto = konto.recordId!

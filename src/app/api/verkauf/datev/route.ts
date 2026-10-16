@@ -45,6 +45,7 @@ export async function GET(request: Request) {
     left join partners p on p.id = k.partner_id
     left join sales_orders so on so.id = k.sales_order_id
     where k.rechnungsdatum between ${von}::date and ${bis}::date
+      and not k.probe
     order by k.rechnungsdatum, k.nummer`
 
   const csv = datevBuchungsstapel(

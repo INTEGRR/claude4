@@ -29,6 +29,8 @@ let h: Harness
 const v: Record<string, string> = {}
 let webhookNr = 0
 
+const RECHNUNG_EINST = { zahlungsziel_tage: 14, mahnfrist_tage: 7, kontenrahmen: 'SKR03', debitorenkonto: '10000', erloeskonto_19: '8400', erloeskonto_7: '8300', erloeskonto_0: '8120' }
+
 const aktion = (name: string, recordId: string | undefined, parameter: Record<string, unknown> = {}) =>
   aktionAusfuehrenGeprueft(name, { recordId, parameter }, ADMIN)
 
@@ -92,6 +94,8 @@ before(async () => {
   h = await harnessStart(DATENBANK)
   const sql = h.sql
   await aktion('einstellungen.shopify_modus_setzen', undefined, { modus: 'schreiben' })
+  // 0117: Vorgabe jeder Instanz ist der Probelauf — dieser Lauf prüft zuerst den Ernstfall (scharf), der Probelauf folgt unten.
+  await aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'scharf', ...RECHNUNG_EINST })
   await aktion('einstellungen.firma_speichern', undefined, {
     name: 'Anvil GmbH', street: 'Neue Friedhofstraße', house: '10', zip: '32457', city: 'Porta Westfalica', country: 'DEU',
     email: 'blink@example.com', phone: '', registergericht: 'Bad Oeynhausen', handelsregister: 'HRB 16523',
@@ -329,5 +333,136 @@ describe('Kundenrechnungen: Shop-Änderungen, Rechnung bei Lieferung, Gutschrift
     assert.ok(zeilenCsv.some((z) => z.includes('"H"')), 'Gutschrift im Haben')
     const r = await aktion('verkauf.datev_uebergeben', undefined, { von: '2026-01-01', bis: '2030-12-31' })
     assert.match(r?.text ?? '', new RegExp(`^${belege.length} Beleg`))
+  })
+})
+
+describe('Rechnungs-Probelauf (0117): Testbelege parallel zum Shop, Vergleich, Löschen, scharf schalten', () => {
+  const GID = 'gid://shopify/Order/5002'
+  const shopBetrag = (betrag: string) => ({
+    totalPriceSet: { shopMoney: { amount: betrag, currencyCode: 'EUR' } },
+    currentTotalPriceSet: { shopMoney: { amount: betrag } },
+  })
+  const lieferungBuchen = async (orderId: string) => {
+    const [p] = await h.sql<{ id: string }[]>`
+      select id from stock_pickings where origin_model = 'sales_order' and origin_id = ${orderId} and state not in ('done', 'cancel') order by created_at limit 1`
+    await aktion('lager.transfer_buchen', p.id, { mengen: {}, lose: {}, backorder: false })
+  }
+  const probeStand = () =>
+    h.sql<{ code: string; next_number: number }[]>`select code, next_number from sequence_state() where code in ('kundenrechnung_probe', 'gutschrift_probe') order by code`
+
+  test('Modus „test": Shop-Lieferung erzeugt eine Testrechnung PROBE-RE-0001 — bezahlt und berechnet wie im Ernstfall, Shop-Betrag am Auftrag', async () => {
+    const [{ n }] = await h.sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where not probe`
+    v.echteVorher = String(n)
+    assert.ok(n >= 4, 'der Ernstfall oben hat echte Belege hinterlassen')
+    await aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'test', ...RECHNUNG_EINST })
+    const [{ modus }] = await h.sql<{ modus: string }[]>`select rechnung_modus() as modus`
+    assert.equal(modus, 'test')
+
+    fakeOrderHinterlegen(shopOrder(GID, '#5002', [{ sku: 'DESKMAT', title: 'Deskmat', qty: 2, brutto: '34.51' }], shopBetrag('76.01')) as never)
+    await webhook(GID, 'orders/create')
+    const so = await auftrag(GID)
+    const [kopf] = await h.sql<{ shopify_brutto: number | null }[]>`select shopify_brutto from sales_orders where id = ${so.id}`
+    assert.equal(Number(kopf.shopify_brutto), 76.01, 'Gesamtbetrag laut Shop steht am Auftrag')
+    await lieferungBuchen(so.id)
+    const r = await rechnungen(so.id)
+    assert.equal(r.length, 1)
+    assert.equal(r[0].nummer, 'PROBE-RE-0001')
+    assert.equal(r[0].status, 'bezahlt')
+    assert.equal(Number(r[0].brutto), 76.01, '2 × 34,51 + Versand 6,99 — gleicher Betrag wie der Shop')
+    v.probeRechnung = r[0].id
+    v.probeAuftrag = so.id
+    assert.deepEqual((await zeilen(so.id)).map((x) => [x.sku, Number(x.qty_invoiced)]), [['DESKMAT', 2]], 'berechnete Menge wie im Ernstfall')
+    const [st] = await h.sql<{ invoice_status: string }[]>`select invoice_status::text from sales_orders where id = ${so.id}`
+    assert.equal(st.invoice_status, 'invoiced')
+    const [probe] = await h.sql<{ probe: boolean }[]>`select probe from kundenrechnungen where id = ${r[0].id}`
+    assert.equal(probe.probe, true)
+    // Echte Nummern bleiben unangetastet.
+    const [[re]] = [await h.sql<{ next_number: number }[]>`select next_number from sequence_state() where code = 'kundenrechnung'`]
+    v.reNaechste = String(re.next_number)
+  })
+
+  test('Testbelege zählen nirgends: Firmenkunden-Testrechnung nicht in den Fälligkeiten, nicht im DATEV-Stapel, PDF trägt die Probe', async () => {
+    const r = await aktion('verkauf.auftrag_mit_positionen', undefined, { kunde: 'Büro Nord GmbH', positionen: [{ produkt: 'DESKMAT', menge: 1, preis: 25 }] })
+    await aktion('verkauf.bestaetigen', r.recordId)
+    await lieferungBuchen(r.recordId!)
+    const [k] = await rechnungen(r.recordId!)
+    assert.equal(k.nummer, 'PROBE-RE-0002')
+    assert.equal(k.status, 'offen')
+    v.probeB2b = k.id
+    const faellig = await h.sql<{ n: number }[]>`
+      select count(*)::int as n from finanz_faellig((current_date + 60)::date) where quelle = 'kundenrechnung' and ref = ${k.id}`
+    assert.equal(faellig[0].n, 0, 'Testbelege stehen nicht in der Forderungsliste')
+    const datev = await aktion('verkauf.datev_uebergeben', undefined, { von: '2026-01-01', bis: '2030-12-31' })
+    assert.match(datev?.text ?? '', /^0 Beleg/, 'Testbelege werden nie an DATEV übergeben')
+    const pdf = await rechnungPdf(k.id)
+    assert.equal(pdf.bytes.subarray(0, 4).toString(), '%PDF')
+    assert.equal(pdf.kopf.probe, true)
+    assert.match(pdf.dateiname, /^PROBE-RE-0002/)
+  })
+
+  test('Shop-Änderung nach der Testrechnung: Testgutschrift PROBE-GU-0001, Shop-Betrag folgt — Vergleich bleibt gleich', async () => {
+    fakeOrderHinterlegen(shopOrder(GID, '#5002', [{ sku: 'DESKMAT', title: 'Deskmat', qty: 2, current: 1, brutto: '34.51' }],
+      { displayFinancialStatus: 'PARTIALLY_REFUNDED', displayFulfillmentStatus: 'FULFILLED', ...shopBetrag('41.50') }) as never)
+    await webhook(GID)
+    const r = await rechnungen(v.probeAuftrag)
+    assert.equal(r.length, 2)
+    const gut = r.find((x) => x.art === 'gutschrift')!
+    assert.equal(gut.nummer, 'PROBE-GU-0001')
+    assert.equal(gut.storno_von_id, v.probeRechnung)
+    assert.equal(Number(gut.brutto), 34.51)
+    const [kopf] = await h.sql<{ shopify_brutto: number }[]>`select shopify_brutto from sales_orders where id = ${v.probeAuftrag}`
+    assert.equal(Number(kopf.shopify_brutto), 41.5)
+    const [summe] = await h.sql<{ krnl: number }[]>`
+      select sum(case art when 'rechnung' then brutto else -brutto end) as krnl from kundenrechnungen where probe and sales_order_id = ${v.probeAuftrag}`
+    assert.equal(Number(summe.krnl), 41.5, 'KRNL-Summe der Testbelege = Shop-Betrag')
+    assert.deepEqual((await probeStand()).map((x) => [x.code, Number(x.next_number)]), [['gutschrift_probe', 2], ['kundenrechnung_probe', 3]])
+  })
+
+  test('Scharf schalten ist gesperrt, solange Testbelege existieren', async () => {
+    await assert.rejects(aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'scharf', ...RECHNUNG_EINST }), /3 Testbeleg\(e\).*Probelauf löschen/)
+    const [{ modus }] = await h.sql<{ modus: string }[]>`select rechnung_modus() as modus`
+    assert.equal(modus, 'test', 'der Modus bleibt beim Probelauf')
+  })
+
+  test('Probelauf löschen: Testbelege samt Zahlung weg, berechnete Mengen und Auftragsstatus zurück, Probe-Kreise auf 1, echte Belege unberührt', async () => {
+    const [konto] = await h.sql<{ id: string }[]>`select id from bankkonten order by created_at limit 1`
+    await aktion('verkauf.rechnung_zahlen', v.probeB2b, { betrag: 29.75, bankkonto_id: konto.id })
+    const [[vorher]] = [await h.sql<{ n: number }[]>`select count(*)::int as n from zahlungen where quelle = 'kundenrechnung'`]
+    const [[probeZahlungen]] = [await h.sql<{ n: number }[]>`
+      select count(*)::int as n from zahlungen z join kundenrechnungen k on k.id = z.kundenrechnung_id where k.probe`]
+    assert.equal(probeZahlungen.n, 1)
+
+    const r = await aktion('verkauf.rechnung_probelauf_loeschen', undefined, {})
+    assert.match(r?.text ?? '', /^3 Testbeleg\(e\) des Probelaufs gelöscht/)
+    const [[rest]] = [await h.sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where probe`]
+    assert.equal(rest.n, 0)
+    const [[echte]] = [await h.sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where not probe`]
+    assert.equal(String(echte.n), v.echteVorher, 'echte Belege bleiben')
+    const [[nachher]] = [await h.sql<{ n: number }[]>`select count(*)::int as n from zahlungen where quelle = 'kundenrechnung'`]
+    assert.equal(nachher.n, vorher.n - 1, 'die Zahlung auf den Testbeleg ist mit weg')
+    assert.deepEqual((await zeilen(v.probeAuftrag)).map((x) => [x.sku, Number(x.qty_invoiced)]), [['DESKMAT', 0]], 'berechnete Menge zurückgerechnet')
+    const [st] = await h.sql<{ invoice_status: string }[]>`select invoice_status::text from sales_orders where id = ${v.probeAuftrag}`
+    assert.notEqual(st.invoice_status, 'invoiced')
+    assert.deepEqual((await probeStand()).map((x) => [x.code, Number(x.next_number)]), [['gutschrift_probe', 1], ['kundenrechnung_probe', 1]])
+    const wieder = await aktion('verkauf.rechnung_probelauf_loeschen', undefined, {})
+    assert.match(wieder?.text ?? '', /^Kein Testbeleg/)
+  })
+
+  test('Danach scharf: die nächste Lieferung bekommt eine echte RE-Nummer in Folge', async () => {
+    await aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'scharf', ...RECHNUNG_EINST })
+    const r = await aktion('verkauf.auftrag_mit_positionen', undefined, { kunde: 'Büro Nord GmbH', positionen: [{ produkt: 'DESKMAT', menge: 1, preis: 25 }] })
+    await aktion('verkauf.bestaetigen', r.recordId)
+    await lieferungBuchen(r.recordId!)
+    const [k] = await rechnungen(r.recordId!)
+    assert.equal(k.nummer, `RE-${String(v.reNaechste).padStart(4, '0')}`, 'der echte Kreis zählt nahtlos weiter')
+    const [probe] = await h.sql<{ probe: boolean }[]>`select probe from kundenrechnungen where id = ${k.id}`
+    assert.equal(probe.probe, false)
+    // Modus aus: keine Automatik, Rechnung nur von Hand (wie bisher automatisch = false).
+    await aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'aus', ...RECHNUNG_EINST })
+    const r2 = await aktion('verkauf.auftrag_mit_positionen', undefined, { kunde: 'Büro Nord GmbH', positionen: [{ produkt: 'DESKMAT', menge: 1, preis: 25 }] })
+    await aktion('verkauf.bestaetigen', r2.recordId)
+    await lieferungBuchen(r2.recordId!)
+    assert.equal((await rechnungen(r2.recordId!)).length, 0, 'aus heißt aus')
+    await aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'scharf', ...RECHNUNG_EINST })
   })
 })

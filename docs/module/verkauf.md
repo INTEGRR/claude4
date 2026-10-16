@@ -137,6 +137,42 @@ mit Mahnung und Teilzahlung, Storno, DATEV), Fixture `kundenrechnung`
 (drei Läufe), Abnahmetest (Rechnungen je Status, Rechnungssumme,
 Forderungen in `finanz_faellig`).
 
+### Probelauf (Migration 0117, seit 2026-10-16)
+
+Die Rechnung aus KRNL ist ein heikles Thema: Nummernkreise sind lückenlos,
+DATEV bekommt, was einmal da ist. Deshalb hat die Kundenrechnung einen
+**Modus** (`settings.rechnung.modus`, Einstellungen → Belege; `automatisch`
+bleibt als Spiegel `modus <> 'aus'` für ältere Leser):
+
+| Modus | Verhalten |
+|---|---|
+| `test` (Vorgabe jeder Instanz) | **Probelauf**: mit jeder gebuchten Lieferung entsteht eine *Testrechnung* mit `probe = true` und eigenem Nummernkreis `PROBE-RE-`/`PROBE-GU-`. Sie verhält sich wie eine echte (bezahlt bei Shop-Aufträgen, offen bei Firmenkunden, Gutschrift bei Shop-Änderung, berechnete Mengen, Zahlung, Mahnstufe), zählt aber nirgends: nicht im DATEV-Stapel, nicht in `finanz_faellig`, nicht im Umsatz der Rechnungsliste, nicht im Zähler der Navigation. PDF mit rotem Banner „TESTBELEG". |
+| `scharf` | Echte Rechnungen `RE-`/`GU-` mit jeder Lieferung. Nur einstellbar, wenn **kein** Testbeleg mehr in der Datenbank steht. |
+| `aus` | Keine Automatik; Rechnung nur von Hand aus der Lieferung (`verkauf.rechnung_erstellen`) — im Modus `test` ergibt auch der Knopf einen Testbeleg. |
+
+Die eine Leseweise des Modus ist `rechnung_modus()` (SQL), der Trigger und
+die Seiten fragen sie. **Vergleich** mit dem Shop: Verkauf → Rechnungen →
+Filter „Probelauf" zeigt je Bestellung die Summe der Testbelege (Rechnungen
+minus Gutschriften) gegen `sales_orders.shopify_brutto` — den Gesamtbetrag
+laut Shop (`currentTotalPriceSet`, brutto inkl. Versand), den der Import
+beim Anlegen und jeder Abgleich nachführt. Abweichungen sind rot, Bestellungen
+ohne Shop-Betrag (vor 0117 importiert, noch kein Abgleich) stehen als „kein
+Shop-Betrag".
+
+**Beenden:** `verkauf.rechnung_probelauf_loeschen` (Administrator,
+Einstellungen → Belege → „Probelauf löschen") ruft
+`kundenrechnung_probelauf_loeschen()`: löscht alle Testbelege samt ihrer
+Zahlungen im Register, rechnet `qty_invoiced` der betroffenen Auftragszeilen
+aus den verbliebenen echten Belegen neu, bestimmt den Auftragsstatus neu und
+setzt die Probe-Nummernkreise auf 1. Echte Belege bleiben unberührt. Danach:
+Nummernkreise `RE-`/`GU-` und Firmendaten prüfen, Modus `scharf`,
+Shopify-Rechnungs-App abschalten (Einrichtungsaufgabe `rechnung_probelauf`).
+
+Nachweis: `tests/prozesse/kundenrechnungen.test.ts` („Rechnungs-Probelauf
+(0117)"): Testrechnung und -gutschrift mit PROBE-Nummern, berechnete Mengen
+wie im Ernstfall, nicht in Fälligkeiten und DATEV, PDF mit Probe, Sperre
+beim Scharfschalten, Löschen mit Rückrechnung, danach nahtlose RE-Nummer.
+
 ## UI
 
 - **Liste**: Nummer, Shopify-Name, Kunde, Datum, Status-Badges (Status/Liefer-/Abrechnungsstatus), Summe; Filter nach Status/Quelle; Volltextsuche.

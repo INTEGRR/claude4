@@ -16,12 +16,15 @@ const FILTER = {
   bezahlt: 'Bezahlt',
   gutschriften: 'Gutschriften',
   storniert: 'Storniert',
+  probelauf: 'Probelauf',
 } as const
 type Filter = keyof typeof FILTER
 
 /**
  * Kundenrechnungen (0115): entstehen bei der Lieferung — hier die Liste mit
- * Filter, offenen Beträgen und dem DATEV-Export des Monats.
+ * Filter, offenen Beträgen und dem DATEV-Export des Monats. Der Probelauf
+ * (0117) hat seinen eigenen Filter: Testbelege (PROBE-…) stehen nur dort,
+ * mit dem Vergleich je Bestellung gegen den Gesamtbetrag laut Shop.
  */
 export default async function KundenrechnungenPage({
   searchParams,
@@ -52,6 +55,7 @@ export default async function KundenrechnungenPage({
       mahnstufe: number
       ueberfaellig: boolean
       datev: boolean
+      probe: boolean
     }[]
   >`
     select k.id, k.nummer, k.art::text as art, k.status::text as status, k.rechnungsdatum::text as rechnungsdatum,
@@ -59,17 +63,18 @@ export default async function KundenrechnungenPage({
            k.sales_order_id, so.number as auftrag, k.kundenreferenz, k.zahlungsart, k.brutto,
            kundenrechnung_offen(k.id) as offen, k.mahnstufe,
            (k.status = 'offen' and k.art = 'rechnung' and k.faellig_am < current_date) as ueberfaellig,
-           k.datev_uebergeben_am is not null as datev
+           k.datev_uebergeben_am is not null as datev, k.probe
     from kundenrechnungen k
     left join partners p on p.id = k.partner_id
     left join sales_orders so on so.id = k.sales_order_id
     where case ${filter}
-            when 'offen' then k.status = 'offen'
-            when 'ueberfaellig' then k.status = 'offen' and k.art = 'rechnung' and k.faellig_am < current_date
-            when 'bezahlt' then k.status = 'bezahlt'
-            when 'gutschriften' then k.art = 'gutschrift'
-            when 'storniert' then k.status = 'storniert'
-            else true end
+            when 'probelauf' then k.probe
+            when 'offen' then k.status = 'offen' and not k.probe
+            when 'ueberfaellig' then k.status = 'offen' and k.art = 'rechnung' and k.faellig_am < current_date and not k.probe
+            when 'bezahlt' then k.status = 'bezahlt' and not k.probe
+            when 'gutschriften' then k.art = 'gutschrift' and not k.probe
+            when 'storniert' then k.status = 'storniert' and not k.probe
+            else not k.probe end
     order by k.rechnungsdatum desc, k.created_at desc
     limit 300`
 
@@ -79,7 +84,35 @@ export default async function KundenrechnungenPage({
            coalesce(sum(case art when 'rechnung' then brutto else -brutto end)
                     filter (where status <> 'storniert' and date_trunc('month', rechnungsdatum) = date_trunc('month', current_date)), 0) as monat,
            count(*) filter (where date_trunc('month', rechnungsdatum) = date_trunc('month', current_date))::int as anzahl_monat
-    from kundenrechnungen`
+    from kundenrechnungen
+    where not probe`
+
+  // Probelauf (0117): Modus, Anzahl der Testbelege und der Vergleich je Bestellung gegen den Shop.
+  const [lage] = await sql<{ modus: string; testbelege: number }[]>`
+    select rechnung_modus() as modus, (select count(*)::int from kundenrechnungen where probe) as testbelege`
+  const vergleich =
+    filter === 'probelauf'
+      ? await sql<
+          { id: string; bestellung: string; shopify_brutto: number | null; krnl_brutto: number; belege: number; nummern: string; letzte: string }[]
+        >`
+          select so.id, coalesce(so.shopify_order_name, so.number) as bestellung, so.shopify_brutto,
+                 sum(case k.art when 'rechnung' then k.brutto else -k.brutto end) as krnl_brutto,
+                 count(*)::int as belege, string_agg(k.nummer, ', ' order by k.created_at) as nummern,
+                 max(k.created_at)::text as letzte
+          from kundenrechnungen k
+          join sales_orders so on so.id = k.sales_order_id
+          where k.probe
+          group by so.id
+          order by max(k.created_at) desc
+          limit 300`
+      : []
+  const abweichung = (z: { shopify_brutto: number | null; krnl_brutto: number }) =>
+    z.shopify_brutto === null ? null : Math.round((Number(z.krnl_brutto) - Number(z.shopify_brutto)) * 100) / 100
+  const vergleichSumme = {
+    gleich: vergleich.filter((z) => abweichung(z) !== null && Math.abs(abweichung(z)!) < 0.005).length,
+    abweichend: vergleich.filter((z) => abweichung(z) !== null && Math.abs(abweichung(z)!) >= 0.005).length,
+    ohne: vergleich.filter((z) => abweichung(z) === null).length,
+  }
 
   const heute = new Date()
   const monatsanfang = isoDatum(new Date(heute.getFullYear(), heute.getMonth(), 1))
@@ -92,6 +125,27 @@ export default async function KundenrechnungenPage({
         subtitle="Rechnungen entstehen mit der Lieferung — Shop-Aufträge sind bezahlt, Firmenkunden zahlen auf Rechnung"
         actions={<Link className="btn" href="/verkauf">Verkaufsaufträge</Link>}
       />
+
+      {lage.modus !== 'scharf' && (
+        <Card tight>
+          <p className="small" style={{ margin: 12 }}>
+            {lage.modus === 'test' ? (
+              <>
+                <strong>Probelauf läuft:</strong> Mit jeder gebuchten Lieferung entsteht eine <em>Testrechnung</em> (PROBE-RE-…)
+                parallel zur Rechnung aus dem Shop. Testbelege zählen nicht in DATEV, Fälligkeiten und Umsatz; die echten Filter
+                hier bleiben leer, bis scharf geschaltet ist. Vergleich und Aufräumen:{' '}
+                <Link href="/verkauf/rechnungen?filter=probelauf">Probelauf</Link> · scharf schalten unter{' '}
+                <Link href="/einstellungen/belege">Einstellungen → Belege</Link>.
+              </>
+            ) : (
+              <>
+                <strong>Automatik aus:</strong> Rechnungen entstehen nur von Hand aus der Lieferung. Modus unter{' '}
+                <Link href="/einstellungen/belege">Einstellungen → Belege</Link>.
+              </>
+            )}
+          </p>
+        </Card>
+      )}
 
       <div className="tiles" style={{ marginBottom: 12 }}>
         <div className="display-panel">
@@ -118,8 +172,61 @@ export default async function KundenrechnungenPage({
             </Link>
           ))}
         </div>
+        {filter === 'probelauf' && (
+          <div style={{ padding: '0 12px 12px' }}>
+            <p className="small muted" style={{ margin: '0 0 8px' }}>
+              Vergleich je Bestellung: Summe der Testbelege (Rechnungen minus Gutschriften) gegen den Gesamtbetrag laut Shop
+              (brutto inkl. Versand, nach Änderungen der aktuelle Stand). Bestellungen von vor dem Probelauf tragen den
+              Shop-Betrag erst nach dem nächsten Abgleich.
+              {' '}{lage.testbelege} Testbeleg(e) · {vergleichSumme.gleich} gleich · {vergleichSumme.abweichend} abweichend ·{' '}
+              {vergleichSumme.ohne} ohne Shop-Betrag.
+              {' '}Aufräumen und scharf schalten: <Link href="/einstellungen/belege">Einstellungen → Belege</Link>.
+            </p>
+            {vergleich.length > 0 && (
+              <TableWrap>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Bestellung</th>
+                      <th>Testbelege</th>
+                      <th className="num">Shop brutto</th>
+                      <th className="num">KRNL brutto</th>
+                      <th className="num">Abweichung</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vergleich.map((z) => {
+                      const d = abweichung(z)
+                      return (
+                        <tr key={z.id}>
+                          <td className="mono"><Link href={`/verkauf/${z.id}`}>{z.bestellung}</Link></td>
+                          <td className="mono small">{z.nummern}</td>
+                          <td className="num nowrap">{z.shopify_brutto === null ? '—' : money(z.shopify_brutto)}</td>
+                          <td className="num nowrap">{money(z.krnl_brutto)}</td>
+                          <td className="num nowrap">
+                            {d === null ? (
+                              <span className="muted">kein Shop-Betrag</span>
+                            ) : Math.abs(d) < 0.005 ? (
+                              <span className="badge ok">gleich</span>
+                            ) : (
+                              <span className="badge warn">{d > 0 ? '+' : ''}{money(d)}</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </TableWrap>
+            )}
+          </div>
+        )}
         {belege.length === 0 ? (
-          <Empty>Keine Belege{filter !== 'alle' ? ' in dieser Auswahl' : ' — die erste Rechnung entsteht mit der ersten gebuchten Lieferung'}.</Empty>
+          <Empty>
+            {filter === 'probelauf'
+              ? 'Noch kein Testbeleg — der erste entsteht mit der nächsten gebuchten Lieferung.'
+              : `Keine Belege${filter !== 'alle' ? ' in dieser Auswahl' : ' — die erste Rechnung entsteht mit der ersten gebuchten Lieferung'}.`}
+          </Empty>
         ) : (
           <TableWrap>
             <table>
@@ -142,6 +249,7 @@ export default async function KundenrechnungenPage({
                     <td className="mono">
                       <span className="actions" style={{ gap: 6 }}>
                         <Link href={`/verkauf/rechnungen/${b.id}`}>{b.nummer}</Link>
+                        {b.probe && <span className="badge warn" title="Testbeleg des Probelaufs — zählt nirgends">Test</span>}
                         {b.art === 'gutschrift' && <span className="badge info">Gutschrift</span>}
                         {b.mahnstufe > 0 && <span className="badge warn">Mahnstufe {b.mahnstufe}</span>}
                         {b.datev && <span className="badge neutral" title="an DATEV übergeben">DATEV</span>}

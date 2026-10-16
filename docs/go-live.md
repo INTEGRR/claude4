@@ -351,6 +351,10 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
       den Rechnungsfuß prüfen, Shopify-Rechnungs-App abschalten, DATEV-Konten
       (SKR03/04) mit der Steuerberatung abstimmen, Rechnungsversand per Mail
       festlegen (noch nicht gebaut).
+      **Seit 0117 läuft die Rechnung im Probelauf** (Entscheidungslog
+      2026-10-16): Testrechnungen PROBE-RE-… parallel zur Shopify-App, zählen
+      nirgends; Vergleich unter Verkauf → Rechnungen → Probelauf, danach
+      „Probelauf löschen" und Modus „scharf" (Einstellungen → Belege).
 - [ ] KI-Region (Einstellungen → KI-Modelle, seit 2026-10-16): Standard
       (Anthropic direkt, OpenAI global — der heutige Weg) oder EU (Claude
       über Bedrock mit EU-Profil, OpenAI über eu.api.openai.com). Für EU
