@@ -6,7 +6,7 @@ import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { RecordComments } from '@/components/record-comments'
-import { LABELS, date, dateTime, money, qty } from '@/modules/shared/format'
+import { date, dateTime, LABELS, money, qty, schreibschutzGrund } from '@/modules/shared/format'
 import {
   cancelMo,
   checkAvailability,
@@ -249,7 +249,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         }
       />
       <div style={{ marginBottom: 12 }}>
-        <ResponsibleForm action={updateMoDetails.bind(null, id)} userId={mo.user_id} priority={mo.priority} />
+        <ResponsibleForm action={updateMoDetails.bind(null, id)} userId={mo.user_id} priority={mo.priority} gesperrt={schreibschutzGrund('mo', mo.state)} />
       </div>
 
       {/* Werkstattanzeige: die drei Zahlen des Auftrags auf einen Blick. */}

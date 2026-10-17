@@ -3,7 +3,7 @@ import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { varianteAufloesen } from './aufloesen.ts'
 import { fertigungsNachfrageAbhaken } from '@/modules/verkauf/extern-versand'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
-import { plural } from '@/modules/shared/format'
+import { plural, schreibschutzPruefen } from '@/modules/shared/format'
 
 /** Ausführung der Fertigungs-Aktionen — Fachlogik unverändert aus fertigung/actions.ts. */
 
@@ -350,6 +350,11 @@ export async function auftragDetails(
   p: { user_id?: string; priority: boolean },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Abgeschlossene Aufträge bleiben, wie sie sind (F6).
+  const [mo] = await sql<{ state: string; number: string }[]>`
+    select state::text as state, number from manufacturing_orders where id = ${ctx.recordId!}`
+  if (!mo) throw new Error('Fertigungsauftrag nicht gefunden.')
+  schreibschutzPruefen('mo', mo.state, mo.number)
   await sql`
     update manufacturing_orders set
       user_id = ${p.user_id ?? null},

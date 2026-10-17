@@ -8,7 +8,7 @@ import { ResponsibleForm } from '@/components/responsible-form'
 import { TagEditor } from '@/components/tag-editor'
 import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
-import { date, dateTime, qty } from '@/modules/shared/format'
+import { date, dateTime, qty, schreibschutzGrund } from '@/modules/shared/format'
 import {
   addPart,
   cancelRepair,
@@ -222,7 +222,7 @@ export default async function RepairPage({
       />
 
       <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <ResponsibleForm action={updateRepairDetails.bind(null, id)} userId={repair.user_id} priority={repair.priority} />
+        <ResponsibleForm action={updateRepairDetails.bind(null, id)} userId={repair.user_id} priority={repair.priority} gesperrt={schreibschutzGrund('repair', repair.state)} />
         <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
       </div>
 

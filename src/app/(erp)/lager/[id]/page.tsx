@@ -11,7 +11,7 @@ import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
 import { VerfolgungKurz } from '@/components/sendungsverfolgung'
 import type { Ereignis, VerfolgungStatus } from '@/modules/versand/track17-logik'
-import { date, qty } from '@/modules/shared/format'
+import { date, qty, schreibschutzGrund } from '@/modules/shared/format'
 import {
   artikeletikettenDrucken,
   cancelPicking,
@@ -273,7 +273,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         }
       />
       <div style={{ marginBottom: 12 }}>
-        <ResponsibleForm action={updatePickingDetails.bind(null, id)} userId={picking.user_id} priority={picking.priority} />
+        <ResponsibleForm action={updatePickingDetails.bind(null, id)} userId={picking.user_id} priority={picking.priority} gesperrt={schreibschutzGrund('picking', picking.state)} />
       </div>
 
       {zulauf &&

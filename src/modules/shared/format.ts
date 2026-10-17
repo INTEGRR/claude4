@@ -408,6 +408,41 @@ export function label(art: LabelArt, wert: string): string {
 type Ton = 'neutral' | 'info' | 'success' | 'warn' | 'danger'
 
 /**
+ * Endzustände je Belegart (F6, Entscheidungslog 2026-10-17): danach ist der
+ * Beleg abgeschlossen — Verantwortlich, Dringend und andere Kopfdaten
+ * ändern sich nicht mehr. Server-Aktionen prüfen das mit
+ * `schreibschutzPruefen`, die Seiten blenden die Eingaben aus.
+ */
+export const ENDZUSTAENDE = {
+  mo: ['done', 'cancel'],
+  picking: ['done', 'cancel'],
+  repair: ['shipped', 'cancel'],
+  sale: ['cancel'],
+  purchase: ['done', 'cancel'],
+  einkaufsprojekt: ['abgeschlossen', 'abgebrochen'],
+  eingangs_sendung: ['abgerechnet', 'storniert'],
+  retoure: ['abgeschlossen', 'abgelehnt', 'storniert'],
+} as const satisfies Partial<Record<LabelArt, readonly string[]>>
+
+/** Ist der Beleg in diesem Zustand noch bearbeitbar? Arten ohne Endzustände: ja. */
+export function bearbeitbar(art: LabelArt, zustand: string): boolean {
+  const ende = (ENDZUSTAENDE as Partial<Record<LabelArt, readonly string[]>>)[art]
+  return !ende || !ende.includes(zustand)
+}
+
+/** Grund für die Sperre („Erledigt — nicht mehr änderbar") oder null. */
+export function schreibschutzGrund(art: LabelArt, zustand: string): string | null {
+  return bearbeitbar(art, zustand) ? null : `${label(art, zustand)} — nicht mehr änderbar`
+}
+
+/** Wirft, wenn der Beleg abgeschlossen ist — für Server-Aktionen. */
+export function schreibschutzPruefen(art: LabelArt, zustand: string, beleg: string): void {
+  if (!bearbeitbar(art, zustand)) {
+    throw new Error(`${beleg} ist ${label(art, zustand).toLowerCase()} — Verantwortlich und Dringend lassen sich nicht mehr ändern.`)
+  }
+}
+
+/**
  * Farbton je Belegart, wo der Code allein nicht reicht: „genehmigt" ist bei
  * einer Retoure ein Zwischenschritt (info), bei einer Abwesenheit das Ziel.
  */

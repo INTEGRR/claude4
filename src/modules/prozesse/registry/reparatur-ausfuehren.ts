@@ -4,6 +4,7 @@ import { dhlConfigured } from '@/modules/versand/dhl'
 import { createLabelForRepair, createReturnLabelForPartner } from '@/modules/versand/service'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 import { kontaktAusAnfrage } from '../../shared/reparaturanfrage.ts'
+import { schreibschutzPruefen } from '@/modules/shared/format'
 
 /** Ausführung der Reparatur-Aktionen — Fachlogik aus reparatur/actions.ts. */
 
@@ -322,6 +323,11 @@ export async function details(
   p: { user_id?: string; priority: boolean },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Versendete oder stornierte Reparaturen bleiben, wie sie sind (F6).
+  const [r] = await sql<{ state: string; number: string }[]>`
+    select state::text as state, number from repair_orders where id = ${ctx.recordId!}`
+  if (!r) throw new Error('Reparaturauftrag nicht gefunden.')
+  schreibschutzPruefen('repair', r.state, r.number)
   await sql`
     update repair_orders set
       user_id = ${p.user_id ?? null},

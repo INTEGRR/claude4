@@ -11,13 +11,27 @@ export async function ResponsibleForm({
   action,
   userId,
   priority,
+  gesperrt,
 }: {
   action: (formData: FormData) => Promise<ActionResult>
   userId: string | null
   priority: string
+  /** Grund, wenn der Beleg abgeschlossen ist (F6, schreibschutzGrund) — dann nur Anzeige. */
+  gesperrt: string | null
 }) {
   const benutzer = await sql<{ id: string; name: string }[]>`
-    select id, name from users where active order by name`
+    select id, name from users where active or id = ${userId}::uuid order by name`
+
+  if (gesperrt) {
+    const name = benutzer.find((u) => u.id === userId)?.name
+    return (
+      <div className="small" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span><span className="mono-label">Verantwortlich</span> {name ?? '—'}</span>
+        {priority === '1' && <span className="mono-label"><span className="led on" /> Dringend</span>}
+        <span className="muted">{gesperrt}</span>
+      </div>
+    )
+  }
 
   return (
     <ActionForm action={action} style={{ marginBottom: 0 }}>

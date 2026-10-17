@@ -164,6 +164,9 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   SQL `< date_trunc('day', now() at time zone 'Europe/Berlin')`. Keine
   eigenen Vergleiche wie `new Date(x) < new Date()` — der Wächter
   `tests/ueberfaellig.test.ts` prüft das und das Schild in den Terminlisten.
+- **Schreibschutz** → `ENDZUSTAENDE` in `format.ts`: Server-Aktionen rufen
+  `schreibschutzPruefen(art, zustand, beleg)`, Seiten zeigen bei
+  `schreibschutzGrund()` nur noch an (z. B. `<ResponsibleForm gesperrt>`).
 - **Statuswerte** → die Zustandstabelle `LABELS` in `format.ts`:
   `<Badge kind="…" state={…} />` bzw. `label(art, wert)` und
   `tone(wert, art)`. Ein neues Status-Enum bekommt dort seine Art und

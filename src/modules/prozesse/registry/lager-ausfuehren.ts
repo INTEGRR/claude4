@@ -11,6 +11,7 @@ import {
 } from '../../druck/etikett-layout.ts'
 import { varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { schreibschutzPruefen } from '@/modules/shared/format'
 
 /**
  * Ausführung der Lager-Aktionen. Die Fachlogik stammt unverändert aus
@@ -90,6 +91,11 @@ export async function transferDetails(
   p: { user_id?: string; priority: boolean },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  // Gebuchte oder stornierte Transfers bleiben, wie sie sind (F6).
+  const [t] = await sql<{ state: string; number: string }[]>`
+    select state::text as state, number from stock_pickings where id = ${ctx.recordId!}`
+  if (!t) throw new Error('Transfer nicht gefunden.')
+  schreibschutzPruefen('picking', t.state, t.number)
   await sql`
     update stock_pickings set
       user_id = ${p.user_id ?? null},

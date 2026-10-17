@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Schreibschutz aus dem Status
+
+**Anlass (UX-Audit):** Erledigte und stornierte Fertigungsaufträge,
+gebuchte Transfers und versendete Reparaturen boten weiter
+„Verantwortlich/Dringend — Übernehmen“ an, und der Server nahm es an.
+
+**Entschieden:**
+- `ENDZUSTAENDE` je Belegart in format.ts ist die eine Quelle für
+  „abgeschlossen“.
+- Die Aktionen `fertigung.auftrag_details`, `lager.transfer_details` und
+  `reparatur.details` lehnen abgeschlossene Belege ab
+  (`schreibschutzPruefen`). Die Seiten zeigen dann nur noch
+  Verantwortlichen und Dringend mit Grund an.
+- Einkaufsprojekte und Sendungen sperrten ihre Eingaben schon über den
+  Status.
+- Tests: tests/prozesse/schreibschutz.test.ts; der Zustandstabellen-
+  Wächter prüft, dass jeder Endzustand ein echter Zustand ist.
+- Doku: [entwicklung.md](entwicklung.md).
+
 ## 2026-10-17 — Plural statt Klammer-Plural
 
 **Anlass (UX-Audit):** Rund hundert Texte schrieben „3 Position(en)“,

@@ -2,7 +2,7 @@ import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { LABELS, type LabelArt, label, tone } from '../src/modules/shared/format.ts'
+import { ENDZUSTAENDE, LABELS, type LabelArt, bearbeitbar, label, tone } from '../src/modules/shared/format.ts'
 import { closeDb, db } from './helpers.ts'
 
 /**
@@ -83,6 +83,16 @@ describe('Zustandstabelle', () => {
     assert.equal(tone('genehmigt', 'retoure'), 'info', 'Retoure genehmigt ist ein Zwischenschritt')
     assert.equal(tone('approved', 'absence'), 'success')
     assert.equal(label('ticket_schwere', 'stoerend'), 'Störend')
+  })
+
+  test('Endzustände (F6) sind echte Zustände ihrer Art; Schreibschutz folgt ihnen', () => {
+    for (const [art, werte] of Object.entries(ENDZUSTAENDE)) {
+      const labels = LABELS[art as LabelArt] as Record<string, string>
+      for (const w of werte) assert.ok(labels[w], `ENDZUSTAENDE.${art}: „${w}" ist kein Zustand von LABELS.${art}`)
+    }
+    assert.equal(bearbeitbar('mo', 'done'), false)
+    assert.equal(bearbeitbar('mo', 'progress'), true)
+    assert.equal(bearbeitbar('ticket', 'behoben'), true, 'Arten ohne Endzustände bleiben bearbeitbar')
   })
 
   test('(b) keine lokalen Status-Maps mit eigenen Texten', () => {
