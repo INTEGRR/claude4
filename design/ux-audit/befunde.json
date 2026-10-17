@@ -400,7 +400,8 @@
      "befund": "Datumsfeld zeigt amerikanisches Format „10/17/2026“ (Browser-Locale), sonst überall deutsch.",
      "vorschlag": "Eigenes Datumsfeld mit TT.MM.JJJJ oder lang=de am Input.",
      "id": "013-aufgaben#4",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: Headless-Chromium ohne Browsersprache; mit --lang=de-DE zeigt das native Datumsfeld TT.MM.JJJJ (geprüft, Entscheidungslog 2026-10-17)."
     },
     {
      "schwere": "niedrig",
@@ -751,7 +752,8 @@
      "befund": "Keine Seitenaufteilung: rund 150 Aufträge auf einer 6.800 px hohen Seite; mit echten Daten wird das unbenutzbar langsam.",
      "vorschlag": "Pagination oder „mehr laden“, Standardfilter „offen“, Zahl der Treffer anzeigen.",
      "id": "100-verkauf#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "a387abf"
     },
     {
      "schwere": "hoch",
@@ -878,7 +880,8 @@
      "befund": "Datumsfelder „Zugesagter Liefertermin“ und „Angebot gültig bis“ zeigen das US-Format mm/dd/yyyy (Browser-Locale statt de-DE).",
      "vorschlag": "Eigene Datumskomponente oder lang=\"de\" am Dokument; Anzeige TT.MM.JJJJ.",
      "id": "102-verkauf-entwurf#2",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: natives Datumsfeld folgt der Browsersprache; deutsch zeigt TT.MM.JJJJ (Entscheidungslog 2026-10-17)."
     },
     {
      "schwere": "mittel",
@@ -982,7 +985,8 @@
      "befund": "Verlaufstext „2 Lieferposition(en), 2 Fertigungsauftrag/-aufträge“ – Klammer-Plural.",
      "vorschlag": "Plural per Zahl auflösen (‚2 Fertigungsaufträge‘).",
      "id": "103-verkauf-bestaetigt#5",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "d7c3b09"
     },
     {
      "schwere": "niedrig",
@@ -1215,7 +1219,8 @@
      "befund": "Status heißt beim Auftrag „ABGEBROCHEN“, bei der Rechnung „STORNIERT“, im Verlauf ‚Auftrag storniert‘ – drei Wörter für denselben Zustand.",
      "vorschlag": "Einheitlich ‚Storniert‘.",
      "id": "107-verkauf-storniert#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "96ed602"
     },
     {
      "schwere": "hoch",
@@ -1240,7 +1245,8 @@
      "befund": "Verlaufstext ‚1.0000 × Retourentest-Board‘ – unformatierte Menge mit vier Nachkommastellen und Punkt.",
      "vorschlag": "Menge mit qty()-Formatierung (‚1 ×‘).",
      "id": "107-verkauf-storniert#4",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     },
     {
      "schwere": "niedrig",
@@ -1416,7 +1422,8 @@
      "befund": "Zahlungsbetrag als ‚0.00‘ mit Dezimalpunkt, Datum als 10/17/2026 – englische Formate in einem deutschen Finanzformular.",
      "vorschlag": "Zahlenfeld mit deutschem Format (Komma) und Datumsfeld TT.MM.JJJJ.",
      "id": "112-rechnung-offen#2",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: natives Zahlen- und Datumsfeld folgen der Browsersprache (deutsch: 0,00 und TT.MM.JJJJ)."
     },
     {
      "schwere": "mittel",
@@ -1677,7 +1684,8 @@
      "befund": "Budget ‚5000‘ ohne Tausenderpunkt/Währung in der Tabelle.",
      "vorschlag": "‚5.000 €‘.",
      "id": "121-vorgaenge-anfrage#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     }
    ],
    "messwerte": {
@@ -2399,7 +2407,8 @@
      "befund": "Verlauf: ‚1.0000 × Prozesstest MTO-Artikel 9300001 defekt → B-Ware‘ – unformatierte Menge.",
      "vorschlag": "qty()-Formatierung.",
      "id": "216-retoure-geprueft#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     },
     {
      "schwere": "mittel",
@@ -2581,7 +2590,8 @@
      "befund": "Liste ist hart auf 200 Zeilen begrenzt (Abfrage limit 200), ohne Hinweis: 271 offene + 45 erledigte Aufträge existieren, ‚Alle‘ zeigt nur 200 bestätigte – erledigte Aufträge sind unter ‚Alle‘ nie sichtbar.",
      "vorschlag": "Seitenaufteilung mit Gesamtzahl (‚200 von 318‘), Standardfilter ‚offen‘, Erledigt erreichbar.",
      "id": "300-fertigung#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "a387abf"
     },
     {
      "schwere": "hoch",
@@ -2589,7 +2599,8 @@
      "befund": "Termine ab 16.08.2025 (über ein Jahr überfällig) erscheinen neutral wie künftige Termine; keine Hervorhebung ‚überfällig‘. Navigation zeigt 271 als Zähler ohne Bedeutung.",
      "vorschlag": "Überfällige Termine rot + Filter ‚überfällig‘; Zähler im Menü = überfällige oder startbare.",
      "id": "300-fertigung#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "659ec34"
     },
     {
      "schwere": "hoch",
@@ -2597,7 +2608,8 @@
      "befund": "Seite ist ~12.000 px lang; Sortierung nach Termin, aber Nummern springen (MO/00006 vor MO/00005) – schwer zu scannen.",
      "vorschlag": "Gruppierung nach Auftrag oder Termin-Woche, sekundär nach Nummer.",
      "id": "300-fertigung#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "a387abf"
     },
     {
      "schwere": "mittel",
@@ -2694,7 +2706,8 @@
      "befund": "Verlauf: ‚2 Position(en) aus Baugruppen aufgelöst‘.",
      "vorschlag": "Plural ausformulieren.",
      "id": "301-mo-bestaetigt#6",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "d7c3b09"
     }
    ],
    "messwerte": {
@@ -2726,7 +2739,8 @@
      "befund": "Verlauf ‚Fertig gemeldet: 1.0000‘ – unformatierte Menge.",
      "vorschlag": "qty()-Formatierung.",
      "id": "302-mo-fertig#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     },
     {
      "schwere": "niedrig",
@@ -2734,7 +2748,8 @@
      "befund": "Verantwortlich/Dringend/Übernehmen bleibt bei erledigtem Auftrag editierbar.",
      "vorschlag": "Bei erledigt schreibgeschützt.",
      "id": "302-mo-fertig#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "ab9953c"
     },
     {
      "schwere": "niedrig",
@@ -2772,7 +2787,8 @@
      "befund": "Status ‚ABGEBROCHEN‘ im Kopf, Verlauf sagt ‚Storniert‘ – zwei Begriffe.",
      "vorschlag": "Einheitlich ‚Storniert‘, bei Rückläufer ‚Entfallen (Rückläufer)‘.",
      "id": "303-mo-storniert#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "96ed602"
     },
     {
      "schwere": "niedrig",
@@ -3184,7 +3200,8 @@
      "befund": "Alle Datumsfelder (ETA, bestätigt, Rest-Termin, Verschifft am) im US-Format mm/dd/yyyy.",
      "vorschlag": "Deutsches Datumsformat (global).",
      "id": "402-bestellung-entwurf#3",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: natives Datumsfeld folgt der Browsersprache; deutsch zeigt TT.MM.JJJJ (Entscheidungslog 2026-10-17)."
     },
     {
      "schwere": "mittel",
@@ -4098,7 +4115,8 @@
      "befund": "Datumsfelder US-Format.",
      "vorschlag": "de-DE.",
      "id": "481-vertrag#3",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: natives Datumsfeld folgt der Browsersprache; deutsch zeigt TT.MM.JJJJ (Entscheidungslog 2026-10-17)."
     }
    ],
    "messwerte": {
@@ -4245,7 +4263,8 @@
      "befund": "Verlauf ‚Zahlung 35.70 € erfasst‘ mit Dezimalpunkt.",
      "vorschlag": "Deutsches Zahlenformat.",
      "id": "496-rechnung-bezahlt#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     }
    ],
    "messwerte": {
@@ -4285,7 +4304,8 @@
      "befund": "Kurse mit Dezimalpunkt (0.1280, 0.128) statt Komma; unterschiedliche Stellenzahl in Kachel und Historie.",
      "vorschlag": "de-DE, einheitlich 4 Stellen.",
      "id": "497-kurse#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     },
     {
      "schwere": "niedrig",
@@ -4324,7 +4344,8 @@
      "befund": "Grundlage-Texte mischen Formate (‚25.0 kg, Fracht 300.00 €‘ mit Punkt).",
      "vorschlag": "de-DE-Formatierung.",
      "id": "498-einstand#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "e2bc647"
     },
     {
      "schwere": "niedrig",
@@ -4332,7 +4353,8 @@
      "befund": "‚1 abgerechnete Sendung(en)‘ – Klammer-Plural; Fachbegriffe (D-Klauseln, DDP) ohne Erklärung.",
      "vorschlag": "Plural auflösen, Tooltips.",
      "id": "498-einstand#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "d7c3b09"
     }
    ],
    "messwerte": {
@@ -4401,7 +4423,8 @@
      "befund": "Offene Wareneingänge mit Termin 16.10.2025 (ein Jahr alt) stehen als ‚BEREIT‘ ohne Überfällig-Kennzeichnung neben aktuellen.",
      "vorschlag": "Überfällige Termine rot, Sortierung ‚überfällig zuerst‘, Filter.",
      "id": "500-transfers#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "659ec34"
     },
     {
      "schwere": "mittel",
@@ -4542,7 +4565,8 @@
      "befund": "Verantwortlich/Dringend/Übernehmen bei erledigtem Transfer editierbar.",
      "vorschlag": "Schreibschutz.",
      "id": "503-lieferung-erledigt#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "ab9953c"
     }
    ],
    "messwerte": {
@@ -4643,7 +4667,8 @@
      "befund": "Überfällige Eingänge seit 16.10.2025 werden weiter ‚erwartet‘ – nach einem Jahr ist das kein Zulauf mehr.",
      "vorschlag": "Ab X Tagen Eskalation ‚beim Lieferanten nachfragen / stornieren‘.",
      "id": "510-zulauf#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "659ec34"
     },
     {
      "schwere": "mittel",
@@ -4930,7 +4955,8 @@
      "befund": "RMA/00001 ‚In Reparatur‘ seit 16.12.2025 und neun ‚Repariert‘-Aufträge seit Monaten nicht zurückgesendet – keine Kennzeichnung von Liegezeit/Überfälligkeit.",
      "vorschlag": "Spalte ‚seit‘ + Warnfarbe ab X Tagen; Filter ‚hängt‘.",
      "id": "600-reparaturen#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "659ec34"
     },
     {
      "schwere": "mittel",
@@ -5047,7 +5073,8 @@
      "befund": "Seit 10 Monaten ‚In Reparatur‘ ohne Hinweis auf Liegezeit.",
      "vorschlag": "‚in Reparatur seit 305 Tagen‘ im Kopf.",
      "id": "603-reparatur-inarbeit#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "659ec34"
     }
    ],
    "messwerte": {
@@ -5162,7 +5189,8 @@
      "befund": "Kopf ‚ABGEBROCHEN‘, Verlauf ‚Reparatur storniert‘.",
      "vorschlag": "Ein Begriff.",
      "id": "606-reparatur-storniert#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "96ed602"
     }
    ],
    "messwerte": {
@@ -5387,7 +5415,8 @@
      "befund": "Kostensatz ‚38.5‘ mit Dezimalpunkt.",
      "vorschlag": "de-DE.",
      "id": "702-mitarbeiter-detail#3",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: natives Zahlenfeld zeigt den Dezimaltrenner der Browsersprache (deutsch: 38,5)."
     }
    ],
    "messwerte": {
@@ -6343,7 +6372,8 @@
      "befund": "Dateiauswahl zeigt englischen Browsertext ‚Choose File / No file chosen‘.",
      "vorschlag": "Eigene Upload-Zone (‚CSV hierher ziehen oder auswählen‘).",
      "id": "952-integrationen-historie#1",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: der Text der nativen Dateiauswahl kommt vom Browser und ist bei deutscher Browsersprache deutsch."
     },
     {
      "schwere": "niedrig",
@@ -7693,7 +7723,8 @@
      "befund": "Schwere/Status in Versalien ohne Umlaut (STOEREND).",
      "vorschlag": "‚Störend‘.",
      "id": "970-tickets#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "96ed602"
     }
    ],
    "messwerte": {
@@ -7945,7 +7976,8 @@
      "befund": "Status ‚UEBERSPRUNGEN‘ ohne Umlaut.",
      "vorschlag": "‚Übersprungen‘.",
      "id": "980-einstellungen-benachrichtigungen#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "96ed602"
     }
    ],
    "messwerte": {
@@ -8537,7 +8569,8 @@
      "befund": "Datum ‚10/17/2026‘ US-Format.",
      "vorschlag": "de-DE.",
      "id": "m05-aufgaben#3",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: natives Datumsfeld folgt der Browsersprache; deutsch zeigt TT.MM.JJJJ (Entscheidungslog 2026-10-17)."
     }
    ],
    "messwerte": {
