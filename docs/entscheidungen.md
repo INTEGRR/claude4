@@ -9,6 +9,20 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Cashflow zählt nur bestätigte Bestellungen
+
+**Anlass (UX-Audit, Code-Prüfung):** Die Prognose und die Liste „Fällig"
+nahmen Zahlplan-Raten jeder nicht stornierten Bestellung — auch Anfragen und
+Entwürfe (Rate „bei Bestellung" sofort fällig, Fremdwährung mangels
+eingefrorenem Kurs 1:1). Gesperrte (`done`) Bestellungen mit offener Rate
+fielen dagegen heraus.
+
+**Entschieden:** Zahlplan-Raten und Restobligo zählen genau für bestätigte
+Bestellungen (`purchase`, `done`). Eine Anfrage ist kein Zahlungsversprechen;
+gesperrt heißt „abgeschlossen bearbeitet", nicht „bezahlt". Migration 0123
+(`finanz_prognose`, `finanz_faellig`), Test in tests/finanzen.test.ts, Doku
+in [prozesse.md](prozesse.md) (Umsatzplan + Prognose).
+
 ## 2026-10-17 — Fehlender Wechselkurs rechnet nicht mehr still 1:1
 
 **Anlass (UX-Audit, Code-Prüfung):** `exchange_rate_at` fällt ohne Kurs auf 1

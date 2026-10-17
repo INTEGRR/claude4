@@ -803,7 +803,9 @@ je einzeln releasebar:
   Planumsatz taggenau mit Kanal-Split (historische Shopify-Quote) und
   Zahlungsversatz; Bestellabflüsse aus drei DISJUNKTEN Quellen (offene
   Zahlplan-Raten, offene Rechnungen ohne Zahlplan, Restobligo bestätigter
-  Bestellungen); Verträge/Darlehen/Steuern; USt-Automatik
+  Bestellungen — Raten und Restobligo seit 0123 nur aus bestätigten, auch
+  gesperrten Bestellungen, nie aus Anfragen/Entwürfen);
+  Verträge/Darlehen/Steuern; USt-Automatik
   (`ust_zahllast_quote_pct` × Planumsatz) nur für Monate ohne erfasste
   Zeile. Herzstück ist das **kumulative Deckungskonto** der
   Wareneinsatz-Quote: Soll C_t = Σ Quote × Planumsatz, Deckung D =

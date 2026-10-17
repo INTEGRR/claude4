@@ -588,3 +588,31 @@ describe('Finanzen: Cashflow-Prognose (Deckungskonto)', () => {
     })
   })
 })
+
+describe('Finanzen: nur bestätigte Bestellungen zählen (0123, UX-Audit)', () => {
+  test('Anfrage zählt nicht, bestätigte und gesperrte zählen — in Fällig-Liste und Prognose', async () => {
+    await withRollback(async (t) => {
+      const s = await finanzSzenario(t)
+      const [rate] = await t<{ id: string }[]>`
+        insert into zahlplan_raten (purchase_order_id, sequence, bezeichnung, anteil_pct, ausloeser)
+        values (${s.orderId}, 10, 'Anzahlung 30 %', 30, 'bestellung') returning id`
+      const faellig = async () =>
+        (await t<{ n: number }[]>`
+          select count(*)::int as n from finanz_faellig(current_date + 14) where ref = ${rate.id}`)[0].n
+      const prognoseAus = async () =>
+        (await t<{ summe: number }[]>`
+          select coalesce(sum(aus_bestellungen), 0) as summe from finanz_prognose('base', 'woche', 13)`)[0].summe
+
+      const ohne = Number(await prognoseAus())
+      assert.equal(await faellig(), 0, 'Anfrage/Entwurf steht nicht in „Fällig"')
+
+      await t`update purchase_orders set state = 'purchase', confirmed_at = now() where id = ${s.orderId}`
+      assert.equal(await faellig(), 1, 'bestätigte Bestellung zählt')
+      assert.ok(Number(await prognoseAus()) > ohne, 'Prognose enthält die Rate')
+
+      await t`update purchase_orders set state = 'done' where id = ${s.orderId}`
+      assert.equal(await faellig(), 1, 'gesperrte Bestellung zählt weiter')
+      assert.ok(Number(await prognoseAus()) > ohne, 'Prognose enthält die Rate auch gesperrt')
+    })
+  })
+})
