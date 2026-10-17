@@ -131,13 +131,13 @@ export async function bestellungErfassen(p: BelegBestellung, ctx: AktionsKontext
       const [ic] = await t<{ code: string }[]>`select code from incoterms where code = ${incoterm}`
       if (!ic) throw new Error(`Incoterm ${incoterm} ist unbekannt.`)
     }
-    // Ohne hinterlegten Kurs rechnet KRNL 1:1 (exchange_rate_at) — das soll
-    // niemand still übersehen, deshalb ein Hinweis im Ergebnis.
+    // Ohne hinterlegten Kurs bleibt die Bestellung Entwurf: Bestätigen und
+    // Zahlung brauchen seit 0122 einen echten Kurs (exchange_rate_strikt).
     const [kurs] = waehrung === 'EUR'
       ? [{ da: true }]
       : await t<{ da: boolean }[]>`select exists (select 1 from exchange_rates where currency = ${waehrung}) as da`
     const hinweise: string[] = []
-    if (!kurs?.da) hinweise.push(`kein ${waehrung}-Kurs hinterlegt — Beträge zählen vorerst 1:1 in Euro (EZB-Kurse holen)`)
+    if (!kurs?.da) hinweise.push(`kein ${waehrung}-Kurs hinterlegt — vor dem Bestätigen oder Bezahlen unter Einkauf → Kurse die EZB-Kurse holen`)
 
     // Lieferant: vorhandener gewinnt, neu nur wenn erlaubt und noch nicht da.
     let lieferant: { id: string; name: string }
@@ -176,7 +176,7 @@ export async function bestellungErfassen(p: BelegBestellung, ctx: AktionsKontext
         zeilen.push({ variantId: da.id, menge: pos.menge, preis })
         continue
       }
-      const [k] = await t<{ kurs: number }[]>`select exchange_rate_at(${waehrung}, current_date) as kurs`
+      const [k] = await t<{ kurs: number | null }[]>`select exchange_rate_kurs(${waehrung}, current_date) as kurs`
       const neu = await produktAnlegen(
         t,
         {
@@ -185,7 +185,8 @@ export async function bestellungErfassen(p: BelegBestellung, ctx: AktionsKontext
           einkaufbar: true,
           verkaufbar: false,
           route: 'kaufen',
-          einstandspreis: Math.round(preis * Number(k?.kurs ?? 1) * 100) / 100,
+          // Ohne Kurs kein Einstand raten — er entsteht beim Bestätigen/Wareneingang.
+          einstandspreis: k?.kurs != null ? Math.round(preis * Number(k.kurs) * 100) / 100 : undefined,
         },
         ctx.actor,
       )
@@ -487,7 +488,7 @@ export async function nebenkostenErfassen(
       next_sequence('landed'), ${ctx.recordId!},
       ${p.cost_type}::landed_cost_type, ${p.basis}::landed_cost_basis,
       ${p.amount}, ${p.currency},
-      exchange_rate_at(${p.currency}, current_date),
+      exchange_rate_strikt(${p.currency}, current_date),
       ${p.is_estimate}, ${p.vendor_id ?? null}, ${p.note ?? null})`
   return { recordId: ctx.recordId }
 }

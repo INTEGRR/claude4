@@ -26,8 +26,8 @@ export default async function KursePage() {
     select id, currency, rate, valid_from::text, source
     from exchange_rates order by currency, valid_from desc limit 100`
 
-  const aktuell = await sql<{ currency: string; rate: number; offene: number }[]>`
-    select c.code as currency, exchange_rate_at(c.code) as rate,
+  const aktuell = await sql<{ currency: string; rate: number | null; offene: number }[]>`
+    select c.code as currency, exchange_rate_kurs(c.code) as rate,
            (select count(*) from purchase_orders po
              where po.currency = c.code and po.state in ('draft', 'sent'))::int as offene
     from currencies c where c.active and c.code <> 'EUR' order by c.code`
@@ -45,11 +45,11 @@ export default async function KursePage() {
           <div className="card" key={a.currency} style={{ marginBottom: 0 }}>
             <div className="stat">
               <div className="label">{a.currency} → EUR</div>
-              <div className="value mono">{Number(a.rate).toFixed(4)}</div>
+              <div className="value mono">{a.rate == null ? '—' : Number(a.rate).toFixed(4)}</div>
               <div className="hint">
-                {Number(a.rate) === 1 ? (
+                {a.rate == null ? (
                   <>
-                    <span className="led warn" /> kein Kurs erfasst
+                    <span className="led warn" /> kein Kurs erfasst — Bestätigen und Zahlungen sind gesperrt
                   </>
                 ) : (
                   <>

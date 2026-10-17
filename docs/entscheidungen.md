@@ -9,6 +9,20 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Fehlender Wechselkurs rechnet nicht mehr still 1:1
+
+**Anlass (UX-Audit, Code-Prüfung):** `exchange_rate_at` fällt ohne Kurs auf 1
+zurück. Beim Bestätigen einer CHF- oder GBP-Bestellung wurde so 1:1 eingefroren
+— Einstand, Bewertung und Zahlungen in Euro waren falsch, ohne Fehler.
+
+**Entschieden:** Wo ein Eurobetrag festgeschrieben wird, gilt der Kurs strikt
+(`exchange_rate_strikt`, Migration 0122): Bestellung bestätigen, Zahlung in
+Fremdwährung, Nebenkosten. Ohne Kurs kommt ein Fehler mit Hinweis
+(„Einkauf → Kurse, EZB-Kurse holen"); ein Entwurf bleibt erfassbar.
+Prognosen und Anzeigen rechnen weiter mit `exchange_rate_at` als Schätzung;
+die Kurse-Seite zeigt fehlende Kurse über `exchange_rate_kurs` (NULL statt 1).
+Doku: [module/einkauf.md](module/einkauf.md).
+
 ## 2026-10-17 — Vorsteuer-Standard nach Lieferantenland
 
 **Anlass (UX-Audit, Code-Prüfung):** Bestellzeilen bekamen die Einkaufssteuer

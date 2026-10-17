@@ -59,8 +59,10 @@ unterwegs. Eine Aktion (`ki`, prozessfrei als alternativer Einstieg wie
   `bezahlt_betrag`, sonst 100 % der Bestellsumme) und
   `zahlung_erfassen(… 'po_rate' …)` in Belegwährung am `bezahlt_am` — die
   Zahlung steht damit im Register (Finanzen) und die Rate ist bezahlt.
-- Fehlt ein Kurs für die Währung, rechnet KRNL 1:1 und sagt es im Ergebnis
-  (EZB-Kurse holen).
+- Fehlt ein Kurs für die Währung, bleibt die Bestellung Entwurf erfassbar,
+  aber **Bestätigen und Zahlung sind gesperrt** (seit 0122,
+  `exchange_rate_strikt`) — das Ergebnis sagt es (EZB-Kurse holen). Vorher
+  rechnete KRNL still 1:1.
 
 Der Beleg selbst wird vom KI-Chat über **`einkauf.beleg_ablegen`**
 (beleggebunden, nicht `ki`) an der Bestellung abgelegt: Inhalt base64 im
