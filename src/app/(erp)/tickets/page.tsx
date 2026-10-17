@@ -4,16 +4,19 @@ import { requireArea } from '@/modules/auth'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { commitUrl, kurzerSha } from '@/modules/shared/repo'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; seite?: string }>
 }) {
   await requireArea('fehler')
   const params = await searchParams
+  const seite = seitenParameter(params)
   const filter = params.status ?? 'alle'
   const status =
     filter === 'offen'
@@ -36,12 +39,13 @@ export default async function TicketsPage({
       created_at: string
     }[]
   >`
-    select id, number, titel, seite, schwere, status, gemeldet_von,
+    select count(*) over () as gesamt, id, number, titel, seite, schwere, status, gemeldet_von,
            aufloesung, commit_sha, created_at
     from bug_reports
     where status = any(${status}::bug_status[])
     order by created_at desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(tickets)
 
   return (
     <>
@@ -50,7 +54,7 @@ export default async function TicketsPage({
         subtitle="Fehlermeldungen aus dem Betrieb — melden über den Reiter am rechten Rand, abgearbeitet auf Zuruf"
       />
 
-      <Card title={`Tickets (${tickets.length})`} tight>
+      <Card title={`Tickets (${gesamt})`} tight>
         <div className="row" style={{ padding: '10px 12px 0', gap: 6 }}>
           {[
             ['alle', 'Alle'],
@@ -132,6 +136,7 @@ export default async function TicketsPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/tickets" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

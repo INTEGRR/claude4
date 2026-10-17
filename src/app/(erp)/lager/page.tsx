@@ -4,6 +4,8 @@ import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date } from '@/modules/shared/format'
 import { UUID, herkunftHref } from './herkunft'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,10 +19,12 @@ const KINDS = [
 export default async function LagerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ art?: string; offen?: string; auftrag?: string }>
+  searchParams: Promise<{ art?: string; offen?: string; auftrag?: string; seite?: string }>
 }) {
   await requireArea('lager')
-  const { art, offen, auftrag: auftragRoh } = await searchParams
+  const params = await searchParams
+  const { art, offen, auftrag: auftragRoh } = params
+  const seite = seitenParameter(params)
   const onlyOpen = offen !== '0'
   // Filter „Transfers zum Auftrag" (Querverweis aus dem Verkauf, z. B. vom
   // Lieferstatus-Schild): nur gültige UUIDs — Unsinn in der Adresszeile
@@ -48,7 +52,7 @@ export default async function LagerPage({
       lines: number
     }[]
   >`
-    select p.id, p.number, ot.kind, ot.name as type_name, p.state,
+    select count(*) over () as gesamt, p.id, p.number, ot.kind, ot.name as type_name, p.state,
            part.name as partner, p.partner_id, p.origin_model, p.origin_id, p.origin_label,
            p.scheduled_date,
            (select count(*) from stock_moves m where m.picking_id = p.id)::int as lines
@@ -60,7 +64,8 @@ export default async function LagerPage({
       and (${auftrag ?? null}::uuid is null
            or (p.origin_model = 'sales_order' and p.origin_id = ${auftrag ?? null}::uuid))
     order by p.scheduled_date desc, p.number desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   // Adresse mit den übrigen Filtern — Art, Zustand und Auftrag bleiben beim
   // Umschalten erhalten.
@@ -177,6 +182,7 @@ export default async function LagerPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/lager" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

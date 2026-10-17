@@ -7,6 +7,8 @@ import { dateTime } from '@/modules/shared/format'
 import { vorgangStarten } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzKunde } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +18,10 @@ export const dynamic = 'force-dynamic'
  * Definition. Eine neue Business-Linie ist hier ein neuer Prozess, keine
  * neue Fachtabelle.
  */
-export default async function VorgaengePage() {
+export default async function VorgaengePage({ searchParams }: { searchParams: Promise<{ seite?: string }> }) {
   const user = await requireArea('verkauf')
+  const params = await searchParams
+  const seite = seitenParameter(params)
 
   const prozesse = await sql<{ code: string; name: string }[]>`
     select code, name from prozesse
@@ -40,7 +44,7 @@ export default async function VorgaengePage() {
       auftrag_number: string | null
     }[]
   >`
-    select v.id, v.number, v.prozess_code, p.name as prozess_name,
+    select count(*) over () as gesamt, v.id, v.number, v.prozess_code, p.name as prozess_name,
            v.titel, v.state, pa.name as partner, v.partner_id, v.created_at,
            ro.id as reparatur_id, ro.number as reparatur_number,
            so.id as auftrag_id, so.number as auftrag_number
@@ -57,7 +61,8 @@ export default async function VorgaengePage() {
       where s.origin_model = 'vorgang' and s.origin_id = v.id limit 1
     ) so on true
     order by v.created_at desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(vorgaenge)
 
   const partner = await sql<{ id: string; name: string }[]>`
     select id, name from partners order by name limit 500`
@@ -106,7 +111,7 @@ export default async function VorgaengePage() {
         </Card>
       )}
 
-      <Card title={`Vorgänge (${vorgaenge.length})`} tight>
+      <Card title={`Vorgänge (${gesamt})`} tight>
         {vorgaenge.length === 0 ? (
           <Empty>Noch keine Vorgänge.</Empty>
         ) : (
@@ -164,6 +169,7 @@ export default async function VorgaengePage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/vorgaenge" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

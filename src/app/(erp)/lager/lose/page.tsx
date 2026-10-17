@@ -3,6 +3,8 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +12,12 @@ export const dynamic = 'force-dynamic'
 export default async function LosePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ q?: string; seite?: string }>
 }) {
   await requireArea('lager')
-  const { q } = await searchParams
+  const params = await searchParams
+  const { q } = params
+  const seite = seitenParameter(params)
 
   const lose = await sql<
     {
@@ -26,7 +30,7 @@ export default async function LosePage({
       created_at: string
     }[]
   >`
-    select sl.id, sl.name, variant_display_name(sl.variant_id) as product, sl.variant_id,
+    select count(*) over () as gesamt, sl.id, sl.name, variant_display_name(sl.variant_id) as product, sl.variant_id,
            pt.tracking,
            coalesce((select sum(lq.on_hand) from stock_lot_quants lq
                      join stock_locations loc on loc.id = lq.location_id
@@ -39,7 +43,8 @@ export default async function LosePage({
            or sl.name ilike ${'%' + (q ?? '') + '%'}
            or variant_display_name(sl.variant_id) ilike ${'%' + (q ?? '') + '%'})
     order by sl.created_at desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(lose)
 
   return (
     <>
@@ -105,6 +110,7 @@ export default async function LosePage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/lager/lose" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

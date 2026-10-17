@@ -10,6 +10,8 @@ import { ActionButton } from '@/components/action-button'
 import { aufgabenListe } from '@/modules/aufgaben/liste'
 import { istFertigungsNachfrage, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
 import { date } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,10 +20,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export default async function FertigungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; produkt?: string; material?: string; auftrag?: string }>
+  searchParams: Promise<{ status?: string; produkt?: string; material?: string; auftrag?: string; seite?: string }>
 }) {
   const user = await requireArea('fertigung')
-  const { status, produkt: produktRoh, material, auftrag: auftragRoh } = await searchParams
+  const params = await searchParams
+  const { status, produkt: produktRoh, material, auftrag: auftragRoh } = params
+  const seite = seitenParameter(params)
   // Das GET-Formular schickt produkt= auch leer mit — ''::uuid wäre ein 500.
   const produkt = produktRoh || undefined
   const nurStartbare = material === 'bereit'
@@ -50,7 +54,7 @@ export default async function FertigungPage({
       missing: number
     }[]
   >`
-    select mo.id, mo.number, variant_display_name(mo.variant_id) as product,
+    select count(*) over () as gesamt, mo.id, mo.number, variant_display_name(mo.variant_id) as product,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date,
            so.number as sales_order_number, so.id as sales_order_id,
            pv.template_id, lf.id as lieferung_id, lf.number as lieferung_number,
@@ -73,10 +77,15 @@ export default async function FertigungPage({
     where (${status ?? null}::text is null or mo.state = ${status ?? null}::mo_state)
       and (${produkt ?? null}::uuid is null or mo.variant_id = ${produkt ?? null}::uuid)
       and (${auftrag ?? null}::uuid is null or mo.sales_order_id = ${auftrag ?? null}::uuid)
+      -- „Nur startbare" in der Abfrage, nicht nachträglich — sonst stimmen Seiten und Zähler nicht.
+      and (not ${nurStartbare} or (mo.state = 'confirmed' and not exists (
+             select 1 from stock_moves m
+             where m.production_id = mo.id and m.state not in ('done','cancel') and m.reserved_qty < m.qty)))
     order by
       case mo.state when 'progress' then 0 when 'confirmed' then 1 when 'draft' then 2 else 3 end,
-      mo.scheduled_date
-    limit 200`
+      mo.scheduled_date, mo.number
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   // „Nur startbare": bestätigt UND Material vollständig reserviert — die
   // Auswahlmenge des Bulk-Starts (BUG/00003).
@@ -310,6 +319,7 @@ export default async function FertigungPage({
             <FertigungBulk rows={gefiltert} />
           </TableWrap>
         )}
+        <Seiten pfad="/fertigung" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

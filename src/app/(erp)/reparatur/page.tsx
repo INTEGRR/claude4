@@ -7,6 +7,8 @@ import { LABELS, date } from '@/modules/shared/format'
 import { createRepair } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzKunde } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +17,12 @@ const ZUSTAENDE = Object.keys(LABELS.repair) as (keyof typeof LABELS.repair)[]
 export default async function ReparaturPage({
   searchParams,
 }: {
-  searchParams: Promise<{ zustand?: string }>
+  searchParams: Promise<{ zustand?: string; seite?: string }>
 }) {
   const user = await requireArea('reparatur')
-  const { zustand } = await searchParams
+  const params = await searchParams
+  const { zustand } = params
+  const seite = seitenParameter(params)
   const filter = ZUSTAENDE.find((z) => z === zustand) ?? null
 
   const rows = await sql<
@@ -41,7 +45,7 @@ export default async function ReparaturPage({
       parts: number
     }[]
   >`
-    select r.id, r.number, r.partner_id, p.name as customer, r.variant_id,
+    select count(*) over () as gesamt, r.id, r.number, r.partner_id, p.name as customer, r.variant_id,
            variant_display_name(r.variant_id) as product,
            r.state, r.under_warranty, r.sales_order_id, so.number as sales_order_number,
            r.scheduled_date, r.received_at, r.origin_model, r.origin_id, r.origin_label,
@@ -55,7 +59,8 @@ export default async function ReparaturPage({
         when 'received' then 0 when 'under_repair' then 1 when 'confirmed' then 2
         when 'awaiting_device' then 3 when 'new' then 4 when 'repaired' then 5 else 6 end,
       r.scheduled_date desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   const partners = await sql<{ id: string; name: string }[]>`
     select id, name from partners where is_customer and active order by name limit 500`
@@ -197,6 +202,7 @@ export default async function ReparaturPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/reparatur" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

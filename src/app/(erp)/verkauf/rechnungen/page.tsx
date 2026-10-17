@@ -5,6 +5,8 @@ import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, isoDatum, money } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 import { datevUebergeben } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -29,11 +31,13 @@ type Filter = keyof typeof FILTER
 export default async function KundenrechnungenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>
+  searchParams: Promise<{ filter?: string; seite?: string }>
 }) {
   const user = await requireArea('verkauf')
   const darfFinanzen = canAccess(user.rollen, 'finanzen', user.befugnisse)
-  const { filter: roh } = await searchParams
+  const params = await searchParams
+  const { filter: roh } = params
+  const seite = seitenParameter(params)
   const filter: Filter = roh && roh in FILTER ? (roh as Filter) : 'alle'
 
   const belege = await sql<
@@ -58,7 +62,7 @@ export default async function KundenrechnungenPage({
       probe: boolean
     }[]
   >`
-    select k.id, k.nummer, k.art::text as art, k.status::text as status, k.rechnungsdatum::text as rechnungsdatum,
+    select count(*) over () as gesamt, k.id, k.nummer, k.art::text as art, k.status::text as status, k.rechnungsdatum::text as rechnungsdatum,
            k.faellig_am::text as faellig_am, coalesce(k.anschrift ->> 'name', p.name) as kunde, k.partner_id,
            k.sales_order_id, so.number as auftrag, k.kundenreferenz, k.zahlungsart, k.brutto,
            kundenrechnung_offen(k.id) as offen, k.mahnstufe,
@@ -76,7 +80,8 @@ export default async function KundenrechnungenPage({
             when 'storniert' then k.status = 'storniert' and not k.probe
             else not k.probe end
     order by k.rechnungsdatum desc, k.created_at desc
-    limit 300`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(belege)
 
   const [summen] = await sql<{ offen: number; ueberfaellig: number; monat: number; anzahl_monat: number }[]>`
     select coalesce(sum(kundenrechnung_offen(id)) filter (where art = 'rechnung' and status = 'offen'), 0) as offen,
@@ -271,6 +276,7 @@ export default async function KundenrechnungenPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/verkauf/rechnungen" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       {darfFinanzen && (

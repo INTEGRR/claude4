@@ -7,6 +7,8 @@ import { startAngebot } from '@/modules/prozesse/angebote'
 import { ProzessAktionen } from '@/components/prozess-aktionen'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, dateTime, qty } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,10 +35,12 @@ export default async function ProzessListe({
   searchParams,
 }: {
   params: Promise<{ code: string }>
-  searchParams: Promise<{ zustand?: string }>
+  searchParams: Promise<{ zustand?: string; seite?: string }>
 }) {
   const { code } = await params
-  const { zustand } = await searchParams
+  const suche = await searchParams
+  const { zustand } = suche
+  const seite = seitenParameter(suche)
 
   const [prozess] = await sql<
     { code: string; name: string; beschreibung: string | null; bereich: string }[]
@@ -83,13 +87,14 @@ export default async function ProzessListe({
       created_at: string
     }[]
   >`
-    select v.id, v.number, v.titel, v.state, pa.name as partner, v.partner_id, v.zusatz, v.created_at
+    select count(*) over () as gesamt, v.id, v.number, v.titel, v.state, pa.name as partner, v.partner_id, v.zusatz, v.created_at
     from vorgaenge v
     left join partners pa on pa.id = v.partner_id
     where v.prozess_code = ${code}
       and (${zustand ?? null}::text is null or v.state = ${zustand ?? null})
     order by v.created_at desc
-    limit 300`
+    limit ${seite.limit} offset ${seite.offset}`
+  const treffer = gesamtAus(vorgaenge)
 
   const jeZustand = await sql<{ state: string; anzahl: number }[]>`
     select state, count(*)::int as anzahl from vorgaenge
@@ -202,6 +207,7 @@ export default async function ProzessListe({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad={`/vorgaenge/prozess/${code}`} params={suche} seite={seite} gesamt={treffer} />
       </Card>
     </>
   )

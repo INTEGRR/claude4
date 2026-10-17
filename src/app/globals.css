@@ -443,6 +443,10 @@ td.mono { font-size: 12.5px; letter-spacing: 0.02em; }
 
 .empty { padding: 34px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
 
+/* Seitenleiste unter Listen (F3): Zähler links, Blättern rechts. */
+.seiten { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.seiten .btn.disabled { opacity: 0.4; pointer-events: none; }
+
 /* --- Status ---------------------------------------------------------------- */
 /* Rechteckig statt Pille: Typenschild, nicht Bonbon. */
 .badge {

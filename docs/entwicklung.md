@@ -147,6 +147,14 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   heißen die Gegenstücke `money_text(betrag)` und `zahl_text(wert, stellen)`
   (0127): nie `format('%s €', …)`, nie `to_char` mit G/D (hängt an
   `lc_numeric`). Der Wächter `tests/zahlen-format.test.ts` prüft beides.
+- **Listen** → Seitenaufteilung statt hartem `limit`: `seitenParameter()`
+  und `gesamtAus()` aus `modules/shared/seiten.ts`, in der Abfrage
+  `count(*) over () as gesamt` und `limit ${seite.limit} offset
+  ${seite.offset}`, unter der Tabelle `<Seiten …/>`
+  (`components/seiten.tsx`, „1–50 von 318 ‹ ›“). Filter und Zähler gehören
+  in die Abfrage, nicht als `rows.filter` auf die Seite. Der Wächter
+  `tests/seiten.test.ts` lässt neue Listen-Seiten mit `limit ≥ 100` ohne
+  Helfer nicht zu (Auswahllisten `order by name/label` sind ausgenommen).
 - **Statuswerte** → die Zustandstabelle `LABELS` in `format.ts`:
   `<Badge kind="…" state={…} />` bzw. `label(art, wert)` und
   `tone(wert, art)`. Ein neues Status-Enum bekommt dort seine Art und

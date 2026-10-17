@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,9 +14,11 @@ const SPRACHEN: Record<string, string> = { de: 'Deutsch', en: 'Englisch', zh: 'C
  * zuständigem Einkäufer, offenen Bestellungen und Dateien — der Einstieg,
  * der quer über alle Projekte zeigt, was bei einem Lieferanten läuft.
  */
-export default async function LieferantenPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function LieferantenPage({ searchParams }: { searchParams: Promise<{ q?: string; seite?: string }> }) {
   await requireArea('einkauf')
-  const { q = '' } = await searchParams
+  const params = await searchParams
+  const { q = '' } = params
+  const seite = seitenParameter(params)
   const such = `%${q.trim()}%`
   const rows = await sql<
     {
@@ -29,7 +33,7 @@ export default async function LieferantenPage({ searchParams }: { searchParams: 
       letzte: string | null
     }[]
   >`
-    select p.id, p.name, p.country_code, p.sprache, u.name as einkaeufer, p.mail_domains,
+    select count(*) over () as gesamt, p.id, p.name, p.country_code, p.sprache, u.name as einkaeufer, p.mail_domains,
            (select count(*)::int from purchase_orders po
              where po.vendor_id = p.id and po.state in ('draft', 'sent', 'purchase')) as offen,
            (select count(*)::int from dokumente d where d.partner_id = p.id) as dateien,
@@ -40,7 +44,8 @@ export default async function LieferantenPage({ searchParams }: { searchParams: 
       and (${q.trim() === ''} or p.name ilike ${such} or array_to_string(p.mail_domains, ' ') ilike ${such})
     order by (select count(*) from purchase_orders po where po.vendor_id = p.id and po.state in ('draft', 'sent', 'purchase')) desc,
              p.name
-    limit 300`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -94,6 +99,7 @@ export default async function LieferantenPage({ searchParams }: { searchParams: 
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/lieferanten" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

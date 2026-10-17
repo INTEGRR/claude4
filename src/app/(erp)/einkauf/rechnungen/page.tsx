@@ -3,10 +3,14 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BillsPage() {
+export default async function BillsPage({ searchParams }: { searchParams: Promise<{ seite?: string }> }) {
+  const params = await searchParams
+  const seite = seitenParameter(params)
   await requireArea('einkauf')
   const bills = await sql<
     {
@@ -22,13 +26,14 @@ export default async function BillsPage() {
       gross: number
     }[]
   >`
-    select b.id, b.number, b.state, b.vendor_id, p.name as vendor, b.bill_date, b.is_credit_note,
+    select count(*) over () as gesamt, b.id, b.number, b.state, b.vendor_id, p.name as vendor, b.bill_date, b.is_credit_note,
            b.purchase_order_id, po.number as po_number, t.gross
     from vendor_bills b
     join partners p on p.id = b.vendor_id
     left join purchase_orders po on po.id = b.purchase_order_id
     cross join lateral vendor_bill_total(b.id) t
-    order by b.created_at desc limit 200`
+    order by b.created_at desc limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(bills)
 
   return (
     <>
@@ -89,6 +94,7 @@ export default async function BillsPage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/rechnungen" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

@@ -7,16 +7,20 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { money, qty } from '@/modules/shared/format'
 import { createProduct } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProduktePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ q?: string; seite?: string }>
 }) {
   const user = await requireArea('produkte')
-  const { q } = await searchParams
+  const params = await searchParams
+  const { q } = params
+  const seite = seitenParameter(params)
 
   const rows = await sql<
     {
@@ -31,7 +35,7 @@ export default async function ProduktePage({
       route_buy: boolean
     }[]
   >`
-    select pt.id, pt.name, u.name as uom, pt.list_price,
+    select count(*) over () as gesamt, pt.id, pt.name, u.name as uom, pt.list_price,
            (select count(*) from product_variants pv where pv.template_id = pt.id and pv.active)::int as variants,
            coalesce((select sum(on_hand_qty(pv.id)) from product_variants pv
                       where pv.template_id = pt.id and pv.active), 0) as on_hand,
@@ -41,7 +45,8 @@ export default async function ProduktePage({
     join uoms u on u.id = pt.uom_id
     where pt.active
       and (${q ?? null}::text is null or pt.name ilike ${'%' + (q ?? '') + '%'})
-    order by pt.name limit 300`
+    order by pt.name limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   const uoms = await sql<{ id: string; name: string; category: string }[]>`
     select u.id, u.name, c.name as category from uoms u
@@ -156,6 +161,7 @@ export default async function ProduktePage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/produkte" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

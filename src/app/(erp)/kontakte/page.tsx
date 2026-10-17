@@ -4,16 +4,20 @@ import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { createPartner } from './actions'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
 export default async function KontaktePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; art?: string }>
+  searchParams: Promise<{ q?: string; art?: string; seite?: string }>
 }) {
   await requireArea('kontakte')
-  const { q, art } = await searchParams
+  const params = await searchParams
+  const { q, art } = params
+  const seite = seitenParameter(params)
 
   const rows = await sql<
     {
@@ -27,7 +31,7 @@ export default async function KontaktePage({
       orders: number
     }[]
   >`
-    select p.id, p.name, p.is_customer, p.is_vendor, p.email, p.city, p.country_code,
+    select count(*) over () as gesamt, p.id, p.name, p.is_customer, p.is_vendor, p.email, p.city, p.country_code,
            ((select count(*) from sales_orders so where so.partner_id = p.id)
             + (select count(*) from purchase_orders po where po.vendor_id = p.id))::int as orders
     from partners p
@@ -37,7 +41,8 @@ export default async function KontaktePage({
       and (${art ?? null}::text is null
            or (${art ?? null} = 'kunden' and p.is_customer)
            or (${art ?? null} = 'lieferanten' and p.is_vendor))
-    order by p.name limit 300`
+    order by p.name limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -186,6 +191,7 @@ export default async function KontaktePage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/kontakte" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

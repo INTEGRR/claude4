@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,13 +42,15 @@ function lieferungHref(r: Row): string | undefined {
 export default async function VerkaufPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>
+  searchParams: Promise<{ status?: string; q?: string; seite?: string }>
 }) {
   await requireArea('verkauf')
-  const { status, q } = await searchParams
+  const params = await searchParams
+  const { status, q } = params
+  const seite = seitenParameter(params)
 
   const rows = await sql<Row[]>`
-    select so.id, so.number, so.state, so.locked, so.delivery_status,
+    select count(*) over () as gesamt, so.id, so.number, so.state, so.locked, so.delivery_status,
            so.source, so.shopify_order_name, so.partner_id, p.name as partner_name, so.order_date,
            (select gross from sales_order_total(so.id)) as gross,
            (select count(*) from manufacturing_orders mo
@@ -72,7 +76,8 @@ export default async function VerkaufPage({
            or coalesce(so.shopify_order_name, '') ilike ${'%' + (q ?? '') + '%'}
            or p.name ilike ${'%' + (q ?? '') + '%'})
     order by so.order_date desc, so.number desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   const filters = [
     { key: undefined, label: 'Alle' },
@@ -199,6 +204,7 @@ export default async function VerkaufPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/verkauf" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

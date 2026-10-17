@@ -4,6 +4,8 @@ import { requireArea } from '@/modules/auth'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { rundeText, trackingLink } from '@/modules/einkauf/bemusterung'
 import { date, money } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +20,11 @@ const ANSICHTEN = [
  * unterwegs ist, was auf die Bewertung wartet, welche Golden Samples gelten.
  * Angefordert wird im Einkaufsprojekt.
  */
-export default async function MusterPage({ searchParams }: { searchParams: Promise<{ ansicht?: string }> }) {
+export default async function MusterPage({ searchParams }: { searchParams: Promise<{ ansicht?: string; seite?: string }> }) {
   await requireArea('einkauf')
-  const { ansicht: roh } = await searchParams
+  const params = await searchParams
+  const { ansicht: roh } = params
+  const seite = seitenParameter(params)
   const ansicht = ANSICHTEN.find((a) => a.key === roh) ?? ANSICHTEN[0]
 
   const rows = await sql<
@@ -43,7 +47,7 @@ export default async function MusterPage({ searchParams }: { searchParams: Promi
       lieferant: string
     }[]
   >`
-    select b.id, b.runde, b.revision, b.bezeichnung, b.status::text as status, b.golden,
+    select count(*) over () as gesamt, b.id, b.runde, b.revision, b.bezeichnung, b.status::text as status, b.golden,
            b.bestellt_am::text as bestellt_am, b.erhalten_am::text as erhalten_am, b.tracking,
            b.kosten::float as kosten, b.waehrung,
            ep.id as projekt_id, ep.nummer as projekt_nummer, ep.titel as projekt_titel,
@@ -54,7 +58,8 @@ export default async function MusterPage({ searchParams }: { searchParams: Promi
     where b.status = any(${ansicht.filter as unknown as string[]}::bemusterung_status[])
       and (${ansicht.key} <> 'freigegeben' or b.golden)
     order by (b.erhalten_am is not null) desc, b.created_at desc
-    limit 300`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -130,6 +135,7 @@ export default async function MusterPage({ searchParams }: { searchParams: Promi
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/muster" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

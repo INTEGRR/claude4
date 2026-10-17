@@ -8,6 +8,8 @@ import { PROJEKT_ARTEN } from '@/modules/einkauf/einkaufsprojekt'
 import { date } from '@/modules/shared/format'
 import { projektAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,10 +25,12 @@ const ANSICHTEN = [
  * Positionen mit Zielpreis, Anfragen an mehrere Lieferanten, Angebote im
  * Vergleich, Bestellung. Abgeschlossen, sobald alles geliefert ist.
  */
-export default async function ProjektePage({ searchParams }: { searchParams: Promise<{ ansicht?: string }> }) {
+export default async function ProjektePage({ searchParams }: { searchParams: Promise<{ ansicht?: string; seite?: string }> }) {
   const user = await requireArea('einkauf')
   const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
-  const { ansicht: roh } = await searchParams
+  const params = await searchParams
+  const { ansicht: roh } = params
+  const seite = seitenParameter(params)
   const ansicht = ANSICHTEN.find((a) => a.key === roh) ?? ANSICHTEN[0]
 
   const [rows, nutzer] = await Promise.all([
@@ -49,7 +53,7 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
         golden: boolean
       }[]
     >`
-      select ep.id, ep.nummer, ep.titel, ep.art, ep.status::text as status, ep.zieltermin::text as zieltermin,
+      select count(*) over () as gesamt, ep.id, ep.nummer, ep.titel, ep.art, ep.status::text as status, ep.zieltermin::text as zieltermin,
              ep.muster_pflicht, einkaufsprojekt_golden_sample(ep.id, ep.gewaehltes_angebot_id) as golden,
              u.name as verantwortlich,
              (select count(*)::int from einkaufsprojekt_positionen p where p.projekt_id = ep.id) as positionen,
@@ -65,9 +69,10 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
       left join partners pa on pa.id = la.partner_id
       where ep.status = any(${ansicht.filter as unknown as string[]}::einkaufsprojekt_status[])
       order by ep.created_at desc
-      limit 200`,
+      limit ${seite.limit} offset ${seite.offset}`,
     sql<{ id: string; name: string }[]>`select id, name from users where active order by name`,
   ])
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -150,6 +155,7 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/projekte" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       {darf && (

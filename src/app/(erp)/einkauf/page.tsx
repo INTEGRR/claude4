@@ -8,16 +8,20 @@ import { createPurchaseOrder } from './actions'
 import { belegLink } from './querverweise'
 import { Auswahl } from '@/components/auswahl'
 import { kurzLieferant } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
 export default async function EinkaufPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>
+  searchParams: Promise<{ filter?: string; seite?: string }>
 }) {
   const user = await requireArea('einkauf')
-  const { filter } = await searchParams
+  const params = await searchParams
+  const { filter } = params
+  const seite = seitenParameter(params)
 
   const rows = await sql<
     {
@@ -37,7 +41,7 @@ export default async function EinkaufPage({
       bill_ids: string[]
     }[]
   >`
-    select po.id, po.number, po.state, po.vendor_id, p.name as vendor, po.order_deadline, po.expected_arrival,
+    select count(*) over () as gesamt, po.id, po.number, po.state, po.vendor_id, p.name as vendor, po.order_deadline, po.expected_arrival,
            po.billing_status, t.gross,
            (po.order_deadline is not null and po.order_deadline < now()
             and po.state in ('draft','sent')) as late,
@@ -54,17 +58,22 @@ export default async function EinkaufPage({
     join partners p on p.id = po.vendor_id
     left join einkaufsprojekte ep on ep.id = po.einkaufsprojekt_id
     cross join lateral purchase_order_total(po.id) t
+    -- Filter in der Abfrage (F3) — sonst filterte er nur die aktuelle Seite.
+    where (${filter ?? null}::text is null
+           or (${filter ?? null} = 'to_send' and po.state = 'draft')
+           or (${filter ?? null} = 'waiting' and po.state = 'sent')
+           or (${filter ?? null} = 'late' and po.order_deadline < now() and po.state in ('draft','sent'))
+           or ${filter ?? null} not in ('to_send', 'waiting', 'late'))
     order by po.created_at desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
-  const filtered =
-    filter === 'to_send'
-      ? rows.filter((r) => r.state === 'draft')
-      : filter === 'waiting'
-        ? rows.filter((r) => r.state === 'sent')
-        : filter === 'late'
-          ? rows.filter((r) => r.late)
-          : rows
+  // Zähler über ALLE Bestellungen, nicht über die Seite.
+  const [zaehler] = await sql<{ zu_senden: number; wartend: number; verspaetet: number }[]>`
+    select count(*) filter (where state = 'draft')::int as zu_senden,
+           count(*) filter (where state = 'sent')::int as wartend,
+           count(*) filter (where order_deadline < now() and state in ('draft','sent'))::int as verspaetet
+    from purchase_orders`
 
   const vendors = await sql<{ id: string; name: string }[]>`
     select id, name from partners where is_vendor and active order by name limit 500`
@@ -79,9 +88,9 @@ export default async function EinkaufPage({
   // Zähler getrennt vom Text, damit die Zahl in Mono gesetzt werden kann.
   const filters: { key?: string; label: string; count?: number }[] = [
     { key: undefined, label: 'Alle' },
-    { key: 'to_send', label: 'Zu senden', count: rows.filter((r) => r.state === 'draft').length },
-    { key: 'waiting', label: 'Wartend', count: rows.filter((r) => r.state === 'sent').length },
-    { key: 'late', label: 'Verspätet', count: rows.filter((r) => r.late).length },
+    { key: 'to_send', label: 'Zu senden', count: zaehler.zu_senden },
+    { key: 'waiting', label: 'Wartend', count: zaehler.wartend },
+    { key: 'late', label: 'Verspätet', count: zaehler.verspaetet },
   ]
 
   return (
@@ -145,7 +154,7 @@ export default async function EinkaufPage({
           })}
         </div>
 
-        {filtered.length === 0 ? (
+        {rows.length === 0 ? (
           <Empty>Keine Bestellungen.</Empty>
         ) : (
           <TableWrap>
@@ -161,7 +170,7 @@ export default async function EinkaufPage({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {rows.map((r) => (
                   <tr key={r.id}>
                     <td className="mono">
                       <span className="actions" style={{ gap: 6 }}>
@@ -210,6 +219,7 @@ export default async function EinkaufPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

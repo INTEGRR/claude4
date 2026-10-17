@@ -9,6 +9,8 @@ import { date } from '@/modules/shared/format'
 import { sendungAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzLieferant } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,10 +26,12 @@ const ANSICHTEN = [
  * Bestellungen — K+N See/Luft oder Express vom Lieferanten. Je Sendung
  * Frachtpapiere, Zoll, Kosten und ihre Verteilung auf die Wareneingänge.
  */
-export default async function SendungenPage({ searchParams }: { searchParams: Promise<{ ansicht?: string }> }) {
+export default async function SendungenPage({ searchParams }: { searchParams: Promise<{ ansicht?: string; seite?: string }> }) {
   const user = await requireArea('einkauf')
   const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
-  const { ansicht: roh } = await searchParams
+  const params = await searchParams
+  const { ansicht: roh } = params
+  const seite = seitenParameter(params)
   const ansicht = ANSICHTEN.find((a) => a.key === roh) ?? ANSICHTEN[0]
 
   const [rows, bestellungen, spediteure] = await Promise.all([
@@ -47,7 +51,7 @@ export default async function SendungenPage({ searchParams }: { searchParams: Pr
         bestellungen: { id: string; number: string; partner_id: string; lieferant: string }[]
       }[]
     >`
-      select s.id, s.nummer, s.bezeichnung, s.status::text as status, s.modus, s.spediteur_id, sp.name as spediteur,
+      select count(*) over () as gesamt, s.id, s.nummer, s.bezeichnung, s.status::text as status, s.modus, s.spediteur_id, sp.name as spediteur,
              s.traeger, s.hbl_awb, s.etd::text as etd, s.eta::text as eta,
              coalesce((select jsonb_agg(jsonb_build_object('id', po.id, 'number', po.number, 'partner_id', pa.id, 'lieferant', pa.name)
                                         order by po.number)
@@ -59,7 +63,7 @@ export default async function SendungenPage({ searchParams }: { searchParams: Pr
       left join partners sp on sp.id = s.spediteur_id
       where s.status = any(${ansicht.filter as unknown as string[]}::eingangs_sendung_status[])
       order by coalesce(s.eta, s.etd) nulls last, s.created_at desc
-      limit 300`,
+      limit ${seite.limit} offset ${seite.offset}`,
     // Bestätigte Bestellungen mit offenem Wareneingang, der noch an keiner Sendung hängt.
     sql<{ id: string; label: string }[]>`
       select po.id, po.number || ' · ' || pa.name || coalesce(' · ETA ' || to_char(coalesce(po.eta_confirmed, po.expected_arrival::date), 'DD.MM.'), '') as label
@@ -73,6 +77,7 @@ export default async function SendungenPage({ searchParams }: { searchParams: Pr
       limit 100`,
     sql<{ id: string; name: string }[]>`select id, name from partners where is_vendor and active order by lower(name) limit 500`,
   ])
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -161,6 +166,7 @@ export default async function SendungenPage({ searchParams }: { searchParams: Pr
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/sendungen" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       {darf && (

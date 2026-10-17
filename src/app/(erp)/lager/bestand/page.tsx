@@ -6,16 +6,20 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { qty } from '@/modules/shared/format'
 import { scrapProduct } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BestandPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string }>
+  searchParams: Promise<{ q?: string; filter?: string; seite?: string }>
 }) {
   await requireArea('lager')
-  const { q, filter } = await searchParams
+  const params = await searchParams
+  const { q, filter } = params
+  const seite = seitenParameter(params)
 
   const rows = await sql<
     {
@@ -30,7 +34,7 @@ export default async function BestandPage({
       forecasted: number
     }[]
   >`
-    select pv.id, coalesce(pv.display_name, pt.name) as product, pv.sku, u.name as uom,
+    select count(*) over () as gesamt, pv.id, coalesce(pv.display_name, pt.name) as product, pv.sku, u.name as uom,
            on_hand_qty(pv.id) as on_hand,
            free_to_use(pv.id) as free,
            incoming_qty(pv.id) as incoming,
@@ -43,17 +47,23 @@ export default async function BestandPage({
       and (${q ?? null}::text is null
            or coalesce(pv.display_name, pt.name) ilike ${'%' + (q ?? '') + '%'}
            or coalesce(pv.sku, '') ilike ${'%' + (q ?? '') + '%'})
+      -- Filter in der Abfrage (F3) — sonst wirkte er nur auf die aktuelle Seite.
+      and (${filter ?? null}::text is distinct from 'unterdeckung' or forecasted_qty(pv.id) < 0)
     order by product
-    limit 500`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
-  const shown = filter === 'unterdeckung' ? rows.filter((r) => Number(r.forecasted) < 0) : rows
+  const shown = rows
 
   const variants = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) as label
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.active and pt.type = 'goods' order by label limit 500`
 
-  const under = rows.filter((r) => Number(r.forecasted) < 0).length
+  // Unterdeckung über ALLE Artikel, nicht über die Seite.
+  const [{ under }] = await sql<{ under: number }[]>`
+    select count(*)::int as under from product_variants pv join product_templates pt on pt.id = pv.template_id
+    where pv.active and pt.active and pt.type = 'goods' and forecasted_qty(pv.id) < 0`
 
   return (
     <>
@@ -128,6 +138,7 @@ export default async function BestandPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/lager/bestand" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       <Card title="Ausschuss buchen">

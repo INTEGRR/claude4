@@ -3,6 +3,8 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,10 +56,12 @@ function Json({
 export default async function TransaktionenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ system?: string; nur?: string; q?: string }>
+  searchParams: Promise<{ system?: string; nur?: string; q?: string; seite?: string }>
 }) {
   await requireArea('integrationen')
-  const { system, nur, q } = await searchParams
+  const params = await searchParams
+  const { system, nur, q } = params
+  const seite = seitenParameter(params)
   const nurFehler = nur === 'fehler'
 
   const rows = await sql<
@@ -75,7 +79,7 @@ export default async function TransaktionenPage({
       created_at: string
     }[]
   >`
-    select id, system, kind, reference, request, response, ok, status_code, error,
+    select count(*) over () as gesamt, id, system, kind, reference, request, response, ok, status_code, error,
            duration_ms, created_at
     from api_transactions
     where (${system ?? null}::text is null or system = ${system ?? null})
@@ -84,7 +88,8 @@ export default async function TransaktionenPage({
            or reference ilike ${'%' + (q ?? '') + '%'}
            or kind ilike ${'%' + (q ?? '') + '%'})
     order by created_at desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   // Querverweis: die Referenz ist meist eine Belegnummer (S…, RMA/…, WH/…,
   // P…) — ein Query für alle Zeilen löst sie zum Beleg auf.
@@ -221,8 +226,9 @@ export default async function TransaktionenPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/integrationen/transaktionen" params={params} seite={seite} gesamt={gesamt} />
         <div className="small muted" style={{ padding: '8px 12px' }}>
-          Zeigt die letzten 200 Einträge. Transaktionen werden nach 30 Tagen automatisch
+          Neueste zuerst. Transaktionen werden nach 30 Tagen automatisch
           aufgeräumt (täglicher Housekeeping-Lauf).
         </div>
       </Card>

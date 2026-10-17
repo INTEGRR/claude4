@@ -4,6 +4,8 @@ import { requireArea } from '@/modules/auth'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { SPRACHEN } from '@/modules/einkauf/mail-vorlagen'
 import { dateTime } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +23,11 @@ const ANSICHTEN = [
  * freigegeben ist — von Hand, aus Vorlagen, aus Bestellungen und ab Stufe 6
  * vom Agenten. Gesendet wird aus dem Entwurf heraus.
  */
-export default async function EntwuerfePage({ searchParams }: { searchParams: Promise<{ ansicht?: string }> }) {
+export default async function EntwuerfePage({ searchParams }: { searchParams: Promise<{ ansicht?: string; seite?: string }> }) {
   await requireArea('einkauf')
-  const { ansicht: roh } = await searchParams
+  const params = await searchParams
+  const { ansicht: roh } = params
+  const seite = seitenParameter(params)
   const ansicht = ANSICHTEN.find((a) => a.key === roh) ?? ANSICHTEN[0]
   const quelle = 'quelle' in ansicht ? ansicht.quelle : null
 
@@ -48,7 +52,7 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
       fehler: string | null
     }[]
   >`
-    select e.id, e.betreff, e.status::text as status, e.sprache, e.an, e.quelle, e.erstellt_von,
+    select count(*) over () as gesamt, e.id, e.betreff, e.status::text as status, e.sprache, e.an, e.quelle, e.erstellt_von,
            e.created_at::text as created_at, e.gesendet_am::text as gesendet_am, p.name as lieferant, e.partner_id,
            e.purchase_order_id, po.number as bestellung, e.einkaufsprojekt_id as projekt_id, ep.nummer as projekt,
            e.thread_id, e.fehler
@@ -59,7 +63,8 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
     where e.status = any(${ansicht.filter as unknown as string[]}::mail_entwurf_status[])
       and (${quelle}::text is null or e.quelle = ${quelle})
     order by coalesce(e.gesendet_am, e.created_at) desc
-    limit 200`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -159,6 +164,7 @@ export default async function EntwuerfePage({ searchParams }: { searchParams: Pr
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/entwuerfe" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

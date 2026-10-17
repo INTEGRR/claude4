@@ -9,6 +9,8 @@ import { date } from '@/modules/shared/format'
 import { vertragAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzLieferant } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,11 +31,13 @@ const ANSICHTEN = [
 export default async function VertraegePage({
   searchParams,
 }: {
-  searchParams: Promise<{ ansicht?: string; lieferant?: string }>
+  searchParams: Promise<{ ansicht?: string; lieferant?: string; seite?: string }>
 }) {
   const user = await requireArea('einkauf')
   const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
   const sp = await searchParams
+  const params = sp
+  const seite = seitenParameter(sp)
   const ansicht = ANSICHTEN.find((a) => a.key === sp.ansicht) ?? ANSICHTEN[0]
   const vorLieferant = sp.lieferant && UUID.test(sp.lieferant) ? sp.lieferant : ''
   const heute = new Date().toISOString().slice(0, 10)
@@ -57,7 +61,7 @@ export default async function VertraegePage({
         preise: number
       }[]
     >`
-      select v.id, v.art::text as art, v.titel, v.status::text as status, v.gueltig_von::text as gueltig_von,
+      select count(*) over () as gesamt, v.id, v.art::text as art, v.titel, v.status::text as status, v.gueltig_von::text as gueltig_von,
              v.gueltig_bis::text as gueltig_bis, lieferantenvertrag_ende(v)::text as ende,
              lieferantenvertrag_stichtag(v)::text as stichtag, v.kuendigungsfrist_monate, v.verlaengerung_monate,
              v.erinnerung_tage, pa.id as partner_id, pa.name as lieferant,
@@ -66,10 +70,11 @@ export default async function VertraegePage({
       where v.status = any(${ansicht.filter as unknown as string[]}::lieferantenvertrag_status[])
         and (${vorLieferant || null}::uuid is null or v.partner_id = ${vorLieferant || null}::uuid)
       order by lieferantenvertrag_stichtag(v) nulls last, pa.name, v.titel
-      limit 500`,
+      limit ${seite.limit} offset ${seite.offset}`,
     sql<{ id: string; name: string }[]>`select id, name from partners where is_vendor and active order by lower(name) limit 500`,
     sql<{ code: string }[]>`select code from currencies where active order by code = 'EUR' desc, code`,
   ])
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -146,6 +151,7 @@ export default async function VertraegePage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/vertraege" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       {darf && (

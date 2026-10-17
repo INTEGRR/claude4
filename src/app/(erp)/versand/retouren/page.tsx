@@ -8,6 +8,8 @@ import { dhlConfigured } from '@/modules/versand/dhl'
 import { createReturnLabel } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzKunde } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,9 +27,11 @@ type Filter = keyof typeof FILTER
  * als Prozessbelege, darunter wie bisher das Label ohne Retoure (z. B. für
  * Sonderfälle) und alle erzeugten Labels.
  */
-export default async function RetourenPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function RetourenPage({ searchParams }: { searchParams: Promise<{ filter?: string; seite?: string }> }) {
   const user = await requireArea('versand')
-  const { filter: roh } = await searchParams
+  const params = await searchParams
+  const { filter: roh } = params
+  const seite = seitenParameter(params)
   const filter: Filter = roh && roh in FILTER ? (roh as Filter) : 'offen'
   const retouren = await sql<
     {
@@ -44,7 +48,7 @@ export default async function RetourenPage({ searchParams }: { searchParams: Pro
       label: string | null
     }[]
   >`
-    select r.id, r.nummer, r.status::text as status, r.quelle, coalesce(so.ship_name, p.name) as kunde, r.partner_id,
+    select count(*) over () as gesamt, r.id, r.nummer, r.status::text as status, r.quelle, coalesce(so.ship_name, p.name) as kunde, r.partner_id,
            r.sales_order_id, coalesce(so.shopify_order_name, so.number) as bestellung,
            (select string_agg(rp.menge::float || ' × ' || rp.bezeichnung, ', ' order by rp.sequence)
             from retoure_positionen rp where rp.retoure_id = r.id) as positionen,
@@ -60,7 +64,8 @@ export default async function RetourenPage({ searchParams }: { searchParams: Pro
             when 'erstattung' then r.status = 'geprueft'
             else true end
     order by r.created_at desc
-    limit 300`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(retouren)
 
   const labels = await sql<
     {
@@ -154,6 +159,7 @@ export default async function RetourenPage({ searchParams }: { searchParams: Pro
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/versand/retouren" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       <Card title="Retourenlabel ohne Retoure">

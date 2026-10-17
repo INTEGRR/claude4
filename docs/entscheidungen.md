@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Seitenaufteilung statt stummer Limits
+
+**Anlass (UX-Audit):** Haupt-Listen schnitten bei 200 bzw. 300 Zeilen ohne
+Hinweis ab. Ein Beispiel: Fertigung mit 316 Aufträgen zeigte unter „Alle“
+nur 200, erledigte nie. Mehrere Seiten filterten und zählten erst
+nachträglich über die geladenen Zeilen. Bestellungen („Zu senden“,
+„Verspätet“), Bestand („Unterdeckung“) und Fertigung („nur startbare“)
+lieferten damit falsche Zähler, sobald es mehr Belege als das Limit gab.
+
+**Entschieden:**
+- 50 Zeilen je Seite mit Gesamtzahl („1–50 von 318 ‹ ›“). Die Filter
+  bleiben beim Blättern erhalten.
+- Filter und Zähler laufen in der Abfrage.
+- Umgebaut wurden Verkauf, Rechnungen, Fertigung (stabile Sortierung nach
+  Nummer), Bestellungen, Transfers, Bestand, Lose, Produkte, Kontakte,
+  Reparaturen, Retouren, Tickets, Vorgänge (und je Prozess),
+  Lieferantenrechnungen, Lieferanten, Entwürfe, Projekte, Sendungen,
+  Muster, Verträge und Transaktionen.
+- Arbeitslisten und Detailseiten mit kleinem Limit stehen als begründete
+  Ausnahmen im Wächter `tests/seiten.test.ts`.
+- Die Aktionsliste der Prozesse (Katalog ohne Limit) bekommt Suche und
+  Gruppierung mit der UI-Überarbeitung.
+- Doku: [entwicklung.md](entwicklung.md).
+
 ## 2026-10-17 — Deutsche Zahlen in Texten; US-Datumsfelder waren ein Audit-Artefakt
 
 **Anlass (UX-Audit):** Verlauf und Meldungen zeigten „1.0000 ×",
