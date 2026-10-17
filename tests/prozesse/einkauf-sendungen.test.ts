@@ -428,10 +428,17 @@ describe('Cockpit und tägliche Zusammenfassung', () => {
 
     // Ohne Finanzrecht keine Raten.
     assert.ok(!(await cockpitLaden(h.sql, { finanzen: false })).some((e) => e.kategorie === 'raten'))
-    // Tinos Sicht: nur seins plus die nicht zugeordneten Mails.
+    // Tinos Sicht: seins plus alles ohne Zuständigen (wie „Meine" in den
+    // Wiedervorlagen, 2026-10-17) — nicht das einer anderen Person.
+    const [lena] = await h.sql<{ id: string }[]>`
+      insert into users (name, benutzername, password_hash, role) values ('Lena', 'lena', 'x', 'mitarbeiter') returning id`
+    await h.sql`insert into wiedervorlagen (modell, record_id, faellig_am, grund, zustaendig_id, erstellt_von)
+                values ('purchase_order', ${ids.a1}, current_date - 1, 'Lenas Rückruf', ${lena.id}, 'test')`
+    const alleMitLena = await cockpitLaden(h.sql, { finanzen: true })
     const meine = await cockpitLaden(h.sql, { zustaendigId: ids.tino, finanzen: true })
-    assert.ok(meine.length > 0 && meine.length < alle.length)
-    assert.ok(meine.every((e) => e.zustaendig_id === ids.tino || e.kategorie === 'unzugeordnet'))
+    assert.ok(meine.length > 0 && meine.length < alleMitLena.length, 'Lenas Wiedervorlage fehlt in Tinos Sicht')
+    assert.ok(meine.every((e) => e.zustaendig_id === ids.tino || e.zustaendig_id === null || e.kategorie === 'unzugeordnet'))
+    assert.ok(!meine.some((e) => e.zustaendig_id === lena.id))
     assert.ok(meine.some((e) => e.kategorie === 'eta_ueberfaellig' && e.record_id === ids.offenePo))
     assert.ok(meine.some((e) => e.kategorie === 'raten'), 'A1 (Tino) hat die fällige Rate')
   })
