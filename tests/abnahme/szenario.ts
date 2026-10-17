@@ -61,6 +61,17 @@ export const PARTNER = {
   kunde: 'Büro Nord GmbH',
 }
 
+/** Sitzland der Lieferanten — ausländische stellen keine deutsche Umsatzsteuer (0121). */
+export const LIEFERANT_LAND: Record<string, string> = {
+  [PARTNER.lieferantEur]: 'DE',
+  [PARTNER.lieferantUsd]: 'US',
+}
+
+/** Vorsteuer-Standard der Bestellzeile nach Lieferantenland (0121): Ausland 0 %, Inland 19 %. */
+export function einkaufSteuersatz(lieferant: string): number {
+  return LIEFERANT_LAND[lieferant] === 'DE' ? STEUERSATZ : 0
+}
+
 export const BANKKONTO = 'Geschäftskonto'
 export const ERSTER_KONTOSTAND = 50_000
 export const SHOPIFY_MTO = { puffer: 2, deckel: 99 }

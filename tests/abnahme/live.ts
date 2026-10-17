@@ -25,6 +25,7 @@ import { abweichungenText, vergleichen } from './vergleich.ts'
 import {
   ARBEITSGANG,
   BANKKONTO,
+  LIEFERANT_LAND,
   PARTNER,
   PRODUKTE,
   SHOP_VERSAND_BRUTTO,
@@ -85,11 +86,11 @@ export function abnahmeLauf(datenbank: Sql, szenario: Szenario, erwartung: Erwar
     k.bankkonto = konto.recordId!
 
     await aktion('kontakte.partner_anlegen', undefined, {
-      name: PARTNER.lieferantEur, is_company: true, is_customer: false, is_vendor: true, country_code: 'DE',
+      name: PARTNER.lieferantEur, is_company: true, is_customer: false, is_vendor: true, country_code: LIEFERANT_LAND[PARTNER.lieferantEur],
       street: 'Industriestraße', house_number: '7', zip: '70173', city: 'Stuttgart',
     })
     await aktion('kontakte.partner_anlegen', undefined, {
-      name: PARTNER.lieferantUsd, is_company: true, is_customer: false, is_vendor: true, country_code: 'US',
+      name: PARTNER.lieferantUsd, is_company: true, is_customer: false, is_vendor: true, country_code: LIEFERANT_LAND[PARTNER.lieferantUsd],
       street: 'Market St', house_number: '400', zip: '94102', city: 'San Francisco',
     })
     await aktion('kontakte.partner_anlegen', undefined, {

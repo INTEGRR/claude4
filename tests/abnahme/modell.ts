@@ -24,6 +24,7 @@ import {
   SHOPIFY_MTO,
   STEUERSATZ,
   STUECKLISTE,
+  einkaufSteuersatz,
   type Schritt,
   type Sku,
   type Szenario,
@@ -171,6 +172,8 @@ interface Bestellung {
   id: string
   waehrung: 'EUR' | 'USD'
   kurs: number
+  /** Vorsteuer-Standard der Zeilen nach Lieferantenland (0121). */
+  steuersatz: number
   zeilen: Bestellzeile[]
   eingaenge: Eingang[]
   /** Vorkasse über den Zahlplan (bereits in Euro) — wird auf Rechnungen angerechnet. */
@@ -490,7 +493,7 @@ export class Modell {
 
   rechnungOffen(r: Rechnung): number {
     const po = this.bestellungen.get(r.bestellung)!
-    const brutto = r.zeilen.reduce((s, z) => s + r2(z.menge * z.preis) + r2((z.menge * z.preis * STEUERSATZ) / 100), 0)
+    const brutto = r.zeilen.reduce((s, z) => s + r2(z.menge * z.preis) + r2((z.menge * z.preis * po.steuersatz) / 100), 0)
     return Math.max(0, r2(brutto * this.kursAm(r.waehrung, r.datum) - r.gezahltEur - po.vorkasseEur))
   }
 
@@ -712,6 +715,7 @@ export class Modell {
       id: s.id,
       waehrung: s.waehrung,
       kurs,
+      steuersatz: einkaufSteuersatz(s.lieferant),
       zeilen,
       eingaenge: [
         {
@@ -722,7 +726,7 @@ export class Modell {
       vorkasseEur: 0,
     }
     if (s.vorkasse_am) {
-      const brutto = zeilen.reduce((sum, z) => sum + r2(z.menge * z.preis) + r2((r2(z.menge * z.preis) * STEUERSATZ) / 100), 0)
+      const brutto = zeilen.reduce((sum, z) => sum + r2(z.menge * z.preis) + r2((r2(z.menge * z.preis) * po.steuersatz) / 100), 0)
       const eur = r2(r2(brutto) * this.kursAm(s.waehrung, s.vorkasse_am))
       po.vorkasseEur = eur
       this.zahlen('aus', eur, s.vorkasse_am, false)
