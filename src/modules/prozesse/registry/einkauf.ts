@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { positionenSchema, type PositionsZeile, type RegistrierteAktion } from './typen.ts'
+import { plural } from '../../shared/format.ts'
 
 const DATUM = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum als JJJJ-MM-TT')
 
@@ -92,7 +93,7 @@ export const EINKAUF = {
       hinweis: z.string().max(500).optional(),
     }),
     zusammenfassung: (p) =>
-      `Bestellung bei ${p.lieferant} mit ${p.positionen.length} Position(en): ` +
+      `Bestellung bei ${p.lieferant} mit ${plural(p.positionen.length, 'Position', 'Positionen')}: ` +
       p.positionen.map((pos: PositionsZeile) => `${pos.menge} × ${pos.produkt}`).join(', '),
     revalidate: ['/einkauf'],
   },

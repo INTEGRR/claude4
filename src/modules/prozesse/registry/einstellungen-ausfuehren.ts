@@ -8,7 +8,7 @@ import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 import { zweifaktorZuruecksetzen } from '../../auth/zweifaktor.ts'
 import { einreihen, textTest } from '../../integrationen/benachrichtigungen.ts'
 import { telegramChatsFinden, telegramConfigured } from '../../integrationen/telegram.ts'
-import { money } from '@/modules/shared/format'
+import { money, plural } from '@/modules/shared/format'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
 
@@ -213,7 +213,7 @@ export async function rechnungenSetzen(
     const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where probe`
     if (n > 0) {
       throw new Error(
-        `Noch ${n} Testbeleg(e) aus dem Probelauf in der Datenbank — erst unter Verkauf → Rechnungen → Probelauf vergleichen und „Probelauf löschen", dann scharf schalten.`,
+        `Noch ${plural(n, 'Testbeleg', 'Testbelege')} aus dem Probelauf in der Datenbank — erst unter Verkauf → Rechnungen → Probelauf vergleichen und „Probelauf löschen", dann scharf schalten.`,
       )
     }
   }
@@ -1150,7 +1150,7 @@ export async function dienstePruefen(
     text:
       geprueft.length === 0
         ? 'Kein Dienst konfiguriert — nichts zu prüfen.'
-        : `${geprueft.length} Dienst(e) geprüft, ${gestoert.length} gestört. ${teile.join(' · ')}`,
+        : `${plural(geprueft.length, 'Dienst', 'Dienste')} geprüft, ${gestoert.length} gestört. ${teile.join(' · ')}`,
   }
 }
 

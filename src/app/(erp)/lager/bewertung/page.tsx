@@ -5,7 +5,7 @@ import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { ShareBar } from '@/components/charts'
 import { ActionButton } from '@/components/action-button'
 import { initializeValuation } from '../actions'
-import { dateTime, money, qty } from '@/modules/shared/format'
+import { dateTime, money, plural, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +81,7 @@ export default async function BewertungPage({
               <ActionButton
                 className="primary"
                 action={initializeValuation}
-                confirm={`${abweichungen.length} unbewertete Position(en) zum hinterlegten Einstandspreis bewerten?`}
+                confirm={`${plural(abweichungen.length, 'unbewertete Position', 'unbewertete Positionen')} zum hinterlegten Einstandspreis bewerten?`}
               >
                 Altbestand bewerten
               </ActionButton>
@@ -111,7 +111,7 @@ export default async function BewertungPage({
 
       {abweichungen.length > 0 && (
         <div className="notice warn">
-          Bei {abweichungen.length} Variante(n) weicht die bewertete Menge vom physischen Bestand ab —
+          Bei {plural(abweichungen.length, 'Variante', 'Varianten')} weicht die bewertete Menge vom physischen Bestand ab —
           typischerweise Bestand, der vor Einführung der Bewertung entstanden ist. Ohne Eröffnungs&shy;bewertung
           würden Abgänge daraus mit 0 € bewertet. „Altbestand bewerten" holt das zum hinterlegten
           Einstandspreis nach.

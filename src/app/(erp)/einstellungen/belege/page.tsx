@@ -7,7 +7,7 @@ import { Card, TableWrap, Zustand } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
-import { money } from '@/modules/shared/format'
+import { money, plural } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -197,7 +197,7 @@ export default async function BelegePage() {
           <p className="small" style={{ margin: '0 0 8px' }}>
             {probelauf.testbelege > 0 ? (
               <>
-                <strong>{probelauf.testbelege} Testbeleg(e)</strong>{probelauf.seit ? ` seit ${probelauf.seit}` : ''} in der Datenbank —{' '}
+                <strong>{plural(probelauf.testbelege, 'Testbeleg', 'Testbelege')}</strong>{probelauf.seit ? ` seit ${probelauf.seit}` : ''} in der Datenbank —{' '}
                 <Link href="/verkauf/rechnungen?filter=probelauf">Vergleich mit dem Shop ansehen</Link>. Löschen entfernt alle
                 Testbelege samt ihrer Zahlungen, rechnet die berechneten Mengen der Aufträge neu und setzt die Probe-Nummernkreise
                 zurück; echte Belege bleiben.

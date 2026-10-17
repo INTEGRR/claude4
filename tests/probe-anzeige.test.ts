@@ -11,7 +11,7 @@ describe('Probelauf-Anzeige', () => {
         { sku: null, name: 'Tastatur Gelb', vorher: 1, neu: 0 },
       ],
     })
-    assert.equal(z.titel, 'Bestand an Shopify: 2 Änderung(en)')
+    assert.equal(z.titel, 'Bestand an Shopify: 2 Änderungen')
     assert.deepEqual(z.details, ['Tastatur Blau (KB-1): 5 → 4', 'Tastatur Gelb: 1 → 0 · ausverkauft'])
     const erste = probeZeile('probe:inventorySetQuantities', { aenderungen: [{ sku: 'X', name: 'X', vorher: null, neu: 3 }] })
     assert.match(erste.titel, /erste vollständige Meldung/)
@@ -23,7 +23,7 @@ describe('Probelauf-Anzeige', () => {
       zweitangebote: true,
       aenderungen: [{ sku: 'KB-1', name: 'Tastatur Weiß', angebot: 'Black Week Editions', vorher: 3, neu: 2 }],
     })
-    assert.equal(z.titel, 'Bestand an Zweitangebote: 1 Änderung(en)')
+    assert.equal(z.titel, 'Bestand an Zweitangebote: 1 Änderung')
     assert.deepEqual(z.details, ['Tastatur Weiß (KB-1) → „Black Week Editions": 3 → 2'])
   })
 

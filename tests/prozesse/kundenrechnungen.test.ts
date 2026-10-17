@@ -419,7 +419,7 @@ describe('Rechnungs-Probelauf (0117): Testbelege parallel zum Shop, Vergleich, L
   })
 
   test('Scharf schalten ist gesperrt, solange Testbelege existieren', async () => {
-    await assert.rejects(aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'scharf', ...RECHNUNG_EINST }), /3 Testbeleg\(e\).*Probelauf löschen/)
+    await assert.rejects(aktion('einstellungen.rechnungen_setzen', undefined, { modus: 'scharf', ...RECHNUNG_EINST }), /3 Testbelege.*Probelauf löschen/)
     const [{ modus }] = await h.sql<{ modus: string }[]>`select rechnung_modus() as modus`
     assert.equal(modus, 'test', 'der Modus bleibt beim Probelauf')
   })
@@ -433,7 +433,7 @@ describe('Rechnungs-Probelauf (0117): Testbelege parallel zum Shop, Vergleich, L
     assert.equal(probeZahlungen.n, 1)
 
     const r = await aktion('verkauf.rechnung_probelauf_loeschen', undefined, {})
-    assert.match(r?.text ?? '', /^3 Testbeleg\(e\) des Probelaufs gelöscht/)
+    assert.match(r?.text ?? '', /^3 Testbelege des Probelaufs gelöscht/)
     const [[rest]] = [await h.sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where probe`]
     assert.equal(rest.n, 0)
     const [[echte]] = [await h.sql<{ n: number }[]>`select count(*)::int as n from kundenrechnungen where not probe`]

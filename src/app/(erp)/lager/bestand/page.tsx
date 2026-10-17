@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { qty } from '@/modules/shared/format'
+import { plural, qty } from '@/modules/shared/format'
 import { scrapProduct } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
@@ -76,7 +76,7 @@ export default async function BestandPage({
       {under > 0 && filter !== 'unterdeckung' && (
         <div className="notice warn">
           <span className="led warn" />{' '}
-          {under} Produkt(e) laufen in eine Unterdeckung.{' '}
+          {plural(under, 'Produkt läuft', 'Produkte laufen')} in eine Unterdeckung.{' '}
           <Link href="/lager/bestand?filter=unterdeckung">Nur diese anzeigen</Link>
         </div>
       )}

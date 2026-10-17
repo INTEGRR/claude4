@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { ColumnChart, HBars, ShareBar } from '@/components/charts'
-import { money, pct, qty } from '@/modules/shared/format'
+import { money, pct, plural, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,7 +203,7 @@ export default async function KennzahlenPage() {
         <Stat
           label="RMA-Quote"
           value={anteil(rmaGesamt, geliefertMenge)}
-          hint={`${rmaGesamt} Reparaturauftrag/-aufträge in 12 Monaten`}
+          hint={`${plural(rmaGesamt, 'Reparaturauftrag', 'Reparaturaufträge')} in 12 Monaten`}
         />
       </div>
 

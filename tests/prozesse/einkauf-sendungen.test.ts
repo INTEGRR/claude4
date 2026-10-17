@@ -138,7 +138,7 @@ describe('Sammelsendung: zwei Lieferanten, drei Bestellungen', () => {
     assert.match(r.text ?? '', /ES\/\d{5} angelegt mit 2 Bestellung/)
     await assert.rejects(aktion('einkauf.sendung_bestellung_zuordnen', ids.s, { bestellungen: ['P99999'] }), /nicht gefunden: P99999/)
     const z = await aktion('einkauf.sendung_bestellung_zuordnen', ids.s, { bestellungen: [ids.a2] })
-    assert.match(z.text ?? '', /3 Wareneingang/)
+    assert.match(z.text ?? '', /3 Wareneingänge/)
     for (const po of [ids.a1, ids.b1, ids.a2]) {
       assert.equal((await eingangVon(po)).eingangs_sendung_id, ids.s)
     }

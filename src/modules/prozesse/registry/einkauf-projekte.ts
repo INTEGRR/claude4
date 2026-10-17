@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { FRACHT_MODUS_NAMEN, PROJEKT_ART_NAMEN, staffelnLesen, zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import type { RegistrierteAktion } from './typen.ts'
+import { plural } from '../../shared/format.ts'
 
 /**
  * Einkauf, Stufe 3 (0097): das Einkaufsprojekt — Bedarf mit Positionen
@@ -119,7 +120,7 @@ export const EINKAUF_PROJEKTE = {
       muster_pflicht: z.boolean().default(false).describe('Musterpflicht: bestellt wird erst mit freigegebenem Golden Sample'),
       positionen: z.array(positionSchema).max(50).default([]),
     }),
-    zusammenfassung: (p) => `Einkaufsprojekt „${p.titel}" mit ${p.positionen.length} Position(en)`,
+    zusammenfassung: (p) => `Einkaufsprojekt „${p.titel}" mit ${plural(p.positionen.length, 'Position', 'Positionen')}`,
     formdata: (fd) => {
       const menge = zahl(fd, 'pos_menge', 'menge')
       const bezeichnung = leer(fd, 'pos_bezeichnung')
@@ -267,7 +268,7 @@ export const EINKAUF_PROJEKTE = {
       ...angebotsFelder,
       staffeln: z.array(staffelSchema).min(1, 'Bitte mindestens einen Preis angeben.').max(500),
     }),
-    zusammenfassung: (p) => `Angebot in ${p.waehrung} mit ${p.staffeln.length} Staffelpreis(en)`,
+    zusammenfassung: (p) => `Angebot in ${p.waehrung} mit ${plural(p.staffeln.length, 'Staffelpreis', 'Staffelpreisen')}`,
     formdata: (fd) => ({ partner_id: String(fd.get('partner_id') ?? ''), ...angebotAusFormular(fd) }),
     revalidate: ['/einkauf/projekte/:id'],
   },

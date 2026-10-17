@@ -1,4 +1,5 @@
 import type { Sql, TransactionSql } from 'postgres'
+import { plural } from '../shared/format.ts'
 
 /**
  * Daten-TÜV: nächtlicher Invarianten-Check über die Kern-Ledger des Systems.
@@ -147,7 +148,7 @@ const PRUEFUNGEN: Pruefung[] = [
         select count(*)::text as anzahl from stock_moves
         where state = 'done' and (date_done is null or qty_done <= 0)`
       const n = Number(zeilen[0]?.anzahl ?? 0)
-      return n > 0 ? [`${n} done-Move(s) ohne date_done oder mit qty_done ≤ 0`] : []
+      return n > 0 ? [`${plural(n, 'done-Move', 'done-Moves')} ohne date_done oder mit qty_done ≤ 0`] : []
     },
   },
   {

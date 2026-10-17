@@ -3,6 +3,7 @@
  * (api_transactions, kind 'probe:<operation>') eine lesbare Zeile für die
  * Debug-Box. Rein rechnend, ohne Datenbank.
  */
+import { plural } from '../shared/format.ts'
 
 export interface ProbeZeile {
   titel: string
@@ -49,7 +50,7 @@ export function probeZeile(kind: string, request: unknown): ProbeZeile {
     }[]
     const ziel = r.zweitangebote ? 'Bestand an Zweitangebote' : 'Bestand an Shopify'
     return {
-      titel: `${ziel}: ${liste.length} Änderung(en)${liste.every((a) => a.vorher === null) ? ' (erste vollständige Meldung)' : ''}`,
+      titel: `${ziel}: ${plural(liste.length, 'Änderung', 'Änderungen')}${liste.every((a) => a.vorher === null) ? ' (erste vollständige Meldung)' : ''}`,
       details: liste.map(
         (a) =>
           `${a.name}${a.sku ? ` (${a.sku})` : ''}${a.angebot ? ` → „${a.angebot}"` : ''}: ` +
@@ -61,7 +62,7 @@ export function probeZeile(kind: string, request: unknown): ProbeZeile {
   if (operation === 'productVariantsBulkUpdate' && Array.isArray(r.varianten)) {
     const liste = r.varianten as string[]
     return {
-      titel: `Made-to-Order einrichten: ${liste.length} Variante(n) — Menge verfolgen, nicht ohne Bestand verkaufen`,
+      titel: `Made-to-Order einrichten: ${plural(liste.length, 'Variante', 'Varianten')} — Menge verfolgen, nicht ohne Bestand verkaufen`,
       details: liste,
     }
   }

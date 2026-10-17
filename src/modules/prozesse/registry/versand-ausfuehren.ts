@@ -16,6 +16,7 @@ import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
 import { gewichteAusShopify } from '@/modules/integrationen/gewichte'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /** Ausführung der Versand-Aktionen — Fachlogik aus versand/actions.ts. */
 
@@ -266,7 +267,7 @@ export async function labelStornieren(
 
 export async function trackingAktualisieren(): Promise<AktionsErgebnis> {
   const r = await syncTracking(20)
-  const text = `${r.checked} Sendung(en) geprüft, ${r.updated} aktualisiert.`
+  const text = `${plural(r.checked, 'Sendung', 'Sendungen')} geprüft, ${r.updated} aktualisiert.`
   return { text: r.fehler ? `${text} Abbruch: ${r.fehler}` : text }
 }
 

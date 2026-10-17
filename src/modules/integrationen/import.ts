@@ -7,6 +7,7 @@ import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { fetchOrder, type ShopifyOrder } from './shopify'
 import { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText } from './bestellung-felder'
 import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
+import { plural } from '@/modules/shared/format'
 
 export { splitStreet }
 export { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText }
@@ -308,7 +309,7 @@ export async function importShopifyOrder(
       }
       if (nachgezogen > 0) {
         await t`select log_event('sales_order', ${existing.id}, 'note',
-          ${`${nachgezogen} geklärte Position(en) aus der Klärliste nachgezogen.`}, 'shopify')`
+          ${`${plural(nachgezogen, 'geklärte Position', 'geklärte Positionen')} aus der Klärliste nachgezogen.`}, 'shopify')`
       }
 
       const [{ offen }] = await t<{ offen: number }[]>`
@@ -329,7 +330,7 @@ export async function importShopifyOrder(
         unmatched: Number(offen),
         message:
           nachgezogen > 0 || bestaetigt
-            ? `${order.name}: ${nachgezogen} Position(en) nachgezogen${bestaetigt ? ', Auftrag bestätigt' : ''}`
+            ? `${order.name}: ${plural(nachgezogen, 'Position', 'Positionen')} nachgezogen${bestaetigt ? ', Auftrag bestätigt' : ''}`
             : `${order.name} war bereits importiert`,
       }
     }
@@ -388,7 +389,7 @@ export async function importShopifyOrder(
 
     if (unmatched > 0) {
       await t`select log_event('sales_order', ${created.id}, 'error',
-        ${`${unmatched} Position(en) konnten keinem Produkt zugeordnet werden und fehlen im Auftrag.`},
+        ${`${plural(unmatched, 'Position', 'Positionen')} konnten keinem Produkt zugeordnet werden und fehlen im Auftrag.`},
         'shopify')`
     }
 
@@ -442,7 +443,7 @@ export async function importShopifyOrder(
       message:
         `${order.name} importiert` +
         (paid && unmatched === 0 ? ' und bestätigt' : '') +
-        (unmatched > 0 ? ` (${unmatched} Position(en) offen)` : ''),
+        (unmatched > 0 ? ` (${plural(unmatched, 'Position', 'Positionen')} offen)` : ''),
     }
   })
   if (storniert) await stornoNachlauf(storniert, 'shopify')
@@ -561,7 +562,7 @@ export async function bestellaenderungNachziehen(
     anzahlGutschriften += Number(r.n)
   }
   await t`select log_event('sales_order', ${auftragId}, 'note',
-    ${`Bestellung im Shop geändert: ${aenderungen.join('; ')}${anzahlGutschriften ? ` — ${anzahlGutschriften} Gutschrift(en) erzeugt` : ''}`.slice(0, 1000)},
+    ${`Bestellung im Shop geändert: ${aenderungen.join('; ')}${anzahlGutschriften ? ` — ${plural(anzahlGutschriften, 'Gutschrift', 'Gutschriften')} erzeugt` : ''}`.slice(0, 1000)},
     'shopify')`
   return `${order.name}: Bestellung im Shop geändert (${aenderungen.join('; ')})`
 }

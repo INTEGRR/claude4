@@ -6,6 +6,7 @@ import { Card, PageHeader, TableWrap } from '@/components/ui'
 import { repository } from '@/modules/prozesse/introspektion'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
 import { paketAktivieren } from './actions'
+import { plural } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,7 +145,7 @@ export default async function ProzesseRepositoryPage({
                         {!p.aktiv ? (
                           <span className="badge neutral">abgeschaltet</span>
                         ) : Number(p.abgeschaltet) > 0 ? (
-                          `${p.abgeschaltet} Schritt(e) abgeschaltet`
+                          `${plural(p.abgeschaltet, 'Schritt', 'Schritte')} abgeschaltet`
                         ) : (
                           'Standard'
                         )}

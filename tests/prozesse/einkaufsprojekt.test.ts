@@ -133,7 +133,7 @@ describe('Einkaufsprojekt: Angebotsvergleich und Anfragen', () => {
       select entwurf_id as id from lieferantenanfragen where projekt_id = ${ids.projekt} and partner_id = ${ids.de}`
     await aktion('einkauf.mail_entwurf_aendern', foam.id, { an: ['info@foam.de'] })
     const r = await aktion('einkauf.anfragen_freigeben', ids.projekt)
-    assert.match(r.text!, /3 Anfrage\(n\) freigegeben/)
+    assert.match(r.text!, /3 Anfragen freigegeben/)
     await jobs()
 
     const anfragen = await h.sql<{ status: string; thread_id: string | null; angefragt_am: string | null }[]>`
@@ -324,7 +324,7 @@ describe('Einkaufsprojekt: Angebotsvergleich und Anfragen', () => {
       where p.id = ${ids.set}`
     assert.deepEqual(artikel, { weight_g: 180, hs_code: '8473.30' })
 
-    await assert.rejects(aktion('einkauf.projekt_abbrechen', ids.projekt, { grund: 'test' }), /Erst die Bestellung\(en\) stornieren/)
+    await assert.rejects(aktion('einkauf.projekt_abbrechen', ids.projekt, { grund: 'test' }), /Erst die Bestellung(en)? stornieren/)
     await assert.rejects(aktion('einkauf.projekt_position_entfernen', ids.projekt, { position_id: ids.puller }), /nur bis zur Bestellung/)
 
     await h.sql`select confirm_purchase_order(${po.id}, 'test')`

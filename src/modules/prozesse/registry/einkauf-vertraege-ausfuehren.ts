@@ -10,6 +10,7 @@ import {
 } from '@/modules/einkauf/lieferantenvertraege'
 import { varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /** Ausführung Einkauf Stufe 4 (0107): Lieferantenverträge und Preislisten (prozessfrei). */
 
@@ -201,11 +202,11 @@ export async function preislisteUebernehmen(
         from product_variants pv where pv.id = ${z.variant_id}`
     }
     await t`select log_event('lieferantenvertrag', ${v.id}, 'info',
-                             ${`Preisliste übernommen: ${aufgeloest.length} Lieferantenpreis(e) in ${v.waehrung}`}, ${ctx.actor})`
+                             ${`Preisliste übernommen: ${plural(aufgeloest.length, 'Lieferantenpreis', 'Lieferantenpreise')} in ${v.waehrung}`}, ${ctx.actor})`
     return aufgeloest.length
   })
   return {
-    text: `${anzahl} Lieferantenpreis(e) aus „${v.titel}" übernommen (${v.waehrung}, gültig ${deutsch(v.gueltig_von)} bis ${deutsch(v.gueltig_bis)}).`,
+    text: `${plural(anzahl, 'Lieferantenpreis', 'Lieferantenpreise')} aus „${v.titel}" übernommen (${v.waehrung}, gültig ${deutsch(v.gueltig_von)} bis ${deutsch(v.gueltig_bis)}).`,
     recordId: v.id,
   }
 }

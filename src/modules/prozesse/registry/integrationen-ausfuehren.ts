@@ -1,5 +1,6 @@
 import { sql, tx } from '@/db/client'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /** Ausführung der Integrations-Aktionen. */
 
@@ -172,8 +173,8 @@ export async function odooVorschau(): Promise<AktionsErgebnis> {
   const komp = new Map(plan.komponenten.map((k) => [k.odooId, k]))
   return {
     text:
-      `${uebersicht.stuecklisten} Stückliste(n) für ${uebersicht.fertigZugeordnet} zugeordnete Varianten, ` +
-      `${uebersicht.komponentenNeu} neue Komponente(n), ${uebersicht.lagerBuchen} weitere Bestände, ${uebersicht.blockiert} blockiert.`,
+      `${plural(uebersicht.stuecklisten, 'Stückliste', 'Stücklisten')} für ${uebersicht.fertigZugeordnet} zugeordnete Varianten, ` +
+      `${plural(uebersicht.komponentenNeu, 'neue Komponente', 'neue Komponenten')}, ${uebersicht.lagerBuchen} weitere Bestände, ${uebersicht.blockiert} blockiert.`,
     daten: {
       uebersicht,
       fertigprodukte: plan.fertigprodukte,
@@ -218,11 +219,11 @@ export async function odooStuecklistenUebernehmen(
   const b = await stuecklistenUebernehmen(ctx.actor)
   return {
     text:
-      `${b.stuecklistenNeu} Stückliste(n) geschrieben, ${b.stuecklistenUnveraendert} unverändert` +
+      `${plural(b.stuecklistenNeu, 'Stückliste', 'Stücklisten')} geschrieben, ${b.stuecklistenUnveraendert} unverändert` +
       (b.stuecklistenAbgeloest ? `, ${b.stuecklistenAbgeloest} alte abgelöst` : '') + '; ' +
-      `${b.komponentenNeu} Komponente(n) angelegt, ${b.komponentenZugeordnet} zugeordnet; ` +
-      `${b.preise} Preis(e), ${b.lieferantenpreise} Lieferantenpreis(e), ${b.bestand + b.bestandWeitere} Bestand/Bestände, ` +
-      `${b.routen} Route(n)` + (b.blockiert ? `; ${b.blockiert} blockiert (siehe Vorschau).` : '.'),
+      `${plural(b.komponentenNeu, 'Komponente', 'Komponenten')} angelegt, ${b.komponentenZugeordnet} zugeordnet; ` +
+      `${plural(b.preise, 'Preis', 'Preise')}, ${plural(b.lieferantenpreise, 'Lieferantenpreis', 'Lieferantenpreise')}, ${b.bestand + b.bestandWeitere} Bestand/Bestände, ` +
+      `${plural(b.routen, 'Route', 'Routen')}` + (b.blockiert ? `; ${b.blockiert} blockiert (siehe Vorschau).` : '.'),
     daten: { ...b },
   }
 }
@@ -236,14 +237,14 @@ export async function odooFertigbestandZuruecknehmen(
   const b = await fertigbestandZuruecknehmen(ctx.actor)
   return {
     text:
-      `${b.varianten} Fertigprodukt-Variante(n) auf 0 gesetzt (${b.menge} Stück)` +
-      (b.reservierungenGeloest ? `, ${b.reservierungenGeloest} Reservierung(en) gelöst` : '') +
+      `${plural(b.varianten, 'Fertigprodukt-Variante', 'Fertigprodukt-Varianten')} auf 0 gesetzt (${b.menge} Stück)` +
+      (b.reservierungenGeloest ? `, ${plural(b.reservierungenGeloest, 'Reservierung', 'Reservierungen')} gelöst` : '') +
       (b.uebersprungen.length
         ? `; ${b.uebersprungen.length} mit echten Lagerbewegungen übersprungen (bitte per Inventur prüfen): ` +
           b.uebersprungen.slice(0, 5).map((u) => u.sku ?? u.name).join(', ')
         : '') +
       (b.fertigungsauftraege.length
-        ? `; ${b.fertigungsauftraege.length} Fertigungsauftrag/-aufträge nachgezogen (` +
+        ? `; ${plural(b.fertigungsauftraege.length, 'Fertigungsauftrag', 'Fertigungsaufträge')} nachgezogen (` +
           b.fertigungsauftraege.map((f) => `${f.nummer} ${f.menge}× ${f.sku ?? ''}`.trim()).join(', ') + ')'
         : '') + '.',
     daten: { ...b },
@@ -260,8 +261,8 @@ export async function odooArtikelZusammenfuehren(
   return {
     recordId: p.behalten_id,
     text:
-      `${b.von} → ${b.nach}: ${b.bestand} Stück Bestand, ${b.stuecklistenzeilen} Stücklistenzeile(n), ` +
-      `${b.offeneBewegungen} offene Bewegung(en), ${b.lieferantenpreise} Lieferantenpreis(e) übernommen` +
+      `${b.von} → ${b.nach}: ${b.bestand} Stück Bestand, ${plural(b.stuecklistenzeilen, 'Stücklistenzeile', 'Stücklistenzeilen')}, ` +
+      `${plural(b.offeneBewegungen, 'offene Bewegung', 'offene Bewegungen')}, ${plural(b.lieferantenpreise, 'Lieferantenpreis', 'Lieferantenpreise')} übernommen` +
       (b.preisUebernommen ? ', Einkaufspreis gesetzt' : '') +
       (b.sku === 'sku' ? `, SKU ${b.von} übernommen` : b.sku === 'barcode' ? `, ${b.von} als Barcode` : '') + '.',
     daten: { ...b },
@@ -278,7 +279,7 @@ export async function versandAbgleichenAktion(): Promise<AktionsErgebnis> {
   const teile = [
     `${r.geprueft} offene Shop-Aufträge geprüft`,
     r.nachgezogen ? `${r.nachgezogen} im Shop versendet → nachgezogen` : 'keiner im Shop versendet',
-    r.nachfragen ? `${r.nachfragen} Nachfrage(n) an die Fertigung nachgelegt` : null,
+    r.nachfragen ? `${plural(r.nachfragen, 'Nachfrage', 'Nachfragen')} an die Fertigung nachgelegt` : null,
     r.fehler ? `${r.fehler} Fehler` : null,
   ].filter(Boolean)
   return {

@@ -4,7 +4,7 @@ import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { dateTime, money } from '@/modules/shared/format'
+import { dateTime, money, plural } from '@/modules/shared/format'
 import { actionError, actionInfo } from '@/modules/shared/action'
 import { type ShopifyOrder, fetchOrdersPage, shopifyConfigured } from '@/modules/integrationen/shopify'
 import { runDueJobs } from '@/modules/integrationen/jobs'
@@ -181,7 +181,7 @@ export default async function ImportUebersicht({
 
       {orders.length > 0 && (
         <Card
-          title={`${orders.length} Bestellung(en) auf dieser Seite — ${fehlend} noch nicht im ERP`}
+          title={`${plural(orders.length, 'Bestellung', 'Bestellungen')} auf dieser Seite — ${fehlend} noch nicht im ERP`}
           actions={
             fehlend > 0 ? (
               <ActionForm action={alleUebernehmen}>

@@ -7,7 +7,7 @@ import { zusammenfuehrenKandidaten } from '@/modules/migration/odoo/doppelte'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { odooKonfiguriert } from '@/modules/migration/odoo/api'
-import { dateTime, qty } from '@/modules/shared/format'
+import { dateTime, plural, qty } from '@/modules/shared/format'
 import { OdooUebernahme } from './odoo-uebernahme'
 import { Auswahl } from '@/components/auswahl'
 
@@ -91,12 +91,12 @@ export default async function OdooPage() {
             Odoo führt Tastaturen und Switch-Tester mit Bestand, weil die Lieferungen dort nicht ausgebucht wurden —
             tatsächlich sind alle Fertigprodukte bei 0. Der Knopf setzt{' '}
             <strong>
-              {qty(zuruecknehmen.length)} Variante(n) mit zusammen {qty(menge)} Stück
+              {plural(zuruecknehmen.length, 'Variante', 'Varianten')} mit zusammen {qty(menge)} Stück
             </strong>{' '}
             per Inventur auf 0
             {reserviert > 0 ? `, löst vorher ${qty(reserviert)} reservierte Stück (die Lieferungen warten dann wieder)` : ''}{' '}
             und legt für{' '}
-            <strong>{qty(luecken.length)} offene Auftragsposition(en)</strong> ohne Fertigungsauftrag einen an
+            <strong>{plural(luecken.length, 'offene Auftragsposition', 'offene Auftragspositionen')}</strong> ohne Fertigungsauftrag einen an
             {luecken.length > 0 ? ` (${luecken.map((l) => `${l.nummer} ${qty(l.fehlt)}× ${l.sku ?? ''}`.trim()).join(', ')})` : ''}.
           </p>
           {kandidaten.length > zuruecknehmen.length && (
@@ -116,7 +116,7 @@ export default async function OdooPage() {
           <ActionButton
             action={fertigbestandZuruecknehmen}
             className="danger"
-            confirm={`${zuruecknehmen.length} Fertigprodukt-Variante(n) (${menge} Stück) auf 0 setzen und ${luecken.length} Fertigungsauftrag/-aufträge nachziehen?`}
+            confirm={`${plural(zuruecknehmen.length, 'Fertigprodukt-Variante', 'Fertigprodukt-Varianten')} (${menge} Stück) auf 0 setzen und ${plural(luecken.length, 'Fertigungsauftrag', 'Fertigungsaufträge')} nachziehen?`}
           >
             Fertigbestand zurücknehmen, Fertigung nachziehen
           </ActionButton>
@@ -146,7 +146,7 @@ export default async function OdooPage() {
                   <tr key={l.id}>
                     <td className="small">
                       {l.sku && <span className="mono">{l.sku}</span>} {l.name.replace(/^\[[^\]]*\]\s*/, '')}
-                      {l.inStuecklisten > 0 && <div className="muted">in {qty(l.inStuecklisten)} Stückliste(n)</div>}
+                      {l.inStuecklisten > 0 && <div className="muted">in {plural(l.inStuecklisten, 'Stückliste', 'Stücklisten')}</div>}
                     </td>
                     <td className="num mono">{qty(l.bestand)}</td>
                     <td>
@@ -187,7 +187,7 @@ export default async function OdooPage() {
 
       <Card title="Stand">
         <p className="small" style={{ margin: 0 }}>
-          {qty(stand.boms)} aktive Stückliste(n) aus Odoo · {qty(stand.angelegt)} Komponente(n) angelegt ·{' '}
+          {plural(stand.boms, 'aktive Stückliste', 'aktive Stücklisten')} aus Odoo · {plural(stand.angelegt, 'Komponente', 'Komponenten')} angelegt ·{' '}
           {qty(stand.zugeordnet)} Artikel zugeordnet
           {stand.zuletzt ? ` · zuletzt ${dateTime(stand.zuletzt)}` : ''}. Ein weiterer Lauf ersetzt nur
           Stücklisten, die er selbst geschrieben hat und die sich in Odoo geändert haben.

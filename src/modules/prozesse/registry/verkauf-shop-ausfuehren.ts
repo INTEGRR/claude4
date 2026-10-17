@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /** Jede Regeländerung wirkt sofort: neu rechnen und melden (im Lesemodus übersprungen). */
 async function anstossen(): Promise<void> {
@@ -94,7 +95,7 @@ export async function shopOptionSetzen(
   await anstossen()
   return {
     recordId: p.template_id,
-    text: `${ziele[0].wert} ${p.gesperrt ? 'gesperrt' : 'freigegeben'} in ${ziele.length} Artikel(n).`,
+    text: `${ziele[0].wert} ${p.gesperrt ? 'gesperrt' : 'freigegeben'} in ${plural(ziele.length, 'Artikel', 'Artikeln')}.`,
   }
 }
 
@@ -103,8 +104,8 @@ export async function shopStandHolen(): Promise<AktionsErgebnis> {
   const r = await holen()
   return {
     text:
-      `Shop-Stand gelesen: ${r.varianten} Variante(n), davon ${r.verkaufbar} verkaufbar, ${r.zugeordnet} in KRNL zugeordnet` +
-      `${r.zweitangebote ? `, ${r.zweitangebote} Zweitangebot(e) mit derselben SKU (bekommen denselben Bestand)` : ''}.`,
+      `Shop-Stand gelesen: ${plural(r.varianten, 'Variante', 'Varianten')}, davon ${r.verkaufbar} verkaufbar, ${r.zugeordnet} in KRNL zugeordnet` +
+      `${r.zweitangebote ? `, ${plural(r.zweitangebote, 'Zweitangebot', 'Zweitangebote')} mit derselben SKU (bekommen denselben Bestand)` : ''}.`,
     daten: { ...r },
   }
 }

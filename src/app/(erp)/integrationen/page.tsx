@@ -4,7 +4,7 @@ import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { dateTime, label, qty, tone } from '@/modules/shared/format'
+import { dateTime, label, plural, qty, tone } from '@/modules/shared/format'
 import { shopifyConfigured, shopifyModus } from '@/modules/integrationen/shopify'
 import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
@@ -31,7 +31,7 @@ async function runJobs() {
   return actionInfo(
     r.ran === 0
       ? 'Nichts zu tun — die Outbox ist leer.'
-      : `${r.ran} Job(s) ausgeführt: ${r.succeeded} erfolgreich, ${r.failed} fehlgeschlagen.`,
+      : `${plural(r.ran, 'Job', 'Jobs')} ausgeführt: ${r.succeeded} erfolgreich, ${r.failed} fehlgeschlagen.`,
   )
 }
 
@@ -43,7 +43,7 @@ async function processWebhooks() {
   return actionInfo(
     r.processed + r.failed === 0
       ? 'Keine offenen Webhooks.'
-      : `${r.processed} Webhook(s) verarbeitet, ${r.failed} fehlgeschlagen.`,
+      : `${plural(r.processed, 'Webhook', 'Webhooks')} verarbeitet, ${r.failed} fehlgeschlagen.`,
   )
 }
 
@@ -79,8 +79,8 @@ async function pushInventarJetzt() {
         : ''
     return actionInfo(
       (r.uebertragen > 0
-        ? `Bestand gemeldet: ${r.uebertragen} von ${r.geprueft} Variante(n) geändert.`
-        : `Alles aktuell — ${r.geprueft} Variante(n) geprüft, nichts zu melden.`) + zweit,
+        ? `Bestand gemeldet: ${r.uebertragen} von ${plural(r.geprueft, 'Variante', 'Varianten')} geändert.`
+        : `Alles aktuell — ${plural(r.geprueft, 'Variante', 'Varianten')} geprüft, nichts zu melden.`) + zweit,
     )
   } catch (err) {
     return actionError((err instanceof Error ? err.message : String(err)).replace(/^error: /, ''))
@@ -446,9 +446,9 @@ export default async function IntegrationenPage() {
       {(stats.failed_events + stats.failed_jobs > 0 || stats.tx_failed_24h > 0 || stats.running_stuck > 0) && (
         <div className="notice danger">
           <span className="led on" />{' '}
-          {stats.failed_jobs > 0 && <>{stats.failed_jobs} Job(s) endgültig fehlgeschlagen. </>}
-          {stats.failed_events > 0 && <>{stats.failed_events} Webhook(s) fehlgeschlagen. </>}
-          {stats.running_stuck > 0 && <>{stats.running_stuck} Job(s) hängen in „running". </>}
+          {stats.failed_jobs > 0 && <>{plural(stats.failed_jobs, 'Job', 'Jobs')} endgültig fehlgeschlagen. </>}
+          {stats.failed_events > 0 && <>{plural(stats.failed_events, 'Webhook', 'Webhooks')} fehlgeschlagen. </>}
+          {stats.running_stuck > 0 && <>{plural(stats.running_stuck, 'Job hängt', 'Jobs hängen')} in „running". </>}
           {stats.tx_failed_24h > 0 && (
             <>
               {stats.tx_failed_24h} API-Fehler in 24 h —{' '}
@@ -689,7 +689,7 @@ export default async function IntegrationenPage() {
         {abweichungen.length > 0 ? (
           <>
             <div className="notice warn" style={{ marginTop: 12 }}>
-              Der Shop meldet für {abweichungen.length} Variante(n) andere Mengen als das ERP —
+              Der Shop meldet für {plural(abweichungen.length, 'Variante', 'Varianten')} andere Mengen als das ERP —
               vermutlich Handkorrekturen im Shopify-Admin. Der nächste Abgleich überschreibt sie
               mit dem ERP-Stand.
             </div>

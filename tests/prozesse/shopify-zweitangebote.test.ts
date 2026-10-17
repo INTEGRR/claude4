@@ -82,7 +82,7 @@ describe('Bestand an Zweitangebote', () => {
     ])
     const r = await aktionAusfuehrenGeprueft('verkauf.shop_stand_holen', {}, ADMIN)
     assert.deepEqual(r.daten, { varianten: 4, verkaufbar: 4, zugeordnet: 1, zweitangebote: 1 })
-    assert.match(r.text ?? '', /1 Zweitangebot\(e\) mit derselben SKU/)
+    assert.match(r.text ?? '', /1 Zweitangebot mit derselben SKU/)
 
     const zeilen = await h.sql<{ id: string; variant_id: string; shopify_variant_id: string; shopify_inventory_item_gid: string; produkt: string }[]>`
       select id, variant_id, shopify_variant_id, shopify_inventory_item_gid, produkt from shopify_zweitangebote`
@@ -136,7 +136,7 @@ describe('Bestand an Zweitangebote', () => {
     await runDueJobs()
     const [job] = await h.sql<{ last_result: string }[]>`
       select last_result from integration_jobs where kind = 'shopify_inventory_push' order by updated_at desc limit 1`
-    assert.match(job.last_result, /Bestand gemeldet: 1 Änderung\(en\).*; Zweitangebote: 1 von 1 gemeldet/)
+    assert.match(job.last_result, /Bestand gemeldet: 1 Änderung.*; Zweitangebote: 1 von 1 gemeldet/)
   })
 
   test('je Angebot steuerbar: „aus" meldet nur dem Zweitangebot 0, der Artikel bleibt', async () => {
@@ -179,7 +179,7 @@ describe('Bestand an Zweitangebote', () => {
     const { probeZeile } = await import('../../src/modules/integrationen/probe-anzeige.ts')
     assert.equal(
       probeZeile('probe:inventorySetQuantities', eintraege[1].request).titel,
-      'Bestand an Zweitangebote: 1 Änderung(en) (erste vollständige Meldung)',
+      'Bestand an Zweitangebote: 1 Änderung (erste vollständige Meldung)',
     )
   })
 

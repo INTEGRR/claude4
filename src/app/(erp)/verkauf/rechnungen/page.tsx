@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, isoDatum, money } from '@/modules/shared/format'
+import { date, isoDatum, money, plural } from '@/modules/shared/format'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { Seiten } from '@/components/seiten'
 import { datevUebergeben } from './actions'
@@ -183,7 +183,7 @@ export default async function KundenrechnungenPage({
               Vergleich je Bestellung: Summe der Testbelege (Rechnungen minus Gutschriften) gegen den Gesamtbetrag laut Shop
               (brutto inkl. Versand, nach Änderungen der aktuelle Stand) — die sevDesk-Rechnung dazu stichprobenartig von Hand. Bestellungen von vor dem Probelauf tragen den
               Shop-Betrag erst nach dem nächsten Abgleich.
-              {' '}{lage.testbelege} Testbeleg(e) · {vergleichSumme.gleich} gleich · {vergleichSumme.abweichend} abweichend ·{' '}
+              {' '}{plural(lage.testbelege, 'Testbeleg', 'Testbelege')} · {vergleichSumme.gleich} gleich · {vergleichSumme.abweichend} abweichend ·{' '}
               {vergleichSumme.ohne} ohne Shop-Betrag.
               {' '}Aufräumen und scharf schalten: <Link href="/einstellungen/belege">Einstellungen → Belege</Link>.
             </p>

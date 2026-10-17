@@ -10,6 +10,7 @@ import {
   teileZweitangebote,
 } from './produkt-import-logik'
 import { zweitangebotMerken } from './zweitangebote'
+import { plural } from '@/modules/shared/format'
 
 /**
  * Bereits in Shopify existierende Produkte ins ERP holen.
@@ -306,7 +307,7 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<Verarbeitung> {
     }
     if (ohnePartner.length > 0) {
       await t`select log_event('product_template', ${tpl.id}, 'error',
-        ${`${ohnePartner.length} Shopify-Variante(n) ohne Gegenstück: ${ohnePartner.map((v) => v.sku ?? v.id).join(', ')}`},
+        ${`${plural(ohnePartner.length, 'Shopify-Variante', 'Shopify-Varianten')} ohne Gegenstück: ${ohnePartner.map((v) => v.sku ?? v.id).join(', ')}`},
         'shopify')`
     }
     if (zweit.length > 0) {
@@ -314,7 +315,7 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<Verarbeitung> {
       // angelegten Artikel — der steht nur in dieser Transaktion.
       await zweitMerken(t)
       await t`select log_event('product_template', ${tpl.id}, 'note',
-        ${`${zweit.length} Variante(n) sind schon Artikel eines anderen Shop-Angebots (Zweitangebot, z. B. Bundle-Bestandteil) und hier archiviert — Bestellungen landen über die SKU beim vorhandenen Artikel, der Bestand geht auch an dieses Angebot: ${zweit.map((v) => v.sku ?? v.id).join(', ')}`},
+        ${`${plural(zweit.length, 'Variante', 'Varianten')} sind schon Artikel eines anderen Shop-Angebots (Zweitangebot, z. B. Bundle-Bestandteil) und hier archiviert — Bestellungen landen über die SKU beim vorhandenen Artikel, der Bestand geht auch an dieses Angebot: ${zweit.map((v) => v.sku ?? v.id).join(', ')}`},
         'shopify')`
     }
     await t`select log_event('product_template', ${tpl.id}, 'note',
@@ -365,7 +366,7 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
       return `„${p.title}" ist ein Bundle — kein eigener Artikel, Bestellungen bringen die Bestandteile`
     }
     const { ergebnis, zweitangebote } = await verarbeiteProdukt(p)
-    const zweit = zweitangebote ? `, ${zweitangebote} Zweitangebot(e)` : ''
+    const zweit = zweitangebote ? `, ${plural(zweitangebote, 'Zweitangebot', 'Zweitangebote')}` : ''
     return `„${p.title}" ${ergebnis === 'angelegt' ? 'im ERP angelegt' : ergebnis === 'verknuepft' ? 'verknüpft' : 'unverändert'}${zweit}`
   }
 
@@ -429,10 +430,10 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
 
   if (offen.length > 0) {
     await sql`select log_event('product_template', ${templateId}, 'error',
-      ${`Shopify-Änderung: ${offen.length} Variante(n) ohne ERP-Gegenstück (${offen.join(', ')}) — im ERP anlegen oder SKU angleichen.`},
+      ${`Shopify-Änderung: ${plural(offen.length, 'Variante', 'Varianten')} ohne ERP-Gegenstück (${offen.join(', ')}) — im ERP anlegen oder SKU angleichen.`},
       'shopify')`
   }
   await sql`select log_event('product_template', ${templateId}, 'note',
     'Aus Shopify aktualisiert (Titel, Preise, Codes).', 'shopify')`
-  return `„${p.title}" aktualisiert${neuVerknuepft ? `, ${neuVerknuepft} Variante(n) neu verknüpft` : ''}${neuZweit ? `, ${neuZweit} Zweitangebot(e)` : ''}${offen.length ? `, ${offen.length} offen` : ''}`
+  return `„${p.title}" aktualisiert${neuVerknuepft ? `, ${plural(neuVerknuepft, 'Variante', 'Varianten')} neu verknüpft` : ''}${neuZweit ? `, ${plural(neuZweit, 'Zweitangebot', 'Zweitangebote')}` : ''}${offen.length ? `, ${offen.length} offen` : ''}`
 }

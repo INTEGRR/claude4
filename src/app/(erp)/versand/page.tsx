@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap, Zustand } from '@/components/ui'
-import { dateTime, money, qty } from '@/modules/shared/format'
+import { dateTime, money, plural, qty } from '@/modules/shared/format'
 import { dhlConfigured, productForCountry } from '@/modules/versand/dhl'
 import { sammelMarken } from '@/modules/versand/kommissionieren'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
@@ -164,7 +164,7 @@ export default async function VersandPage({
           <ActionForm action={gelabelteAusbuchen}>
             <div className="row" style={{ alignItems: 'center', gap: 12 }}>
               <div>
-                {gelabelt.length} Lieferung(en) haben ein Label, sind aber noch nicht ausgebucht — Lager
+                {plural(gelabelt.length, 'Lieferung hat', 'Lieferungen haben')} ein Label, {gelabelt.length === 1 ? 'ist' : 'sind'} aber noch nicht ausgebucht — Lager
                 und Shopify wissen nichts vom Versand (
                 {gelabelt.slice(0, 5).map((g, i) => (
                   <span key={g.picking_id}>
@@ -240,7 +240,7 @@ export default async function VersandPage({
 
       {wartend > 0 && (
         <div className="notice">
-          {wartend} Lieferung(en) warten auf Ware. Sie erscheinen hier von selbst, sobald Bestand
+          {plural(wartend, 'Lieferung wartet', 'Lieferungen warten')} auf Ware. Sie erscheinen hier von selbst, sobald Bestand
           gebucht ist (Wareneingang, Inventur, Fertigmeldung, Storno) —{' '}
           <Link href="/lager?art=delivery">Warenausgänge ansehen</Link>.
         </div>

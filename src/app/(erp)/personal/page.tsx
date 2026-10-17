@@ -4,7 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { HBars } from '@/components/charts'
-import { date, hours, label, LABELS, money } from '@/modules/shared/format'
+import { date, hours, label, LABELS, money, plural } from '@/modules/shared/format'
 import { createEmployee } from './actions'
 import { Auswahl } from '@/components/auswahl'
 
@@ -86,7 +86,7 @@ export default async function PersonalPage() {
         <Stat
           label="Erfasst diesen Monat"
           value={hours(monatsminuten)}
-          hint={`${schichten[0].c} Schicht(en) diese Woche geplant`}
+          hint={`${plural(schichten[0].c, 'Schicht', 'Schichten')} diese Woche geplant`}
         />
         <Stat
           label="Personalkosten"

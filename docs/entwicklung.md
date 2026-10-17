@@ -155,6 +155,10 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   in die Abfrage, nicht als `rows.filter` auf die Seite. Der Wächter
   `tests/seiten.test.ts` lässt neue Listen-Seiten mit `limit ≥ 100` ohne
   Helfer nicht zu (Auswahllisten `order by name/label` sind ausgenommen).
+- **Mengen im Text** → `plural(n, 'Position', 'Positionen')` (SQL:
+  `plural_text`, 0128) — nie „Position(en)“ oder „Auftrag/-aufträge“
+  (Wächter `tests/plural.test.ts`). Folgt ein Verb, gehört es in beide
+  Formen: `plural(n, 'Lieferung wartet', 'Lieferungen warten')`.
 - **Überfällig** → `ueberfaellig(termin, erledigt)` bzw. `<Ueberfaellig
   termin erledigt />` (Berliner Kalendertag, „überfällig · 12 Tage“); in
   SQL `< date_trunc('day', now() at time zone 'Europe/Berlin')`. Keine

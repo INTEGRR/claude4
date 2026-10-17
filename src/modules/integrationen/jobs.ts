@@ -11,6 +11,7 @@ import {
 } from './shopify'
 import { htmlSicher, sendMail } from './mail'
 import { type JobKind, KI_SPUR_JOBS } from '@/modules/prozesse/jobs-katalog'
+import { plural } from '@/modules/shared/format'
 
 /** Nachschlag über den (aus der DB stammenden) Job-Typ als String. */
 function handlerFuer(kind: string): Handler | undefined {
@@ -176,7 +177,7 @@ const handlers = {
         ? `; Zweitangebote: ${r.angeboteUebertragen} von ${r.angebote} gemeldet` +
           `${r.angeboteAbgelehnt ? `, ${r.angeboteAbgelehnt} von Shopify abgelehnt (Grund in der Shop-Verfügbarkeit)` : ''}`
         : ''
-    return `Bestand gemeldet: ${r.uebertragen} Änderung(en) bei ${r.geprueft} Variante(n)${runden}${zusatz}${zweit}`
+    return `Bestand gemeldet: ${plural(r.uebertragen, 'Änderung', 'Änderungen')} bei ${plural(r.geprueft, 'Variante', 'Varianten')}${runden}${zusatz}${zweit}`
   },
 
   /**
@@ -191,11 +192,11 @@ const handlers = {
     if (r.befunde.length > 0) {
       const kopf = r.befunde.slice(0, 5).join(' | ')
       const rest = r.befunde.length > 5 ? ` … +${r.befunde.length - 5} weitere` : ''
-      throw new Error(`${r.befunde.length} Integritätsbefund(e): ${kopf}${rest}`)
+      throw new Error(`${plural(r.befunde.length, 'Integritätsbefund', 'Integritätsbefunde')}: ${kopf}${rest}`)
     }
     const warnung =
       r.warnungen.length > 0
-        ? ` — ${r.warnungen.length} Warnung(en): ${r.warnungen.slice(0, 3).join(' | ')}` +
+        ? ` — ${plural(r.warnungen.length, 'Warnung', 'Warnungen')}: ${r.warnungen.slice(0, 3).join(' | ')}` +
           (r.warnungen.length > 3 ? ` … +${r.warnungen.length - 3} weitere` : '')
         : ''
     return `${r.pruefungen} Invarianten geprüft, keine Befunde${warnung}`
@@ -214,9 +215,9 @@ const handlers = {
     if (r.nextCursor) {
       await sql`select enqueue_job('shopify_customer_import',
         ${sql.json({ cursor: r.nextCursor })}, ${`kunden-import:${r.nextCursor}`})`
-      return `${r.imported} Kunde(n) neu übernommen — nächste Seite eingereiht`
+      return `${plural(r.imported, 'Kunde', 'Kunden')} neu übernommen — nächste Seite eingereiht`
     }
-    return `${r.imported} Kunde(n) neu übernommen — Übernahme abgeschlossen`
+    return `${plural(r.imported, 'Kunde', 'Kunden')} neu übernommen — Übernahme abgeschlossen`
   },
 
   /** Änderungen an einem verknüpften Produkt in den Shop übertragen. */
@@ -243,8 +244,8 @@ const handlers = {
         ${sql.json({ durchgang: 2 })}, 'produkt-import:2:start')`
     }
     const zusatz = [
-      r.zweitangebote ? `${r.zweitangebote} Zweitangebot(e) per SKU verknüpft` : '',
-      r.bundles ? `${r.bundles} Bundle(s) ohne eigenen Artikel` : '',
+      r.zweitangebote ? `${plural(r.zweitangebote, 'Zweitangebot', 'Zweitangebote')} per SKU verknüpft` : '',
+      r.bundles ? `${plural(r.bundles, 'Bundle', 'Bundles')} ohne eigenen Artikel` : '',
     ].filter(Boolean).join(', ')
     const problem = r.probleme.length ? ` — Probleme: ${r.probleme.join(' | ')}` : ''
     const weiter = r.nextCursor
@@ -269,9 +270,9 @@ const handlers = {
     if (r.nextCursor) {
       await sql`select enqueue_job('shopify_order_backfill',
         ${sql.json({ q, cursor: r.nextCursor })}, ${`bestell-import:${r.nextCursor}`})`
-      return `${r.imported} Bestellung(en) übernommen — nächste Seite eingereiht`
+      return `${plural(r.imported, 'Bestellung', 'Bestellungen')} übernommen — nächste Seite eingereiht`
     }
-    return `${r.imported} Bestellung(en) übernommen — Übernahme abgeschlossen`
+    return `${plural(r.imported, 'Bestellung', 'Bestellungen')} übernommen — Übernahme abgeschlossen`
   },
 
   /** Freigegebenen Mail-Entwurf über das Einkaufspostfach senden (einkauf/mail-senden.ts). */

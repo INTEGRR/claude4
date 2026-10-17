@@ -8,7 +8,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { ANBINDUNGEN, type AnbindungsStand, anbindungsStand } from '@/modules/einstellungen/umgebung'
 import { type DienstStatus, dienstStatusLesen } from '@/modules/integrationen/wache'
-import { dateTime, qty } from '@/modules/shared/format'
+import { dateTime, plural, qty } from '@/modules/shared/format'
 import { madeToOrderEinstellung, madeToOrderVorschau } from '@/modules/integrationen/made-to-order'
 import { POSTFACH_SCHLUESSEL, type PostfachStand } from '@/modules/einkauf/postfach-abgleich'
 import { postfachKonfiguriert } from '@/modules/google/auth'
@@ -325,7 +325,7 @@ export default async function SchnittstellenPage() {
               <p className="small" style={{ margin: '0 0 8px' }}>
                 Engpässe:{' '}
                 {engpaesse
-                  .map(([teil, e]) => `${teil.replace(/^\[[^\]]*\]\s*/, '')} (reicht für ${qty(e.baubar)}, ${qty(e.varianten)} Variante(n))`)
+                  .map(([teil, e]) => `${teil.replace(/^\[[^\]]*\]\s*/, '')} (reicht für ${qty(e.baubar)}, ${plural(qty(e.varianten), 'Variante', 'Varianten')})`)
                   .join(' · ')}
               </p>
             )}

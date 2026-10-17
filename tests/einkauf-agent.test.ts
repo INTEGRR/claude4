@@ -109,7 +109,7 @@ describe('Einkaufs-Agent: Werkzeug-Eingaben prüfen', () => {
     assert.equal(r.wert.werte.waehrung, 'USD', 'Schema normalisiert die Währung')
     assert.equal(r.wert.werte.werkzeugkosten, 0, 'Standardwerte aus dem Schema')
     assert.deepEqual(r.wert.belege, [{ art: 'nachricht', id: ID.nachricht, titel: 'Mail' }], 'ungültige Belege fallen weg')
-    assert.equal(r.wert.titel, 'Angebot in USD mit 1 Staffelpreis(en)')
+    assert.equal(r.wert.titel, 'Angebot in USD mit 1 Staffelpreis')
   })
 
   test('abgewiesen: Aktion außerhalb der Liste, fehlende Beleg-ID, Schemafehler, keine Belege, keine Begründung', () => {

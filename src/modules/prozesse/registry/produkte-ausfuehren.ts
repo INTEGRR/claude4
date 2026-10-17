@@ -2,7 +2,7 @@ import { sql } from '@/db/client'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { type ProduktEingabe, produktAnlegen } from '../../ki/produkt-anlegen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
-import { money } from '@/modules/shared/format'
+import { money, plural } from '@/modules/shared/format'
 
 /** Ausführung der Produkt-Aktionen — dieselbe Fachlogik wie die KI-Aktion. */
 
@@ -13,7 +13,7 @@ export async function produktAnlegenAktion(
   const ergebnis = await produktAnlegen(sql, p, ctx.actor)
   return {
     text:
-      `Produkt „${p.name}" angelegt — ${ergebnis.varianten} Variante(n)` +
+      `Produkt „${p.name}" angelegt — ${plural(ergebnis.varianten, 'Variante', 'Varianten')}` +
       (ergebnis.benannt > 0 ? `, ${ergebnis.benannt} mit Artikelnummer` : '') +
       '.',
     link: `/produkte/${ergebnis.templateId}`,
@@ -195,7 +195,7 @@ export async function attributAnlegen(p: {
               on conflict (attribute_id, name) do nothing`
   }
 
-  return { text: `Attribut „${p.name}" mit ${p.werte.length} Wert(en) angelegt.` }
+  return { text: `Attribut „${p.name}" mit ${plural(p.werte.length, 'Wert', 'Werten')} angelegt.` }
 }
 
 export async function lieferantenpreisAnlegen(
@@ -246,7 +246,7 @@ export async function zuShopify(_p: object, ctx: AktionsKontext): Promise<Aktion
   const { pushProduktZuShopify } = await import('@/modules/integrationen/produkt-push')
   const r = await pushProduktZuShopify(ctx.recordId!)
   return {
-    text: `In Shopify angelegt (${r.varianten} Variante(n)) — der Bestand wird gleich gemeldet.`,
+    text: `In Shopify angelegt (${plural(r.varianten, 'Variante', 'Varianten')}) — der Bestand wird gleich gemeldet.`,
     recordId: ctx.recordId,
   }
 }

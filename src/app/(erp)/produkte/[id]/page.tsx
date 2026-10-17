@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { money, qty } from '@/modules/shared/format'
+import { money, plural, qty } from '@/modules/shared/format'
 import { addAttribute, addVendorPrice, deleteVendorPrice, produktZuShopify, updateProduct } from '../actions'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
@@ -137,7 +137,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         title={tpl.name}
         subtitle={
           <>
-            {variants.length} Variante(n) · Einheit <span className="mono">{tpl.uom}</span>
+            {plural(variants.length, 'Variante', 'Varianten')} · Einheit <span className="mono">{tpl.uom}</span>
           </>
         }
         actions={

@@ -3,6 +3,7 @@ import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { varianteAufloesen } from './aufloesen.ts'
 import { fertigungsNachfrageAbhaken } from '@/modules/verkauf/extern-versand'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /** Ausführung der Fertigungs-Aktionen — Fachlogik unverändert aus fertigung/actions.ts. */
 
@@ -154,7 +155,7 @@ export async function massenstart(
   }
   return {
     text:
-      `${gestartet.length} Fertigungsauftrag/-aufträge gestartet.` +
+      `${plural(gestartet.length, 'Fertigungsauftrag', 'Fertigungsaufträge')} gestartet.` +
       (uebersprungen.length > 0 ? ` Übersprungen: ${uebersprungen.join(', ')}.` : ''),
   }
 }

@@ -272,7 +272,7 @@ describe('Lieferantenverträge und Preislisten', () => {
       text: '# Keycaps\nKC-PBT-01 / 500: 7,20\nKC-PBT-01 / 1.000: 6,85\nKC-PULL: 0,35',
       lieferzeit_tage: 30,
     })
-    assert.match(u.text!, /3 Lieferantenpreis\(e\) aus „Preisliste 2026\/27" übernommen \(USD, gültig 01\.10\.2026 bis 30\.09\.2027\)/)
+    assert.match(u.text!, /3 Lieferantenpreise aus „Preisliste 2026\/27" übernommen \(USD, gültig 01\.10\.2026 bis 30\.09\.2027\)/)
     const preise = await h.sql<{ template_id: string; min_qty: number; price: number; currency: string; date_start: string; date_end: string; lead_time_days: number }[]>`
       select template_id, min_qty::float as min_qty, price::float as price, currency, date_start::text as date_start,
              date_end::text as date_end, lead_time_days

@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import { ShopifyError, shopifyGraphQL } from './shopify'
+import { plural } from '@/modules/shared/format'
 
 /**
  * Legt ein ERP-Produkt samt Varianten in Shopify an und verknüpft beide
@@ -277,5 +278,5 @@ export async function aktualisiereProduktInShopify(templateId: string): Promise<
     throw new ShopifyError(`Varianten abgelehnt: ${fehler.map((f) => f.message).join('; ')}`, false)
   }
 
-  return `„${tpl.name}" im Shop aktualisiert (${verknuepft.length} Variante(n))`
+  return `„${tpl.name}" im Shop aktualisiert (${plural(verknuepft.length, 'Variante', 'Varianten')})`
 }

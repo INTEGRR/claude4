@@ -5,6 +5,7 @@ import { KOSTEN_ARTEN, type KostenArt, SENDUNG_STATUS, type SendungModus, type S
 import { verfolgungAnmelden, verfolgungJetztAbfragen } from '@/modules/versand/zulauf-verfolgung'
 import { entwurfAnlegen } from './einkauf-mailversand-ausfuehren.ts'
 import { type AktionsErgebnis, type AktionsKontext, UUID_MUSTER } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /**
  * Ausführung Einkauf Stufe 5 (0108): Eingangssendungen, Kosten und Zoll,
@@ -131,7 +132,7 @@ export async function sendungAnlegen(p: KopfFelder & { bestellungen: string[] },
     return { ...s, anzahl: bestellungen.length }
   })
   return {
-    text: `Eingangssendung ${neu.nummer} angelegt${neu.anzahl ? ` mit ${neu.anzahl} Bestellung(en)` : ''}.`,
+    text: `Eingangssendung ${neu.nummer} angelegt${neu.anzahl ? ` mit ${plural(neu.anzahl, 'Bestellung', 'Bestellungen')}` : ''}.`,
     recordId: neu.id,
     link: `/einkauf/sendungen/${neu.id}`,
   }
@@ -205,7 +206,7 @@ export async function sendungBestellungZuordnen(p: { bestellungen: string[] }, c
   })
   if (!ergebnis.neu.length) return { text: 'Die Bestellungen sind schon in der Sendung.', recordId: s.id }
   return {
-    text: `${ergebnis.neu.join(', ')} in ${s.nummer} aufgenommen — ${ergebnis.eingaenge} Wareneingang/-eingänge hängen an der Sendung.`,
+    text: `${ergebnis.neu.join(', ')} in ${s.nummer} aufgenommen — ${plural(ergebnis.eingaenge, 'Wareneingang hängt', 'Wareneingänge hängen')} an der Sendung.`,
     recordId: s.id,
   }
 }
@@ -305,7 +306,7 @@ export async function sendungAbrechnen(_p: object, ctx: AktionsKontext): Promise
     return Number(r.n)
   })
   return {
-    text: `${s.nummer} abgerechnet${n ? ` — ${n} Landed-Cost-Beleg(e) auf die Wareneingänge gebucht` : ''}.`,
+    text: `${s.nummer} abgerechnet${n ? ` — ${plural(n, 'Landed-Cost-Beleg', 'Landed-Cost-Belege')} auf die Wareneingänge gebucht` : ''}.`,
     recordId: s.id,
   }
 }
@@ -403,7 +404,7 @@ export async function sendungVerteilen(_p: object, ctx: AktionsKontext): Promise
     return Number(r.n)
   })
   return {
-    text: n ? `${n} Landed-Cost-Beleg(e) auf die Wareneingänge von ${s.nummer} gebucht.` : 'Nichts zu verteilen — alle Kosten sind verteilt.',
+    text: n ? `${plural(n, 'Landed-Cost-Beleg', 'Landed-Cost-Belege')} auf die Wareneingänge von ${s.nummer} gebucht.` : 'Nichts zu verteilen — alle Kosten sind verteilt.',
     recordId: s.id,
   }
 }
@@ -491,7 +492,7 @@ export async function sendungZollErfassen(
                 and ersetzt_durch_id is null and id <> ${k.id}`
     }
     await t`select log_event('eingangs_sendung', ${s.id}, 'info',
-                             ${`Zollbescheid erfasst: ${p.zeilen.length} Zeile(n), Zoll ${geld(zoll, 'EUR')}, EUSt ${geld(eust, 'EUR')}`},
+                             ${`Zollbescheid erfasst: ${plural(p.zeilen.length, 'Zeile', 'Zeilen')}, Zoll ${geld(zoll, 'EUR')}, EUSt ${geld(eust, 'EUR')}`},
                              ${ctx.actor})`
   })
   return {

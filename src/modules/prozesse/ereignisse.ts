@@ -42,7 +42,7 @@ export const EREIGNISSE = {
   },
   'shop:produkt_geaendert': {
     label: 'Produkt im Shop geändert',
-    beschreibung: 'Produktanlage/-änderung im Shop-Admin; verknüpfte Produkte folgen dem Shop.',
+    beschreibung: 'Produkt im Shop-Admin angelegt oder geändert; verknüpfte Produkte folgen dem Shop.',
     quelle: 'shopify webhook products/create + products/update',
   },
   'shop:bestand_geaendert': {

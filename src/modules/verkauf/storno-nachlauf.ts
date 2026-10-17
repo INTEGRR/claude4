@@ -1,6 +1,7 @@
 import 'server-only'
 import { sql } from '@/db/client'
 import { cancelShipmentById } from '@/modules/versand/service'
+import { plural } from '@/modules/shared/format'
 
 /**
  * Nachlauf eines Auftrags-Stornos — der Teil, der nicht in die
@@ -50,7 +51,7 @@ export async function stornoNachlauf(
   }
   if (labelsStorniert > 0) {
     await sql`select log_event('sales_order', ${auftragId}, 'note',
-      ${`${labelsStorniert} DHL-Label(s) storniert.`}, ${akteur})`
+      ${`${plural(labelsStorniert, 'DHL-Label', 'DHL-Labels')} storniert.`}, ${akteur})`
   }
 
   if (imHaus.length === 0) return { labelsStorniert, aufgaben: 0 }

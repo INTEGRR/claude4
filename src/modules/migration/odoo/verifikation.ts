@@ -11,6 +11,7 @@
 
 import type { Sql, TransactionSql } from 'postgres'
 import type { OdooSql } from './quelle.ts'
+import { plural } from '../../shared/format.ts'
 
 type Ziel = Sql | TransactionSql
 
@@ -246,7 +247,7 @@ export async function zaehlAbgleich(quelle: OdooSql, ziel: Ziel): Promise<string
   return [
     ...report,
     fehler.length > 0
-      ? `  → ${fehler.length} unerklärte Abweichung(en) — vor dem nächsten Schritt klären.`
+      ? `  → ${plural(fehler.length, 'unerklärte Abweichung', 'unerklärte Abweichungen')} — vor dem nächsten Schritt klären.`
       : '  → alle Zählungen stimmen.',
   ].join('\n')
 }

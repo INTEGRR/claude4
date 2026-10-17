@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { date, dateTime, isoDatum, label, LABELS } from '@/modules/shared/format'
+import { date, dateTime, isoDatum, label, LABELS, plural } from '@/modules/shared/format'
 import { decideAbsence, requestAbsence } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 
@@ -123,7 +123,7 @@ export default async function AbwesenheitenPage() {
                           {/* Kollision → die Woche im Schichtplan, in der sie liegt. */}
                           <span className="led warn" />{' '}
                           <Link className="muted" href={`/personal/schichtplan?woche=${a.starts_on}`}>
-                            {a.schichten} Schicht(en) geplant
+                            {plural(a.schichten, 'Schicht', 'Schichten')} geplant
                           </Link>
                         </div>
                       )}

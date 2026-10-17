@@ -2,7 +2,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, isoDatum, kurs } from '@/modules/shared/format'
+import { date, isoDatum, kurs, plural } from '@/modules/shared/format'
 import { setExchangeRate } from '../actions'
 import { ezbKurseHolen } from '../projekte/actions'
 import { Auswahl } from '@/components/auswahl'
@@ -56,7 +56,7 @@ export default async function KursePage() {
                     <span className="led ok" /> gepflegt
                   </>
                 )}
-                {a.offene > 0 && ` · ${a.offene} offene Bestellung(en)`}
+                {a.offene > 0 && ` · ${plural(a.offene, 'offene Bestellung', 'offene Bestellungen')}`}
               </div>
             </div>
           </div>

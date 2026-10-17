@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { RegistrierteAktion } from './typen.ts'
+import { plural } from '../../shared/format.ts'
 
 /**
  * Retouren (0119, Entscheidungslog 2026-10-17): Rücksendung gelieferter
@@ -50,7 +51,7 @@ export const VERSAND_RETOURE = {
         email: String(fd.get('email') ?? '').trim() || undefined,
       }
     },
-    zusammenfassung: (p) => `Retoure über ${p.positionen.length} Position(en)`,
+    zusammenfassung: (p) => `Retoure über ${plural(p.positionen.length, 'Position', 'Positionen')}`,
     revalidate: ['/versand/retouren', '/verkauf/:id'],
   },
 

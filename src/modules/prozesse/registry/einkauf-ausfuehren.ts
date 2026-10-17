@@ -1,5 +1,5 @@
 import { sql, tx } from '@/db/client'
-import { money, qty } from '@/modules/shared/format'
+import { money, plural, qty } from '@/modules/shared/format'
 import { htmlSicher } from '@/modules/integrationen/mail'
 import { produktAnlegen } from '@/modules/ki/produkt-anlegen'
 import { verfolgungAnmelden, verfolgungJetztAbfragen } from '@/modules/versand/zulauf-verfolgung'
@@ -87,7 +87,7 @@ export async function bestellungMitPositionen(
   const [order] = await sql<{ number: string }[]>`
     select number from purchase_orders where id = ${orderId}`
   return {
-    text: `Bestellung ${order.number} bei ${lieferant.name} mit ${p.positionen.length} Position(en) angelegt.`,
+    text: `Bestellung ${order.number} bei ${lieferant.name} mit ${plural(p.positionen.length, 'Position', 'Positionen')} angelegt.`,
     link: `/einkauf/${orderId}`,
     recordId: orderId,
   }
@@ -255,7 +255,7 @@ export async function bestellungErfassen(p: BelegBestellung, ctx: AktionsKontext
 
   const { po, lieferant, neuerLieferant, neueArtikel, zahlung, hinweise } = erfasst
   const teile = [
-    `Bestellung ${po.number} bei ${lieferant.name} erfasst (${p.positionen.length} Position(en), ${waehrung})`,
+    `Bestellung ${po.number} bei ${lieferant.name} erfasst (${plural(p.positionen.length, 'Position', 'Positionen')}, ${waehrung})`,
     p.bestaetigen ? 'bestätigt — der Wareneingang wird erwartet' : 'als Entwurf',
     zahlung ? `Vorkasse ${zahlung} vermerkt` : null,
     neuerLieferant ? `Lieferant neu angelegt` : null,

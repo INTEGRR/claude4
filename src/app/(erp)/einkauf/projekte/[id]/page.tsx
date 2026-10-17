@@ -24,7 +24,7 @@ import { rundeText } from '@/modules/einkauf/bemusterung'
 import { WERKZEUG_ARTEN } from '@/modules/einkauf/werkzeuge'
 import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { driveLink } from '@/modules/google/drive'
-import { date, dateTime, money } from '@/modules/shared/format'
+import { date, dateTime, money, plural } from '@/modules/shared/format'
 import {
   anfragenFreigeben,
   anfragenVorbereiten,
@@ -655,7 +655,7 @@ export default async function ProjektPage({ params }: { params: Promise<{ id: st
             <ActionButton
               action={anfragenFreigeben.bind(null, id)}
               className="small primary"
-              confirm={`${entwuerfeOffen} Anfrage(n) freigeben und über das Einkaufspostfach senden?`}
+              confirm={`${plural(entwuerfeOffen, 'Anfrage', 'Anfragen')} freigeben und über das Einkaufspostfach senden?`}
             >
               Anfragen freigeben ({entwuerfeOffen})
             </ActionButton>

@@ -7,6 +7,7 @@ import { drive } from '@/modules/google/drive'
 import { belegPruefen } from './einkauf-dokumente-ausfuehren.ts'
 import type { WiedervorlageModell } from './einkauf-postfach.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { plural } from '@/modules/shared/format'
 
 /** Ausführung Einkauf Stufe 2a (0093): Posteingang, erfasste Nachrichten, Wiedervorlagen. */
 
@@ -110,7 +111,7 @@ export async function mailZuordnen(
     text:
       `Thread ${[partner?.name, projekt?.nummer].filter(Boolean).join(' · ')} zugeordnet.` +
       (gemerkt ? ` ${gemerkt} wird künftig automatisch zugeordnet.` : '') +
-      (umgezogen ? ` ${umgezogen} Datei(en) in den Lieferantenordner verschoben.` : ''),
+      (umgezogen ? ` ${plural(umgezogen, 'Datei', 'Dateien')} in den Lieferantenordner verschoben.` : ''),
     recordId: threadId,
   }
 }
@@ -260,7 +261,7 @@ export async function postfachAbgleichenAusfuehren(_p: object, _ctx: AktionsKont
   }
   const r = await postfachAbgleichen(20_000)
   const teile = [
-    `${r.neu} neue Nachricht(en)`,
+    `${plural(r.neu, 'neue Nachricht', 'neue Nachrichten')}`,
     r.zugeordnet ? `${r.zugeordnet} zugeordnet` : '',
     r.anhaenge ? `${r.anhaenge} Anhang/Anhänge zur Ablage eingereiht` : '',
     r.weiter ? 'weitere folgen beim nächsten Lauf' : '',

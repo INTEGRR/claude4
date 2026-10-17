@@ -29,6 +29,7 @@
  */
 import { sql, tx } from '@/db/client'
 import type { TransactionSql } from 'postgres'
+import { plural } from '@/modules/shared/format'
 
 /** Notiz der eigenen Korrekturzählung — zählt wie eine Übernahme-Zählung, nicht als echte Buchung. */
 const NOTIZ = 'Odoo-Fertigbestand zurückgenommen'
@@ -169,9 +170,9 @@ export async function fertigbestandZuruecknehmen(von: string): Promise<Fertigbes
     }
 
     await t`select log_event('odoo', gen_random_uuid(), 'note',
-      ${`Odoo-Fertigbestand zurückgenommen: ${bericht.varianten} Variante(n), ${bericht.menge} Stück, ` +
-        `${bericht.reservierungenGeloest} Reservierung(en) gelöst; ${bericht.uebersprungen.length} übersprungen; ` +
-        `${bericht.fertigungsauftraege.length} Fertigungsauftrag/-aufträge nachgezogen` +
+      ${`Odoo-Fertigbestand zurückgenommen: ${plural(bericht.varianten, 'Variante', 'Varianten')}, ${bericht.menge} Stück, ` +
+        `${plural(bericht.reservierungenGeloest, 'Reservierung', 'Reservierungen')} gelöst; ${bericht.uebersprungen.length} übersprungen; ` +
+        `${plural(bericht.fertigungsauftraege.length, 'Fertigungsauftrag', 'Fertigungsaufträge')} nachgezogen` +
         (bericht.fertigungsauftraege.length
           ? ` (${bericht.fertigungsauftraege.map((f) => `${f.nummer} ${f.menge}× ${f.sku ?? ''}`.trim()).join(', ')})`
           : '')},

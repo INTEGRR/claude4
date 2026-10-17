@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { ActionResult } from '@/modules/shared/action'
 import { Stat, TableWrap } from '@/components/ui'
-import { money, qty } from '@/modules/shared/format'
+import { money, plural, qty } from '@/modules/shared/format'
 
 interface Vorschau {
   uebersicht: Record<string, number>
@@ -87,7 +87,7 @@ export function OdooUebernahme({
           >
             {pending
               ? 'Übernehme …'
-              : `${qty(u?.stuecklisten ?? 0)} Stückliste(n) und ${qty((u?.bestand ?? 0) + (u?.lagerBuchen ?? 0))} Bestände übernehmen`}
+              : `${plural(qty(u?.stuecklisten ?? 0), 'Stückliste', 'Stücklisten')} und ${qty((u?.bestand ?? 0) + (u?.lagerBuchen ?? 0))} Bestände übernehmen`}
           </button>
         )}
       </div>
@@ -167,7 +167,7 @@ export function OdooUebernahme({
                 {vorschau.stuecklisten.map((s) => (
                   <tr key={s.skus.join('|')}>
                     <td className="mono small">
-                      {s.jeVariante ? s.skus.join(', ') : `${s.skus.length} Variante(n)`}
+                      {s.jeVariante ? s.skus.join(', ') : `${plural(s.skus.length, 'Variante', 'Varianten')}`}
                       <div className="muted">
                         {s.jeVariante ? 'je Variante' : 'eine Stückliste für den ganzen Artikel, Zeilen mit Variantenfilter'}
                       </div>
@@ -216,7 +216,7 @@ export function OdooUebernahme({
 
           {(u.lagerFertigprodukte ?? 0) > 0 && (
             <p className="small muted" style={{ marginTop: 16 }}>
-              {qty(u.lagerFertigprodukte)} Fertigprodukt(e) mit Odoo-Bestand werden ausgelassen: Ihr Bestand in Odoo
+              {plural(u.lagerFertigprodukte, 'Fertigprodukt', 'Fertigprodukte')} mit Odoo-Bestand werden ausgelassen: Ihr Bestand in Odoo
               stimmt nicht (Lieferungen dort nicht ausgebucht) — in KRNL bleiben sie bei 0.
             </p>
           )}

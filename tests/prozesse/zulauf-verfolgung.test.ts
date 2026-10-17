@@ -132,7 +132,7 @@ describe('Zulauf-Sendungsverfolgung (17TRACK)', () => {
     assert.equal(webhookSignaturPruefen(roh, sign.replace(/^./, 'f')), false)
     assert.equal(webhookSignaturPruefen(roh, null), false)
 
-    assert.equal(await webhookVerarbeiten(payload), '1 Sendung(en) aktualisiert')
+    assert.equal(await webhookVerarbeiten(payload), '1 Sendung aktualisiert')
     const [v] = await zeile('purchase_order', poId)
     assert.equal(v.status, 'zugestellt')
     assert.equal(v.aktiv, false)
@@ -147,11 +147,11 @@ describe('Zulauf-Sendungsverfolgung (17TRACK)', () => {
     assert.match(tg.text, /Zulauf zugestellt/)
     assert.match(tg.text, new RegExp(`${NR} zu P\\d+ \\(Zulauf Lieferant\\)`))
     assert.match(tg.text, /Berlin, 15.10. 09:30: Zugestellt/)
-    assert.equal(await webhookVerarbeiten(payload), '1 Sendung(en) aktualisiert', 'derselbe Push noch einmal')
+    assert.equal(await webhookVerarbeiten(payload), '1 Sendung aktualisiert', 'derselbe Push noch einmal')
     const [{ n: tgN }] = await h.sql<{ n: number }[]>`select count(*)::int as n from benachrichtigungen where art = 'zulauf' and schluessel like ${`zulauf:${v.id}:%`}`
     assert.equal(Number(tgN), 1, 'kein zweites Telegram für denselben Zustand')
 
-    assert.equal(await webhookVerarbeiten({ event: 'TRACKING_UPDATED', data: fakeEintrag('UNBEKANNT1', null) }), '1 Nummer(n) unbekannt — ignoriert')
+    assert.equal(await webhookVerarbeiten({ event: 'TRACKING_UPDATED', data: fakeEintrag('UNBEKANNT1', null) }), '1 Nummer unbekannt — ignoriert')
     assert.equal(await webhookVerarbeiten({ event: 'TRACKING_UPDATED', data: {} }), 'ohne Sendungsnummer — ignoriert')
   })
 

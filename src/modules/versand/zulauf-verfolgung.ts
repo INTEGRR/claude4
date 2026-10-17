@@ -21,6 +21,7 @@ import {
 import { type Abgelehnt, type Angemeldet, Track17Error, nummernAnmelden, staendeAbfragen, track17Konfiguriert } from './track17'
 import { automatischAnmelden, kontingentMerken, kontingentStandLesen } from './track17-einstellung'
 import { einreihen, textZulauf } from '@/modules/integrationen/benachrichtigungen'
+import { plural } from '@/modules/shared/format'
 
 type Db = Sql | TransactionSql
 
@@ -448,7 +449,7 @@ export async function webhookVerarbeiten(payload: WebhookDaten): Promise<string>
       await standUebernehmen(sql, r, eintrag, 'webhook')
     }
   }
-  return betroffen === 0 ? `${eintraege.length} Nummer(n) unbekannt — ignoriert` : `${betroffen} Sendung(en) aktualisiert`
+  return betroffen === 0 ? `${plural(eintraege.length, 'Nummer', 'Nummern')} unbekannt — ignoriert` : `${plural(betroffen, 'Sendung', 'Sendungen')} aktualisiert`
 }
 
 /**

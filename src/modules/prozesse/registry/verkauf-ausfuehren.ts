@@ -2,7 +2,7 @@ import { sql } from '@/db/client'
 import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
-import { money } from '@/modules/shared/format'
+import { money, plural } from '@/modules/shared/format'
 
 /** Ausführung der Verkaufs-Aktionen — Fachlogik unverändert aus verkauf/actions.ts. */
 
@@ -89,7 +89,7 @@ export async function auftragMitPositionen(
   const [order] = await sql<{ number: string }[]>`
     select number from sales_orders where id = ${orderId}`
   return {
-    text: `Angebot ${order.number} für ${kunde.name} mit ${p.positionen.length} Position(en) angelegt.`,
+    text: `Angebot ${order.number} für ${kunde.name} mit ${plural(p.positionen.length, 'Position', 'Positionen')} angelegt.`,
     link: `/verkauf/${orderId}`,
     recordId: orderId,
   }
@@ -307,7 +307,7 @@ export async function rechnungProbelaufLoeschen(_p: object, ctx: AktionsKontext)
   return {
     text:
       r.n > 0
-        ? `${r.n} Testbeleg(e) des Probelaufs gelöscht — Probe-Nummernkreise stehen wieder auf 1. Jetzt kann die Rechnung scharf geschaltet werden (Einstellungen → Belege).`
+        ? `${plural(r.n, 'Testbeleg', 'Testbelege')} des Probelaufs gelöscht — Probe-Nummernkreise stehen wieder auf 1. Jetzt kann die Rechnung scharf geschaltet werden (Einstellungen → Belege).`
         : 'Kein Testbeleg vorhanden — nichts zu löschen.',
     link: '/einstellungen/belege',
   }
@@ -318,7 +318,7 @@ export async function datevUebergeben(p: { von: string; bis: string }, ctx: Akti
     update kundenrechnungen set datev_uebergeben_am = now()
     where rechnungsdatum between ${p.von}::date and ${p.bis}::date and datev_uebergeben_am is null and not probe`
   await sql`select log_event('settings', gen_random_uuid(), 'note',
-    ${`DATEV: ${r.count} Kundenbeleg(e) ${p.von}–${p.bis} als übergeben markiert`}, ${ctx.actor})`
-  return { text: `${r.count} Beleg(e) als an DATEV übergeben markiert.` }
+    ${`DATEV: ${plural(r.count, 'Kundenbeleg', 'Kundenbelege')} ${p.von}–${p.bis} als übergeben markiert`}, ${ctx.actor})`
+  return { text: `${plural(r.count, 'Beleg', 'Belege')} als an DATEV übergeben markiert.` }
 }
 

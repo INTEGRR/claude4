@@ -27,6 +27,7 @@
 import { sql, tx } from '@/db/client'
 import type { TransactionSql } from 'postgres'
 import { vorschlagen } from './doppelte-vorschlag.ts'
+import { plural } from '@/modules/shared/format'
 
 export interface ZusammenfuehrenZeile {
   id: string
@@ -245,7 +246,7 @@ export async function artikelZusammenfuehren(
 
     await t`select log_event('odoo', gen_random_uuid(), 'note',
       ${`Artikel zusammengeführt: ${a.sku ?? a.name} → ${b.name} (${bericht.bestand} Stück, ` +
-        `${bericht.stuecklistenzeilen} Stücklistenzeile(n), ${bericht.offeneBewegungen} offene Bewegung(en))`},
+        `${plural(bericht.stuecklistenzeilen, 'Stücklistenzeile', 'Stücklistenzeilen')}, ${plural(bericht.offeneBewegungen, 'offene Bewegung', 'offene Bewegungen')})`},
       ${von})`
     return bericht
   })

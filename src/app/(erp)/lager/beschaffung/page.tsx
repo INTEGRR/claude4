@@ -3,7 +3,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { MengenWahl } from '@/components/mengen-wahl'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, isoDatum, money, qty } from '@/modules/shared/format'
+import { date, isoDatum, money, plural, qty } from '@/modules/shared/format'
 import Link from 'next/link'
 import {
   createOrderpoint,
@@ -104,8 +104,8 @@ export default async function BeschaffungPage() {
 
       {regeln.some((r) => r.snoozed_until && r.snoozed_until >= isoDatum(new Date())) && (
         <div className="notice info">
-          {regeln.filter((r) => r.snoozed_until && r.snoozed_until >= isoDatum(new Date())).length}{' '}
-          Regel(n) schlummern und erscheinen deshalb nicht in den Vorschlägen. Sie stehen unten
+          {plural(regeln.filter((r) => r.snoozed_until && r.snoozed_until >= isoDatum(new Date())).length, 'Regel schlummert', 'Regeln schlummern')}{' '}
+          und erscheinen deshalb nicht in den Vorschlägen. Sie stehen unten
           in der Regelliste und lassen sich dort wieder aufwecken.
         </div>
       )}

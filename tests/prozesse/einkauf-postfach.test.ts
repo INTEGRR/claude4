@@ -264,7 +264,7 @@ describe('Einkauf Stufe 2a: Postfach lesen und zuordnen', () => {
       TINO,
     )
     assert.match(r.text ?? '', /neuer-lieferant\.cn wird künftig automatisch zugeordnet/)
-    assert.match(r.text ?? '', /1 Datei\(en\) in den Lieferantenordner verschoben/)
+    assert.match(r.text ?? '', /1 Datei in den Lieferantenordner verschoben/)
     const [ordner] = await h.sql<{ folder_id: string }[]>`select folder_id from drive_ordner where schluessel = ${`partner:${ids.keycap}`}`
     assert.deepEqual(fakeDatei(dok.drive_file_id)?.parents, [ordner.folder_id])
     const [p] = await h.sql<{ mail_domains: string[] }[]>`select mail_domains from partners where id = ${ids.keycap}`

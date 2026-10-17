@@ -9,6 +9,19 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Plural statt Klammer-Plural
+
+**Anlass (UX-Audit):** Rund hundert Texte schrieben „3 Position(en)“,
+„1 Fertigungsauftrag/-aufträge“, „Job(s)“ — in Meldungen, Verlauf und auf
+Seiten.
+
+**Entschieden:** `plural(n, eins, viele)` in format.ts (Zahl deutsch
+formatiert), in SQL `plural_text` (Migration 0128, sechs Funktionen neu
+definiert). Wo ein Verb folgt, steht es in beiden Formen. Der Wächter
+tests/plural.test.ts verbietet Klammer- und Schrägstrich-Plurale im Code
+und in der jeweils neuesten SQL-Funktion (Kommentare ausgenommen). Doku:
+[entwicklung.md](entwicklung.md).
+
 ## 2026-10-17 — Eine Regel für „überfällig“
 
 **Anlass (UX-Audit):** Termine, die ein Jahr zurücklagen, sahen aus wie

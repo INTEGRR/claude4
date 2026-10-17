@@ -8,7 +8,7 @@ import {
   staffelFuer,
 } from '@/modules/einkauf/einkaufsprojekt'
 import type { Sprache } from '@/modules/einkauf/mail-vorlagen'
-import { money } from '@/modules/shared/format'
+import { money, plural } from '@/modules/shared/format'
 import { varianteAufloesen } from './aufloesen.ts'
 import { entwurfAnlegen, entwurfLesen, freigabeEinreihen, freigabePruefen } from './einkauf-mailversand-ausfuehren.ts'
 import { werkzeugAusBestellung } from './einkauf-werkzeuge-ausfuehren.ts'
@@ -105,7 +105,7 @@ export async function projektAnlegen(
                 ${pos.gewicht_g ?? null}, ${pos.hs_code ?? null}, ${pos.spezifikation ?? null})`
     }
     await t`select log_event('einkaufsprojekt', ${ep.id}, 'state',
-                             ${`Projekt angelegt (${positionen.length} Position(en)${p.muster_pflicht ? ', mit Musterpflicht' : ''})`}, ${ctx.actor})`
+                             ${`Projekt angelegt (${plural(positionen.length, 'Position', 'Positionen')}${p.muster_pflicht ? ', mit Musterpflicht' : ''})`}, ${ctx.actor})`
     return ep
   })
   return {
@@ -328,7 +328,7 @@ export async function anfragenFreigeben(_p: object, ctx: AktionsKontext): Promis
   })
   return {
     text: offen.length
-      ? `${offen.length} Anfrage(n) freigegeben — sie gehen innerhalb einer Minute hinaus.`
+      ? `${plural(offen.length, 'Anfrage', 'Anfragen')} freigegeben — sie gehen innerhalb einer Minute hinaus.`
       : 'Alle Anfragen sind schon unterwegs — Projekt steht auf „angefragt".',
     recordId: projekt.id,
   }
@@ -725,7 +725,7 @@ export async function projektAbbrechen(p: { grund: string }, ctx: AktionsKontext
     const offen = await sql<{ number: string }[]>`
       select number from purchase_orders where einkaufsprojekt_id = ${projekt.id} and state <> 'cancel' order by number`
     if (offen.length) {
-      throw new Error(`Erst die Bestellung(en) stornieren: ${offen.map((o) => o.number).join(', ')}.`)
+      throw new Error(`Erst ${offen.length === 1 ? 'die Bestellung' : 'die Bestellungen'} stornieren: ${offen.map((o) => o.number).join(', ')}.`)
     }
   }
   await tx(async (t) => {

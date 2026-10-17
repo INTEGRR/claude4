@@ -5,7 +5,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
-import { date, dateTime, hours, isoDatum, label, LABELS, money } from '@/modules/shared/format'
+import { date, dateTime, hours, isoDatum, label, LABELS, money, plural } from '@/modules/shared/format'
 import { addTimeEntry, deleteTimeEntry, requestAbsence, updateEmployee } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 
@@ -146,7 +146,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           value={`${Number(urlaub.genommen)} / ${Number(e.vacation_days)} Tage`}
           hint={
             Number(urlaub.offen) > 0
-              ? `${Number(urlaub.offen)} Tag(e) beantragt`
+              ? `${plural(Number(urlaub.offen), 'Tag', 'Tage')} beantragt`
               : 'genehmigt im laufenden Jahr'
           }
         />

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { RegistrierteAktion } from './typen.ts'
+import { plural } from '../../shared/format.ts'
 
 /**
  * Aktionen des Versands. Kern für den Shopify-Prozess (P4) ist
@@ -213,7 +214,7 @@ export const VERSAND = {
       ids: z.array(z.string().uuid()).min(1).max(500).optional().describe('Lieferungen; leer = alle'),
     }),
     zusammenfassung: (p) =>
-      p.ids ? `${p.ids.length} gelabelte Lieferung(en) ausbuchen` : 'alle gelabelten Lieferungen ausbuchen',
+      p.ids ? `${plural(p.ids.length, 'gelabelte Lieferung', 'gelabelte Lieferungen')} ausbuchen` : 'alle gelabelten Lieferungen ausbuchen',
     formdata: (fd) => {
       const ids = fd.getAll('ids').map(String).filter(Boolean)
       return { ids: ids.length ? ids : undefined }

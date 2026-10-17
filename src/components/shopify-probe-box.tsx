@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { plural } from '../modules/shared/format.ts'
 
 interface Eintrag {
   id: string
@@ -103,7 +104,7 @@ export function ShopifyProbeBox() {
                   </div>
                   {e.details.length > 0 && (
                     <details>
-                      <summary className="small muted">{e.details.length} Zeile(n)</summary>
+                      <summary className="small muted">{plural(e.details.length, 'Zeile', 'Zeilen')}</summary>
                       <ul className="small mono">
                         {e.details.slice(0, 60).map((d, i) => (
                           <li key={i}>{d}</li>

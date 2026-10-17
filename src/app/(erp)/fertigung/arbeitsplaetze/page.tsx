@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { money, qty } from '@/modules/shared/format'
+import { money, plural, qty } from '@/modules/shared/format'
 import { createWorkCenter, updateWorkCenter } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -97,7 +97,7 @@ export default async function WorkCentersPage() {
                       {w.name}
                       {w.note && <div className="small muted">{w.note}</div>}
                       <div className="small muted">
-                        {w.operations} Arbeitsgang/-gänge in Stücklisten
+                        {plural(w.operations, 'Arbeitsgang', 'Arbeitsgänge')} in Stücklisten
                       </div>
                     </td>
                     <td className="num mono">{money(w.cost_per_hour)}</td>
