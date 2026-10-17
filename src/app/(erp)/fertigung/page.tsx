@@ -8,7 +8,7 @@ import { FertigungBulk } from './bulk'
 import { Auswahl } from '@/components/auswahl'
 import { ActionButton } from '@/components/action-button'
 import { aufgabenListe } from '@/modules/aufgaben/liste'
-import { NACHFRAGE_PRAEFIX, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
+import { istFertigungsNachfrage, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
 import { date } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
@@ -103,11 +103,11 @@ export default async function FertigungPage({
     return query ? `/fertigung?${query}` : '/fertigung'
   }
 
-  // Versand außerhalb von KRNL (2026-10-15): der Shop hat versendet, der
-  // Fertigungsauftrag ist noch offen — die Nachfragen ans Team Fertigung,
+  // Versendet (extern 2026-10-15, von Hand gebucht 2026-10-17), der
+  // Fertigungsauftrag ist aber noch offen — die Nachfragen ans Team Fertigung,
   // hier, wo entschieden wird (Fertig melden oder stornieren hakt sie ab).
   const nachfragen = (await aufgabenListe(user, 'offen', 500)).filter(
-    (a) => a.rolle === 'fertigung' && a.titel.startsWith(NACHFRAGE_PRAEFIX),
+    (a) => a.rolle === 'fertigung' && istFertigungsNachfrage(a.titel),
   )
   const nachfrageNrn = [...new Set(nachfragen.flatMap((a) => nachfrageNummern(a.titel)))]
   // manuell = Komponenten mit Verbrauchsart „manuell": die Fertigmeldung
@@ -139,12 +139,12 @@ export default async function FertigungPage({
 
       {nachfragen.length > 0 && (
         <Card
-          title={`Extern versendet — Fertigung noch durchführen? (${nachfragen.length})`}
+          title={`Versendet — Fertigung noch durchführen? (${nachfragen.length})`}
           tight
           actions={<Link className="btn small" href="/aufgaben?filter=offen">Alle Aufgaben</Link>}
         >
           <p className="small muted" style={{ margin: '10px 12px 6px' }}>
-            Der Shop meldet diese Aufträge als versendet (Sendcloud), KRNL hat den Warenausgang gebucht — der
+            Diese Aufträge sind versendet — vom Shop gemeldet (Sendcloud) oder in KRNL von Hand gebucht —, der
             Fertigungsauftrag ist aber noch offen. Die Antwort ist die Buchung: <strong>Ja, gebaut</strong> meldet
             den Auftrag fertig (Material wird verbraucht, Bestand des Erzeugnisses geht auf null);{' '}
             <strong>Nein, nicht gebaut</strong> storniert ihn (dann den Bestand per Inventur korrigieren). Die

@@ -192,13 +192,13 @@ export async function fertigMelden(
   // Versand außerhalb von KRNL (2026-10-15): die Nachfrage ans Team Fertigung
   // ist damit beantwortet — sie wird abgehakt, keiner muss sie extra schließen.
   const nachfragen = await fertigungsNachfrageAbhaken(sql, ctx.recordId!, ctx.actor, 'fertig gemeldet')
-  return { recordId: ctx.recordId, text: nachfragen.length ? 'Fertig gemeldet — die Nachfrage „Extern versendet" ist abgehakt.' : undefined }
+  return { recordId: ctx.recordId, text: nachfragen.length ? 'Fertig gemeldet — die Nachfrage an die Fertigung ist abgehakt.' : undefined }
 }
 
 export async function stornieren(_p: object, ctx: AktionsKontext): Promise<AktionsErgebnis> {
   await sql`select mo_cancel(${ctx.recordId!}, ${ctx.actor})`
   const nachfragen = await fertigungsNachfrageAbhaken(sql, ctx.recordId!, ctx.actor, 'storniert')
-  return { recordId: ctx.recordId, text: nachfragen.length ? 'Storniert — die Nachfrage „Extern versendet" ist abgehakt; Bestand des Erzeugnisses per Inventur prüfen.' : undefined }
+  return { recordId: ctx.recordId, text: nachfragen.length ? 'Storniert — die Nachfrage an die Fertigung ist abgehakt; Bestand des Erzeugnisses per Inventur prüfen.' : undefined }
 }
 
 // --- Arbeitsgänge am Auftrag ------------------------------------------------

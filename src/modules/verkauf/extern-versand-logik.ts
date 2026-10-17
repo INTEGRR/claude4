@@ -48,21 +48,26 @@ export function externVersandText(e: ExternVersand): string {
 }
 
 /**
- * Die Nachfrage ans Team Fertigung, wenn der Shop versendet meldet, der
- * Fertigungsauftrag aber noch offen ist: Eine Aufgabe je Auftrag, der
- * Titel ist zugleich der Doppel-Schutz.
+ * Die Nachfrage ans Team Fertigung, wenn der Auftrag versendet ist, der
+ * Fertigungsauftrag aber noch offen: Eine Aufgabe je Auftrag, der Titel ist
+ * zugleich der Doppel-Schutz. `extern` = der Shop hat versendet (Sendcloud);
+ * sonst wurde die Lieferung in KRNL von Hand gebucht (seit 2026-10-17).
  */
 export function fertigungsNachfrage(
   auftrag: { id: string; number: string; shopify_order_name: string | null },
   mos: { id: string; number: string }[],
+  extern = true,
 ): { titel: string; beschreibung: string } {
   const name = auftrag.shopify_order_name ? `${auftrag.number} (${auftrag.shopify_order_name})` : auftrag.number
   const nummern = mos.map((m) => m.number).join(', ')
   return {
-    titel: `Extern versendet: Fertigung ${nummern} zu ${name} noch durchführen?`,
+    titel: `${extern ? NACHFRAGE_PRAEFIX : NACHFRAGE_PRAEFIX_KRNL}${nummern} zu ${name} noch durchführen?`,
     beschreibung:
-      `Der Shop meldet ${name} als versendet (Versand außerhalb von KRNL, z. B. Sendcloud); ` +
-      'KRNL hat den Warenausgang gebucht. Der Fertigungsauftrag ist aber noch offen — wurde die Ware gebaut?\n' +
+      (extern
+        ? `Der Shop meldet ${name} als versendet (Versand außerhalb von KRNL, z. B. Sendcloud); ` +
+          'KRNL hat den Warenausgang gebucht.'
+        : `Die Lieferung zu ${name} ist in KRNL gebucht, ohne dass die Fertigung fertig gemeldet war.`) +
+      ' Der Fertigungsauftrag ist aber noch offen — wurde die Ware gebaut?\n' +
       '• Ja: Fertigungsauftrag „Fertig melden" — das Material wird verbraucht und das Erzeugnis gebucht, ' +
       'der Bestand des Erzeugnisses geht damit wieder auf null.\n' +
       '• Nein: Fertigungsauftrag stornieren und den Bestand des Erzeugnisses per Inventur korrigieren.\n' +
@@ -70,11 +75,20 @@ export function fertigungsNachfrage(
   }
 }
 
-/** Titel-Präfix der Nachfrage — zugleich der Schlüssel, um sie wiederzufinden. */
+/** Titel-Präfixe der Nachfrage — zugleich der Schlüssel, um sie wiederzufinden. */
 export const NACHFRAGE_PRAEFIX = 'Extern versendet: Fertigung '
+export const NACHFRAGE_PRAEFIX_KRNL = 'Versendet ohne Fertigmeldung: Fertigung '
+export const NACHFRAGE_PRAEFIXE = [NACHFRAGE_PRAEFIX, NACHFRAGE_PRAEFIX_KRNL] as const
+
+/** Ist diese Aufgabe eine Nachfrage an die Fertigung (gleich welcher Herkunft)? */
+export function istFertigungsNachfrage(titel: string): boolean {
+  return NACHFRAGE_PRAEFIXE.some((p) => titel.startsWith(p))
+}
 
 /** „Extern versendet: Fertigung FA/0418, FA/0419 zu S00042 (#5012) noch durchführen?" → ['FA/0418', 'FA/0419'] */
 export function nachfrageNummern(titel: string): string[] {
-  const m = /^Extern versendet: Fertigung (.+?) zu \S+/.exec(titel)
+  const praefix = NACHFRAGE_PRAEFIXE.find((p) => titel.startsWith(p))
+  if (!praefix) return []
+  const m = /^(.+?) zu \S+/.exec(titel.slice(praefix.length))
   return m ? m[1].split(',').map((n) => n.trim()).filter(Boolean) : []
 }

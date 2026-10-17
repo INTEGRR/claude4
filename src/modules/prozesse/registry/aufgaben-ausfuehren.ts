@@ -9,7 +9,7 @@ import {
   uhrzeitAufloesen,
 } from '@/modules/aufgaben/termin'
 import { darfAbhaken, darfVerwerfen } from '@/modules/aufgaben/rechte'
-import { NACHFRAGE_PRAEFIX, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
+import { istFertigungsNachfrage, nachfrageNummern } from '@/modules/verkauf/extern-versand-logik'
 import { type AktionsErgebnis, type AktionsKontext, UUID_MUSTER } from './typen.ts'
 
 /** Ausführung der Aufgaben (0104): anlegen, abhaken, verwerfen. */
@@ -142,7 +142,7 @@ export async function aufgabeErledigen(p: { aufgabe: string; notiz?: string }, c
   // ist eine Frage an den Fertigungsauftrag — abhaken allein stellt nichts
   // fertig. Beantwortet wird sie am Auftrag (Fertig melden / Stornieren), und
   // das hakt sie von selbst ab. Solange ein genannter Auftrag offen ist: nein.
-  if (a.titel.startsWith(NACHFRAGE_PRAEFIX)) {
+  if (istFertigungsNachfrage(a.titel)) {
     const nummern = nachfrageNummern(a.titel)
     const offen = await sql<{ number: string }[]>`
       select number from manufacturing_orders where number = any(${nummern}) and state not in ('done', 'cancel')`

@@ -798,7 +798,8 @@ je einzeln releasebar:
   rechnet Umsatzsteuer − Vorsteuer aus den Belegen und wird per Klick (oder
   Cron) als Termin übernommen — gebucht wird nie automatisch.
 - **Umsatzplan + Prognose (0061)**: `umsatzplan` (Monat × best/base/worst,
-  Vorschlag = Vorjahresmonat × Trend, Handeingaben gewinnen dauerhaft).
+  Vorschlag = Vorjahresmonat × Trend, Handeingaben gewinnen dauerhaft; der
+  Trend gilt seit 0126 nur bei vollständigem Vorjahresfenster, sonst 1).
   `finanz_prognose(szenario, raster)` über 13 Wochen oder 12 Monate:
   Planumsatz taggenau mit Kanal-Split (historische Shopify-Quote) und
   Zahlungsversatz; Bestellabflüsse aus drei DISJUNKTEN Quellen (offene

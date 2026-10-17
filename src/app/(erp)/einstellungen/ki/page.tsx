@@ -7,7 +7,6 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { KI_EBENEN, MODELL_KATALOG, modellAufloesen } from '@/modules/ki/modelle'
 import { KI_REGIONEN, bedrockModellId, bedrockRegion, kiPfadBereit, kiRegionAufloesen, openaiBasis } from '@/modules/ki/region'
-import { kiConfigured } from '@/modules/ki/agent'
 import { kiFake, uebersetzungMoeglich } from '@/modules/ki/uebersetzen'
 import { einkaufKiStandLesen, verbrauchImMonat, verbrauchJeEbene } from '@/modules/ki/einkauf-ki'
 import { Auswahl } from '@/components/auswahl'
@@ -39,7 +38,6 @@ export default async function KiModellePage() {
   const standardBereit = kiPfadBereit('standard')
   const euBereit = kiPfadBereit('eu')
   const einkauf = einkaufKiStandLesen(await einstellung<Record<string, unknown>>('ki_einkauf'))
-  const verbunden = kiConfigured()
   // Der Agent läuft mit Schlüssel oder mit der Attrappe (KI_FAKE=1).
   const agentBereit = uebersetzungMoeglich()
   const [monat, jeEbene] = await Promise.all([verbrauchImMonat(sql, 'einkauf'), verbrauchJeEbene(sql)])
@@ -90,8 +88,12 @@ export default async function KiModellePage() {
 
       <Card title="Modell je Ebene">
         <div style={{ marginBottom: 12 }}>
-          <Zustand ton={verbunden ? 'ok' : 'off'}>
-            {verbunden ? 'KI-Zugang vorhanden' : 'nicht konfiguriert — weder ANTHROPIC_API_KEY noch AWS-Zugang, die KI ist aus'}
+          {/* Dieselbe Wahrheit wie die Regionskarte (UX-Audit): zählt nur der
+              Zugang der gewählten Region, nicht irgendein Schlüssel. */}
+          <Zustand ton={regionBereit ? 'ok' : 'warn'}>
+            {regionBereit
+              ? `KI-Zugang für die Region „${region === 'eu' ? 'EU' : 'Standard'}" vorhanden`
+              : `kein Zugang für die gewählte Region „${region === 'eu' ? 'EU' : 'Standard'}" — die Modelle sind gespeichert, aber KI-Aufrufe schlagen fehl`}
           </Zustand>
         </div>
         <ActionForm action={kiModelleSpeichern}>

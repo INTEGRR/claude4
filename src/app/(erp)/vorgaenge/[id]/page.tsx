@@ -69,6 +69,7 @@ export default async function VorgangDetail({
   const [zustandsSchritt] = await sql<{ name: string }[]>`
     select name from prozess_schritte
     where version_id = prozess_aktive_version(${v.prozess_code}) and zustand = ${v.state}
+    order by sequence, code
     limit 1`
 
   // Alle eigenen Felder des Ablaufs — mit Typ/Auswahl, denn hier wird

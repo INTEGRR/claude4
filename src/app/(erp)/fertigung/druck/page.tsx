@@ -1,5 +1,5 @@
 import { requireArea } from '@/modules/auth'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { moZettelDaten } from '@/modules/fertigung/zettel-daten'
 import { PrintButton } from '@/components/print-button'
 import { ZettelAnsicht } from '../zettel-ansicht'
@@ -23,7 +23,8 @@ export default async function MoSammeldruckPage({
     .map((s) => s.trim())
     .filter(Boolean)
     .slice(0, 50)
-  if (liste.length === 0) notFound()
+  // Ohne Auswahl (Lesezeichen, Zurück-Taste) zur Liste statt auf eine 404 (UX-Audit).
+  if (liste.length === 0) redirect('/fertigung')
 
   const zettel = (await Promise.all(liste.map((id) => moZettelDaten(id)))).filter(
     (d): d is NonNullable<typeof d> => d !== null,

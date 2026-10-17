@@ -118,6 +118,10 @@
     --accent-text: #ff8a5c;
     --accent-soft: #2b1a12;
 
+    --wichtig: #9085e9;
+    --wichtig-kontrast: #14151a;
+    --wichtig-soft: #211d33;
+
     --success: #7fa98a;
     --success-soft: #1a241d;
     --warn: #c9a051;
@@ -129,6 +133,9 @@
 
     --display: #0a0b0d;
     --display-2: #131518;
+    --display-line: #3a3c40;
+    --display-text: #c9cace;
+    --display-bright: #ededea;
 
     --shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.4);
@@ -1139,6 +1146,9 @@ label.field > span, .field > .feld-titel {
   .app.nav-offen .sidebar {
     transform: translateX(0);
     box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.02), 12px 0 32px rgb(0 0 0 / 0.18);
+    /* Offen über den festen Bedienelementen (Befehlsfeld, Ticket-Lasche,
+       Probe-Box, alle z-index 60) — sonst liegen sie auf dem Menü (UX-Audit). */
+    z-index: 66;
   }
 
   /* Fläche zum Schließen: liegt unter der Navigation, über allem anderen. */
@@ -1146,7 +1156,7 @@ label.field > span, .field > .feld-titel {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 30;
+    z-index: 65;
     border: 0;
     padding: 0;
     background: rgb(0 0 0 / 0.45);

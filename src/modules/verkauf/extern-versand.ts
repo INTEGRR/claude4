@@ -1,6 +1,6 @@
 import type { TransactionSql } from 'postgres'
 import type { ShopifyOrder } from '../integrationen/shopify.ts'
-import { NACHFRAGE_PRAEFIX, externVersandAusShop, externVersandText, fertigungsNachfrage, nachfrageNummern } from './extern-versand-logik.ts'
+import { NACHFRAGE_PRAEFIXE, externVersandAusShop, externVersandText, fertigungsNachfrage, nachfrageNummern } from './extern-versand-logik.ts'
 import type { Sql } from 'postgres'
 
 /**
@@ -96,7 +96,7 @@ export async function fertigungsNachfrageAbhaken(
   if (!mo) return []
   const offen = await db<{ id: string; titel: string }[]>`
     select id, titel from aufgaben
-    where status = 'offen' and rolle = 'fertigung' and titel like ${`${NACHFRAGE_PRAEFIX}%`}
+    where status = 'offen' and rolle = 'fertigung' and titel like any(${NACHFRAGE_PRAEFIXE.map((p) => `${p}%`)})
       and titel like ${`%${mo.number}%`}`
   const erledigt: string[] = []
   for (const a of offen) {
@@ -117,36 +117,70 @@ export async function fertigungsNachfrageAbhaken(
   return erledigt
 }
 
+/** Ab hier zählt auch die von Hand gebuchte Lieferung (Einführung, Entscheidungslog 2026-10-17). */
+export const NACHFRAGE_KRNL_AB = '2026-10-17'
+
 /**
- * Nachfragen sind eine Projektion aus den Belegen (2026-10-15): extern
- * versendete Lieferung + noch offener Fertigungsauftrag ⇒ es muss eine
- * offene Nachfrage geben. Wurde sie ohne Buchung geschlossen (alte Fassung
+ * Nachfragen sind eine Projektion aus den Belegen (2026-10-15): versendete
+ * Lieferung + noch offener Fertigungsauftrag ⇒ es muss eine offene
+ * Nachfrage geben. Wurde sie ohne Buchung geschlossen (alte Fassung
  * „Abhaken"), legt der Abgleich sie wieder an — die Frage ist erst
  * beantwortet, wenn der Fertigungsauftrag fertig oder storniert ist.
+ *
+ * Seit 2026-10-17 zählt auch die in KRNL von Hand gebuchte Lieferung — aber
+ * nur, wenn keine Lieferung des Auftrags mehr offen ist (sonst gehört der
+ * offene Fertigungsauftrag zur Restlieferung, und es gibt nichts zu fragen).
+ * `nurAuftrag` grenzt auf einen Auftrag ein (direkt nach dem Warenausgang).
  */
-export async function fertigungsNachfragenNachziehen(db: Sql | TransactionSql): Promise<number> {
-  const faelle = await db<{ id: string; number: string; shopify_order_name: string | null; mo_ids: string[]; mo_nummern: string[] }[]>`
+export async function fertigungsNachfragenNachziehen(db: Sql | TransactionSql, nurAuftrag: string | null = null): Promise<number> {
+  const faelle = await db<{ id: string; number: string; shopify_order_name: string | null; extern: boolean; mo_ids: string[]; mo_nummern: string[] }[]>`
     select so.id, so.number, so.shopify_order_name,
+           exists (select 1 from stock_pickings p
+                   where p.origin_model = 'sales_order' and p.origin_id = so.id
+                     and p.extern_versand is not null and p.state = 'done') as extern,
            array_agg(m.id order by m.number) as mo_ids, array_agg(m.number order by m.number) as mo_nummern
     from sales_orders so
     join manufacturing_orders m on m.sales_order_id = so.id and m.state not in ('done', 'cancel')
-    where exists (select 1 from stock_pickings p
-                  where p.origin_model = 'sales_order' and p.origin_id = so.id
-                    and p.extern_versand is not null and p.state = 'done')
+    where (${nurAuftrag}::uuid is null or so.id = ${nurAuftrag}::uuid)
+      -- Extern versendet: immer; von Hand gebucht: erst ab Einführung —
+      -- kein rückwirkender Schwall an Nachfragen für Altfälle.
+      and exists (select 1 from stock_pickings p
+                  where p.origin_model = 'sales_order' and p.origin_id = so.id and p.state = 'done'
+                    and (p.extern_versand is not null or p.date_done >= ${NACHFRAGE_KRNL_AB}::date))
+      and not exists (select 1 from stock_pickings p
+                      where p.origin_model = 'sales_order' and p.origin_id = so.id
+                        and p.state not in ('done', 'cancel'))
     group by so.id, so.number, so.shopify_order_name`
   let neu = 0
   for (const f of faelle) {
     const mos = f.mo_ids.map((id, i) => ({ id, number: f.mo_nummern[i] }))
-    const { titel, beschreibung } = fertigungsNachfrage({ id: f.id, number: f.number, shopify_order_name: f.shopify_order_name }, mos)
+    const { titel, beschreibung } = fertigungsNachfrage({ id: f.id, number: f.number, shopify_order_name: f.shopify_order_name }, mos, f.extern)
+    const quelle = f.extern ? 'shopify' : 'system'
     const [row] = await db<{ id: string }[]>`
       insert into aufgaben (titel, beschreibung, rolle, faellig_am, erstellt_von)
-      select ${titel}, ${beschreibung}, 'fertigung', (now() at time zone 'Europe/Berlin')::date, 'shopify'
+      select ${titel}, ${beschreibung}, 'fertigung', (now() at time zone 'Europe/Berlin')::date, ${quelle}
       where not exists (select 1 from aufgaben where titel = ${titel} and status = 'offen')
       returning id`
     if (!row) continue
     neu++
+    const nummern = mos.map((m) => m.number).join(', ')
     await db`select log_event('sales_order', ${f.id}, 'error',
-      ${`Fertigung ${mos.map((m) => m.number).join(', ')} noch offen — Nachfrage ans Team Fertigung erneut angelegt (die vorige war ohne Buchung geschlossen).`}, 'shopify')`
+      ${f.extern
+        ? `Fertigung ${nummern} noch offen — Nachfrage ans Team Fertigung erneut angelegt (die vorige war ohne Buchung geschlossen).`
+        : `Lieferung gebucht, Fertigung ${nummern} aber noch offen — Nachfrage ans Team Fertigung angelegt (Aufgabe).`}, ${quelle})`
   }
   return neu
+}
+
+/**
+ * Direkt nach einem Warenausgang in KRNL (Lager, Packtisch): war es die
+ * letzte offene Lieferung eines Verkaufsauftrags und ist dessen Fertigung
+ * noch offen, entsteht sofort die Nachfrage — nicht erst beim nächsten
+ * Shop-Abgleich. Darf den Warenausgang nie blockieren.
+ */
+export async function fertigungsNachfrageNachLieferung(db: Sql | TransactionSql, pickingId: string): Promise<void> {
+  const [p] = await db<{ origin_id: string }[]>`
+    select origin_id from stock_pickings
+    where id = ${pickingId} and origin_model = 'sales_order' and state = 'done'`
+  if (p) await fertigungsNachfragenNachziehen(db, p.origin_id)
 }

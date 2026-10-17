@@ -30,8 +30,9 @@ Betreibers: [Entscheidungslog 2026-10-17](../entscheidungen.md).
    Schalter „Retourenlabel sofort mailen" (Standard an): DHL-Retourenlabel
    mit der Retourennummer `RT/…` als Referenz, Absender die **Lieferadresse
    der Bestellung**, Mail an die Adresse der Anfrage bzw. der Bestellung.
-   Scheitert das Label, bleibt die Retoure genehmigt, der Grund steht am
-   Beleg und „Retourenlabel senden" wird dort angeboten
+   Scheitert das Label, bleibt die Retoure genehmigt, der Grund steht im
+   Verlauf und als letzter Fehler auf der Labelkarte (beim Genehmigen wie
+   beim erneuten Senden) und „Retourenlabel senden" wird dort angeboten
    (`versand.retoure_label_senden`). Oder **Ablehnen** (`abgelehnt`) mit
    Begründung, auf Wunsch per Mail (`send_return_rejected_email`).
 3. **Ware eingegangen** (`eingegangen`, `versand.retoure_eingang`) — Scan

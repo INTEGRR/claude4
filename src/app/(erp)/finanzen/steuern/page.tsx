@@ -26,10 +26,11 @@ export default async function SteuernSeite() {
   const termine = await sql<
     { id: string; art: string; zeitraum_von: string; zeitraum_bis: string;
       bezeichnung: string; betrag: number; faellig_am: string;
-      quelle: string; bezahlt_am: string | null }[]
+      quelle: string; bezahlt_am: string | null; ueberfaellig: boolean }[]
   >`
     select id, art, zeitraum_von, zeitraum_bis, bezeichnung, betrag,
-           faellig_am, quelle, bezahlt_am
+           faellig_am, quelle, bezahlt_am,
+           (bezahlt_am is null and faellig_am < current_date) as ueberfaellig
     from steuerzahlungen
     order by bezahlt_am is not null, faellig_am`
 
@@ -108,7 +109,10 @@ export default async function SteuernSeite() {
                     <td className="mono muted">
                       {date(s.zeitraum_von)} – {date(s.zeitraum_bis)}
                     </td>
-                    <td className="mono muted">{date(s.faellig_am)}</td>
+                    <td className="mono muted">
+                      {date(s.faellig_am)}
+                      {s.ueberfaellig && <> <span className="badge danger">überfällig</span></>}
+                    </td>
                     <td className="mono" style={{ textAlign: 'right' }}>
                       {Number(s.betrag) < 0 ? '+' : ''}{money(Math.abs(Number(s.betrag)))}
                       {Number(s.betrag) < 0 && <span className="muted small"> Erstattung</span>}

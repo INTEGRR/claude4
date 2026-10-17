@@ -616,3 +616,42 @@ describe('Finanzen: nur bestätigte Bestellungen zählen (0123, UX-Audit)', () =
     })
   })
 })
+
+describe('Finanzen: Umsatzplan-Trend aus vollständigem Vorjahresfenster (0126, UX-Audit)', () => {
+  test('Lücke im Vorjahr → Trend 1; volles Fenster → Verhältnis der Summen', async () => {
+    await withRollback(async (t) => {
+      const s = await finanzSzenario(t)
+      // Fremde Belege der Dev-DB aus allen Fenstern schieben — der Test misst absolut.
+      await t`update sales_orders set order_date = '2000-01-15'`
+      const [kunde] = await t<{ id: string }[]>`
+        insert into partners (name, is_customer) values ('Trend Kunde', true) returning id`
+      const [variant] = await t<{ id: string }[]>`
+        select pv.id from product_variants pv
+        join product_templates pt on pt.id = pv.template_id
+        where pt.name = 'Gehäuse CNC' limit 1`
+      const beleg = async (monateZurueck: number, netto: number) => {
+        const [so] = await t<{ id: string }[]>`
+          insert into sales_orders (number, partner_id, state, order_date)
+          values (next_sequence('sale'), ${kunde.id}, 'sale',
+                  (date_trunc('month', current_date) - make_interval(months => ${monateZurueck}) + interval '4 days')::date)
+          returning id`
+        await t`insert into sales_order_lines (order_id, variant_id, name, qty, uom_id, price_unit, tax_rate)
+                values (${so.id}, ${variant.id}, 'Gehäuse CNC', 1, ${s.uom}, ${netto}, 19)`
+      }
+      const vorschlag = async () =>
+        Number((await t<{ v: number }[]>`
+          select umsatzplan_vorschlag((date_trunc('month', current_date) + interval '11 months')::date) as v`)[0].v)
+
+      // Letzte drei Monate je 1000; im Vorjahresfenster nur ein Monat.
+      for (const m of [1, 2, 3]) await beleg(m, 1000)
+      await beleg(13, 500)
+      // Vorjahresmonat des Zielmonats (+11) ist Monat −1 = 1000; Trend 1, nicht 3000/500 (gekappt 4).
+      assert.equal(await vorschlag(), 1000)
+
+      // Vorjahresfenster vollständig (3 × 500) → Trend 3000 / 1500 = 2.
+      await beleg(14, 500)
+      await beleg(15, 500)
+      assert.equal(await vorschlag(), 2000)
+    })
+  })
+})

@@ -55,6 +55,7 @@ export default async function Dashboard({
       umsatz_monat: number
       kuendigungen: number
       zahlungen_faellig: number
+      zahlungen_ueberfaellig: number
       unterdeckung: number
       reparaturen_erwartet: number
       reparaturen_arbeit: number
@@ -89,7 +90,10 @@ export default async function Dashboard({
                 where so.state = 'sale' and so.order_date >= date_trunc('month', now())), 0)
         as umsatz_monat,
       (select count(*) from vertraege v where vertrag_kuendigung_ansteht(v.id))::int as kuendigungen,
-      (select count(*) from finanz_faellig(current_date + 7))::int as zahlungen_faellig,
+      -- Überfällig und „diese Woche" getrennt (UX-Audit): finanz_faellig liefert
+      -- auch alles Verpasste — das gehört nicht unter „diese Woche".
+      (select count(*) from finanz_faellig(current_date + 7) where faellig_am >= current_date)::int as zahlungen_faellig,
+      (select count(*) from finanz_faellig(current_date - 1))::int as zahlungen_ueberfaellig,
       coalesce((select fremdkapitalbedarf from finanz_unterdeckung('base')), 0) as unterdeckung,
       -- Reparaturen nach Lage: erwartet (angenommen, Gerät noch nicht da —
       -- „neu" und „wartet auf Gerät"), in Arbeit (Gerät da, bestätigt, in
@@ -207,8 +211,11 @@ export default async function Dashboard({
     ...(sees('finanzen') && s.kuendigungen > 0
       ? [{ label: 'Verträge: Kündigungsfrist läuft ab', wert: s.kuendigungen, href: '/finanzen/vertraege', wichtig: true }]
       : []),
+    ...(sees('finanzen') && s.zahlungen_ueberfaellig > 0
+      ? [{ label: 'Zahlungen überfällig', wert: s.zahlungen_ueberfaellig, href: '/finanzen', warn: true }]
+      : []),
     ...(sees('finanzen') && s.zahlungen_faellig > 0
-      ? [{ label: 'Zahlungen fällig diese Woche', wert: s.zahlungen_faellig, href: '/finanzen', warn: true }]
+      ? [{ label: 'Zahlungen fällig diese Woche', wert: s.zahlungen_faellig, href: '/finanzen' }]
       : []),
     // Die Entscheidung schlechthin: Fremdkapital beschaffen oder Einkauf
     // strecken — deshalb Violett, nicht Gelb.

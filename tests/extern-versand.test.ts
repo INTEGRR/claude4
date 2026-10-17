@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { externVersandAusShop, externVersandText, fertigungsNachfrage, nachfrageNummern } from '../src/modules/verkauf/extern-versand-logik.ts'
+import { externVersandAusShop, externVersandText, fertigungsNachfrage, istFertigungsNachfrage, nachfrageNummern } from '../src/modules/verkauf/extern-versand-logik.ts'
 import { EREIGNISSE } from '../src/modules/prozesse/ereignisse.ts'
 
 /**
@@ -72,5 +72,13 @@ describe('Versand außerhalb von KRNL: Nachfrage an die Fertigung', () => {
     assert.ok(n.titel.length <= 200, 'Aufgaben-Titel sind auf 200 Zeichen begrenzt')
     assert.deepEqual(nachfrageNummern(n.titel), ['FA/0418', 'FA/0419'], 'der Titel ist der Schlüssel zum Abhaken')
     assert.deepEqual(nachfrageNummern('Lager fegen'), [])
+  })
+
+  test('von Hand gebuchte Lieferung: eigener Titel, gleicher Schlüssel (2026-10-17)', () => {
+    const n = fertigungsNachfrage({ id: 'a1', number: 'S00042', shopify_order_name: null }, [{ id: 'm1', number: 'FA/0418' }], false)
+    assert.equal(n.titel, 'Versendet ohne Fertigmeldung: Fertigung FA/0418 zu S00042 noch durchführen?')
+    assert.match(n.beschreibung, /in KRNL gebucht/)
+    assert.ok(istFertigungsNachfrage(n.titel))
+    assert.deepEqual(nachfrageNummern(n.titel), ['FA/0418'])
   })
 })

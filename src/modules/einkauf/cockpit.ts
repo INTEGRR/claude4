@@ -51,8 +51,9 @@ export interface CockpitEintrag {
 }
 
 /**
- * Lädt das Cockpit. `zustaendigId` = nur Einträge dieses Einkäufers (nicht
- * zugeordnete Mails gehören niemandem und stehen immer dabei); ohne = alle.
+ * Lädt das Cockpit. `zustaendigId` = nur Einträge dieses Einkäufers plus
+ * alles ohne Zuständigen (nicht zugeordnete Mails, Wiedervorlagen ohne
+ * Person) — dieselbe Regel wie „Meine" in den Wiedervorlagen; ohne = alle.
  * `finanzen` = fällige Zahlplan-Raten mitladen.
  */
 export async function cockpitLaden(
@@ -64,7 +65,8 @@ export async function cockpitLaden(
     select c.kategorie, c.modell, c.record_id, c.titel, c.detail, c.link,
            to_char(c.faellig_am, 'YYYY-MM-DD') as faellig_am, c.zustaendig_id, c.partner_id
     from einkauf_cockpit c
-    where ${nur}::uuid is null or c.zustaendig_id = ${nur}::uuid or c.kategorie = 'unzugeordnet'
+    where ${nur}::uuid is null or c.zustaendig_id = ${nur}::uuid or c.zustaendig_id is null
+       or c.kategorie = 'unzugeordnet'
     order by c.faellig_am nulls last, c.titel`
 
   // Offene Vorschläge des Agenten (0109) — je Beleg, an dem sie erscheinen:
@@ -105,9 +107,12 @@ export async function cockpitLaden(
     from zahlplan_raten r
     join purchase_orders po on po.id = r.purchase_order_id
     join partners pa on pa.id = po.vendor_id
-    where r.bezahlt_am is null and po.state not in ('cancel', 'done')
+    -- Nur bestätigte (auch gesperrte) Bestellungen — dieselbe Regel wie die
+    -- Cashflow-Prognose (0123); ohne Zuständigen zählt bei „Meine" mit.
+    where r.bezahlt_am is null and po.state in ('purchase', 'done')
       and zahlplan_faelligkeit(r) <= current_date + 7
-      and (${nur}::uuid is null or coalesce(po.user_id, pa.einkaeufer_id) = ${nur}::uuid)
+      and (${nur}::uuid is null or coalesce(po.user_id, pa.einkaeufer_id) = ${nur}::uuid
+           or coalesce(po.user_id, pa.einkaeufer_id) is null)
     order by zahlplan_faelligkeit(r)`
   return [...eintraege, ...vorschlaege, ...raten]
 }

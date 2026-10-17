@@ -726,11 +726,13 @@ nie still überschrieben).
 
 ### Einkaufs-Cockpit (`/einkauf/cockpit`, Sicht `einkauf_cockpit`)
 
-Je Einkäufer (Meine/Alle): **überfällig**, **heute fällig** (manuelle und
+Je Einkäufer (Meine/Alle — „Meine" zeigt wie die Wiedervorlagen auch alles
+ohne Zuständigen, seit 2026-10-17): **überfällig**, **heute fällig** (manuelle und
 regelbasierte Wiedervorlagen), **überfällige ETA**, **fehlende
 Dokumente** (mit „nachfragen" je Beleg), **fehlende Rechnungen** (Ware da,
 Lieferantenrechnung fehlt), **fällige Raten** (7 Tage, nur mit
-Finanzrecht — aus einer eigenen Abfrage, nicht aus der Sicht), **wartet auf
+Finanzrecht, nur bestätigte Bestellungen wie die Cashflow-Prognose — aus
+einer eigenen Abfrage, nicht aus der Sicht), **wartet auf
 uns**, **wartet auf Lieferant**, **nicht zugeordnete Mails**, **laufende
 Sendungen**, **laufende Muster**, **Werkzeuge am Lebensende**. Jeder Eintrag
 führt zu seinem Beleg. Neu als regelbasierte Wiedervorlage: Bestellungen mit

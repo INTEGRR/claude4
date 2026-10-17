@@ -8,6 +8,7 @@ import {
   queueFulfillmentForPicking,
   syncTracking,
 } from '@/modules/versand/service'
+import { fertigungsNachfrageNachLieferung } from '@/modules/verkauf/extern-versand'
 import { pruefText } from '@/modules/versand/dhl-validierung'
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { packtischAbgleich } from '@/modules/versand/packtisch-logik'
@@ -65,6 +66,7 @@ export async function nachLabelAusbuchen(
     return { ausgebucht: false, hinweis: `Ausbuchen fehlgeschlagen: ${message}` }
   }
   await consumePackagingForPicking(pickingId).catch(() => undefined)
+  await fertigungsNachfrageNachLieferung(sql, pickingId).catch(() => undefined)
   try {
     await queueFulfillmentForPicking(pickingId)
   } catch (err) {
@@ -224,6 +226,7 @@ export async function packtischAbschliessen(
   if (zustand?.state !== 'done') {
     await sql`select picking_validate(${pickingId}, ${sql.json({})}, false)`
     await consumePackagingForPicking(pickingId).catch(() => undefined)
+    await fertigungsNachfrageNachLieferung(sql, pickingId).catch(() => undefined)
   }
 
   // Shop-Rückmeldung (Fulfillment + Tracking, Shopify mailt den Kunden) —

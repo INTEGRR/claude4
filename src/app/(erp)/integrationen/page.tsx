@@ -193,6 +193,7 @@ const JOB_STATUS: Record<string, string> = {
   running: 'läuft',
   done: 'erledigt',
   failed: 'fehlgeschlagen',
+  skipped: 'übersprungen',
 }
 
 const EVENT_STATUS: Record<string, string> = {
@@ -217,8 +218,8 @@ function QueueStatus({ status, labels }: { status: string; labels: Record<string
       </span>
     )
   }
-  const ton = status === 'done' ? 'success' : status === 'failed' ? 'danger' : 'warn'
-  return <span className={`badge ${ton}`}>{wort}</span>
+  const ton = status === 'done' ? ' success' : status === 'failed' ? ' danger' : status === 'skipped' ? '' : ' warn'
+  return <span className={`badge${ton}`}>{wort}</span>
 }
 
 /** Verbindungszustand einer Anbindung: Leuchte plus Wort, nicht als Kennzahl. */
@@ -763,7 +764,12 @@ export default async function IntegrationenPage() {
                   <tr key={j.id}>
                     <td className="mono small">{j.kind}</td>
                     <td>
-                      <QueueStatus status={j.status} labels={JOB_STATUS} />
+                      {/* Übersprungene Jobs (Schreibschutz, fehlende Konfiguration) enden
+                          als done — „erledigt" täuschte Vollzug vor (UX-Audit). */}
+                      <QueueStatus
+                        status={j.status === 'done' && j.last_result?.startsWith('Übersprungen') ? 'skipped' : j.status}
+                        labels={JOB_STATUS}
+                      />
                       {j.status === 'running' && j.started_at && (
                         <span className="muted small mono"> seit {dateTime(j.started_at)}</span>
                       )}

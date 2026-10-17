@@ -86,6 +86,14 @@ export default async function RetourePage({
   const labels = await sql<{ id: string; shipment_number: string; emailed_at: string | null; qr_link: string | null; created_at: string }[]>`
     select id, shipment_number, emailed_at::text as emailed_at, qr_link, created_at::text as created_at
     from return_labels where retoure_id = ${id} order by created_at desc`
+  // Letzter Label-Fehler nach dem letzten Label (UX-Audit): stand bisher nur
+  // im Verlauf — die Labelkarte sagte „Noch kein Label" ohne Grund.
+  const [labelFehler] = await sql<{ message: string; created_at: string }[]>`
+    select a.message, a.created_at from audit_log a
+    where a.model = 'retoure' and a.record_id = ${id} and a.kind = 'error'
+      and a.message like 'Retourenlabel fehlgeschlagen%'
+      and a.created_at > coalesce((select max(created_at) from return_labels where retoure_id = ${id}), '-infinity')
+    order by a.created_at desc limit 1`
 
   const zeitpunkte: [string, string | null][] = [
     ['Angefragt', r.created_at],
@@ -256,6 +264,12 @@ export default async function RetourePage({
                 </li>
               ))}
             </ul>
+          )}
+          {labelFehler && (
+            <p className="small" style={{ marginTop: 0 }}>
+              <span className="badge danger">Fehler</span> {labelFehler.message.replace(/^Retourenlabel fehlgeschlagen: /, '')}{' '}
+              <span className="muted">({dateTime(labelFehler.created_at)})</span>
+            </p>
           )}
           {r.status === 'genehmigt' && dhlConfigured() && (
             <ActionButton action={retoureLabelSenden.bind(null, id)}>

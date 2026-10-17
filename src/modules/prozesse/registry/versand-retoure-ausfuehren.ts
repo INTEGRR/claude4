@@ -63,6 +63,8 @@ export async function retoureLabelSenden(_p: object, ctx: AktionsKontext): Promi
   if (r.status !== 'genehmigt') {
     throw new Error(`Das Retourenlabel gibt es zur genehmigten Retoure (${r.nummer} steht auf „${r.status}").`)
   }
+  // Fehler landen im Verlauf (Labelkarte zeigt den letzten) — egal ob beim
+  // Genehmigen oder über „Retourenlabel senden" ausgelöst.
   const label = await createReturnLabelForPartner(r.partner_id, {
     retoureId: id,
     salesOrderId: r.sales_order_id,
@@ -76,6 +78,11 @@ export async function retoureLabelSenden(_p: object, ctx: AktionsKontext): Promi
       country_code: r.country_code ?? 'DE',
       email: r.email,
     },
+  }).catch(async (err: unknown) => {
+    const grund = (err instanceof Error ? err.message : String(err)).replace(/^error: /, '')
+    await sql`select log_event('retoure', ${id}::uuid, 'error',
+      ${`Retourenlabel fehlgeschlagen: ${grund.slice(0, 300)}`}, ${ctx.actor})`
+    throw new Error(grund)
   })
   await sql`select log_event('retoure', ${id}::uuid, 'note',
     ${`Retourenlabel ${label.shipmentNumber} erstellt, Mail in der Warteschlange`}, ${ctx.actor})`
@@ -95,9 +102,7 @@ export async function retoureGenehmigen(p: { label_senden: boolean }, ctx: Aktio
         await retoureLabelSenden({}, ctx)
         hinweis = ' Retourenlabel ist an den Kunden gemailt.'
       } catch (err) {
-        const grund = (err instanceof Error ? err.message : String(err)).replace(/^error: /, '')
-        await sql`select log_event('retoure', ${id}::uuid, 'error',
-          ${`Retourenlabel fehlgeschlagen: ${grund.slice(0, 300)}`}, ${ctx.actor})`
+        const grund = err instanceof Error ? err.message : String(err)
         hinweis = ` Retourenlabel fehlgeschlagen: ${grund} — am Beleg erneut senden.`
       }
     }

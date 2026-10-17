@@ -1,5 +1,5 @@
 import { requireArea } from '@/modules/auth'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { PrintButton } from '@/components/print-button'
 import { packzettelDaten } from '@/modules/versand/packzettel-daten'
 import { PackzettelAnsicht } from '../../lager/[id]/druck/packzettel-ansicht'
@@ -25,6 +25,8 @@ export default async function PackzettelSammeldruck({
     .map((s) => s.trim())
     .filter((s) => UUID.test(s))
     .slice(0, 100)
+  // Ohne Auswahl (Lesezeichen, Zurück-Taste) zur Liste statt auf eine 404 (UX-Audit).
+  if (liste.length === 0) redirect('/versand')
   const zettel = await packzettelDaten(liste)
   if (zettel.length === 0) notFound()
 

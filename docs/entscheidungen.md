@@ -9,6 +9,44 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Nachfrage an die Fertigung auch bei von Hand gebuchter Lieferung
+
+**Anlass (UX-Audit, Code-Prüfung):** Die Nachfrage „Fertigung noch
+durchführen?" entstand nur, wenn der Shop extern versendet meldete. Wer in
+KRNL die Lieferung bucht, obwohl der Fertigungsauftrag offen ist (Überbuchen
+ist erlaubt, Entscheidung zum Audit-Befund 502), ließ den Auftrag ohne Frage
+offen — Material nie verbraucht, Erzeugnis im Minus.
+
+**Entschieden:** Dieselbe Nachfrage (eigener Titel „Versendet ohne
+Fertigmeldung: …", gleicher Antwortweg Fertig melden/Stornieren) entsteht
+direkt nach dem Warenausgang in Lager und Packtisch und im Abgleich — aber
+nur, wenn keine Lieferung des Auftrags mehr offen ist (Teillieferung: der
+offene Fertigungsauftrag gehört zur Restlieferung) und erst für Lieferungen
+ab heute (`NACHFRAGE_KRNL_AB`), damit Altfälle keinen Schwall Aufgaben
+auslösen. Tests: tests/prozesse/fertigung-nachfrage-krnl.test.ts,
+tests/extern-versand.test.ts. Doku: [module/fertigung.md](module/fertigung.md).
+
+## 2026-10-17 — Umsatzplan-Trend nur aus vollständigem Vorjahresfenster
+
+**Anlass (UX-Audit, Code-Prüfung):** Der Trend teilte drei aktuelle Monate
+durch das Vorjahresfenster — fehlten dort Monate, standen drei gegen einen,
+der Faktor lief bis zur Kappung 4 und vervielfachte die Vorschläge.
+
+**Entschieden:** Trend nur, wenn alle drei Vorjahresmonate Umsatz haben,
+sonst 1 (Vorjahresmonat unverändert). Migration 0126, Test in
+tests/finanzen.test.ts, Doku in [prozesse.md](prozesse.md).
+
+## 2026-10-17 — Dunkelmodus: beide Wege setzen dieselben Tokens (Wächter)
+
+**Anlass (Design-System-Abgleich):** Der System-Dunkelmodus
+(`prefers-color-scheme`) vergaß `--wichtig*` — Violett blieb die helle
+Variante auf dunklem Grund (Kontrast 2,1:1), nur wer den Dunkelmodus
+ausdrücklich wählte, sah es richtig.
+
+**Entschieden:** Fehlende Tokens ergänzt; der Wächter
+tests/theme-tokens.test.ts verlangt, dass `:root[data-theme='dark']` und der
+System-Block dieselben Variablen mit denselben Werten setzen.
+
 ## 2026-10-17 — Rechnung über 0 € ist ausgeglichen; Retoure-Restmenge je Aufruf
 
 **Anlass (UX-Audit, Code-Prüfung):** Eine Lieferung mit Gesamtbetrag 0 €

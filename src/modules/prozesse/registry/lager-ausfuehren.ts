@@ -2,6 +2,7 @@ import { SPERRE_MINUTEN, sammelAbgleich } from '../../versand/kommissionier-logi
 import { sql, tx } from '@/db/client'
 import { parseLotSpec } from '@/modules/shared/form'
 import { consumePackagingForPicking, queueFulfillmentForPicking } from '@/modules/versand/service'
+import { fertigungsNachfrageNachLieferung } from '@/modules/verkauf/extern-versand'
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import {
   MAX_ANZAHL_JE_VARIANTE,
@@ -48,6 +49,8 @@ export async function transferBuchen(
 
   // Die Kartonage verlässt das Haus mit der Ware — jetzt wird sie verbraucht.
   await consumePackagingForPicking(pickingId).catch(() => undefined)
+  // Letzte Lieferung gebucht, Fertigung noch offen → Nachfrage (2026-10-17).
+  await fertigungsNachfrageNachLieferung(sql, pickingId).catch(() => undefined)
 
   // Nach dem Warenausgang die Sendung an Shopify melden (läuft über die
   // Outbox). Die Rückmeldung darf den Warenausgang nie blockieren — aber sie
