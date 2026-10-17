@@ -69,6 +69,10 @@ der [AGENTS.md](../AGENTS.md).
 - [go-live.md](go-live.md) — **der Go-Live-Plan**: Checkliste aller
   Zugänge, Einstellungen und Prüfungen vor dem Stichtag (DHL-Keys,
   Supabase, Vercel, Konten, Versandtests); verweist aufs Cutover-Runbook.
+- [../design/ux-audit/README.md](../design/ux-audit/README.md) — **UX-Audit
+  vom 17.10.2026**: jede Route und Detailseite je Belegzustand fotografiert
+  und bewertet (UI, Abläufe, Status), mit übergreifenden Mustern und
+  maschinenlesbaren Befunden — Grundlage für die UI-Überarbeitung.
 
 ## Module (Fachdoku der Gründungsphase, je Bereich)
 
