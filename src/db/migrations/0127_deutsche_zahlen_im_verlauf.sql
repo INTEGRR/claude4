@@ -10,7 +10,7 @@
 --
 --  * zahl_text (neu)
 --  * volle Körper, nur die Textausgaben geändert: mo_produce (0021),
---    orderpoint_execute (0015), darlehen_rate_zahlen (0060),
+--    orderpoint_execute (0054, Signatur mit p_qty), darlehen_rate_zahlen (0060),
 --    eingangs_sendung_schaetzung (0108), eingangs_sendung_verteilen (0108),
 --    sendung_kosten_stornieren (0108), purchase_order_approve (0056),
 --    zahlplan_pruefen (0058), retoure_pruefen (0119), zahlung_erfassen (0122)
@@ -211,11 +211,14 @@ begin
 end $$;
 
 
-create or replace function orderpoint_execute(p_orderpoint uuid, p_actor text default 'system')
+create or replace function orderpoint_execute(p_orderpoint uuid, p_actor text default 'system',
+                                   p_qty numeric default null)
 returns text
 language plpgsql as $$
 declare
   s record;
+  v_qty numeric;
+  v_price numeric;
   v_po uuid;
   v_po_number text;
   v_uom uuid;
@@ -227,8 +230,13 @@ begin
     raise exception 'Kein offener Beschaffungsvorschlag zu dieser Regel';
   end if;
 
+  v_qty := coalesce(p_qty, s.qty_empfohlen, s.qty_to_order);
+  if v_qty is null or v_qty <= 0 then
+    raise exception 'Die Menge muss über 0 liegen';
+  end if;
+
   if s.route = 'manufacture' then
-    v_mo := create_manufacturing_order(s.variant_id, s.qty_to_order, null, null, p_actor);
+    v_mo := create_manufacturing_order(s.variant_id, v_qty, null, null, p_actor);
     update manufacturing_orders
       set orderpoint_id = p_orderpoint, origin = 'Meldebestand ' || s.product
       where id = v_mo;
@@ -240,6 +248,14 @@ begin
   if s.vendor_id is null then
     raise exception 'Kein Lieferant mit Preisliste für % hinterlegt', s.product;
   end if;
+
+  if s.moq is not null and v_qty < s.moq then
+    raise exception 'Menge % liegt unter der Mindestbestellmenge % von %',
+      v_qty, s.moq, s.vendor_name;
+  end if;
+
+  v_price := vendor_price_net((best_vendor_price(s.variant_id, s.vendor_id, v_qty)).price,
+                              (best_vendor_price(s.variant_id, s.vendor_id, v_qty)).discount);
 
   -- Offene Entwurfs-Bestellung des Lieferanten wiederverwenden.
   select id, number into v_po, v_po_number
@@ -262,10 +278,10 @@ begin
   values (
     v_po,
     coalesce((select max(sequence) + 10 from purchase_order_lines where order_id = v_po), 10),
-    s.variant_id, s.product, s.qty_to_order, v_uom, coalesce(s.unit_price, 0));
+    s.variant_id, s.product, v_qty, v_uom, coalesce(v_price, s.unit_price, 0));
 
   perform log_event('purchase_order', v_po, 'note',
-    format('Position aus Meldebestand: %s × %s', zahl_text(s.qty_to_order), s.product), p_actor);
+    format('Position aus Meldebestand: %s × %s', zahl_text(v_qty), s.product), p_actor);
   return v_po_number;
 end $$;
 

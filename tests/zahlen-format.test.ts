@@ -29,7 +29,7 @@ function neuesteFunktionen(): Map<string, { datei: string; text: string }> {
   const neueste = new Map<string, { datei: string; text: string }>()
   for (const datei of readdirSync(MIGRATIONEN).filter((d) => d.endsWith('.sql')).sort()) {
     const s = readFileSync(join(MIGRATIONEN, datei), 'utf8')
-    for (const m of s.matchAll(/create or replace function (\w+)\s*\(/g)) {
+    for (const m of s.matchAll(/create (?:or replace )?function (\w+)\s*\(/g)) {
       const auf = s.indexOf('$$', m.index)
       const zu = s.indexOf('$$', auf + 2)
       neueste.set(m[1], { datei, text: s.slice(m.index, s.indexOf(';', zu) + 1) })
