@@ -29,6 +29,35 @@ KRNL ist funktional sehr breit und in sich konsistent gebaut. Es hat ein eigenst
 
 **Notenverteilung (1 = unbrauchbar … 5 = vorbildlich):** 4 → 46 Ansichten · 3 → 123 · 2 → 31 · 1 → 1 (die englische 404-Seite). Keine Ansicht ist „vorbildlich“, keine ist unbenutzbar. Das Niveau ist solide, mit klaren Hebeln.
 
+## Backlog und Code-Verifikation (Stand 17.10.2026)
+
+`befunde.json` ist der **gepflegte Backlog**. Jeder Befund hat eine ID (`<seite>#<n>`) und
+einen Status:
+- `offen`
+- `erledigt` mit Commit
+- `verworfen` mit Grund
+
+Der Wächter `tests/ux-audit.test.ts` hält das Format ein.
+
+Die rund 55 Logik-, Daten- und Status-Befunde der Stufen kritisch/hoch wurden im Code geprüft:
+
+- **16 echte Code-Bugs und 2 Lücken.** Sie werden in den Paketen A1/A2 behoben. Dazu gehören:
+  - Positionen gelieferter Aufträge löschbar
+  - 19 % Vorsteuer bei Drittland-Lieferanten
+  - Wechselkurs still 1:1
+  - Cashflow mit Anfragen
+  - Listen ohne Hinweis abgeschnitten
+  - 0-€-Rechnung bleibt offen
+  - Steuertermine ohne Überfällig
+  - widersprüchlicher KI-Status
+  - keine deutsche 404
+  - Mobil-Navigation verdeckt
+- **Gewollt** (verworfen mit Grund): Überbuchen beim Ausbuchen, „geliefert und Fertigung offen“,
+  Mengenabweichungen-Kachel, Kündigungsfrist-Kachel, Prüf-Flag der Lieferantenrechnung.
+- **Audit-Befund falsch:**
+  - 104: Bei Teillieferung wird nur Geliefertes fakturiert.
+  - 451: Platzhalter werden vor der Mail-Freigabe geprüft.
+
 ## Methodik
 
 - **Umgebung:** Produktions-Build (`next build` + `next start`) des Branch-Stands vom 17.10.2026 gegen eine lokale Kopie der Demodaten (`erp_audit`). Darin sind alle 55 Prozess-Fixture-Läufe durchgespielt, damit **jede Belegart in jedem Zustand** existiert (z. B. Verkauf: Angebot/bestätigt/teilgeliefert/Shop geliefert/Shop offen/storniert; Retoure: alle 7 Zustände; Reparatur: alle 7 Zustände). Externe Dienste liefen als Attrappe (Shopify, DHL, KI). Für vier Ansichten (2FA-Einrichtung, 2FA-Code, Lieferantenvertrag, Los) wurden die nötigen Zustände in der Audit-Kopie gezielt hergestellt. Die 2FA-Einstellung wurde danach zurückgesetzt.
