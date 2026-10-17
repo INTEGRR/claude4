@@ -58,6 +58,30 @@ Die rund 55 Logik-, Daten- und Status-Befunde der Stufen kritisch/hoch wurden im
   - 104: Bei Teillieferung wird nur Geliefertes fakturiert.
   - 451: Platzhalter werden vor der Mail-Freigabe geprüft.
 
+### Stand nach den Paketen A1, A2 und F (17.10.2026, abends)
+
+**538 Befunde: 40 erledigt · 17 verworfen · 481 offen.** Die offenen sind
+überwiegend Darstellung und Seitenaufbau (Muster M1–M18) — Arbeitsauftrag
+für die UI-Überarbeitung. Erledigt mit Commit in `befunde.json`:
+
+- **A1 Daten & Geld:** Positionen-Schutz (0120), Vorsteuer nach
+  Lieferantenland (0121), Wechselkurs strikt (0122), Cashflow nur
+  bestätigte Bestellungen (0123), 0-€-Rechnung (0124), Retoure-Restmenge
+  (0125).
+- **A2 Anzeige & Ablauf:** Steuern überfällig, Zahlungs-Kachel geteilt,
+  KI-Karte, Cockpit „Meine“, Label-Fehler, Umsatzplan-Trend (0126),
+  Outbox „übersprungen“, deutsche 404, Mobil-Navigation, Dunkelmodus-
+  Violett, Fertigungs-Nachfrage bei Handbuchung.
+- **F Logik-Fundament** (je mit Wächter): Zustandstabelle, deutsche
+  Zahlen (0127), Seitenaufteilung, Überfällig-Signal, Plural (0128),
+  Schreibschutz.
+- **Verworfen als Browser-Artefakt:** native Datums-, Zahlen- und
+  Dateifelder im US-Format. Mit Browsersprache Deutsch zeigt Chromium
+  TT.MM.JJJJ und Dezimalkomma.
+
+Vorher/Nachher der betroffenen Seiten: `screenshots-nachher/` (gleiche
+IDs wie `screenshots/`; `A02-404-im-rahmen` ist neu).
+
 ## Methodik
 
 - **Umgebung:** Produktions-Build (`next build` + `next start`) des Branch-Stands vom 17.10.2026 gegen eine lokale Kopie der Demodaten (`erp_audit`). Darin sind alle 55 Prozess-Fixture-Läufe durchgespielt, damit **jede Belegart in jedem Zustand** existiert (z. B. Verkauf: Angebot/bestätigt/teilgeliefert/Shop geliefert/Shop offen/storniert; Retoure: alle 7 Zustände; Reparatur: alle 7 Zustände). Externe Dienste liefen als Attrappe (Shopify, DHL, KI). Für vier Ansichten (2FA-Einrichtung, 2FA-Code, Lieferantenvertrag, Los) wurden die nötigen Zustände in der Audit-Kopie gezielt hergestellt. Die 2FA-Einstellung wurde danach zurückgesetzt.
