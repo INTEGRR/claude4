@@ -101,10 +101,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       qty_delivered: number
       subtotal: number
       variant_id: string | null
+      sperrgrund: string | null
     }[]
   >`
     select l.id, l.name, l.qty, u.name as uom, l.price_unit, l.discount, l.tax_rate,
-           l.qty_delivered, sale_line_subtotal(l) as subtotal, l.variant_id
+           l.qty_delivered, sale_line_subtotal(l) as subtotal, l.variant_id,
+           sales_order_line_entfernbar(l.id) as sperrgrund
     from sales_order_lines l
     left join uoms u on u.id = l.uom_id
     where l.order_id = ${id} and l.display_type is null
@@ -503,9 +505,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <td className="num">{money(l.subtotal, order.currency)}</td>
                     {editable && (
                       <td className="num">
-                        <ActionButton className="small danger" action={removeLine.bind(null, id, l.id)}>
-                          Entfernen
-                        </ActionButton>
+                        {l.sperrgrund ? (
+                          <span className="small muted" title={l.sperrgrund}>
+                            —
+                          </span>
+                        ) : (
+                          <ActionButton className="small danger" action={removeLine.bind(null, id, l.id)}>
+                            Entfernen
+                          </ActionButton>
+                        )}
                       </td>
                     )}
                   </tr>

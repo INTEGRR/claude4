@@ -206,6 +206,8 @@ export async function positionEntfernen(
 ): Promise<AktionsErgebnis> {
   const orderId = ctx.recordId!
   await sql`select sales_order_guard_editable(${orderId})`
+  // Gelieferte/fakturierte Zeilen bleiben (0120) — Korrektur über Retoure/Gutschrift.
+  await sql`select sales_order_line_guard_entfernen(${p.line_id})`
   await sql`delete from sales_order_lines where id = ${p.line_id} and order_id = ${orderId}`
   await sql`select sales_order_recompute_status(${orderId})`
   return { recordId: orderId }

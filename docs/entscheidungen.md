@@ -9,6 +9,20 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Gelieferte oder abgerechnete Auftragspositionen sind nicht mehr löschbar
+
+**Anlass (UX-Audit, Code-Prüfung):** `verkauf.position_entfernen` prüfte nur
+„gesperrt/storniert" und löschte auch geliefert oder fakturierte Zeilen hart —
+Rechnungs- und Retourenzeilen verloren ihren Bezug.
+
+**Entschieden:** Eine Position mit Liefermenge, Rechnungszeile oder Retoure
+bleibt; Korrektur über Retoure bzw. Gutschrift (`sales_order_line_entfernbar`,
+`sales_order_line_guard_entfernen`, Migration 0120; das Formular zeigt dann
+kein „Entfernen"). **Bewusst nicht entschieden:** wie Aufträge nach der
+Bestätigung grundsätzlich geändert werden (Zeilen dazu, Aufpreis) — dafür gibt
+es eine Entscheidungsvorlage (`docs/vorlagen/auftragsaenderung.md`); bis dahin
+bleibt das übrige Verhalten unverändert. Doku: [module/verkauf.md](module/verkauf.md).
+
 ## 2026-10-17 — Retouren als Prozess: Portal im Shop, Prüfung mit Rückbuchung, Erstattung bleibt in Shopify, überflüssige Fertigung entfällt
 
 **Anlass (Betreiber):** Retouren liefen bisher lose (Label von Hand, Paket
