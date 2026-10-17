@@ -9,6 +9,31 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Go-live über den API-Weg; Produktivgang-Seite prüft sich selbst
+
+**Anlass:** Der Go-live-Plan (go-live.md §7) verlangte noch die Dump-
+Choreografie: Odoo einfrieren, Prod leerräumen, Komplett-Import. Seit
+2026-09-29 ist der gewählte Weg aber die selektive Übernahme per API, und
+KRNL läuft schon produktiv. Offene Aufgabe #17; der Betreiber hat den Bau
+freigegeben.
+
+**Entschieden:**
+- Der Stichtag ist eine Reihe von Schaltern an der laufenden Instanz:
+  letzte Odoo-Übernahme, Odoo schreibgeschützt, Nummernkreise RE-/GU-,
+  Rechnungsmodus „scharf" (sevDesk-Ausgabe aus), Shopify „schreiben".
+  Das Cutover-Runbook in migration-odoo.md bleibt als Werkzeug für eine
+  leere Instanz (als historisch markiert).
+- Neue Seite **Einstellungen → Produktivgang**: 14 Prüfpunkte als Ampel
+  (rot = vor dem Stichtag erledigen, grau = bewusst nicht eingerichtet,
+  grün = bereit), jede Zeile verlinkt dorthin, wo man sie erledigt; dazu
+  die Handarbeit, die KRNL nicht sieht (PITR, AV-Vertrag, Vercel, Odoo,
+  sevDesk, Sendcloud). Nur lesend — keine neue Schreibaktion; der Knopf
+  „Dienste jetzt prüfen" nutzt `einstellungen.dienste_pruefen`.
+- Logik pur in `src/modules/einstellungen/produktivgang.ts`, Test
+  `tests/produktivgang.test.ts`.
+- Doku: [go-live.md](go-live.md) §7, [module/einstellungen.md](module/einstellungen.md),
+  [migration-odoo.md](migration-odoo.md).
+
 ## 2026-10-17 — Shop-Rechnung bezahlt nur, wenn Shopify nichts mehr offen meldet
 
 **Anlass:** Punkt 3 der Vorlage [auftragsaenderung.md](vorlagen/auftragsaenderung.md):

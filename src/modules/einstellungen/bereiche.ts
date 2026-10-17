@@ -125,6 +125,12 @@ export const EINSTELLUNGS_BEREICHE: readonly Bereich[] = [
     beschreibung: 'Interessenten von der öffentlichen Startseite.',
   },
   {
+    href: '/einstellungen/produktivgang',
+    label: 'Produktivgang',
+    gruppe: 'Verwaltung',
+    beschreibung: 'Go-live-Checkliste, die sich selbst prüft — was vor dem Stichtag noch rot ist.',
+  },
+  {
     href: '/einstellungen/gefahrenzone',
     label: 'Gefahrenzone',
     gruppe: 'Verwaltung',

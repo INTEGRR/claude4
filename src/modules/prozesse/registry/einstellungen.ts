@@ -1165,7 +1165,7 @@ export const EINSTELLUNGEN = {
       'ab dem zweiten Fehlschlag in Folge als Telegram-Meldung.',
     bindung: 'frei',
     schema: z.object({}),
-    revalidate: ['/integrationen'],
+    revalidate: ['/integrationen', '/einstellungen/produktivgang'],
   },
 
   'einstellungen.telegram_chats': {

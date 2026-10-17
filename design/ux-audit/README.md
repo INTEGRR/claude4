@@ -60,7 +60,7 @@ Die rund 55 Logik-, Daten- und Status-Befunde der Stufen kritisch/hoch wurden im
 
 ### Stand nach den Paketen A1, A2 und F (17.10.2026, abends)
 
-**538 Befunde: 40 erledigt · 17 verworfen · 481 offen.** Die offenen sind
+**538 Befunde: 44 erledigt · 17 verworfen · 477 offen.** Die offenen sind
 überwiegend Darstellung und Seitenaufbau (Muster M1–M18) — Arbeitsauftrag
 für die UI-Überarbeitung. Erledigt mit Commit in `befunde.json`:
 

@@ -99,6 +99,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/einstellungen/ki', label: 'Einstellungen · KI-Modelle', area: 'einstellungen' },
   { href: '/einstellungen/nutzung', label: 'Einstellungen · Nutzungsbericht', area: 'einstellungen' },
   { href: '/einstellungen/registrierungen', label: 'Einstellungen · Registrierungen (Startseite)', area: 'einstellungen' },
+  { href: '/einstellungen/produktivgang', label: 'Einstellungen · Produktivgang (Go-live-Checkliste)', area: 'einstellungen' },
   { href: '/einstellungen/gefahrenzone', label: 'Einstellungen · Gefahrenzone', area: 'einstellungen' },
   { href: '/tickets', label: 'Tickets', area: 'fehler' },
   // Jede Rolle: 'fehler' ist der eine Bereich, den alle erreichen (Seite prüft nur requireUser).

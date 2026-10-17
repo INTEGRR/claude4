@@ -54,7 +54,8 @@
      "befund": "Feldlabels in Mono-Versalien mit großem Buchstabenabstand sind klein (≈10 px) und grau — schwer lesbar.",
      "vorschlag": "Labels 12 px, Kontrast auf --text-2, Versalien nur für Abschnittsköpfe.",
      "id": "000-login#4",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6dd3b17"
     }
    ],
    "messwerte": {
@@ -573,7 +574,8 @@
      "befund": "Durchgängig sehr kleine Mono-Versalien mit Sperrung (Gruppen, Labels, Status) in grauer Farbe — Lesbarkeit und Kontrast leiden, besonders auf Monitoren im Lager.",
      "vorschlag": "Mindestgröße 12 px für Labels, Versalien nur für Abschnittsköpfe, Kontrast ≥ 4.5:1.",
      "id": "A00-rahmen#6",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6dd3b17"
     },
     {
      "schwere": "niedrig",

@@ -358,6 +358,11 @@ gelesen und eingeordnet:
 
 ## Cutover-Runbook (Stichtag)
 
+> **Historisch (seit 2026-10-17):** Der Go-live läuft über den API-Weg
+> ([go-live.md](go-live.md) §7) — Schalter an der laufenden Instanz statt
+> Komplett-Import auf leergeräumter Prod. Das Runbook bleibt als Werkzeug
+> für eine neue, leere Instanz.
+
 Voraussetzung: die Probelauf-Choreografie oben ist lokal grün
 durchgelaufen (inklusive No-Op-Beweis). Der finale Lauf ist **immer ein
 kompletter Neulauf auf leergeräumter Prod** — kein Delta-Lauf (Begründung:

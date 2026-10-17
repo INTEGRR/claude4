@@ -3,10 +3,12 @@
 Alles, was vor dem Stichtag eingerichtet, entschieden oder geprüft sein
 muss, an einem Ort — damit nichts im Chat liegen bleibt. Der Plan ist eine
 Checkliste: abgehakt wird in dieser Datei, im selben Commit wie die
-Umsetzung. Die eigentliche Datenübernahme steht im
-[Cutover-Runbook](migration-odoo.md#cutover-runbook-stichtag), die
-Variablen im Detail in [vercel-supabase.md](vercel-supabase.md); dieser
-Plan verweist dorthin, statt es zu wiederholen.
+Umsetzung. Der Stichtag läuft seit 2026-10-17 über den **API-Weg** (§7):
+KRNL ist schon produktiv, am Stichtag werden nur Schalter umgelegt — kein
+Dump, kein Leerräumen. Was KRNL selbst prüfen kann, zeigt die Seite
+**Einstellungen → Produktivgang** als Ampel; die Variablen im Detail stehen
+in [vercel-supabase.md](vercel-supabase.md); dieser Plan verweist dorthin,
+statt es zu wiederholen.
 
 **Wer:** „Betreiber" ist die Person mit Zugang zu Vercel, Supabase, DHL
 und Shopify. „KRNL" sind Aufgaben im Code, die vor dem Stichtag fertig
@@ -289,16 +291,41 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       *Stand 2026-10-01: alle konfigurierten Dienste grün; Mail und Google
       „unbekannt" (nicht eingerichtet).*
 
-- [ ] Probelauf-Choreografie lokal mit **frischem** Odoo-Dump grün,
-      inklusive No-Op-Beweis
-      ([migration-odoo.md](migration-odoo.md#probelauf-choreografie-lokal-vor-jedem-prod-gedanken)).
-- [ ] Stichtag nach dem [Cutover-Runbook](migration-odoo.md#cutover-runbook-stichtag):
-      Odoo einfrieren → Dump → PITR-Punkt → Prod leerräumen → Import →
-      Abnahme → Shopify → Betrieb.
-- [ ] Nach dem Import: Einstellungen → Schnittstellen zeigt alle Anbindungen
-      konfiguriert und erreichbar, der Ereignis-Monitor `/integrationen` ist ruhig,
-      die Cron-Ergebnisse der ersten Stunde durchsehen (Outbox leer,
-      Tracking ohne `fehler`).
+**Der API-Weg (Entscheidungslog 2026-10-17).** KRNL läuft bereits
+produktiv im Parallelbetrieb; Kunden und Bestellungen kommen aus Shopify,
+aus Odoo nur Stücklisten, Komponenten, Lieferanten und Bestände per API
+([migration-odoo.md](migration-odoo.md), Stand 2026-09-29). Die
+Dump-Choreografie und das Cutover-Runbook (Prod leerräumen, Komplett-
+Import) sind damit Werkzeug für eine leere Instanz, nicht mehr der Plan.
+Der Stichtag ist eine Reihe von Schaltern an der laufenden Instanz —
+Einstellungen → **Produktivgang** zeigt vorher und nachher, was grün ist.
+
+Vor dem Stichtag:
+- [ ] Produktivgang-Seite: alle automatischen Punkte grün außer den
+      Stichtags-Schaltern (Shopify-Modus, Rechnungsmodus, Nummernkreise).
+- [ ] Odoo-Übernahme (Einstellungen → Odoo-Übernahme) ein letztes Mal mit
+      Vorschau laufen lassen: Stücklisten, Komponenten, Lieferanten,
+      Bestände — ohne Doppel.
+- [ ] PITR-Punkt notieren (Supabase), bevor geschaltet wird.
+
+Am Stichtag, in dieser Reihenfolge:
+- [ ] Odoo schreibgeschützt: keine Buchungen mehr in Odoo, Bestände ab
+      jetzt nur in KRNL.
+- [ ] Nummernkreise RE-/GU- auf die nächste freie sevDesk-Nummer
+      (Einstellungen → Belege & Freigaben).
+- [ ] Rechnungsmodus: Probelauf löschen, dann „scharf"; im selben Zug die
+      Rechnungsausgabe in sevDesk abschalten (§7c).
+- [ ] Shopify-Modus „schreiben", Webhooks registrieren, einmal „Mit
+      Shopify abgleichen" (§6).
+- [ ] Produktivgang-Seite: alles grün außer der Handarbeit.
+
+Danach:
+- [ ] Einstellungen → Schnittstellen zeigt alle Anbindungen konfiguriert
+      und erreichbar, der Ereignis-Monitor `/integrationen` ist ruhig, die
+      Cron-Ergebnisse der ersten Stunde durchsehen (Outbox leer, Tracking
+      ohne `fehler`).
+- [ ] Erste echte Rechnung gegen die Shopify-Bestellung prüfen (Betrag,
+      Zahlstatus — offen nur bei Aufpreis, 0130).
 
 ## 7b. Einkaufstool (Betreiber, vor dem echten Postfach-Betrieb)
 
@@ -371,8 +398,7 @@ kein Google. Stufe 6 (Einkaufs-Agent, nur Entwürfe) braucht das Postfach und
       vorher AWS-Zugang in Vercel setzen und beim OpenAI-Projekt Zero Data
       Retention bzw. Modified Abuse Monitoring beantragen; AVV mit beiden
       Anbietern in jedem Fall.
-- [ ] Stichtag festlegen; vorher einen frischen Odoo-Dump für den lokalen
-      Probelauf bereitstellen.
+- [ ] Stichtag festlegen (API-Weg, §7 — kein Odoo-Dump mehr nötig).
 
 ## 8. Nachlauf
 
