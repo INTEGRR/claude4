@@ -37,20 +37,21 @@ describe('Abnahmetest — Rechenmodell', () => {
     assert.equal(runden(0.28 * 0.92, 6), 0.2576)
   })
 
-  test('Einkauf von Hand: Switch-Einstand 0,2576 €, Vorkasse 1.598,41 €, Rechnung PO1 2.939,30 €', () => {
+  test('Einkauf von Hand: Switch-Einstand 0,2576 €, Vorkasse 1.343,20 €, Rechnung PO1 2.939,30 €', () => {
     // 5000 × 0,28 USD × Kurs 0,92 = 0,2576 je Switch — am Ende von Monat 1
     // ist das zugleich der Durchschnittspreis, weil nur PO2 geliefert hat.
     // Verbraucht wurden 3 × 70 Switches (SH1, SH3, SH4), 70 sind reserviert (SH5).
     assert.equal(m1.bestand['SW-LIN'].on_hand, 5000 - 210)
     assert.equal(m1.bestand['SW-LIN'].reserviert, 70)
     assert.equal(m1.bestand['SW-LIN'].mac, 0.2576)
-    // Vorkasse: (1400 + 60) netto + 19 % = 1737,40 USD × 0,92 = 1598,41 € ohne Konto.
-    assert.equal(m1.zahlungen.saldo['Ohne Konto'], -1598.41)
+    // Vorkasse: (1400 + 60) USD netto, US-Lieferant ohne deutsche USt (0121)
+    // = 1460 USD × 0,92 = 1343,20 € ohne Konto.
+    assert.equal(m1.zahlungen.saldo['Ohne Konto'], -1343.2)
     // R1: 40 × 36,50 + 40 × 21 + 20 × 8,50 = 2470 netto, 469,30 Steuer.
     const m1aus = m1.zahlungen.je_monat['2026-08']
     assert.ok(m1aus, 'Zahlungen in Monat 1')
-    // Miete 1200 + Lizenz 89 + R1 2939,30 + Vorkasse 1598,41
-    assert.equal(m1aus.aus, 1200 + 89 + 2939.3 + 1598.41)
+    // Miete 1200 + Lizenz 89 + R1 2939,30 + Vorkasse 1343,20
+    assert.equal(m1aus.aus, 1200 + 89 + 2939.3 + 1343.2)
     assert.equal(m1aus.ein, 12000)
   })
 
@@ -112,10 +113,11 @@ describe('Abnahmetest — Rechenmodell', () => {
     assert.deepEqual(m3.faellig.steuer, { anzahl: 1, summe: 1950 })
     assert.equal(m3.faellig.vendor_bill, undefined, 'alle Rechnungen bezahlt')
     assert.deepEqual(m3.steuern, { offen: 1950, bezahlt: 1850 + 2300 })
-    // Ende Monat 2 war die USD-Rechnung R4 noch offen: (810 + 40 Fracht) netto
-    // + 19 % = 1.011,50 USD × 0,90 (Kurs am Rechnungstag) = 910,35 €.
-    assert.deepEqual(m2.verbindlichkeiten, { offen: 910.35, rechnungen: 1 })
-    assert.deepEqual(m2.faellig.vendor_bill, { anzahl: 1, summe: 910.35 })
+    // Ende Monat 2 war die USD-Rechnung R4 noch offen: (810 + 40 Fracht) netto,
+    // US-Lieferant ohne deutsche USt (0121) = 850 USD × 0,90 (Kurs am
+    // Rechnungstag) = 765 €.
+    assert.deepEqual(m2.verbindlichkeiten, { offen: 765, rechnungen: 1 })
+    assert.deepEqual(m2.faellig.vendor_bill, { anzahl: 1, summe: 765 })
     assert.deepEqual(m3.verbindlichkeiten, { offen: 0, rechnungen: 0 })
   })
 

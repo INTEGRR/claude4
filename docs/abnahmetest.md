@@ -93,17 +93,17 @@ verschieben sich nur Monatsnamen und die Fälligkeiten „ab heute".
 | Fulfillments an Shopify | 5 | 10 | 16 |
 | Umsatz brutto (Monat 1 / 2 / 3) | 1.154,30 | 1.154,30 / 1.356,60 / 809,20 | 1.154,30 / 1.356,60 / 1.657,67 |
 | Fertigung: Stück / Material / Lohn | 3 / 233,9697 / 72 | 12 / 936,1007 / 288 | 17 / 1.325,4235 / 408 |
-| Saldo Geschäftskonto / Ohne Konto | 57.771,70 / −1.598,41 | 52.613,87 / −1.598,41 | 47.589,14 / −1.598,41 |
-| Offene Verbindlichkeiten | 0 | 910,35 (PO4) | 0 |
+| Saldo Geschäftskonto / Ohne Konto | 57.771,70 / −1.343,20 | 52.613,87 / −1.343,20 | 47.734,49 / −1.343,20 |
+| Offene Verbindlichkeiten | 0 | 765 (PO4) | 0 |
 | Darlehen: Restschuld / nächste Rate | 12.000 / 09-05 | 11.522,62 / 10-05 | 11.043,33 / 11-05 |
 | Fällig bis Jahresende: Verträge / Raten / Steuern | 5 (2.667) / 4 (2.101,52) / — | 5 (2.667) / 3 (1.576,14) / 1 (2.300) | 4 (2.578) / 2 (1.050,76) / 1 (1.950) |
 | Deckungsbeitrag: Erlös / Wareneinsatz | 771 / 363,3088 | 2.591 / 1.266,652 | 3.304 / 1.608,7819 |
 
 Von Hand nachrechenbar (und in `tests/abnahme-modell.test.ts` festgehalten):
 Switch-Einstand 0,28 USD × 0,92 = 0,2576 €; Vorkasse PO2 = (1.400 + 60)
-× 1,19 = 1.737,40 USD × 0,92 = 1.598,41 €; Rechnung PO1 = 2.470 netto +
+USD, US-Lieferant ohne deutsche USt (0121) = 1.460 USD × 0,92 = 1.343,20 €; Rechnung PO1 = 2.470 netto +
 469,30 Steuer = 2.939,30 €; Lohn 24 € je Tastatur; Rechnung PO4 =
-(810 + 40) × 1,19 = 1.011,50 USD × 0,90 = 910,35 €.
+810 + 40 = 850 USD × 0,90 = 765 €.
 
 ## Zufallsszenario ×10
 
