@@ -1,7 +1,7 @@
 import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
-import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap, Ueberfaellig } from '@/components/ui'
 import { date } from '@/modules/shared/format'
 import { UUID, herkunftHref } from './herkunft'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
@@ -19,13 +19,15 @@ const KINDS = [
 export default async function LagerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ art?: string; offen?: string; auftrag?: string; seite?: string }>
+  searchParams: Promise<{ art?: string; offen?: string; auftrag?: string; ueberfaellig?: string; seite?: string }>
 }) {
   await requireArea('lager')
   const params = await searchParams
   const { art, offen, auftrag: auftragRoh } = params
   const seite = seitenParameter(params)
   const onlyOpen = offen !== '0'
+  // „Überfällig" (F4): offen und Termin vor heute (Berlin).
+  const nurUeberfaellig = params.ueberfaellig === '1'
   // Filter „Transfers zum Auftrag" (Querverweis aus dem Verkauf, z. B. vom
   // Lieferstatus-Schild): nur gültige UUIDs — Unsinn in der Adresszeile
   // wäre sonst ein 500 statt einer leeren Liste.
@@ -61,6 +63,8 @@ export default async function LagerPage({
     left join partners part on part.id = p.partner_id
     where (${art ?? null}::text is null or ot.kind = ${art ?? null}::picking_kind)
       and (${onlyOpen} = false or p.state not in ('done', 'cancel'))
+      and (not ${nurUeberfaellig} or (p.state not in ('done', 'cancel')
+                                     and p.scheduled_date < date_trunc('day', now() at time zone 'Europe/Berlin')))
       and (${auftrag ?? null}::uuid is null
            or (p.origin_model = 'sales_order' and p.origin_id = ${auftrag ?? null}::uuid))
     order by p.scheduled_date desc, p.number desc
@@ -69,11 +73,12 @@ export default async function LagerPage({
 
   // Adresse mit den übrigen Filtern — Art, Zustand und Auftrag bleiben beim
   // Umschalten erhalten.
-  const href = (f: { art?: string; offen: boolean; auftrag?: string }) => {
+  const href = (f: { art?: string; offen: boolean; auftrag?: string; ueberfaellig?: boolean }) => {
     const q = new URLSearchParams()
     if (f.art) q.set('art', f.art)
     if (!f.offen) q.set('offen', '0')
     if (f.auftrag) q.set('auftrag', f.auftrag)
+    if (f.ueberfaellig) q.set('ueberfaellig', '1')
     const s = q.toString()
     return s ? `/lager?${s}` : '/lager'
   }
@@ -123,6 +128,14 @@ export default async function LagerPage({
               </Link>
             )
           })}
+          <Link
+            href={href({ art, offen: onlyOpen, auftrag, ueberfaellig: !nurUeberfaellig })}
+            className="btn small"
+            aria-current={nurUeberfaellig ? 'page' : undefined}
+          >
+            <span className={nurUeberfaellig ? 'led on' : 'led off'} />
+            Überfällig
+          </Link>
           <span className="mono-label" style={{ marginLeft: 'auto' }}>
             <span className={onlyOpen ? 'led on' : 'led off'} /> {onlyOpen ? 'nur offene' : 'alle Zustände'}
           </span>
@@ -174,7 +187,10 @@ export default async function LagerPage({
                       </td>
                       <td className="num">{r.lines}</td>
                       <td><Badge state={r.state} kind="picking" href={`/lager/${r.id}`} /></td>
-                      <td className="nowrap mono small">{date(r.scheduled_date)}</td>
+                      <td className="nowrap mono small">
+                        {date(r.scheduled_date)}{' '}
+                        <Ueberfaellig termin={r.scheduled_date} erledigt={r.state === 'done' || r.state === 'cancel'} />
+                      </td>
                     </tr>
                   )
                 })}

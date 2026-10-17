@@ -86,6 +86,33 @@ export function pct(anteil: number | string | null | undefined, stellen = 1): st
  * bei einem reinen Datum in Mitteleuropa den Vortag liefern kann. Deshalb
  * werden die lokalen Feldwerte genommen.
  */
+/** Heute in Berlin als JJJJ-MM-TT — die Server laufen in UTC, der Betrieb nicht. */
+export function heuteBerlin(jetzt: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(jetzt)
+}
+
+/**
+ * Überfällig-Signal (F4, Entscheidungslog 2026-10-17): Tage seit dem
+ * Termin — null, wenn erledigt, ohne Termin oder noch nicht fällig.
+ * Termine mit Uhrzeit zählen nach ihrem Berliner Kalendertag.
+ */
+export function ueberfaellig(
+  termin: string | Date | null | undefined,
+  erledigt: boolean,
+  heute: string = heuteBerlin(),
+): number | null {
+  if (erledigt || !termin) return null
+  const tag = typeof termin === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(termin) ? termin : heuteBerlin(new Date(termin))
+  if (tag >= heute) return null
+  return Math.round((Date.parse(heute) - Date.parse(tag)) / 86_400_000)
+}
+
+/** Zahl mit Singular/Plural (F5): plural(1, 'Tag', 'Tagen') → „1 Tag", statt „Tag(e)". */
+export function plural(n: number | string, eins: string, viele: string): string {
+  const zahl = Number(n)
+  return `${qty(zahl)} ${zahl === 1 ? eins : viele}`
+}
+
 export function isoDatum(wert: string | Date | null | undefined): string {
   if (wert === null || wert === undefined) return ''
   if (typeof wert === 'string') return wert.slice(0, 10)

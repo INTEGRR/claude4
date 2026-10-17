@@ -3,7 +3,7 @@ import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { LineBandChart } from '@/components/charts'
-import { date, money } from '@/modules/shared/format'
+import { date, money, ueberfaellig as ueberfaelligSeit } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,7 +75,8 @@ export default async function FinanzenSeite({
     left join darlehen d on d.id = dr.darlehen_id
     order by f.faellig_am`
   const faelligSumme = faellig.reduce((s, f) => s + Number(f.betrag_eur), 0)
-  const ueberfaellig = faellig.filter((f) => new Date(f.faellig_am) < new Date())
+  // Überfällig erst ab morgen — vorher war „heute fällig“ schon rot (UTC-Mitternacht, F4).
+  const ueberfaellig = faellig.filter((f) => ueberfaelligSeit(f.faellig_am, false) !== null)
 
   const zahlungen = await sql<
     { id: string; nummer: string; richtung: string; betrag_eur: number; gezahlt_am: string;
@@ -293,8 +294,8 @@ export default async function FinanzenSeite({
                       <td className="muted">
                         {f.partner_id ? <Link href={`/kontakte/${f.partner_id}`}>{f.partner}</Link> : (f.partner ?? '—')}
                       </td>
-                      <td className={new Date(f.faellig_am) < new Date() ? 'mono' : 'mono muted'}>
-                        {new Date(f.faellig_am) < new Date() && <span className="led warn" style={{ marginRight: 6 }} />}
+                      <td className={ueberfaelligSeit(f.faellig_am, false) !== null ? 'mono' : 'mono muted'}>
+                        {ueberfaelligSeit(f.faellig_am, false) !== null && <span className="led warn" style={{ marginRight: 6 }} />}
                         {date(f.faellig_am)}
                       </td>
                       <td className="mono" style={{ textAlign: 'right' }}>{money(f.betrag_eur)}</td>

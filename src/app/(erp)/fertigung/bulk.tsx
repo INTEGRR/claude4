@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { bulkEtiketten, bulkStart, bulkZettel } from './actions'
 import { isActionError } from '@/modules/shared/action'
-import { Badge } from '@/components/ui'
+import { Badge, Ueberfaellig } from '@/components/ui'
 import { date, qty } from '@/modules/shared/format'
 
 /**
@@ -289,7 +289,10 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
                   </div>
                 )}
               </td>
-              <td className="mono nowrap">{date(r.scheduled_date)}</td>
+              <td className="mono nowrap">
+                {date(r.scheduled_date)}{' '}
+                <Ueberfaellig termin={r.scheduled_date} erledigt={r.state === 'done' || r.state === 'cancel'} />
+              </td>
             </tr>
           ))}
         </tbody>

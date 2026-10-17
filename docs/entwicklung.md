@@ -155,6 +155,11 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   in die Abfrage, nicht als `rows.filter` auf die Seite. Der Wächter
   `tests/seiten.test.ts` lässt neue Listen-Seiten mit `limit ≥ 100` ohne
   Helfer nicht zu (Auswahllisten `order by name/label` sind ausgenommen).
+- **Überfällig** → `ueberfaellig(termin, erledigt)` bzw. `<Ueberfaellig
+  termin erledigt />` (Berliner Kalendertag, „überfällig · 12 Tage“); in
+  SQL `< date_trunc('day', now() at time zone 'Europe/Berlin')`. Keine
+  eigenen Vergleiche wie `new Date(x) < new Date()` — der Wächter
+  `tests/ueberfaellig.test.ts` prüft das und das Schild in den Terminlisten.
 - **Statuswerte** → die Zustandstabelle `LABELS` in `format.ts`:
   `<Badge kind="…" state={…} />` bzw. `label(art, wert)` und
   `tone(wert, art)`. Ein neues Status-Enum bekommt dort seine Art und

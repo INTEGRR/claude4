@@ -1,7 +1,7 @@
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
-import { Card, Empty, PageHeader } from '@/components/ui'
-import { date as datum, isoDatum } from '@/modules/shared/format'
+import { Card, Empty, PageHeader, Ueberfaellig } from '@/components/ui'
+import { date as datum, heuteBerlin, isoDatum, plural, ueberfaellig as ueberfaelligSeit } from '@/modules/shared/format'
 import { VerfolgungKurz } from '@/components/sendungsverfolgung'
 import type { Ereignis, VerfolgungStatus } from '@/modules/versand/track17-logik'
 import Link from 'next/link'
@@ -42,7 +42,7 @@ const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', '
 
 
 function EingangsKarte({ e, heute }: { e: Eingang; heute: string }) {
-  const ueberfaellig = e.termin != null && e.termin < heute
+  const ueberfaellig = ueberfaelligSeit(e.termin, false, heute) !== null
   const bestaetigt = e.eta_bestaetigt != null && e.eta_bestaetigt === e.termin
   return (
     <div
@@ -65,8 +65,9 @@ function EingangsKarte({ e, heute }: { e: Eingang; heute: string }) {
             <Link className="mono" href={`/einkauf/${e.bestellung_id}`}>{e.bestellung}</Link> ·{' '}
           </>
         )}
-        {e.positionen} Position(en)
-        {bestaetigt ? ' · bestätigt' : e.termin ? ' · geschätzt' : ''}
+        {plural(e.positionen, 'Position', 'Positionen')}
+        {bestaetigt ? ' · bestätigt' : e.termin ? ' · geschätzt' : ''}{' '}
+        <Ueberfaellig termin={e.termin} erledigt={false} />
       </div>
       {(e.carrier || e.tracking_number) && (
         <div className="small muted">
@@ -138,7 +139,7 @@ export default async function ZulaufPage({
   // Wochenraster: Montag der angezeigten Woche in UTC — dieselbe Basis, auf
   // der auch die Termine (date-Spalten) liegen.
   const jetzt = new Date()
-  const heute = isoDatum(jetzt)
+  const heute = heuteBerlin(jetzt)
   const montag = new Date(jetzt)
   montag.setUTCDate(jetzt.getUTCDate() - ((jetzt.getUTCDay() + 6) % 7) + offset * 7)
   const tage = Array.from({ length: 7 }, (_, i) => {
@@ -187,7 +188,7 @@ export default async function ZulaufPage({
     where r.status = 'genehmigt'
     order by r.genehmigt_am nulls last, r.nummer`
 
-  const ueberfaellige = eingaenge.filter((e) => e.termin != null && e.termin < heute)
+  const ueberfaellige = eingaenge.filter((e) => ueberfaelligSeit(e.termin, false, heute) !== null)
   const ohneTermin = eingaenge.filter((e) => e.termin == null)
   const jeTag = new Map<string, Eingang[]>(tage.map((t) => [t, []]))
   for (const e of eingaenge) {

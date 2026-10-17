@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
-import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Card, Empty, PageHeader, TableWrap, Ueberfaellig } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
 import { steuerZahlen, ustVorschlagUebernehmen } from '../actions'
 
@@ -26,11 +26,10 @@ export default async function SteuernSeite() {
   const termine = await sql<
     { id: string; art: string; zeitraum_von: string; zeitraum_bis: string;
       bezeichnung: string; betrag: number; faellig_am: string;
-      quelle: string; bezahlt_am: string | null; ueberfaellig: boolean }[]
+      quelle: string; bezahlt_am: string | null }[]
   >`
     select id, art, zeitraum_von, zeitraum_bis, bezeichnung, betrag,
-           faellig_am, quelle, bezahlt_am,
-           (bezahlt_am is null and faellig_am < current_date) as ueberfaellig
+           faellig_am::text as faellig_am, quelle, bezahlt_am
     from steuerzahlungen
     order by bezahlt_am is not null, faellig_am`
 
@@ -111,7 +110,7 @@ export default async function SteuernSeite() {
                     </td>
                     <td className="mono muted">
                       {date(s.faellig_am)}
-                      {s.ueberfaellig && <> <span className="badge danger">überfällig</span></>}
+                      {' '}<Ueberfaellig termin={s.faellig_am} erledigt={s.bezahlt_am != null} />
                     </td>
                     <td className="mono" style={{ textAlign: 'right' }}>
                       {Number(s.betrag) < 0 ? '+' : ''}{money(Math.abs(Number(s.betrag)))}

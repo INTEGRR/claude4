@@ -5,7 +5,7 @@ import { canAccess, canWrite } from '@/modules/auth/permissions'
 import { ActionButton } from '@/components/action-button'
 import { Card, Empty, PageHeader } from '@/components/ui'
 import { COCKPIT_KATEGORIEN, type CockpitEintrag, cockpitGruppieren, cockpitLaden } from '@/modules/einkauf/cockpit'
-import { date } from '@/modules/shared/format'
+import { date, heuteBerlin, ueberfaellig as ueberfaelligSeit } from '@/modules/shared/format'
 import { pflichtdokumenteNachfragen } from '../sendungen/actions'
 
 export const dynamic = 'force-dynamic'
@@ -39,12 +39,12 @@ export default async function CockpitPage({ searchParams }: { searchParams: Prom
   const namen = new Map(
     (await sql<{ id: string; name: string }[]>`select id, name from users`).map((u) => [u.id, u.name]),
   )
-  const heute = new Date().toISOString().slice(0, 10)
+  const heute = heuteBerlin()
   const handeln = gruppen.filter((g) => COCKPIT_KATEGORIEN[g.kategorie].digest)
   const lage = gruppen.filter((g) => !COCKPIT_KATEGORIEN[g.kategorie].digest)
 
   const zeile = (e: CockpitEintrag) => {
-    const ueberfaellig = e.faellig_am !== null && e.faellig_am < heute && !['sendungen', 'muster', 'wartet_lieferant', 'wartet_uns', 'unzugeordnet', 'ki_vorschlaege'].includes(e.kategorie)
+    const ueberfaellig = ueberfaelligSeit(e.faellig_am, false, heute) !== null && !['sendungen', 'muster', 'wartet_lieferant', 'wartet_uns', 'unzugeordnet', 'ki_vorschlaege'].includes(e.kategorie)
     return (
       <li key={`${e.kategorie}:${e.modell}:${e.record_id}:${e.titel}`} className="dok-zeile">
         <div className="dok-text">

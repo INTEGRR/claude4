@@ -2,7 +2,7 @@ import { requireArea } from '@/modules/auth'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
-import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap, Ueberfaellig } from '@/components/ui'
 import { LABELS, date } from '@/modules/shared/format'
 import { createRepair } from './actions'
 import { Auswahl } from '@/components/auswahl'
@@ -24,6 +24,9 @@ export default async function ReparaturPage({
   const { zustand } = params
   const seite = seitenParameter(params)
   const filter = ZUSTAENDE.find((z) => z === zustand) ?? null
+  // „Überfällig" (F4): Termin verstrichen, Auftrag weder versendet noch storniert —
+  // fängt auch „repariert, aber seit Monaten nicht zurückgeschickt".
+  const nurUeberfaellig = zustand === 'ueberfaellig'
 
   const rows = await sql<
     {
@@ -54,6 +57,8 @@ export default async function ReparaturPage({
     join partners p on p.id = r.partner_id
     left join sales_orders so on so.id = r.sales_order_id
     where ${filter ? sql`r.state = ${filter}::repair_state` : sql`true`}
+      and (not ${nurUeberfaellig} or (r.state not in ('shipped', 'cancel')
+                                     and r.scheduled_date < date_trunc('day', now() at time zone 'Europe/Berlin')))
     order by
       case r.state
         when 'received' then 0 when 'under_repair' then 1 when 'confirmed' then 2
@@ -125,7 +130,7 @@ export default async function ReparaturPage({
       <Card tight>
         {/* Filter als Links: die Adresszeile ist der Filterzustand. */}
         <div className="actions" style={{ padding: '10px 12px 0', flexWrap: 'wrap', gap: 6 }}>
-          <Link className={`btn small${filter ? '' : ' primary'}`} href="/reparatur">alle</Link>
+          <Link className={`btn small${filter || nurUeberfaellig ? '' : ' primary'}`} href="/reparatur">alle</Link>
           {ZUSTAENDE.map((z) => (
             <Link
               key={z}
@@ -135,6 +140,9 @@ export default async function ReparaturPage({
               {LABELS.repair[z]}
             </Link>
           ))}
+          <Link className={`btn small${nurUeberfaellig ? ' primary' : ''}`} href="/reparatur?zustand=ueberfaellig">
+            Überfällig
+          </Link>
         </div>
         {rows.length === 0 ? (
           <Empty>Keine Reparaturaufträge{filter ? ` im Zustand „${LABELS.repair[filter]}"` : ''}.</Empty>
@@ -195,7 +203,10 @@ export default async function ReparaturPage({
                       )}
                     </td>
                     <td className="mono nowrap">{r.received_at ? date(r.received_at) : '—'}</td>
-                    <td className="mono nowrap">{date(r.scheduled_date)}</td>
+                    <td className="mono nowrap">
+                      {date(r.scheduled_date)}{' '}
+                      <Ueberfaellig termin={r.scheduled_date} erledigt={r.state === 'shipped' || r.state === 'cancel'} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LABELS, dateTime, money, tone } from '@/modules/shared/format'
+import { LABELS, date, dateTime, money, plural, tone, ueberfaellig } from '@/modules/shared/format'
 
 /**
  * Leuchte je Tonlage. Konvention im ganzen Haus:
@@ -160,6 +160,20 @@ export function Stat({
     </Link>
   ) : (
     body
+  )
+}
+
+/**
+ * Überfällig-Schild (F4): erscheint nur, wenn der Termin verstrichen und der
+ * Beleg nicht erledigt ist — „überfällig · 12 Tage", das Datum im Tooltip.
+ */
+export function Ueberfaellig({ termin, erledigt }: { termin: string | Date | null | undefined; erledigt: boolean }) {
+  const tage = ueberfaellig(termin, erledigt)
+  if (tage === null) return null
+  return (
+    <span className="badge danger" title={`fällig am ${date(termin)}`}>
+      überfällig · {plural(tage, 'Tag', 'Tage')}
+    </span>
   )
 }
 

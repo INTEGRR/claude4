@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Eine Regel für „überfällig“
+
+**Anlass (UX-Audit):** Termine, die ein Jahr zurücklagen, sahen aus wie
+künftige. Betroffen waren Fertigung, Transfers, Zulauf, Reparaturen (seit
+Monaten „repariert“, nie versendet) und Steuern. Wo „überfällig“
+berechnet wurde, geschah das jeweils anders. `/finanzen` färbte eine
+Zahlung schon am Fälligkeitstag rot, weil `new Date('JJJJ-MM-TT')` UTC-
+Mitternacht ist.
+
+**Entschieden:**
+- `ueberfaellig(termin, erledigt)` in format.ts zählt ab dem Tag nach dem
+  Termin nach Berliner Kalendertag; `heuteBerlin()` liefert den Stichtag.
+- Das Schild `<Ueberfaellig>` („überfällig · 12 Tage“) steht in
+  Fertigung, Transfers, Zulauf, Reparaturen, Steuern und Verträgen (offene
+  Rate).
+- Einen Filter „Überfällig“ in SQL bekommen Fertigung, Transfers und
+  Reparaturen.
+- Der Wächter `tests/ueberfaellig.test.ts` prüft die Regel, verbietet
+  eigene Vergleiche und verlangt das Schild in den Terminlisten.
+- Doku: [entwicklung.md](entwicklung.md).
+
 ## 2026-10-17 — Seitenaufteilung statt stummer Limits
 
 **Anlass (UX-Audit):** Haupt-Listen schnitten bei 200 bzw. 300 Zeilen ohne

@@ -29,6 +29,9 @@ export default async function FertigungPage({
   // Das GET-Formular schickt produkt= auch leer mit — ''::uuid wäre ein 500.
   const produkt = produktRoh || undefined
   const nurStartbare = material === 'bereit'
+  // „Überfällig" (F4) ist ein Filter über Termin und Zustand, kein Belegstatus.
+  const nurUeberfaellig = status === 'ueberfaellig'
+  const moStatus = nurUeberfaellig ? undefined : status
   // Filter „Fertigung zum Auftrag" (Querverweis vom Verkauf, „N offen"):
   // nur gültige UUIDs, sonst wäre Unsinn in der Adresszeile ein 500.
   const auftrag = auftragRoh && UUID.test(auftragRoh) ? auftragRoh : undefined
@@ -74,7 +77,9 @@ export default async function FertigungPage({
       order by (sp.state in ('done', 'cancel')), sp.scheduled_date desc
       limit 1
     ) lf on true
-    where (${status ?? null}::text is null or mo.state = ${status ?? null}::mo_state)
+    where (${moStatus ?? null}::text is null or mo.state = ${moStatus ?? null}::mo_state)
+      and (not ${nurUeberfaellig} or (mo.scheduled_date < date_trunc('day', now() at time zone 'Europe/Berlin')
+                                     and mo.state not in ('done', 'cancel')))
       and (${produkt ?? null}::uuid is null or mo.variant_id = ${produkt ?? null}::uuid)
       and (${auftrag ?? null}::uuid is null or mo.sales_order_id = ${auftrag ?? null}::uuid)
       -- „Nur startbare" in der Abfrage, nicht nachträglich — sonst stimmen Seiten und Zähler nicht.
@@ -136,6 +141,7 @@ export default async function FertigungPage({
     { key: 'confirmed', label: 'Bestätigt' },
     { key: 'progress', label: 'In Bearbeitung' },
     { key: 'done', label: 'Erledigt' },
+    { key: 'ueberfaellig', label: 'Überfällig' },
   ]
 
   return (

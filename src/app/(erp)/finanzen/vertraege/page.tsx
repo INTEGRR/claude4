@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
-import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
+import { Card, Empty, PageHeader, Stat, TableWrap, Ueberfaellig } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
@@ -100,7 +100,9 @@ export default async function VertraegeSeite() {
                     </td>
                     <td className="muted">{v.intervall}</td>
                     <td className="mono muted">
-                      {v.naechste_zahlung ? date(v.naechste_zahlung) : '—'}
+                      {v.naechste_zahlung ? date(v.naechste_zahlung) : '—'}{' '}
+                      {/* Offene Rate aus der Vergangenheit = nicht bezahlt (F4). */}
+                      <Ueberfaellig termin={v.naechste_zahlung} erledigt={false} />
                     </td>
                     <td>
                       {v.status === 'aktiv' && v.kuendbar_zum ? (
