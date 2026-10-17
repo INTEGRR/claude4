@@ -74,6 +74,12 @@ der [AGENTS.md](../AGENTS.md).
   und bewertet (UI, Abläufe, Status), mit übergreifenden Mustern und
   maschinenlesbaren Befunden — Grundlage für die UI-Überarbeitung.
 
+## Entscheidungsvorlagen (offen, Betreiber entscheidet)
+
+- [vorlagen/auftragsaenderung.md](vorlagen/auftragsaenderung.md) — Auftrag
+  nach der Bestätigung ändern: heutiger Weg (Shopify führt, KRNL zieht
+  nach), Aufpreis, rechtlicher Rahmen, Optionen mit Empfehlung.
+
 ## Module (Fachdoku der Gründungsphase, je Bereich)
 
 - [module/verkauf.md](module/verkauf.md) — Verkaufsaufträge, Shopify-Import,

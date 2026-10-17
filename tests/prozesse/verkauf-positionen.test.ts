@@ -2,7 +2,9 @@
  * Auftragspositionen entfernen (0120, UX-Audit): eine schon gelieferte oder
  * abgerechnete Zeile bleibt — Korrektur über Retoure bzw. Gutschrift. Wie
  * Änderungen nach der Bestätigung grundsätzlich laufen, ist noch offen
- * (docs/vorlagen/auftragsaenderung.md); bis dahin ändert sich sonst nichts.
+ * (docs/vorlagen/auftragsaenderung.md). Seit 2026-10-17 ziehen Änderungen von
+ * Hand am bestätigten Auftrag Lieferung und Fertigung nach — derselbe Weg
+ * wie Shop-Änderungen (sales_order_lieferung_angleichen).
  */
 import './spur.ts'
 import test, { after, before, describe } from 'node:test'
@@ -88,5 +90,27 @@ describe('Auftragspositionen entfernen', () => {
     )
     const [noch] = await h.sql<{ n: number }[]>`select count(*)::int as n from sales_order_lines where id = ${a.zeilen[0]}`
     assert.equal(noch.n, 1, 'gelieferte Zeile ist noch da')
+  })
+
+  test('bestätigter Auftrag: Entfernen und Hinzufügen ziehen die Lieferung nach', async () => {
+    const a = await auftrag('POS-ANGLEICH')
+    await aktionAusfuehrenGeprueft('verkauf.bestaetigen', { recordId: a.id }, ADMIN)
+    const offeneMengen = async () =>
+      new Map((await h.sql<{ sku: string; qty: number }[]>`
+        select pv.sku, sum(sm.qty)::float as qty from stock_moves sm
+        join stock_pickings p on p.id = sm.picking_id
+        join product_variants pv on pv.id = sm.variant_id
+        where p.origin_model = 'sales_order' and p.origin_id = ${a.id} and sm.state not in ('done', 'cancel')
+        group by pv.sku`).map((r) => [r.sku, Number(r.qty)]))
+    assert.deepEqual(await offeneMengen(), new Map([['POS-ANGLEICH-A', 1], ['POS-ANGLEICH-B', 1]]))
+
+    await aktionAusfuehrenGeprueft('verkauf.position_entfernen',
+      { recordId: a.id, parameter: { line_id: a.zeilen[1] } }, ADMIN)
+    assert.deepEqual(await offeneMengen(), new Map([['POS-ANGLEICH-A', 1]]), 'die entfernte Zeile wird nicht mehr geliefert')
+
+    const [v] = await h.sql<{ id: string }[]>`select id from product_variants where sku = 'POS-ANGLEICH-B'`
+    await aktionAusfuehrenGeprueft('verkauf.position_hinzufuegen',
+      { recordId: a.id, parameter: { variant_id: v.id, qty: 3, price_unit: 20 } }, ADMIN)
+    assert.deepEqual(await offeneMengen(), new Map([['POS-ANGLEICH-A', 1], ['POS-ANGLEICH-B', 3]]), 'die neue Zeile wird geliefert')
   })
 })

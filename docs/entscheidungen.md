@@ -9,6 +9,23 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Änderungen von Hand am bestätigten Auftrag ziehen Lieferung und Fertigung nach
+
+**Anlass (Recherche zur Entscheidungsvorlage Auftragsänderung):**
+`verkauf.position_entfernen` löschte die Zeile, ließ aber die Lieferbewegung
+stehen — die Ware wäre versendet und mit der Lieferung berechnet worden.
+`verkauf.position_hinzufuegen` legte keine Lieferbewegung und keinen
+Fertigungsauftrag an. `sales_order_lieferung_angleichen` (0115) ist laut
+Kommentar für Shop-Änderungen „oder von Hand" gedacht, wurde von Hand aber
+nie gerufen.
+
+**Entschieden:** Beide Aktionen rufen die Funktion nach der Änderung (im
+Entwurf tut sie nichts). Das ist ein Fehler-Fix, keine Grundsatzentscheidung
+— ob ein bestätigter Auftrag überhaupt geändert werden darf, bleibt offen:
+[vorlagen/auftragsaenderung.md](vorlagen/auftragsaenderung.md). Test in
+tests/prozesse/verkauf-positionen.test.ts, Doku in
+[module/verkauf.md](module/verkauf.md).
+
 ## 2026-10-17 — Nachfrage an die Fertigung auch bei von Hand gebuchter Lieferung
 
 **Anlass (UX-Audit, Code-Prüfung):** Die Nachfrage „Fertigung noch

@@ -196,6 +196,9 @@ export async function positionHinzufuegen(
       ${p.variant_id}, ${info.name}, ${p.qty}, ${info.uom_id},
       ${p.price_unit ?? Number(info.price)})`
 
+  // Bestätigter Auftrag: Lieferung und Fertigung folgen der Zeile — derselbe
+  // Weg wie eine Shop-Änderung (0115). Im Entwurf tut die Funktion nichts.
+  await sql`select sales_order_lieferung_angleichen(${orderId}, ${ctx.actor})`
   await sql`select sales_order_recompute_status(${orderId})`
   return { recordId: orderId }
 }
@@ -209,6 +212,8 @@ export async function positionEntfernen(
   // Gelieferte/fakturierte Zeilen bleiben (0120) — Korrektur über Retoure/Gutschrift.
   await sql`select sales_order_line_guard_entfernen(${p.line_id})`
   await sql`delete from sales_order_lines where id = ${p.line_id} and order_id = ${orderId}`
+  // Sonst bliebe die Lieferbewegung stehen — die Ware ginge raus und würde berechnet.
+  await sql`select sales_order_lieferung_angleichen(${orderId}, ${ctx.actor})`
   await sql`select sales_order_recompute_status(${orderId})`
   return { recordId: orderId }
 }
