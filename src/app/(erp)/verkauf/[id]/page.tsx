@@ -69,6 +69,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
   if (!order) notFound()
   const shopAuftrag = order.source === 'shopify'
+  // Noch rücksendbare Menge (0125) — der Retoure-Knopf erscheint nur, wenn etwas übrig ist.
+  const [{ rest: retoureRest }] = shopAuftrag
+    ? await sql<{ rest: number }[]>`select retoure_restmenge(${id}) as rest`
+    : [{ rest: 0 }]
   const shopUrl = shopAuftrag ? shopifyBestellungUrl(order.shopify_order_id) : null
 
   const kopf = (order as unknown) as {
@@ -265,7 +269,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <ActionButton action={setLocked.bind(null, id, true)}>Sperren</ActionButton>
               ))}
             {/* Retoure (0119): gelieferte Shop-Ware zurücknehmen — Erstattung bleibt im Shop. */}
-            {shopAuftrag && ['partial', 'full'].includes(order.delivery_status) && (
+            {shopAuftrag && ['partial', 'full'].includes(order.delivery_status) && Number(retoureRest) > 0 && (
               <Link className="btn" href={`/versand/retouren/neu?auftrag=${id}`}>Retoure anlegen</Link>
             )}
             {/* Storno führt Shopify (2026-10-02): Shop-Aufträge werden im

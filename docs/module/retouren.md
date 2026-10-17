@@ -20,7 +20,8 @@ Betreibers: [Entscheidungslog 2026-10-17](../entscheidungen.md).
    (App Proxy)") oder intern über Versand → Retouren → „Retoure anlegen"
    bzw. den Knopf am gelieferten Shop-Auftrag (`versand.retoure_anlegen`).
    Je Auftragszeile höchstens die gelieferte Menge abzüglich offener oder
-   erledigter Retouren; Grund aus einer festen Liste
+   erledigter Retouren — seit 0125 auch, wenn dieselbe Zeile im selben
+   Aufruf mehrfach kommt; Grund aus einer festen Liste
    (`modules/versand/retoure-gruende.ts`), Anliegen als Freitext. Das Portal
    schickt eine Eingangsbestätigung (Outbox-Job `send_return_request_email`).
    Gespeichert wird der Shop-Gesamtbetrag zum Zeitpunkt der Anfrage
@@ -100,7 +101,8 @@ eigener Zustand.
 - **Retoure** (`/versand/retouren/[id]`): Anfrage, Verlauf mit Zeitpunkten,
   Positionen bzw. Prüfmaske, Retourenlabel, Prozess-Panel, Kommentare.
 - **Verkaufsauftrag**: Knopf „Retoure anlegen" bei gelieferten
-  Shop-Aufträgen; der Shop-Storno nach Lieferung meldet keinen Fehler mehr,
+  Shop-Aufträgen, solange noch etwas rücksendbar ist
+  (`retoure_restmenge(auftrag)` > 0, seit 0125); der Shop-Storno nach Lieferung meldet keinen Fehler mehr,
   wenn eine Retoure existiert.
 
 ## Datenmodell

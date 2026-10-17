@@ -9,6 +9,22 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Rechnung über 0 € ist ausgeglichen; Retoure-Restmenge je Aufruf
+
+**Anlass (UX-Audit, Code-Prüfung):** Eine Lieferung mit Gesamtbetrag 0 €
+erzeugte eine *offene* Rechnung, die nichts schloss und die mahnbar war.
+`retoure_anlegen` ließ die gerade entstehende Retoure aus der Summe heraus —
+dieselbe Zeile zweimal in einem Aufruf überstieg die Liefermenge; der Knopf
+„Retoure anlegen" stand auch dann noch da, wenn alles schon zurückging.
+
+**Entschieden:** 0-€-Rechnungen entstehen als `bezahlt` (ausgeglichen);
+`kundenrechnung_mahnen` lehnt Rechnungen ohne offenen Betrag ab (0124).
+Bestehende 0-€-Rechnungen ändert keine Migration — Betriebsdaten fasst nur
+der Mensch an (von Hand als bezahlt markieren). Retouren zählen die eigenen,
+schon erfassten Zeilen mit; `retoure_restmenge(auftrag)` steuert den Knopf
+(0125). Tests: tests/prozesse/rechnung-null-retoure-rest.test.ts. Doku:
+[module/verkauf.md](module/verkauf.md), [module/retouren.md](module/retouren.md).
+
 ## 2026-10-17 — Cashflow zählt nur bestätigte Bestellungen
 
 **Anlass (UX-Audit, Code-Prüfung):** Die Prognose und die Liste „Fällig"

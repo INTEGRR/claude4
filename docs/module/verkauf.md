@@ -95,10 +95,12 @@ positionen, grund)` erzeugt die GU-Nummer mit Bezug zur Rechnung
 Einzahlung ins Zahlungsregister (`zahlungen.quelle = 'kundenrechnung'`,
 mit Bankkonto und Betrag — Teilzahlungen erlaubt) oder markiert ohne Konto
 als bezahlt (Bar, Shop). `kundenrechnung_offen(id)` = brutto − Zahlungen;
-bei 0 kippt der Status auf `bezahlt`. Offene Rechnungen (Forderung, `ein`)
+bei 0 kippt der Status auf `bezahlt`. Eine Rechnung über 0,00 € (Garantie,
+Ersatz zum Nulltarif) entsteht seit 0124 gleich als `bezahlt` —
+ausgeglichen, nie offen, nie gemahnt. Offene Rechnungen (Forderung, `ein`)
 und offene Gutschriften (Erstattung, `aus`) stehen in `finanz_faellig`
 und damit in der Cashflow-Sicht. **Mahnstufen 1–3** (`verkauf.rechnung_mahnen`,
-nur nach Fälligkeit): Zahlungserinnerung, 1. Mahnung, 2. Mahnung — je als
+nur nach Fälligkeit und mit offenem Betrag): Zahlungserinnerung, 1. Mahnung, 2. Mahnung — je als
 PDF mit Frist `rechnung.mahnfrist_tage`; überfällige Rechnungen zählt die
 Navigation (`/verkauf/rechnungen`, rot).
 
