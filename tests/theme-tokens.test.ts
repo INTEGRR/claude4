@@ -36,4 +36,47 @@ describe('Theme-Tokens', () => {
     const anders = [...gewaehlt].filter(([k, v]) => system.get(k) !== v).map(([k]) => k)
     assert.deepEqual(anders, [], `abweichende Werte: ${anders.join(', ')}`)
   })
+
+  /**
+   * Kontrast (Entscheidungslog 2026-10-17, KRNL-Stil bleibt): Text erreicht
+   * in beiden Themes mindestens 4,5:1 (WCAG AA). Der Audit fand gedämpften
+   * Text bei 2,75:1 und Weiß auf Orange bei 3,1:1. Orange-Flächen ohne Text
+   * (LED, Balken) bleiben `--accent`; die Primärtaste nutzt `--accent-fill`.
+   */
+  test('Textfarben erreichen 4,5:1 in hell und dunkel', () => {
+    const luminanz = (hex: string): number => {
+      const roh = hex.replace('#', '')
+      const voll = roh.length === 3 ? [...roh].map((c) => c + c).join('') : roh
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(voll.slice(i, i + 2), 16) / 255)
+        .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const kontrast = (a: string, b: string): number => {
+      const [hell, dunkel] = [luminanz(a), luminanz(b)].sort((x, y) => y - x)
+      return (hell + 0.05) / (dunkel + 0.05)
+    }
+    const themes = {
+      hell: variablen(/^:root\s*\{/gm),
+      dunkel: variablen(/^:root\[data-theme='dark'\]\s*\{/gm),
+    }
+    const paare: [string, string][] = [
+      ...['--text', '--text-2', '--text-muted'].flatMap((t) =>
+        ['--bg', '--surface', '--surface-2'].map((g): [string, string] => [t, g])),
+      ['#fff', '--accent-fill'],
+      ['--accent-text', '--surface'],
+      ['--wichtig-kontrast', '--wichtig'],
+    ]
+    const zuSchwach: string[] = []
+    for (const [name, v] of Object.entries(themes)) {
+      const farbe = (x: string) => (x.startsWith('#') ? x : v.get(x))
+      for (const [vorne, hinten] of paare) {
+        const a = farbe(vorne)
+        const b = farbe(hinten)
+        assert.ok(a && b, `${name}: ${vorne} oder ${hinten} fehlt`)
+        const k = kontrast(a, b)
+        if (k < 4.5) zuSchwach.push(`${name}: ${vorne} auf ${hinten} = ${k.toFixed(2)}:1`)
+      }
+    }
+    assert.deepEqual(zuSchwach, [], `unter 4,5:1:\n${zuSchwach.join('\n')}`)
+  })
 })

@@ -953,7 +953,8 @@
      "befund": "Nach der Bestätigung sind Positionen weiterhin per „Entfernen“ löschbar und „Position hinzufügen“ ist aktiv, obwohl Lieferung und zwei Fertigungsaufträge existieren. Was mit Lieferung/FA passiert, ist nicht erkennbar.",
      "vorschlag": "Positionen nach Bestätigung sperren oder Änderung nur über eine bewusste Aktion ‚Auftrag ändern‘ mit Vorschau der Folgen (FA anpassen/stornieren).",
      "id": "103-verkauf-bestaetigt#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "1cdf5cd"
     },
     {
      "schwere": "hoch",
@@ -1100,7 +1101,8 @@
      "befund": "Shop-Auftrag ist vollständig geliefert und bezahlt, trotzdem sind „Entfernen“ und „Position hinzufügen“ aktiv. Änderungen kollidieren mit Shopify als Quelle und der gestellten Rechnung.",
      "vorschlag": "Shop-Aufträge: Positionen schreibgeschützt (‚Änderungen im Shopify-Admin‘).",
      "id": "105-verkauf-shop-geliefert#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "1cdf5cd"
     },
     {
      "schwere": "mittel",

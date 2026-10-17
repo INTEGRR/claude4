@@ -100,6 +100,7 @@ Sie sind der Grund, warum die Konventionen mitwachsen statt zu verrotten:
 | `tests/daten-tuev.test.ts` | Die Invariantenprüfung findet echte Korruption |
 | `tests/actions.test.ts` | Server Actions werfen nicht (Next schwärzt Fehler in Produktion) |
 | `tests/formularfelder.test.ts` | `min` ist ein Vielfaches von `step` — sonst sperrt der Browser glatte Werte |
+| `tests/theme-tokens.test.ts` | Dunkelmodus auf beiden Wegen gleich; Text erreicht 4,5:1 Kontrast in hell und dunkel (KRNL-Stil, `--accent-fill` für weiße Schrift auf Orange) |
 | `tests/auswahl.test.ts` | Kein natives `<select>` im internen Teil — Auswahlfelder sind `<Auswahl>` mit Suche (Ausnahmen: zwei öffentliche Formulare) |
 | `tests/db-client.test.ts` | App-Client ohne Pipelining (Supavisor), kein `.begin(` — Transaktionen über `tx()`/`transaktion()` |
 | `tests/prozesse/fakes.test.ts` (`after`) | Ein Test ohne Datenbank lässt keine Verbindung offen |

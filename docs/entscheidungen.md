@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Design: KRNL-Stil bleibt; Text-Kontrast ≥ 4,5:1 mit Wächter
+
+**Anlass:** Offene Design-Frage aus dem UX-Audit: KRNL-Stil beibehalten oder
+die ANVIL-Marke einfließen lassen? Dazu zwei Kontrastlücken (Design-System-
+Abgleich): gedämpfter Text auf der Werkbank 2,75:1, Weiß auf Orange in der
+Primärtaste 3,1:1 (hell) bzw. 2,8:1 (dunkel). Ziel für Text ist 4,5:1.
+
+**Entschieden (Betreiber):**
+- Der **KRNL-Stil bleibt** (Werkbank, Hairlines, Orange führt, Violett
+  antwortet). Die ANVIL-Marke bleibt dem Shop.
+- Hell `--text-muted` `#8a8a84` → `#656561` (4,6–5,0:1 auf allen Gründen);
+  dunkel bestand schon.
+- Neues Token `--accent-fill` (hell `#c94a1c`, dunkel `#c44a1a`) nur für
+  Flächen mit weißer Schrift: Primärtaste und Senden-Knopf (≥ 4,7:1).
+  `--accent` bleibt für LEDs, Balken und Marker — das „Glühen" bleibt hell.
+  Hover dunkelt ab statt aufzuhellen, damit der Kontrast hält.
+- Wächter: `tests/theme-tokens.test.ts` rechnet den WCAG-Kontrast für
+  Text-, Akzent- und Schlüsselschalter-Paare in hell und dunkel.
+- Doku: [entwicklung.md](entwicklung.md) (Wächtertabelle), Design-System-
+  Artifact (Kontrast-Checkliste).
+
 ## 2026-10-17 — Auftragsänderung nach der Bestätigung: Shopify führt (Option c)
 
 **Anlass:** Bestätigte Aufträge waren in KRNL frei änderbar (UX-Audit
