@@ -73,6 +73,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const [{ rest: retoureRest }] = shopAuftrag
     ? await sql<{ rest: number }[]>`select retoure_restmenge(${id}) as rest`
     : [{ rest: 0 }]
+  // Bestehende Retouren verlinken (UX-Audit 107#2) — sonst sieht man sie am Auftrag nicht.
+  const retouren = shopAuftrag
+    ? await sql<{ id: string; nummer: string }[]>`
+        select id, nummer from retouren where sales_order_id = ${id} order by created_at`
+    : []
   const shopUrl = shopAuftrag ? shopifyBestellungUrl(order.shopify_order_id) : null
 
   const kopf = (order as unknown) as {
@@ -272,6 +277,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             {shopAuftrag && ['partial', 'full'].includes(order.delivery_status) && Number(retoureRest) > 0 && (
               <Link className="btn" href={`/versand/retouren/neu?auftrag=${id}`}>Retoure anlegen</Link>
             )}
+            {retouren.map((r) => (
+              <Link key={r.id} className="btn small" href={`/versand/retouren/${r.id}`} title="Retoure zu diesem Auftrag">
+                {r.nummer}
+              </Link>
+            ))}
             {/* Storno führt Shopify (2026-10-02): Shop-Aufträge werden im
                 Shopify-Admin storniert (mit Erstattung); der Webhook storniert
                 hier samt Lieferung, Fertigung und Label. */}
