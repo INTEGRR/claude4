@@ -1054,7 +1054,8 @@
      "befund": "„Entfernen“ auch bei einer bereits teilweise gelieferten Position (Blau, 1 geliefert).",
      "vorschlag": "Entfernen sperren, sobald geliefert > 0.",
      "id": "104-verkauf-teilgeliefert#5",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "d3eadf2"
     },
     {
      "schwere": "niedrig",
@@ -1222,7 +1223,8 @@
      "befund": "„Retoure anlegen“ wird weiter angeboten, obwohl schon Retoure RT/00001 existiert und der Auftrag storniert ist. Die bestehende Retoure ist nirgends verlinkt (keine Retouren-Karte).",
      "vorschlag": "Karte ‚Retouren‘ mit Link und Status; Knopf nur, wenn noch rücksendbare Menge übrig ist.",
      "id": "107-verkauf-storniert#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "1e10fbc"
     },
     {
      "schwere": "mittel",
@@ -1302,7 +1304,8 @@
      "befund": "RE-0130 über 0,00 € steht als ‚OFFEN‘, Spalte Offen ‚—‘ – Nullrechnung bleibt dauerhaft offen.",
      "vorschlag": "Nullrechnungen automatisch als ausgeglichen markieren oder gar nicht erzeugen.",
      "id": "110-rechnungen#4",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "02b5d53"
     },
     {
      "schwere": "mittel",
@@ -1421,7 +1424,8 @@
      "befund": "Nullrechnung (0,00 €) bietet ‚Zahlung erfassen‘, Teilgutschrift und Storno an.",
      "vorschlag": "Bei 0 € nur ‚als erledigt markieren‘.",
      "id": "112-rechnung-offen#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "02b5d53"
     },
     {
      "schwere": "mittel",
@@ -3161,7 +3165,8 @@
      "befund": "Bestellung bei einem chinesischen Lieferanten in CNY rechnet 19 % deutsche USt auf: Netto 37.800 CNY → ‚Gesamt (brutto) 44.982 CNY‘. Bei Import fällt keine USt des Lieferanten an (EUSt erst beim Zoll).",
      "vorschlag": "Steuersatz aus Lieferant/Land ableiten (Drittland = 0 %), Brutto-Zeile bei 0 % weglassen.",
      "id": "402-bestellung-entwurf#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "b79167d"
     },
     {
      "schwere": "hoch",
@@ -4268,7 +4273,8 @@
      "befund": "CHF und GBP zeigen ‚1.0000 – kein Kurs erfasst‘: ein fehlender Kurs wird als 1:1 dargestellt (und ggf. gerechnet).",
      "vorschlag": "Fehlenden Kurs als ‚—‘ + Warnung; Bestellungen in dieser Währung blockieren.",
      "id": "497-kurse#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "831a15f"
     },
     {
      "schwere": "mittel",
@@ -5612,7 +5618,8 @@
      "befund": "Cashflow-Oktober enthält Bestellungen über 285.652,96 € (u. a. die nicht bestätigte CNY-Anfrage P00036 mit 19 % USt und alle seit Monaten überfälligen Testbestellungen) → Fremdkapitalbedarf 175.162 € und ‚Fällig in 14 Tagen 257.107,98 € (122 Posten)‘ – die Kernaussage der Seite ist dadurch falsch.",
      "vorschlag": "Nur bestätigte Bestellungen einrechnen; Anfragen getrennt als ‚möglich‘; überfällige Zahlungen als eigener Block statt im laufenden Monat.",
      "id": "850-cashflow#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "ef4378c"
     },
     {
      "schwere": "hoch",
@@ -5636,7 +5643,8 @@
      "befund": "Fremdkapitalbedarf in Violett. Laut Designsystem (globals.css) ist Violett der seltene Entscheidungsakzent (Freigaben, Befugnis-Schritte, KI-Vorschläge). Eine Prognosezahl ist keine Entscheidung – die Farbsemantik verwässert; als Risiko gehört sie in die Gefahrenfarbe.",
      "vorschlag": "Gefahrenfarbe (rot) aus den Tokens.",
      "id": "850-cashflow#4",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "gewollt: Violett markiert die Entscheidung „Fremdkapital beschaffen oder Einkauf strecken“ (Kommentar in src/app/(erp)/page.tsx) — Kontrast im Dunkelmodus läuft unter d04-finanzen#1."
     },
     {
      "schwere": "niedrig",
