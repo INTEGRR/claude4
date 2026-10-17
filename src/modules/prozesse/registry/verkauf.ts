@@ -189,7 +189,9 @@ export const VERKAUF = {
   'verkauf.position_hinzufuegen': {
     label: 'Position hinzufügen',
     bereich: 'verkauf',
-    beschreibung: 'Nimmt ein Produkt in den Beleg auf (Preis aus der Liste, überschreibbar).',
+    beschreibung:
+      'Nimmt ein Produkt in den Beleg auf (Preis aus der Liste, überschreibbar). Nicht bei Shop-Aufträgen ' +
+      '(die ändert Shopify) und nicht mehr, sobald etwas geliefert ist.',
     bindung: 'beleg',
     modell: 'sales_order',
     schema: z.object({
@@ -211,7 +213,9 @@ export const VERKAUF = {
   'verkauf.position_entfernen': {
     label: 'Position entfernen',
     bereich: 'verkauf',
-    beschreibung: 'Entfernt eine Belegzeile (nur im Entwurf).',
+    beschreibung:
+      'Entfernt eine Belegzeile. Nicht bei Shop-Aufträgen (die ändert Shopify) und nicht mehr, sobald ' +
+      'etwas geliefert ist.',
     bindung: 'beleg',
     modell: 'sales_order',
     prozessfrei: true,

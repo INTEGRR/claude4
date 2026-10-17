@@ -9,6 +9,28 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Auftragsänderung nach der Bestätigung: Shopify führt (Option c)
+
+**Anlass:** Bestätigte Aufträge waren in KRNL frei änderbar (UX-Audit
+103#1, 105#1), obwohl Shop-Änderungen schon per Webhook ankommen. Die
+Entscheidungsvorlage [auftragsaenderung.md](vorlagen/auftragsaenderung.md)
+stellte (a) nur Entwurf, (b) Änderungsmaske, (c) Shopify als einzige Quelle
+zur Wahl. Der Betreiber hat (c) gewählt.
+
+**Entschieden:**
+- Shop-Aufträge ändert nur Shopify. KRNL lehnt „Position
+  hinzufügen/entfernen“ ab und verweist auf den Shopify-Admin; Positionen,
+  Lieferung, Fertigung und Belege zieht der Import nach (0115).
+- Aufträge in KRNL (B2B) bleiben änderbar, solange keine Zeile geliefert
+  ist. Danach: Retoure oder neuer Auftrag.
+- Umsetzung: 0129 `sales_order_positionen_aenderbar` (Grund) und
+  `sales_order_guard_positionen` (Aktionen), Seite `/verkauf/[id]`.
+- Tests: tests/prozesse/verkauf-positionen.test.ts, Prozess-Fixture
+  Verkauf (Shop-Auftrag).
+- Offen und bewusst später: Preisänderung an bestehender B2B-Zeile
+  (Option b für B2B) und die Fragen an die Steuerberatung.
+- Doku: [module/verkauf.md](module/verkauf.md).
+
 ## 2026-10-17 — Schreibschutz aus dem Status
 
 **Anlass (UX-Audit):** Erledigte und stornierte Fertigungsaufträge,

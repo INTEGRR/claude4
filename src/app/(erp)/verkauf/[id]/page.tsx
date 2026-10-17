@@ -199,6 +199,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     order by label limit 500`
 
   const editable = order.state !== 'cancel' && !order.locked
+  // Option (c), 0129: Positionen ändert bei Shop-Aufträgen Shopify, bei B2B nur bis zur ersten Lieferung.
+  const [{ grund: positionenGrund }] = await sql<{ grund: string | null }[]>`
+    select sales_order_positionen_aenderbar(${id}) as grund`
+  const positionenAenderbar = editable && !positionenGrund
 
   // Lieferstatus-Schild als Weg: genau eine offene (oder überhaupt nur eine)
   // Lieferung → direkt dorthin, sonst die Transfers des Auftrags.
@@ -485,7 +489,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <th className="num">Einzelpreis</th>
                   <th className="num">MwSt.</th>
                   <th className="num">Netto</th>
-                  {editable && <th />}
+                  {positionenAenderbar && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -517,7 +521,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <td className="num">{money(l.price_unit, order.currency)}</td>
                     <td className="num">{qty(l.tax_rate)} %</td>
                     <td className="num">{money(l.subtotal, order.currency)}</td>
-                    {editable && (
+                    {positionenAenderbar && (
                       <td className="num">
                         {l.sperrgrund ? (
                           <span className="small muted" title={l.sperrgrund}>
@@ -539,23 +543,23 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <tr>
                   <td colSpan={6} className="num mono-label">Netto</td>
                   <td className="num">{money(order.net, order.currency)}</td>
-                  {editable && <td />}
+                  {positionenAenderbar && <td />}
                 </tr>
                 <tr>
                   <td colSpan={6} className="num mono-label">MwSt.</td>
                   <td className="num">{money(order.tax, order.currency)}</td>
-                  {editable && <td />}
+                  {positionenAenderbar && <td />}
                 </tr>
                 <tr style={{ borderTop: '2px solid var(--border-strong)' }}>
                   <td colSpan={6} className="num mono-label">Gesamt</td>
                   <td className="num">{money(order.gross, order.currency)}</td>
-                  {editable && <td />}
+                  {positionenAenderbar && <td />}
                 </tr>
                 {Number(order.versandkosten) > 0 && (
                   <tr>
                     <td colSpan={6} className="num mono-label">zzgl. Versand netto (Shopify)</td>
                     <td className="num muted">{money(order.versandkosten, order.currency)}</td>
-                    {editable && <td />}
+                    {positionenAenderbar && <td />}
                   </tr>
                 )}
               </tfoot>
@@ -563,7 +567,24 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </TableWrap>
         )}
 
-        {editable && (
+        {editable && positionenGrund && (
+          <div className="small muted" style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
+            {shopAuftrag ? (
+              <>
+                Positionen ändert Shopify — KRNL übernimmt Änderungen automatisch samt Lieferung und Fertigung.{' '}
+                {shopUrl ? (
+                  <a href={shopUrl} target="_blank" rel="noopener">In Shopify bearbeiten ↗</a>
+                ) : (
+                  <span title="SHOPIFY_SHOP_DOMAIN fehlt — deshalb kein Link">Bearbeiten im Shopify-Admin</span>
+                )}
+              </>
+            ) : (
+              positionenGrund
+            )}
+          </div>
+        )}
+
+        {positionenAenderbar && (
           <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
             <ActionForm action={addLine.bind(null, id)}>
               <div className="row">

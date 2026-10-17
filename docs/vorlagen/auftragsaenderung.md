@@ -1,8 +1,9 @@
 # Entscheidungsvorlage: Auftrag nach der Bestätigung ändern
 
-**Stand:** 17.10.2026 · **Status:** offen. Der Betreiber entscheidet. Die
+**Stand:** 17.10.2026 · **Status:** entschieden am 17.10.2026 — **Option
+(c)**, Punkte 1–3 umgesetzt (Entscheidungslog 2026-10-17). Die Fragen
+„Für die Steuerberatung“ bleiben offen und werden später geklärt; die
 rechtlichen Punkte sind eine Einordnung ohne Gewähr, keine Steuerberatung.
-Die Punkte unter „Für die Steuerberatung“ vor der Entscheidung dort klären.
 
 ## Anlass
 

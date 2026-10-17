@@ -1,10 +1,10 @@
 /**
- * Auftragspositionen entfernen (0120, UX-Audit): eine schon gelieferte oder
- * abgerechnete Zeile bleibt — Korrektur über Retoure bzw. Gutschrift. Wie
- * Änderungen nach der Bestätigung grundsätzlich laufen, ist noch offen
- * (docs/vorlagen/auftragsaenderung.md). Seit 2026-10-17 ziehen Änderungen von
- * Hand am bestätigten Auftrag Lieferung und Fertigung nach — derselbe Weg
- * wie Shop-Änderungen (sales_order_lieferung_angleichen).
+ * Auftragspositionen ändern. 0120 (UX-Audit): eine schon gelieferte oder
+ * abgerechnete Zeile bleibt — Korrektur über Retoure bzw. Gutschrift.
+ * Option (c), 0129 (Entscheidungslog 2026-10-17): Shop-Aufträge ändert
+ * Shopify, Aufträge in KRNL nur, solange nichts geliefert ist. Änderungen von
+ * Hand am bestätigten Auftrag ziehen Lieferung und Fertigung nach — derselbe
+ * Weg wie Shop-Änderungen (sales_order_lieferung_angleichen).
  */
 import './spur.ts'
 import test, { after, before, describe } from 'node:test'
@@ -68,7 +68,7 @@ describe('Auftragspositionen entfernen', () => {
     assert.equal(n.n, 1)
   })
 
-  test('gelieferte Position bleibt, nicht gelieferte darf weiter entfernt werden', async () => {
+  test('nach einer Teillieferung sind die Positionen fest', async () => {
     const a = await auftrag('POS-GELIEFERT')
     await aktionAusfuehrenGeprueft('verkauf.bestaetigen', { recordId: a.id }, ADMIN)
     const [p] = await h.sql<{ id: string }[]>`
@@ -90,6 +90,38 @@ describe('Auftragspositionen entfernen', () => {
     )
     const [noch] = await h.sql<{ n: number }[]>`select count(*)::int as n from sales_order_lines where id = ${a.zeilen[0]}`
     assert.equal(noch.n, 1, 'gelieferte Zeile ist noch da')
+
+    // Option (c): auch die nicht gelieferte Zeile bleibt, und nichts kommt dazu.
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('verkauf.position_entfernen',
+        { recordId: a.id, parameter: { line_id: a.zeilen[1] } }, ADMIN),
+      /teilgeliefert — Positionen lassen sich nicht mehr ändern/,
+    )
+    const [v] = await h.sql<{ id: string }[]>`select variant_id as id from sales_order_lines where id = ${a.zeilen[1]}`
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('verkauf.position_hinzufuegen',
+        { recordId: a.id, parameter: { variant_id: v.id, qty: 1, price_unit: 20 } }, ADMIN),
+      /geliefert/,
+    )
+  })
+
+  test('Shop-Auftrag: Positionen ändert Shopify', async () => {
+    const a = await auftrag('POS-SHOP')
+    await aktionAusfuehrenGeprueft('verkauf.bestaetigen', { recordId: a.id }, ADMIN)
+    await h.sql`update sales_orders set source = 'shopify', shopify_order_id = 'gid://shopify/Order/990129' where id = ${a.id}`
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('verkauf.position_entfernen',
+        { recordId: a.id, parameter: { line_id: a.zeilen[1] } }, ADMIN),
+      /im Shopify-Admin bearbeiten/,
+    )
+    const [v] = await h.sql<{ id: string }[]>`select variant_id as id from sales_order_lines where id = ${a.zeilen[0]}`
+    await assert.rejects(
+      aktionAusfuehrenGeprueft('verkauf.position_hinzufuegen',
+        { recordId: a.id, parameter: { variant_id: v.id, qty: 1 } }, ADMIN),
+      /im Shopify-Admin bearbeiten/,
+    )
+    const [n] = await h.sql<{ n: number }[]>`select count(*)::int as n from sales_order_lines where order_id = ${a.id}`
+    assert.equal(n.n, 2, 'unverändert')
   })
 
   test('bestätigter Auftrag: Entfernen und Hinzufügen ziehen die Lieferung nach', async () => {

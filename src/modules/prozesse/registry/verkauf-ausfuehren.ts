@@ -180,7 +180,8 @@ export async function positionHinzufuegen(
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const orderId = ctx.recordId!
-  await sql`select sales_order_guard_editable(${orderId})`
+  // Option (c), 0129: Shop-Aufträge ändert Shopify, B2B nur bis zur ersten Lieferung.
+  await sql`select sales_order_guard_positionen(${orderId})`
 
   const [info] = await sql<{ uom_id: string; name: string; price: number }[]>`
     select pt.uom_id, variant_display_name(pv.id) as name,
@@ -209,7 +210,7 @@ export async function positionEntfernen(
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const orderId = ctx.recordId!
-  await sql`select sales_order_guard_editable(${orderId})`
+  await sql`select sales_order_guard_positionen(${orderId})`
   // Gelieferte/fakturierte Zeilen bleiben (0120) — Korrektur über Retoure/Gutschrift.
   await sql`select sales_order_line_guard_entfernen(${p.line_id})`
   await sql`delete from sales_order_lines where id = ${p.line_id} and order_id = ${orderId}`

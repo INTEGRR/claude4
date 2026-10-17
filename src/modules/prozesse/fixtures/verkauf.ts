@@ -91,6 +91,18 @@ export const VERKAUF_FIXTURE: ProzessFixture = {
             /im Shopify-Admin stornieren/,
             'Shop-Aufträge storniert Shopify, nicht KRNL',
           )
+          // Option (c), 0129: auch Positionen ändert bei Shop-Aufträgen nur Shopify.
+          const [zeile] = await sql<{ id: string }[]>`
+            select id from sales_order_lines where order_id = ${ctx.p4AuftragId} limit 1`
+          await assert.rejects(
+            aktionAusfuehrenGeprueft(
+              'verkauf.position_entfernen',
+              { recordId: ctx.p4AuftragId, parameter: { line_id: zeile.id } },
+              { name: 'prozesstest', role: 'admin' },
+            ),
+            /im Shopify-Admin bearbeiten/,
+            'Shop-Aufträge ändert Shopify, nicht KRNL',
+          )
           await shopStornoEinspeisen(sql, ctx.p4AuftragId)
           return undefined
         },
