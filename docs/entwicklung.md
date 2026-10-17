@@ -143,7 +143,10 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   Server Action in `kurzanlage-actions.ts` plus Beschreibung in
   `kurzanlage.ts`.
 - **Formatierung** → `modules/shared/format.ts` (`qty`, `money`, `pct`,
-  `date`, `isoDatum` — bitte nichts davon lokal nachbauen)
+  `kurs`, `date`, `isoDatum` — bitte nichts davon lokal nachbauen). In SQL
+  heißen die Gegenstücke `money_text(betrag)` und `zahl_text(wert, stellen)`
+  (0127): nie `format('%s €', …)`, nie `to_char` mit G/D (hängt an
+  `lc_numeric`). Der Wächter `tests/zahlen-format.test.ts` prüft beides.
 - **Statuswerte** → die Zustandstabelle `LABELS` in `format.ts`:
   `<Badge kind="…" state={…} />` bzw. `label(art, wert)` und
   `tone(wert, art)`. Ein neues Status-Enum bekommt dort seine Art und

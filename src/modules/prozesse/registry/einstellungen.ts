@@ -4,6 +4,7 @@ import { KI_REGIONEN, type KiRegion } from '../../ki/region.ts'
 import type { RegistrierteAktion } from './typen.ts'
 import { DRUCKFORMATE, FINANZ_FELDER, optionaleZahl, zahlAusFormular } from '../../einstellungen/finanz-parameter.ts'
 import { DRUCKART_LABELS, DRUCKARTEN, type Druckart } from '../../druck/routing.ts'
+import { money } from '../../shared/format.ts'
 
 // Nur geprüfte Katalog-Modelle sind wählbar — ein Freitextfeld wäre eine
 // stille Tippfehler-Falle, die erst beim nächsten KI-Aufruf explodiert.
@@ -341,7 +342,7 @@ export const EINSTELLUNGEN = {
         .nullable(),
     }),
     zusammenfassung: (p) =>
-      p.einkauf_limit == null ? 'keine Freigabepflicht' : `Freigabe ab ${p.einkauf_limit.toFixed(2)} €`,
+      p.einkauf_limit == null ? 'keine Freigabepflicht' : `Freigabe ab ${money(p.einkauf_limit)}`,
     formdata: (fd) => {
       const roh = String(fd.get('einkauf_limit') ?? '').trim()
       return { einkauf_limit: roh === '' ? null : zahlAusFormular(roh) }

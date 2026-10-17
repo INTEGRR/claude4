@@ -2,6 +2,7 @@ import { sql } from '@/db/client'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { type ProduktEingabe, produktAnlegen } from '../../ki/produkt-anlegen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { money } from '@/modules/shared/format'
 
 /** Ausführung der Produkt-Aktionen — dieselbe Fachlogik wie die KI-Aktion. */
 
@@ -219,7 +220,7 @@ export async function lieferantenpreisAnlegen(
     values (${p.vendor_id}, ${ctx.recordId!}, ${p.preis}, ${p.rabatt}, ${p.moq},
             ${p.lieferzeit_tage}, ${p.gueltig_von ?? null}, ${p.gueltig_bis ?? null})`
   await sql`select log_event('product_template', ${ctx.recordId!}, 'note',
-    ${`Lieferantenpreis: ${vendor.name} ab ${p.moq} Stück zu ${p.preis.toFixed(2)} €` +
+    ${`Lieferantenpreis: ${vendor.name} ab ${p.moq} Stück zu ${money(p.preis)}` +
       (p.rabatt > 0 ? ` (−${p.rabatt} %)` : '')}, ${ctx.actor})`
   return {
     text: `Staffel für ${vendor.name} angelegt${p.moq > 0 ? ` (ab ${p.moq})` : ''}.`,

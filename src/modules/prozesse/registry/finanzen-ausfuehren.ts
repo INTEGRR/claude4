@@ -1,5 +1,6 @@
 import { sql } from '@/db/client'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
+import { money } from '@/modules/shared/format'
 
 /**
  * Ausführung der Finanz-Aktionen — dünne Wrapper um die SQL-Funktionen aus
@@ -74,7 +75,7 @@ export async function rechnungTeilzahlung(
     text:
       Number(offen.offen) <= 0
         ? 'Zahlung erfasst — die Rechnung ist vollständig bezahlt.'
-        : `Zahlung erfasst — noch offen: ${Number(offen.offen).toFixed(2)} €.`,
+        : `Zahlung erfasst — noch offen: ${money(offen.offen)}.`,
   }
 }
 

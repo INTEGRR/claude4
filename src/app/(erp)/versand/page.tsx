@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap, Zustand } from '@/components/ui'
-import { dateTime, qty } from '@/modules/shared/format'
+import { dateTime, money, qty } from '@/modules/shared/format'
 import { dhlConfigured, productForCountry } from '@/modules/versand/dhl'
 import { sammelMarken } from '@/modules/versand/kommissionieren'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
@@ -471,7 +471,7 @@ export default async function VersandPage({
                                 vorschlag.productRegel && `Regel: ${vorschlag.productRegel}`,
                                 vorschlag.kartonage && `Kartonage: ${vorschlag.kartonage.name}`,
                                 vorschlag.insuredValue &&
-                                  `Versicherung ${vorschlag.insuredValue.toFixed(2)} € (${vorschlag.insuranceRegel})`,
+                                  `Versicherung ${money(vorschlag.insuredValue)} (${vorschlag.insuranceRegel})`,
                               ]
                                 .filter(Boolean)
                                 .join(' · ')}

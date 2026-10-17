@@ -2,7 +2,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { date, isoDatum } from '@/modules/shared/format'
+import { date, isoDatum, kurs } from '@/modules/shared/format'
 import { setExchangeRate } from '../actions'
 import { ezbKurseHolen } from '../projekte/actions'
 import { Auswahl } from '@/components/auswahl'
@@ -45,7 +45,7 @@ export default async function KursePage() {
           <div className="card" key={a.currency} style={{ marginBottom: 0 }}>
             <div className="stat">
               <div className="label">{a.currency} → EUR</div>
-              <div className="value mono">{a.rate == null ? '—' : Number(a.rate).toFixed(4)}</div>
+              <div className="value mono">{kurs(a.rate)}</div>
               <div className="hint">
                 {a.rate == null ? (
                   <>
@@ -116,7 +116,7 @@ export default async function KursePage() {
                 {kurse.map((k) => (
                   <tr key={k.id}>
                     <td className="mono">{k.currency}</td>
-                    <td className="num mono">{Number(k.rate).toFixed(8).replace(/0+$/, '')}</td>
+                    <td className="num mono">{kurs(k.rate)}</td>
                     <td className="mono nowrap">{date(k.valid_from)}</td>
                     <td className="small muted">{k.source ?? '—'}</td>
                   </tr>

@@ -7,6 +7,7 @@ import { Card, TableWrap, Zustand } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
+import { money } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,7 +110,7 @@ export default async function BelegePage() {
             </div>
             <div className="shrink field">
               {freigaben.einkauf_limit != null ? (
-                <Zustand ton="ok">aktiv ab {Number(freigaben.einkauf_limit).toFixed(2)} €</Zustand>
+                <Zustand ton="ok">aktiv ab {money(freigaben.einkauf_limit)}</Zustand>
               ) : (
                 <Zustand ton="off">keine Freigabepflicht</Zustand>
               )}

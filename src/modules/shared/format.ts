@@ -30,6 +30,14 @@ export function qty(value: number | string | null | undefined): string {
   return numberFormat.format(Number(value))
 }
 
+const kursFormat = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 4, maximumFractionDigits: 6 })
+
+/** Wechselkurs deutsch, 4–6 Nachkommastellen (0,1280) — F2, statt toFixed mit Punkt. */
+export function kurs(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  return kursFormat.format(Number(value))
+}
+
 export function money(value: number | string | null | undefined, currency = 'EUR'): string {
   if (value === null || value === undefined) return '—'
   if (currency !== 'EUR') {

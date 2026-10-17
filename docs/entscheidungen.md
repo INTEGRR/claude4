@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Deutsche Zahlen in Texten; US-Datumsfelder waren ein Audit-Artefakt
+
+**Anlass (UX-Audit):** Verlauf und Meldungen zeigten „1.0000 ×",
+„Zahlung 35.70 € erfasst", „Zins 469.61", „25.0 kg … 300.00 €", Kurse mit
+Punkt. Dazu meldete der Audit native Datumsfelder im Format „10/17/2026".
+
+**Entschieden:**
+- Datumsfelder: **keine eigene Datumskomponente.** Nachgestellt mit
+  Chromium: Mit Browsersprache Deutsch (`--lang=de-DE`) zeigt das native
+  Feld 17.10.2026, nur der Headless-Standard zeigt 10/17/2026. Die Befunde
+  sind als Audit-Artefakt verworfen (ebenso Dateiauswahl „Choose File" und
+  Zahlenfelder mit Punkt).
+- SQL: neue Funktion `zahl_text(wert, stellen)` (Tausenderpunkt,
+  Dezimalkomma, ohne überflüssige Nullen); zehn Funktionen schreiben ihre
+  Texte jetzt über `zahl_text`/`money_text` (Migration 0127). Betroffen sind
+  Fertigmeldung, Meldebestand, Darlehensrate, Sendungskosten, Freigabe,
+  Zahlplan, Retourenprüfung, Zahlungen.
+- Code: `money()` statt `toFixed(2) €` (zwölf Stellen), `kurs()` für
+  Wechselkurse, Vorgangsfelder typgerecht (Zahl, Datum, Ja/Nein).
+- Wächter `tests/zahlen-format.test.ts`: kein `toFixed` vor „€" im Code; in
+  der jeweils neuesten SQL-Funktionsdefinition kein `%s €` und kein
+  `to_char` mit G/D. Bestehende Verlaufseinträge bleiben, wie sie sind.
+- Doku: [entwicklung.md](entwicklung.md).
+
 ## 2026-10-17 — Zustandstabelle: eine Quelle für Statusbeschriftungen, „Storniert" statt „Abgebrochen"
 
 **Anlass (UX-Audit, Muster „ein Zustand, mehrere Wörter"):** Etwa zehn

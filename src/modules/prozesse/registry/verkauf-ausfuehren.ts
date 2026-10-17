@@ -2,6 +2,7 @@ import { sql } from '@/db/client'
 import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { partnerAufloesen, varianteAufloesen } from './aufloesen.ts'
 import type { AktionsErgebnis, AktionsKontext, PositionsZeile } from './typen.ts'
+import { money } from '@/modules/shared/format'
 
 /** Ausführung der Verkaufs-Aktionen — Fachlogik unverändert aus verkauf/actions.ts. */
 
@@ -226,7 +227,7 @@ export async function rechnungErstellen(_p: object, ctx: AktionsKontext): Promis
   const [k] = await sql<{ nummer: string; brutto: number }[]>`
     select nummer, brutto from kundenrechnungen where id = ${r.id}`
   return {
-    text: `Rechnung ${k.nummer} über ${Number(k.brutto).toFixed(2)} € erstellt.`,
+    text: `Rechnung ${k.nummer} über ${money(k.brutto)} erstellt.`,
     link: `/verkauf/rechnungen/${r.id}`,
     recordId: r.id,
   }
@@ -256,7 +257,7 @@ export async function rechnungZahlen(
     recordId: id,
     text: nachher.status === 'bezahlt'
       ? `${k.nummer} ist ${k.art === 'rechnung' ? 'bezahlt' : 'erstattet'}.`
-      : `Zahlung erfasst — offen bleiben ${Number(nachher.offen).toFixed(2)} €.`,
+      : `Zahlung erfasst — offen bleiben ${money(nachher.offen)}.`,
   }
 }
 
@@ -281,7 +282,7 @@ export async function gutschriftErstellen(
   const [k] = await sql<{ nummer: string; brutto: number }[]>`select nummer, brutto from kundenrechnungen where id = ${g.id}`
   return {
     recordId: ctx.recordId,
-    text: `Teilgutschrift ${k.nummer} über ${Number(k.brutto).toFixed(2)} € erstellt.`,
+    text: `Teilgutschrift ${k.nummer} über ${money(k.brutto)} erstellt.`,
     link: `/verkauf/rechnungen/${g.id}`,
   }
 }

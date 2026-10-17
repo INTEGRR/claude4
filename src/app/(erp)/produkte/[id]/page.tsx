@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { qty } from '@/modules/shared/format'
+import { money, qty } from '@/modules/shared/format'
 import { addAttribute, addVendorPrice, deleteVendorPrice, produktZuShopify, updateProduct } from '../actions'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
@@ -383,9 +383,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <tr key={z.id}>
                       <td><Link href={`/kontakte/${z.vendor_id}`}>{z.vendor}</Link></td>
                       <td className="num mono">{qty(z.min_qty)}</td>
-                      <td className="num mono">{Number(z.price).toFixed(2)} €</td>
+                      <td className="num mono">{money(z.price)}</td>
                       <td className="num">{Number(z.discount) > 0 ? `${qty(z.discount)} %` : '—'}</td>
-                      <td className="num mono">{Number(z.netto).toFixed(2)} €</td>
+                      <td className="num mono">{money(z.netto)}</td>
                       <td className="num">{z.lead_time_days > 0 ? `${z.lead_time_days} Tage` : '—'}</td>
                       <td className="small muted nowrap">
                         {z.date_start || z.date_end

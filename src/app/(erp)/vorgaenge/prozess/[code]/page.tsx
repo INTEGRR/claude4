@@ -6,7 +6,7 @@ import { sql } from '@/db/client'
 import { startAngebot } from '@/modules/prozesse/angebote'
 import { ProzessAktionen } from '@/components/prozess-aktionen'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
-import { dateTime } from '@/modules/shared/format'
+import { date, dateTime, qty } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +20,14 @@ export const dynamic = 'force-dynamic'
  * Der Sammelblick /vorgaenge bleibt daneben bestehen — er zeigt alle
  * Laufzeit-Prozesse zusammen.
  */
+/** Feldwert typgerecht (F2): Zahlen deutsch, Datum TT.MM.JJJJ, Schalter Ja/Nein. */
+function feldWert(typ: string, wert: unknown): string {
+  if (typ === 'nummer' && wert !== '' && Number.isFinite(Number(wert))) return qty(Number(wert))
+  if (typ === 'datum' && typeof wert === 'string') return date(wert)
+  if (typ === 'schalter') return wert === true || wert === 'true' ? 'Ja' : 'Nein'
+  return String(wert)
+}
+
 export default async function ProzessListe({
   params,
   searchParams,
@@ -52,8 +60,8 @@ export default async function ProzessListe({
   // `in_liste` im Entwurf setzt 'liste' in sichtbar_in. Hat niemand eine
   // Spalte gewählt, zeigen wir die ersten vier Formularfelder — eine leere
   // Tabelle wäre die schlechtere Vorgabe.
-  const alleFelder = await sql<{ name: string; label: string; sichtbar_in: string[] }[]>`
-    select name, label, sichtbar_in from feld_definitionen
+  const alleFelder = await sql<{ name: string; label: string; typ: string; sichtbar_in: string[] }[]>`
+    select name, label, typ, sichtbar_in from feld_definitionen
     where modell = 'vorgang' and (prozess_code is null or prozess_code = ${code})
     order by prozess_code nulls last, sequence, name`
   const gewaehlt = alleFelder.filter((f) => f.sichtbar_in.includes('liste'))
@@ -183,7 +191,7 @@ export default async function ProzessListe({
                         {v.zusatz?.[f.name] == null ? (
                           <span className="muted">—</span>
                         ) : (
-                          String(v.zusatz[f.name])
+                          feldWert(f.typ, v.zusatz[f.name])
                         )}
                       </td>
                     ))}

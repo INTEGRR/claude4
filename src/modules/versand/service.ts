@@ -24,6 +24,7 @@ import { brauchtZoll } from './dhl-codes'
 import { type AdressPruefung, adresseEinzeilig, fehlendeAdressfelder } from './dhl-validierung'
 import { billingNumberForProduct } from './regeln-logik'
 import { vorschlaegeFuerPickings } from './regeln'
+import { money } from '@/modules/shared/format'
 
 /**
  * Labels werden bei uns gespeichert, weil DHL sie nur rund drei Tage vorhält.
@@ -426,7 +427,7 @@ export async function createLabelForPicking(
     ${`DHL-Label erstellt: ${result.shipmentNumber} (${product}` +
       `${ruleName ? `, Regel „${ruleName}"` : ''}` +
       `${vorschlag?.kartonage ? `, Kartonage ${vorschlag.kartonage.name}` : ''}` +
-      `${insuredValue ? `, versichert ${insuredValue.toFixed(2)} €` : ''})`}, 'system')`
+      `${insuredValue ? `, versichert ${money(insuredValue)}` : ''})`}, 'system')`
 
   return {
     shipmentId: shipment.id,

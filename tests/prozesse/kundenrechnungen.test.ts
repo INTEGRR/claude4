@@ -288,7 +288,7 @@ describe('Kundenrechnungen: Shop-Änderungen, Rechnung bei Lieferung, Gutschrift
 
     const [pos] = await h.sql<{ id: string }[]>`select id from kundenrechnung_positionen where rechnung_id = ${k.id}`
     const g = await aktion('verkauf.gutschrift_erstellen', k.id, { positionen: [{ position_id: pos.id, menge: 1 }], grund: 'eine Matte beschädigt' })
-    assert.match(g?.text ?? '', /Teilgutschrift GU-\d{4} über 29.75 €/)
+    assert.match(g?.text ?? '', /Teilgutschrift GU-\d{4} über 29,75\s€/)
     const [nachher] = await h.sql<{ status: string; offen: number }[]>`select status::text as status, kundenrechnung_offen(id) as offen from kundenrechnungen where id = ${k.id}`
     assert.equal(nachher.status, 'offen', 'Teilgutschrift lässt die Rechnung bestehen')
     assert.equal(Number(nachher.offen), 119, 'die Gutschrift ist ein eigener Beleg, verrechnet wird in der Zahlung')

@@ -8,6 +8,7 @@ import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 import { zweifaktorZuruecksetzen } from '../../auth/zweifaktor.ts'
 import { einreihen, textTest } from '../../integrationen/benachrichtigungen.ts'
 import { telegramChatsFinden, telegramConfigured } from '../../integrationen/telegram.ts'
+import { money } from '@/modules/shared/format'
 
 /** Ausführung der Prozess-Verwaltungsaktionen. */
 
@@ -251,7 +252,7 @@ export async function freigabenSetzen(
   }
   await einstellungMergen('freigaben', { einkauf_limit: p.einkauf_limit })
   return {
-    text: `Gespeichert: Bestellungen ab ${p.einkauf_limit.toFixed(2)} € netto brauchen eine Freigabe.`,
+    text: `Gespeichert: Bestellungen ab ${money(p.einkauf_limit)} netto brauchen eine Freigabe.`,
   }
 }
 

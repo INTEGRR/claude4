@@ -3,6 +3,7 @@ import { zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import { PFLICHT_MODELLE } from '../../einkauf/pflichtdokumente.ts'
 import { KOSTEN_ART_NAMEN, SENDUNG_MODUS_NAMEN, bestellnummernLesen, zollzeilenLesen } from '../../einkauf/sendungen.ts'
 import type { RegistrierteAktion } from './typen.ts'
+import { money } from '../../shared/format.ts'
 
 /**
  * Einkauf, Stufe 5 (0108): Eingangssendungen (Sammelfracht) mit eigenem
@@ -360,8 +361,8 @@ export const EINKAUF_SENDUNGEN = {
         }
       }),
     zusammenfassung: (p) =>
-      `Zollbescheid: ${p.zeilen.length} Zeile(n), Zoll ${p.zeilen.reduce((s: number, z: { zoll_eur: number }) => s + z.zoll_eur, 0).toFixed(2)} €, ` +
-      `EUSt ${p.zeilen.reduce((s: number, z: { eust_eur: number }) => s + z.eust_eur, 0).toFixed(2)} €`,
+      `Zollbescheid: ${p.zeilen.length} Zeile(n), Zoll ${money(p.zeilen.reduce((s: number, z: { zoll_eur: number }) => s + z.zoll_eur, 0))}, ` +
+      `EUSt ${money(p.zeilen.reduce((s: number, z: { eust_eur: number }) => s + z.eust_eur, 0))}`,
     formdata: (fd) => {
       const { zeilen, fehler } = zollzeilenLesen(String(fd.get('zeilen') ?? ''))
       return {
