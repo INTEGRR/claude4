@@ -1978,7 +1978,8 @@
      "befund": "Standard-Next.js-404 auf Englisch (‚This page could not be found.‘) – die einzige englische Seite im System.",
      "vorschlag": "Eigene not-found-Seite auf Deutsch mit Suche und Link zur Übersicht.",
      "id": "A01-404-seite#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "hoch",
@@ -2309,7 +2310,8 @@
      "befund": "Genehmigt, aber ‚Noch kein Label.‘ ohne Grund – war der Schalter aus oder ist der DHL-Aufruf gescheitert? Der Kunde kann ohne Label nichts zurückschicken.",
      "vorschlag": "Deutlicher Hinweis (gelb) ‚Kunde hat noch kein Label – Grund: … – jetzt senden‘.",
      "id": "214-retoure-genehmigt#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "niedrig",
@@ -3916,7 +3918,8 @@
      "befund": "Filter ‚Meine‘ zeigt Einträge mit Zuständig ‚—‘ (niemand); gleichzeitig meldet das Cockpit ‚Nichts offen‘.",
      "vorschlag": "‚Meine‘ = mir zugewiesen; Nicht-zugewiesene als eigener Filter; Cockpit nutzt dieselbe Liste.",
      "id": "460-wiedervorlagen#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "niedrig",
@@ -5682,7 +5685,8 @@
      "befund": "Vorschlag liegt durchgehend beim 2,7-fachen des Vorjahres (Okt 9.532 € → 26.173 €) ohne erkennbare Begründung – der Trend ist offensichtlich falsch berechnet oder nicht erklärt.",
      "vorschlag": "Wachstumsannahme sichtbar machen (‚+x % ggü. Vorjahr‘) und begrenzen; Methode erklären.",
      "id": "851-umsatzplan#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "mittel",
@@ -5875,7 +5879,8 @@
      "befund": "USt-Voranmeldung 09/2026, fällig 10.10.2026, steht als ‚offen‘ (orange) – sieben Tage überfällig, ohne Überfällig-Kennzeichnung.",
      "vorschlag": "Überfällig rot + Hinweis auf der Übersicht.",
      "id": "856-steuern#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "niedrig",
@@ -6251,7 +6256,8 @@
      "befund": "Shopify steht auf ‚nur lesen‘, trotzdem melden die Outbox-Einträge ‚Bestand gemeldet‘ und ‚Fulfillment in Shopify angelegt, Kunde wurde benachrichtigt‘ als ERLEDIGT – widersprüchlich (im Fake-Modus ausgeführt, aber nicht gekennzeichnet).",
      "vorschlag": "Übersprungene/simulierte Jobs als ‚übersprungen (nur lesen)‘ bzw. ‚Test‘ markieren.",
      "id": "950-integrationen#1",
-     "status": "offen"
+     "status": "verworfen",
+     "grund": "Audit-Artefakt: die Shopify-Attrappe (SHOPIFY_FAKE) sitzt bewusst vor dem Lese-/Schreibmodus; im echten Betrieb endet der Job als „Übersprungen: nur lesen\" und heißt in der Outbox seit 864c5c7 auch so."
     },
     {
      "schwere": "mittel",
@@ -8100,7 +8106,8 @@
      "befund": "Widerspruch: oben ‚KI ist aus (Schlüssel fehlt)‘, darunter ‚● KI-Zugang vorhanden‘.",
      "vorschlag": "Ein gemeinsamer Status je Anbieter.",
      "id": "980-einstellungen-ki#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "mittel",
@@ -8699,7 +8706,8 @@
      "befund": "Das schwebende Befehlsfeld liegt über der geöffneten Navigation und verdeckt Benutzername/‚Abmelden‘.",
      "vorschlag": "Befehlsfeld bei offener Navigation ausblenden (z-index).",
      "id": "m10-navigation#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     },
     {
      "schwere": "mittel",
@@ -8837,7 +8845,8 @@
      "befund": "Fremdkapitalbedarf violett (siehe 850) – im Dunkelmodus zusätzlich kontrastarm.",
      "vorschlag": "Gefahrenfarbe aus Tokens.",
      "id": "d04-finanzen#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "864c5c7"
     }
    ],
    "messwerte": {
