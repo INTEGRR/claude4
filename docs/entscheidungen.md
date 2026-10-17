@@ -9,6 +9,22 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Vorsteuer-Standard nach Lieferantenland
+
+**Anlass (UX-Audit, Code-Prüfung):** Bestellzeilen bekamen die Einkaufssteuer
+des Produkts, ohne Produktsteuer pauschal 19 % — auch bei Lieferanten in China
+(Bestellung über 37.800 CNY zeigte 44.982 CNY brutto). Der überhöhte Wert floss
+in Zahlplan, Cashflow-Prognose und Fremdkapitalbedarf.
+
+**Entschieden:** Lieferant mit Land ≠ DE → Bestellzeile ohne Steuer (0 %),
+denn er stellt keine deutsche Umsatzsteuer in Rechnung (Drittland: EUSt erst
+beim Zoll, über Sendung/Zollbescheid; EU: innergemeinschaftlicher Erwerb, die
+Erwerbsteuer meldet der Käufer selbst). Inland unverändert: Produktsteuer,
+sonst 19 %. Gilt für neue Zeilen (`einkauf_steuersatz`/`einkauf_steuer_id`,
+Migration 0121); bestehende Bestellungen bleiben, wie sie sind. Die
+steuerliche Buchung von EUSt/Erwerbsteuer bleibt Sache der
+Buchhaltungsanbindung (auf Hold). Doku: [module/einkauf.md](module/einkauf.md).
+
 ## 2026-10-17 — Gelieferte oder abgerechnete Auftragspositionen sind nicht mehr löschbar
 
 **Anlass (UX-Audit, Code-Prüfung):** `verkauf.position_entfernen` prüfte nur

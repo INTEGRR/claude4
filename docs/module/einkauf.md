@@ -30,7 +30,7 @@ draft/sent/purchase ──(Stornieren)──▶ cancel ──(Auf Entwurf setzen
 
 ## Bestellpositionen
 
-Variante, Beschreibung, **Menge + Einkaufs-Maßeinheit**, Einzelpreis, Steuersatz; berechnete Spalten **Erhalten** (`qty_received`, aus validierten Eingängen, in Einkaufs-UoM zurückgerechnet) und **Abgerechnet** (`qty_billed`, aus gebuchten Rechnungen).
+Variante, Beschreibung, **Menge + Einkaufs-Maßeinheit**, Einzelpreis, Steuersatz (Standard seit 0121: Lieferant mit Land ≠ DE → 0 %, weil er keine deutsche Umsatzsteuer berechnet; Inland Produktsteuer, sonst 19 % — `einkauf_steuersatz`); berechnete Spalten **Erhalten** (`qty_received`, aus validierten Eingängen, in Einkaufs-UoM zurückgerechnet) und **Abgerechnet** (`qty_billed`, aus gebuchten Rechnungen).
 
 ## Bestellung aus Beleg erfassen (`einkauf.bestellung_erfassen`)
 

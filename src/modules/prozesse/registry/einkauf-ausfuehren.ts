@@ -51,8 +51,7 @@ export async function positionHinzufuegen(
     select ${orderId},
            coalesce((select max(sequence) + 10 from purchase_order_lines where order_id = ${orderId}), 10),
            ${p.variant_id}, ${info.name}, ${p.qty}, ${info.purchase_uom}, ${price}, ${discount},
-           pt.purchase_tax_id,
-           coalesce((select amount from taxes where id = pt.purchase_tax_id), 19)
+           einkauf_steuer_id(${order.vendor_id}, pv.id), einkauf_steuersatz(${order.vendor_id}, pv.id)
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.id = ${p.variant_id}`
 
@@ -212,7 +211,7 @@ export async function bestellungErfassen(p: BelegBestellung, ctx: AktionsKontext
           (order_id, sequence, variant_id, name, qty, uom_id, price_unit, discount, tax_id, tax_rate)
         select ${po.id}, ${sequence}, ${variantId}, ${name ?? t`variant_display_name(pv.id)`}, ${menge},
                coalesce(pt.purchase_uom_id, pt.uom_id), ${preis}, 0,
-               pt.purchase_tax_id, coalesce((select amount from taxes where id = pt.purchase_tax_id), 19)
+               einkauf_steuer_id(${lieferant.id}, pv.id), einkauf_steuersatz(${lieferant.id}, pv.id)
         from product_variants pv join product_templates pt on pt.id = pv.template_id
         where pv.id = ${variantId}`
       sequence += 10

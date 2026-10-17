@@ -632,7 +632,7 @@ export async function projektBestellen(_p: object, ctx: AktionsKontext): Promise
         insert into purchase_order_lines
           (order_id, sequence, variant_id, name, qty, uom_id, price_unit, discount, tax_id, tax_rate, angebot_staffel_id)
         select ${po.id}, ${sequence}, ${variantId}, ${name}, ${menge}, coalesce(pt.purchase_uom_id, pt.uom_id), ${preis}, 0,
-               pt.purchase_tax_id, coalesce((select amount from taxes where id = pt.purchase_tax_id), 19), ${staffelId}
+               einkauf_steuer_id(${a.partner_id}, pv.id), einkauf_steuersatz(${a.partner_id}, pv.id), ${staffelId}
         from product_variants pv join product_templates pt on pt.id = pv.template_id
         where pv.id = ${variantId}
         returning id`
