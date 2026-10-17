@@ -1699,3 +1699,19 @@ der Übersicht und auf `/aufgaben`, mit Knopf **Öffnen** zur Seite
   Fähigkeits-Schicht liegt bereits im JOB_KATALOG (anbieterneutral,
   getestet), ein Umbenennen der persistierten Kinds (integration_jobs,
   Dedupe-Schlüssel) brächte Datenmigration ohne Verhaltensgewinn.
+
+## Retoure: Prozess `retoure` (Migration 0119, umgesetzt)
+
+Beleg `retoure` (`retouren`, Nummern `RT/…`, Status `angefragt` →
+`genehmigt` → `eingegangen` → `geprueft` → `abgeschlossen`, Zweige
+`abgelehnt` und `storniert`), Bereich Versand, nur Shop-Aufträge. Schritte:
+Retoure anfragen (`versand.retoure_anlegen`, Beleg = Verkaufsauftrag; das
+Portal im Shop ruft dieselbe SQL-Funktion) → Genehmigen + Retourenlabel →
+Ware eingegangen (auch direkt aus „angefragt") → Prüfen und zurückbuchen →
+Ereignis „Im Shop erstattet" (`shop:bestellung_erstattet`, Bestell-Webhook)
+→ Abschließen (Fertigung anpassen; von Hand nur mit Bestätigung der
+Erstattung). Die Erstattung ist ein Ereignis mit Zeitstempel, kein zweiter
+Zustand; kommt sie vor der Prüfung, schließt die Prüfung ab.
+Fachdoku: [module/retouren.md](module/retouren.md). Fixture `retoure`
+(drei Läufe), `tests/prozesse/retouren.test.ts`.
+

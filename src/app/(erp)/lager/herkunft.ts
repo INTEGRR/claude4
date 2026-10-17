@@ -9,6 +9,7 @@ const HERKUNFT_ROUTE: Record<string, string> = {
   repair_order: '/reparatur',
   manufacturing_order: '/fertigung',
   vorgang: '/vorgaenge',
+  retoure: '/versand/retouren',
 }
 
 export function herkunftHref(model: string | null, id: string | null): string | null {

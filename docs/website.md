@@ -301,6 +301,19 @@ Code: `src/app/api/shopify/proxy/[[...pfad]]/route.ts`
 `tests/shop-proxy.test.ts` (Signatur, Escaping, keine Spuren),
 `tests/prozesse/shop-reparatur.test.ts` (Route gegen die Datenbank).
 
+**Retourenportal (seit 0119):** Dieselbe App, Unterpfad `/retoure` —
+`https://<shop>/apps/reparatur/retoure`, keine neue App und keine
+Proxy-Änderung im Shop nötig. Schritt 1: Bestellnummer + E-Mail der
+Bestellung (angemeldete Kunden wählen aus ihren gelieferten Bestellungen,
+die signierte Kunden-ID genügt). Schritt 2: Artikel, Menge und Grund. Eine
+falsche Kombination ergibt immer dieselbe Meldung („nicht gefunden"), eine
+Nummer allein reicht nie; Honigtopf und Drossel (5 Anfragen je Absender in
+10 Minuten) wie bei der Reparaturanfrage. Code:
+`modules/versand/retoure-shop-seiten.ts` (Seiten),
+`modules/versand/retoure-eingang.ts` (Eingang); Prozess in
+[module/retouren.md](module/retouren.md). Im Shop gehört ein Link
+„Rücksendung" darauf (Einrichtungsaufgabe `retouren_portal`).
+
 **Lokal ausprobieren:** `SHOPIFY_FAKE=1 node --experimental-strip-types
 scripts/shop-proxy-url.ts [--kunde 123] [--basis http://localhost:3000]`
 druckt eine signierte Adresse (90 Sekunden gültig) und ein `curl` zum

@@ -88,6 +88,9 @@ der [AGENTS.md](../AGENTS.md).
   Massendruck.
 - [module/reparatur.md](module/reparatur.md) — Reparaturaufträge mit
   Teileverbrauch.
+- [module/retouren.md](module/retouren.md) — Rücksendungen von Shop-Kunden:
+  Portal, Genehmigung mit Label, Eingang, Prüfung, Erstattung im Shop,
+  überflüssige Fertigung entfällt.
 - [module/personal.md](module/personal.md) — Mitarbeiter, Zeiterfassung,
   Schichten, Abwesenheiten.
 - [module/stammdaten.md](module/stammdaten.md) — Produkte, Kategorien,

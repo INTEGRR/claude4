@@ -75,6 +75,16 @@ export const JOB_KATALOG = {
     beschreibung: 'Schickt das DHL-Retourenlabel samt QR-Code an den Kunden.',
     faehigkeit: 'mail:retourenlabel',
   },
+  send_return_request_email: {
+    label: 'Rücksendeanfrage bestätigen (Kunde)',
+    beschreibung: 'Eingangsbestätigung mit Retourennummer und Positionen an den Kunden, der im Portal eine Rücksendung angefragt hat.',
+    faehigkeit: 'mail:retoure_bestaetigung',
+  },
+  send_return_rejected_email: {
+    label: 'Rücksendung ablehnen (Kunde)',
+    beschreibung: 'Teilt dem Kunden die Ablehnung seiner Rücksendeanfrage mit Begründung mit.',
+    faehigkeit: 'mail:retoure_ablehnung',
+  },
   send_repair_request_email: {
     label: 'Reparaturanfrage bestätigen (Kunde)',
     beschreibung:

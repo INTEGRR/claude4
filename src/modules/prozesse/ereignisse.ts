@@ -32,6 +32,14 @@ export const EREIGNISSE = {
     beschreibung: 'Storno oder Erstattung im Shop; der Auftrag wird nach den Storno-Regeln behandelt.',
     quelle: 'shopify webhook orders/cancelled + orders/updated (REFUNDED)',
   },
+  'shop:bestellung_erstattet': {
+    label: 'Im Shop erstattet',
+    beschreibung:
+      'Der Shop hat zu einer Bestellung mit offener Retoure erstattet (Gesamtbetrag gesunken oder ganz ' +
+      'erstattet): die Retoure gilt als erstattet und schließt — ist sie geprüft — sofort ab; nicht begonnene ' +
+      'Fertigung, die der Rückläufer deckt, entfällt.',
+    quelle: 'shopify webhook orders/updated (currentTotalPriceSet, displayFinancialStatus) + Abgleich',
+  },
   'shop:produkt_geaendert': {
     label: 'Produkt im Shop geändert',
     beschreibung: 'Produktanlage/-änderung im Shop-Admin; verknüpfte Produkte folgen dem Shop.',

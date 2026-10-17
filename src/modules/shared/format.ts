@@ -148,6 +148,15 @@ export const LABELS = {
     bezahlt: 'Bezahlt',
     storniert: 'Storniert',
   },
+  retoure: {
+    angefragt: 'Angefragt',
+    genehmigt: 'Genehmigt',
+    abgelehnt: 'Abgelehnt',
+    eingegangen: 'Eingegangen',
+    geprueft: 'Geprüft — wartet auf Erstattung',
+    abgeschlossen: 'Abgeschlossen',
+    storniert: 'Storniert',
+  },
   picking: {
     draft: 'Entwurf',
     waiting: 'Wartend',

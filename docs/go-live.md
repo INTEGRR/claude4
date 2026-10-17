@@ -220,7 +220,10 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       (Vorbelegung, Bestellnummern), `curl -sI https://anvil.gg/apps/reparatur`
       ohne verräterische Header, im ERP annehmen, Retourenlabel mit
       RMA-Nummer im Geschäftskundenportal sichtbar; Rückversand-Label aus
-      einer Reparatur testen. Sendcloud-Retourenportal-Link ersetzen.
+      einer Reparatur testen. Sendcloud-Retourenportal-Link ersetzen — durch
+      das Retourenportal von KRNL unter `/apps/reparatur/retoure` (seit 0119,
+      [module/retouren.md](module/retouren.md); Einrichtungsaufgabe
+      `retouren_portal`).
       *Stand 2026-10-01: App „reparatur" mit Proxy läuft — Shop vorerst auf
       www.nvil.gg, `https://www.nvil.gg/apps/reparatur` antwortet (Formular im
       Theme, keine verräterischen Header). Offen: `REPARATUR_SHOP_URL`,

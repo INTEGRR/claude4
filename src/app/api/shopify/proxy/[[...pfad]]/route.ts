@@ -16,6 +16,8 @@ import {
   stoerungSeite,
 } from '@/modules/reparatur/shop-seiten'
 import { ANFRAGE_FELDER, type Anfrage, normalisiereAnfrage } from '@/modules/shared/reparaturanfrage'
+import { bestellungFinden, retoureAufnehmen, retourePortalAktiv } from '@/modules/versand/retoure-eingang'
+import { auswahlSeite, retoureDankeSeite, suchSeite } from '@/modules/versand/retoure-shop-seiten'
 
 /**
  * Reparaturformular IM SHOP — Shopify App Proxy (Entscheidungslog
@@ -76,9 +78,13 @@ async function behandeln(request: Request, ctx: Kontext, methode: 'GET' | 'POST'
   const aktion = pfadPraefix(url.searchParams.get('path_prefix'))
   try {
     const { pfad = [] } = await ctx.params
+    const kundeId = kundenNummer(url.searchParams.get('logged_in_customer_id'))
+    // Retourenportal (0119): dieselbe App, Unterpfad /retoure.
+    if (pfad.length === 1 && pfad[0] === 'retoure') {
+      return methode === 'GET' ? await retoureZeigen(aktion, kundeId) : await retoureAbsenden(request, aktion, kundeId)
+    }
     if (pfad.some(Boolean)) return liquid(nichtGefundenSeite(aktion), 404)
 
-    const kundeId = kundenNummer(url.searchParams.get('logged_in_customer_id'))
     return methode === 'GET'
       ? await zeigen(aktion, kundeId)
       : await absenden(request, aktion, kundeId)
@@ -163,6 +169,78 @@ async function absenden(request: Request, aktion: string, kundeId: string | null
       }
       return liquid(dankeSeite(ergebnis.nummer))
   }
+}
+
+// --- Retourenportal (0119) ---------------------------------------------------------
+
+async function retoureZeigen(aktion: string, kundeId: string | null): Promise<Response> {
+  if (!(await retourePortalAktiv())) return liquid(nichtVerfuegbarSeite())
+  return liquid(suchSeite({ aktion, bestellungen: kundeId ? await gelieferteBestellungen(kundeId) : undefined }))
+}
+
+async function retoureAbsenden(request: Request, aktion: string, kundeId: string | null): Promise<Response> {
+  if (!(await retourePortalAktiv())) return liquid(nichtVerfuegbarSeite(), 503)
+  const roh: Record<string, string> = {}
+  try {
+    const formular = await request.formData()
+    for (const [k, v] of formular.entries()) if (typeof v === 'string') roh[k] = v.slice(0, 1000)
+  } catch {
+    // Kein lesbares Formular — leer weiter, die Suche meldet „nicht gefunden".
+  }
+  const bestellungen = kundeId ? await gelieferteBestellungen(kundeId) : undefined
+  const email = (roh.email ?? '').trim()
+
+  if (roh.schritt !== 'absenden') {
+    if ((roh.webseite ?? '').trim() !== '') return liquid(retoureDankeSeite())
+    const suche = await bestellungFinden(roh.bestellnummer ?? '', email, kundeId)
+    if (suche.art === 'ok') {
+      return liquid(auswahlSeite({ aktion, bestellnummer: suche.bestellung.bestellung, email, zeilen: suche.bestellung.zeilen }))
+    }
+    return liquid(
+      suchSeite({
+        aktion,
+        bestellnummer: roh.bestellnummer,
+        email,
+        bestellungen,
+        meldung:
+          suche.art === 'nichts_offen'
+            ? `Zu ${suche.bestellung} ist nichts mehr zurücksendbar (noch nicht geliefert oder schon angemeldet).`
+            : 'Diese Bestellung haben wir nicht gefunden — bitte Bestellnummer und E-Mail der Bestellung prüfen.',
+      }),
+    )
+  }
+
+  const ergebnis = await retoureAufnehmen(roh, { kundeId })
+  switch (ergebnis.art) {
+    case 'ok':
+      return liquid(retoureDankeSeite(ergebnis.nummer))
+    case 'honigtopf':
+      return liquid(retoureDankeSeite())
+    case 'inaktiv':
+      return liquid(nichtVerfuegbarSeite(), 503)
+    case 'gedrosselt':
+      return liquid(suchSeite({ aktion, bestellungen, meldung: 'Zu viele Anfragen in kurzer Zeit — bitte versuch es in ein paar Minuten erneut.' }), 429)
+    case 'fehler': {
+      const suche = await bestellungFinden(roh.bestellnummer ?? '', email, kundeId)
+      return liquid(
+        suche.art === 'ok'
+          ? auswahlSeite({ aktion, bestellnummer: suche.bestellung.bestellung, email, zeilen: suche.bestellung.zeilen, meldung: ergebnis.meldung, werte: roh })
+          : suchSeite({ aktion, bestellungen, meldung: ergebnis.meldung }),
+      )
+    }
+  }
+}
+
+/** Gelieferte Shop-Bestellungen des angemeldeten Kunden (nur eigene Datenbank). */
+async function gelieferteBestellungen(kundeId: string): Promise<string[]> {
+  const zeilen = await sql<{ name: string }[]>`
+    select so.shopify_order_name as name
+    from sales_orders so join partners p on p.id = so.partner_id
+    where p.shopify_customer_id = ${`gid://shopify/Customer/${kundeId}`}
+      and so.shopify_order_name is not null and so.delivery_status in ('partial', 'full')
+    order by so.order_date desc
+    limit 10`
+  return zeilen.map((z) => z.name)
 }
 
 /**

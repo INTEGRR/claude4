@@ -25,6 +25,7 @@ import { REPARATUR } from './reparatur.ts'
 import { VERKAUF } from './verkauf.ts'
 import { VERKAUF_SHOP } from './verkauf-shop.ts'
 import { VERSAND } from './versand.ts'
+import { VERSAND_RETOURE } from './versand-retoure.ts'
 import { VORGANG } from './vorgang.ts'
 
 /**
@@ -62,6 +63,7 @@ export const REGISTRY = {
   ...VERKAUF,
   ...VERKAUF_SHOP,
   ...VERSAND,
+  ...VERSAND_RETOURE,
   ...VORGANG,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

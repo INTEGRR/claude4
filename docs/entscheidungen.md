@@ -9,6 +9,59 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Retouren als Prozess: Portal im Shop, Prüfung mit Rückbuchung, Erstattung bleibt in Shopify, überflüssige Fertigung entfällt
+
+**Anlass (Betreiber):** Retouren liefen bisher lose (Label von Hand, Paket
+ohne Zuordnung, Rückbuchung am Transfer „wenn jemand dran denkt").
+Gewünscht: abbilden wie die Reparatur — Portal, Genehmigung, Label,
+Eingang, Prüfung, Rückbuchung als Fertigprodukt; ein verkaufsfähiges Board
+wird wieder verkauft, und die Fertigung erfährt, dass sie es nicht bauen
+muss.
+
+**Entschieden (Betreiber):**
+
+- **Erstattung bleibt im Shopify-Admin.** KRNL liest sie am Bestell-Webhook
+  ab (ganz erstattet oder Gesamtbetrag unter dem Stand bei der Anfrage) und
+  schreibt nichts an den Shop.
+- **Prüfergebnisse:** verkaufsfähig, B-Ware, defekt. B-Ware und Defekt
+  werden nur **markiert** — ein gemeinsamer Ort `WH/B-Ware`, der nirgends
+  zählt (Typ `inventory_loss`: nicht im freien Bestand, nicht für Shopify,
+  nicht reservierbar). Keine Demontage, kein Ausschuss-Ort.
+- **Nur Shop-Aufträge.**
+- **Fertigung schließen,** wenn die Retoure eingegangen, geprüft und im Shop
+  erstattet ist: nicht begonnene Fertigungsaufträge, deren Lieferung der
+  verkaufsfähige Rückläufer jetzt deckt, werden storniert (höchstens die
+  zurückgekommene Menge), das Team Fertigung bekommt eine Aufgabe.
+
+**Dazu entschieden (Umsetzung):**
+
+- Bereich **Versand** — Eingang und Prüfung macht das Lager, die Rolle Lager
+  schreibt Versand. Prozess, Registry und Seiten unter `/versand/retouren`.
+- Portal über die **bestehende Shop-App** „reparatur" (Unterpfad
+  `/retoure`), keine zweite App. Ausweis: Bestellnummer + E-Mail der
+  Bestellung oder angemeldeter Kunde; einheitliche „nicht gefunden"-Meldung.
+- Rückbuchung erst mit der **Prüfung**, nicht beim Eingang — erst dann steht
+  fest, wohin die Ware gehört. Verkaufsfähig ist sofort wieder verkaufbar.
+- `confirm_sales_order` rechnet **nur Rückläufer gegen Made-to-Order**:
+  verkaufsfähig geprüfte, noch nicht wiederverwendete Retouren-Mengen
+  (`retoure_positionen.wiederverwendet`). Sonst würde ein Rückläufer ohne
+  wartenden Auftrag beim nächsten Auftrag doppelt gebaut. Gewöhnlicher
+  Fertigbestand ersetzt bewusst weiterhin keine Fertigung — die Regel „MTO
+  beschafft auftragsbezogen, auch bei Bestand" bleibt (Fertigung auf Lager,
+  Abnahmetest, Odoo-Fertigbestand verlassen sich darauf).
+- Der Shop-Storno nach Lieferung schreibt keinen Fehler „Retoure anlegen"
+  mehr, wenn eine Retoure existiert.
+
+Umgesetzt: Migration 0119, Registry `versand.retoure_*`
+(`registry/versand-retoure.ts`), Portal (`modules/versand/retoure-*`,
+App-Proxy-Route), Webhook (`import.ts`), Scanner, Zulauf, Mails
+(`send_return_request_email`, `send_return_rejected_email`, Label-Mail mit
+Retourennummer). Doku: [module/retouren.md](module/retouren.md),
+[prozesse.md](prozesse.md), [website.md](website.md),
+[module/versand.md](module/versand.md),
+[module/fertigung.md](module/fertigung.md), [go-live.md](go-live.md).
+Nachweis: Fixture `retoure`, `tests/prozesse/retouren.test.ts`.
+
 ## 2026-10-16 — Buchhaltungsanbindung zurückgestellt: sevDesk und Pathway laufen unverändert, bis der Probelauf steht
 
 **Entschieden (Betreiber):** Die Frage, wie KRNL-Rechnungen in die

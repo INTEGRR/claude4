@@ -262,6 +262,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <ActionButton action={setLocked.bind(null, id, true)}>Sperren</ActionButton>
               ))}
+            {/* Retoure (0119): gelieferte Shop-Ware zurücknehmen — Erstattung bleibt im Shop. */}
+            {shopAuftrag && ['partial', 'full'].includes(order.delivery_status) && (
+              <Link className="btn" href={`/versand/retouren/neu?auftrag=${id}`}>Retoure anlegen</Link>
+            )}
             {/* Storno führt Shopify (2026-10-02): Shop-Aufträge werden im
                 Shopify-Admin storniert (mit Erstattung); der Webhook storniert
                 hier samt Lieferung, Fertigung und Label. */}

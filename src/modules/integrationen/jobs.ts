@@ -342,12 +342,19 @@ const handlers = {
         email: string | null
         name: string
         rma: string | null
+        retoure: string | null
+        bestellung: string | null
       }[]
     >`
-      select rl.shipment_number, rl.qr_link, p.email, p.name, r.number as rma
+      select rl.shipment_number, rl.qr_link,
+             coalesce(rt.email, so.ship_email, p.email) as email,
+             coalesce(so.ship_name, p.name) as name, r.number as rma,
+             rt.nummer as retoure, so.shopify_order_name as bestellung
       from return_labels rl
       join partners p on p.id = rl.partner_id
       left join repair_orders r on r.id = rl.repair_order_id
+      left join retouren rt on rt.id = rl.retoure_id
+      left join sales_orders so on so.id = rt.sales_order_id
       where rl.id = ${labelId}`
     if (!label) return 'Retourenlabel nicht gefunden'
     if (!label.email) throw new Error(`${label.name} hat keine E-Mail-Adresse`)
@@ -355,12 +362,20 @@ const handlers = {
     // Kunden werden geduzt wie im Shop (Betreiber 2026-10-01).
     const betreff = label.rma
       ? `Dein Retourenlabel für die Reparatur ${label.rma}`
-      : `Dein Retourenlabel (${label.shipment_number})`
+      : label.retoure
+        ? `Dein Retourenlabel für die Rücksendung ${label.retoure}`
+        : `Dein Retourenlabel (${label.shipment_number})`
     const einleitung = label.rma
       ? `<p>anbei das Retourenlabel für deine Reparatur <strong>${htmlSicher(label.rma)}</strong>. ` +
         `Bitte kleb das Label auf das Paket und leg einen Zettel mit der Nummer ` +
         `<strong>${htmlSicher(label.rma)}</strong> und einer kurzen Fehlerbeschreibung bei.</p>`
-      : '<p>anbei dein Retourenlabel.</p>'
+      : label.retoure
+        ? `<p>deine Rücksendung <strong>${htmlSicher(label.retoure)}</strong>` +
+          `${label.bestellung ? ` zur Bestellung ${htmlSicher(label.bestellung)}` : ''} ist genehmigt — anbei das ` +
+          `Retourenlabel. Bitte pack die Ware gut ein (am besten in der Originalverpackung), kleb das Label ` +
+          `auf das Paket und leg einen Zettel mit der Nummer <strong>${htmlSicher(label.retoure)}</strong> bei. ` +
+          `Sobald das Paket bei uns eingegangen und geprüft ist, erstatten wir den Betrag.</p>`
+        : '<p>anbei dein Retourenlabel.</p>'
 
     await sendMail({
       to: label.email,
@@ -378,7 +393,44 @@ const handlers = {
     })
 
     await sql`update return_labels set emailed_at = now() where id = ${labelId}`
-    return `Retourenlabel an ${label.email} gesendet${label.rma ? ` (${label.rma})` : ''}`
+    return `Retourenlabel an ${label.email} gesendet${label.rma ? ` (${label.rma})` : label.retoure ? ` (${label.retoure})` : ''}`
+  },
+
+  /** Eingangsbestätigung einer Rücksendeanfrage aus dem Portal (0119). */
+  async send_return_request_email(payload) {
+    const r = await retoureMailDaten(String(payload.retoure_id))
+    if (!r) return 'Retoure nicht mehr vorhanden'
+    if (!r.email) return 'Keine E-Mail-Adresse — nichts zu senden'
+    await sendMail({
+      to: r.email,
+      subject: `Deine Rücksendeanfrage ${r.nummer} ist eingegangen`,
+      html:
+        `<p>Hallo ${htmlSicher(r.name)},</p>` +
+        `<p>danke! Deine Rücksendeanfrage${r.bestellung ? ` zur Bestellung ${htmlSicher(r.bestellung)}` : ''} hat die ` +
+        `Nummer <strong>${htmlSicher(r.nummer)}</strong>:</p>` +
+        `<ul>${r.positionen.map((p) => `<li>${htmlSicher(`${p.menge} × ${p.bezeichnung}`)}</li>`).join('')}</ul>` +
+        `<p>Wir prüfen die Anfrage und schicken dir das Retourenlabel per Mail. Bitte schick die Ware erst los, ` +
+        `wenn du das Label hast.</p>`,
+    })
+    return `Eingangsbestätigung an ${r.email} gesendet (${r.nummer})`
+  },
+
+  /** Ablehnung einer Rücksendeanfrage mit Begründung (0119). */
+  async send_return_rejected_email(payload) {
+    const r = await retoureMailDaten(String(payload.retoure_id))
+    if (!r) return 'Retoure nicht mehr vorhanden'
+    if (!r.email) return 'Keine E-Mail-Adresse — nichts zu senden'
+    await sendMail({
+      to: r.email,
+      subject: `Deine Rücksendeanfrage ${r.nummer}`,
+      html:
+        `<p>Hallo ${htmlSicher(r.name)},</p>` +
+        `<p>leider können wir deine Rücksendeanfrage <strong>${htmlSicher(r.nummer)}</strong>` +
+        `${r.bestellung ? ` zur Bestellung ${htmlSicher(r.bestellung)}` : ''} nicht annehmen.</p>` +
+        (r.ablehnungsgrund ? `<p>${htmlSicher(r.ablehnungsgrund)}</p>` : '') +
+        `<p>Bei Fragen antworte einfach auf diese Mail.</p>`,
+    })
+    return `Ablehnung an ${r.email} gesendet (${r.nummer})`
   },
 
   /**
@@ -441,9 +493,15 @@ async function originForJob(
     const [row] = await sql<{ repair_order_id: string | null }[]>`
       select repair_order_id from return_labels where id = ${String(payload.return_label_id)}`
     if (row?.repair_order_id) return { model: 'repair_order', id: row.repair_order_id }
+    const [rt] = await sql<{ retoure_id: string | null }[]>`
+      select retoure_id from return_labels where id = ${String(payload.return_label_id)}`
+    if (rt?.retoure_id) return { model: 'retoure', id: rt.retoure_id }
   }
   if (kind === 'send_repair_request_email' && payload.vorgang_id) {
     return { model: 'vorgang', id: String(payload.vorgang_id) }
+  }
+  if ((kind === 'send_return_request_email' || kind === 'send_return_rejected_email') && payload.retoure_id) {
+    return { model: 'retoure', id: String(payload.retoure_id) }
   }
   if (kind === 'gmail_anhang_ablegen' && payload.anhang_id) {
     const [row] = await sql<{ thread_id: string }[]>`
@@ -605,4 +663,31 @@ export async function resetRunningJob(jobId: string): Promise<void> {
     update integration_jobs
     set status = 'pending', next_run_at = now(), last_error = 'Manuell zurückgesetzt'
     where id = ${jobId} and status = 'running'`
+}
+
+/** Daten für die Retouren-Mails: Empfänger aus Anfrage, Bestellung oder Kontakt. */
+async function retoureMailDaten(id: string): Promise<
+  | {
+      nummer: string
+      email: string | null
+      name: string
+      bestellung: string | null
+      ablehnungsgrund: string | null
+      positionen: { menge: number; bezeichnung: string }[]
+    }
+  | null
+> {
+  const [r] = await sql<
+    { nummer: string; email: string | null; name: string | null; bestellung: string | null; ablehnungsgrund: string | null }[]
+  >`
+    select r.nummer, coalesce(r.email, so.ship_email, p.email) as email,
+           coalesce(so.ship_name, p.name) as name, so.shopify_order_name as bestellung, r.ablehnungsgrund
+    from retouren r
+    join sales_orders so on so.id = r.sales_order_id
+    join partners p on p.id = r.partner_id
+    where r.id = ${id}`
+  if (!r) return null
+  const positionen = await sql<{ menge: number; bezeichnung: string }[]>`
+    select menge::float as menge, bezeichnung from retoure_positionen where retoure_id = ${id} order by sequence`
+  return { ...r, name: r.name ?? 'Kundin/Kunde', positionen }
 }

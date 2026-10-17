@@ -385,3 +385,6 @@ export function nichtVerfuegbarSeite(): string {
     text: 'Schreib uns einfach eine E-Mail, wir helfen trotzdem weiter.',
   })
 }
+
+/** Rahmen und Bausteine für weitere Shop-Seiten derselben App (Retourenportal, 0119). */
+export { seite as shopSeite, CARET, SKRIPT_VERLAUF }

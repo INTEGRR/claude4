@@ -111,6 +111,45 @@ export function positionsPreis(
   )
 }
 
+/**
+ * Erstattung zu offenen Retouren (0119, Entscheidungslog 2026-10-17): die
+ * Erstattung bleibt im Shopify-Admin, KRNL liest sie ab. Erstattet heißt:
+ * der Shop meldet die Bestellung ganz erstattet, oder ihr Gesamtbetrag
+ * (currentTotalPriceSet, zählt Erstattungen ab) liegt unter dem Stand bei
+ * der Anfrage. Ohne diesen Stand (vor 0117 importiert) genügt „teilweise
+ * erstattet". Eine geprüfte Retoure schließt retoure_erstattet sofort ab —
+ * samt Fertigung schließen. Sind mehrere Retouren derselben Bestellung
+ * gleichzeitig offen, gelten alle als erstattet (selten; von Hand korrigierbar
+ * ist nur die Fertigung, die Retoure selbst bleibt dokumentiert).
+ */
+async function retourenErstattungNachziehen(
+  t: TransactionSql,
+  auftragId: string,
+  order: ShopifyOrder,
+): Promise<string | null> {
+  const offen = await t<{ id: string; nummer: string; shop_brutto_vorher: number | null }[]>`
+    select id, nummer, shop_brutto_vorher from retouren
+    where sales_order_id = ${auftragId} and erstattet_am is null
+      and status in ('angefragt', 'genehmigt', 'eingegangen', 'geprueft')
+    order by created_at`
+  if (offen.length === 0) return null
+  const finanz = order.displayFinancialStatus
+  const brutto = shopBrutto(order)
+  const meldungen: string[] = []
+  for (const r of offen) {
+    const erstattet =
+      finanz === 'REFUNDED' ||
+      (r.shop_brutto_vorher !== null && brutto !== null
+        ? brutto < Number(r.shop_brutto_vorher) - 0.005
+        : finanz === 'PARTIALLY_REFUNDED')
+    if (!erstattet) continue
+    await t`select retoure_erstattet(${r.id}, 'shopify')`
+    const [n] = await t<{ status: string }[]>`select status::text as status from retouren where id = ${r.id}`
+    meldungen.push(`Retoure ${r.nummer} erstattet${n?.status === 'abgeschlossen' ? ' und abgeschlossen' : ''}`)
+  }
+  return meldungen.join(' · ') || null
+}
+
 /** Gesamtbetrag der Bestellung laut Shop (brutto inkl. Versand), nach Änderungen der aktuelle Stand. */
 export function shopBrutto(order: Pick<ShopifyOrder, 'totalPriceSet' | 'currentTotalPriceSet'>): number | null {
   const roh = order.currentTotalPriceSet?.shopMoney.amount ?? order.totalPriceSet?.shopMoney.amount
@@ -164,9 +203,12 @@ export async function importShopifyOrder(
 
     if (beendet && existing) {
       if (existing.state === 'cancel') {
+        const retoure = await retourenErstattungNachziehen(t, existing.id, order)
         return { salesOrderId: existing.id, created: false, unmatched: 0,
-          message: `${order.name} ist ${grund} - war bereits storniert` }
+          message: [`${order.name} ist ${grund} - war bereits storniert`, retoure].filter(Boolean).join(' · ') }
       }
+      // Retoure (0119): die Erstattung schließt eine geprüfte Retoure ab.
+      const retoureMeldung = await retourenErstattungNachziehen(t, existing.id, order)
       await t`select cancel_sales_order(${existing.id}, 'shopify')`
       storniert = existing.id
       if (erstattet) {
@@ -189,7 +231,10 @@ export async function importShopifyOrder(
       // partial/full = Ware (teilweise) beim Kunden. Der frühere Vergleich
       // mit 'none' (kein Enum-Wert) war immer wahr und warnte bei jedem
       // Shop-Storno; 'started' heißt nur reserviert und ist unkritisch.
-      if (['partial', 'full'].includes(existing.delivery_status)) {
+      const [{ hatRetoure }] = await t<{ hatRetoure: boolean }[]>`
+        select exists(select 1 from retouren where sales_order_id = ${existing.id}
+                      and status not in ('abgelehnt', 'storniert')) as "hatRetoure"`
+      if (['partial', 'full'].includes(existing.delivery_status) && !hatRetoure) {
         await t`select log_event('sales_order', ${existing.id}, 'error',
           'Ware war bereits (teilweise) versandt — für die Rückabwicklung eine Retoure bzw. Reparatur/RMA anlegen.',
           'shopify')`
@@ -199,7 +244,7 @@ export async function importShopifyOrder(
         created: false,
         unmatched: 0,
         message: `Auftrag zu ${order.name} ${erstattet ? 'wegen Erstattung ' : ''}storniert${
-          gutgeschrieben.length ? ` — Gutschrift ${gutgeschrieben.join(', ')}` : ''}`,
+          gutgeschrieben.length ? ` — Gutschrift ${gutgeschrieben.join(', ')}` : ''}${retoureMeldung ? ` · ${retoureMeldung}` : ''}`,
       }
     }
 
@@ -215,11 +260,13 @@ export async function importShopifyOrder(
         // Versand außerhalb von KRNL (Sendcloud → Shopify, 2026-10-15): der
         // Shop meldet FULFILLED, KRNL hat keine Sendung — nachziehen.
         const extern = await externVersandNachziehen(t, existing.id, order)
+        // Retoure (0119): Erstattung im Shop erkannt → Retoure erstattet/abgeschlossen.
+        const retoure = await retourenErstattungNachziehen(t, existing.id, order)
         return {
           salesOrderId: existing.id,
           created: false,
           unmatched: 0,
-          message: [geaendert, extern].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
+          message: [geaendert, extern, retoure].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
         }
       }
 

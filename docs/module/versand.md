@@ -530,6 +530,12 @@ lassen sich wie beim Label überschreiben.
 
 ## Retouren (DHL Returns API)
 
+**Kunden-Retouren als Prozess (seit 0119):** Rücksendungen gelieferter
+Shop-Ware laufen als Beleg `retoure` mit Portal im Shop, Genehmigung,
+Label mit der Retourennummer `RT/…` als Referenz, Eingang per Scan, Prüfung
+und Rückbuchung — Fachdoku in [retouren.md](retouren.md). Die Seite
+Versand → Retouren listet sie; das Label ohne Retoure bleibt darunter.
+
 Aus dem Reparatur-/Retourenprozess heraus: Button „DHL-Retourenlabel erstellen" → `POST returns/v1/orders?labelType=BOTH` (`receiverId` des GKP-Retourenempfängers, Kundenadresse als Absender) → Label-PDF + QR-Code per E-Mail an den Kunden (Resend). Voraussetzung: Retouren-Vertrag + Retourenempfänger im GKP.
 Meldet DHL „Sorry, this recipient is not available", kennt das Konto die
 gesendete `receiverId` nicht (Standard `deu`, solange

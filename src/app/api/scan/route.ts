@@ -41,6 +41,19 @@ export async function GET(request: Request) {
         from return_labels rl
         where rl.shipment_number = ${kandidat} and rl.repair_order_id is not null
         union all
+        -- Retourennummer (0119): wartet die Retoure auf die Ware, öffnet die
+        -- Seite gleich „Ware eingegangen"; sonst den Beleg (Prüfung, Abschluss).
+        select '/versand/retouren/' || id
+               || case when status in ('angefragt', 'genehmigt') then '?schritt=eingang'
+                       else '' end,
+               5
+        from retouren where nummer = ${kandidat}
+        union all
+        -- Retouren-Sendungsnummer einer Kunden-Rücksendung → derselbe Weg.
+        select '/versand/retouren/' || rl.retoure_id || '?schritt=eingang', 5
+        from return_labels rl
+        where rl.shipment_number = ${kandidat} and rl.retoure_id is not null
+        union all
         -- Vorgangsnummer (z. B. aus der Bestätigungsmail einer Reparaturanfrage,
         -- die der Kunde auf den Karton schreibt) → der Vorgang selbst.
         select '/vorgaenge/' || id, 5 from vorgaenge where number = ${kandidat}

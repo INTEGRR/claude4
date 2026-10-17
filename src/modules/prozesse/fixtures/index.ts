@@ -13,6 +13,7 @@ import { INVENTUR_FIXTURE } from './inventur.ts'
 import { KUNDENRECHNUNG_FIXTURE } from './kundenrechnung.ts'
 import { REPARATUR } from './reparatur.ts'
 import { REPARATUR_ANFRAGE } from './reparatur-anfrage.ts'
+import { RETOURE_FIXTURE } from './retoure.ts'
 import { SHOPIFY_VERSAND } from './shopify-versand.ts'
 import { VERKAUF_FIXTURE } from './verkauf.ts'
 import { WARENEINGANG_FIXTURE } from './wareneingang.ts'
@@ -43,6 +44,7 @@ export const FIXTURES = {
   mail_versand: EINKAUF_MAIL,
   reparatur: REPARATUR,
   reparatur_anfrage: REPARATUR_ANFRAGE,
+  retoure: RETOURE_FIXTURE,
   shopify_bestellung_versand: SHOPIFY_VERSAND,
   verkauf: VERKAUF_FIXTURE,
   wareneingang: WARENEINGANG_FIXTURE,

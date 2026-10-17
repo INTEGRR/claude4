@@ -173,6 +173,20 @@ export default async function ZulaufPage({
     where r.state = 'awaiting_device'
     order by rl.created_at nulls last, r.number`
 
+  // Kunden-Retouren (0119), deren Ware unterwegs ist: genehmigt, Label raus.
+  const retourenUnterwegs = await sql<
+    { id: string; nummer: string; kunde: string; kunde_id: string; shipment_number: string | null; emailed_at: string | null }[]
+  >`
+    select r.id, r.nummer, p.name as kunde, p.id as kunde_id, rl.shipment_number, rl.emailed_at
+    from retouren r
+    join partners p on p.id = r.partner_id
+    left join lateral (
+      select shipment_number, emailed_at from return_labels
+      where retoure_id = r.id order by created_at desc limit 1
+    ) rl on true
+    where r.status = 'genehmigt'
+    order by r.genehmigt_am nulls last, r.nummer`
+
   const ueberfaellige = eingaenge.filter((e) => e.termin != null && e.termin < heute)
   const ohneTermin = eingaenge.filter((e) => e.termin == null)
   const jeTag = new Map<string, Eingang[]>(tage.map((t) => [t, []]))
@@ -278,6 +292,30 @@ export default async function ZulaufPage({
                     : r.label_am
                       ? ' · Mail in Warteschlange'
                       : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {retourenUnterwegs.length > 0 && (
+        <Card title={`Erwartete Kunden-Retouren (${retourenUnterwegs.length})`}>
+          <p className="small muted" style={{ margin: '0 0 8px' }}>
+            Genehmigte Rücksendungen. Beim Eingang die DHL-Sendungsnummer oder die Retourennummer scannen —
+            die Retoure springt auf „Ware eingegangen", gebucht wird erst mit der Prüfung.
+          </p>
+          <div className="grid-3">
+            {retourenUnterwegs.map((r) => (
+              <div key={r.id} className="display-panel" style={{ marginBottom: 6 }}>
+                <div className="small">
+                  <span className={`led ${r.emailed_at ? 'ok' : 'warn'}`} />{' '}
+                  <Link className="mono" href={`/versand/retouren/${r.id}?schritt=eingang`}>{r.nummer}</Link>
+                  {' '}· <Link href={`/kontakte/${r.kunde_id}`}>{r.kunde}</Link>
+                </div>
+                <div className="small muted">
+                  {r.shipment_number ? <>Retoure <span className="mono">{r.shipment_number}</span></> : 'ohne Retourenlabel'}
+                  {r.emailed_at ? ` · Label gemailt ${datum(r.emailed_at)}` : ''}
                 </div>
               </div>
             ))}

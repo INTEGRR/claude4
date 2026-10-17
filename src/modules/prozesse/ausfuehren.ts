@@ -25,6 +25,7 @@ import * as reparatur from './registry/reparatur-ausfuehren.ts'
 import * as verkauf from './registry/verkauf-ausfuehren.ts'
 import * as verkaufShop from './registry/verkauf-shop-ausfuehren.ts'
 import * as versand from './registry/versand-ausfuehren.ts'
+import * as versandRetoure from './registry/versand-retoure-ausfuehren.ts'
 import * as vorgang from './registry/vorgang-ausfuehren.ts'
 
 /**
@@ -327,6 +328,14 @@ export const AUSFUEHRUNG = {
   'versand.gewichte_aus_shopify': versand.gewichteAusShopifyUebernehmen,
   'versand.packzettel_drucken': versand.packzettelDrucken,
   'versand.retourenlabel_erstellen': versand.retourenlabelErstellen,
+  'versand.retoure_anlegen': versandRetoure.retoureAnlegen,
+  'versand.retoure_genehmigen': versandRetoure.retoureGenehmigen,
+  'versand.retoure_ablehnen': versandRetoure.retoureAblehnen,
+  'versand.retoure_label_senden': versandRetoure.retoureLabelSenden,
+  'versand.retoure_eingang': versandRetoure.retoureEingang,
+  'versand.retoure_pruefen': versandRetoure.retourePruefen,
+  'versand.retoure_abschliessen': versandRetoure.retoureAbschliessen,
+  'versand.retoure_stornieren': versandRetoure.retoureStornieren,
   'versand.kartonage_speichern': versand.kartonageSpeichern,
   'versand.kartonage_schalten': versand.kartonageSchalten,
   'versand.kartonage_loeschen': versand.kartonageLoeschen,

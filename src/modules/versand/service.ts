@@ -728,11 +728,26 @@ export async function pruneTrackingData(): Promise<number> {
 /** Retourenlabel für einen Kunden erzeugen und per E-Mail schicken. */
 export async function createReturnLabelForPartner(
   partnerId: string,
-  opts: { repairOrderId?: string; salesOrderId?: string; reference?: string } = {},
+  opts: {
+    repairOrderId?: string
+    salesOrderId?: string
+    retoureId?: string
+    reference?: string
+    /** Absender des Pakets statt der Kontaktadresse — Retoure: die Lieferadresse der Bestellung (0119). */
+    absender?: {
+      name: string
+      street: string | null
+      house_number: string | null
+      zip: string | null
+      city: string | null
+      country_code: string
+      email: string | null
+    }
+  } = {},
 ): Promise<{ id: string; shipmentNumber: string }> {
   if (!dhlConfigured()) throw new DhlError('DHL ist nicht konfiguriert')
 
-  const [partner] = await sql<
+  const [kontakt] = await sql<
     {
       name: string
       street: string | null
@@ -744,7 +759,8 @@ export async function createReturnLabelForPartner(
     }[]
   >`select name, street, house_number, zip, city, country_code, email
      from partners where id = ${partnerId}`
-  if (!partner) throw new Error('Kontakt nicht gefunden')
+  if (!kontakt) throw new Error('Kontakt nicht gefunden')
+  const partner = opts.absender?.street ? opts.absender : kontakt
   if (!partner.street || !partner.zip || !partner.city) {
     throw new Error('Die Adresse des Kunden ist unvollständig')
   }
@@ -768,9 +784,9 @@ export async function createReturnLabelForPartner(
 
   const [row] = await sql<{ id: string }[]>`
     insert into return_labels (
-      repair_order_id, sales_order_id, partner_id, shipment_number,
+      repair_order_id, sales_order_id, retoure_id, partner_id, shipment_number,
       label_path, label_pdf, qr_link)
-    values (${opts.repairOrderId ?? null}, ${opts.salesOrderId ?? null}, ${partnerId},
+    values (${opts.repairOrderId ?? null}, ${opts.salesOrderId ?? null}, ${opts.retoureId ?? null}, ${partnerId},
             ${result.shipmentNumber},
             ${labelPath},
             ${result.labelBase64 ? Buffer.from(result.labelBase64, 'base64') : null},

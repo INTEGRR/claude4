@@ -42,6 +42,7 @@ async function badges() {
       offene_eingaenge: number
       versandbereit: number
       offene_reparaturen: number
+      retouren_offen: number
       beschaffung: number
       anwesend: number
       abwesenheiten: number
@@ -71,6 +72,8 @@ async function badges() {
         where art = 'rechnung' and status = 'offen' and faellig_am < current_date and not probe)::int as rechnungen_ueberfaellig,
       (select count(*) from repair_orders
         where state not in ('shipped','cancel'))::int as offene_reparaturen,
+      -- Retouren, an denen jemand etwas tun muss: entscheiden oder prüfen (0119).
+      (select count(*) from retouren where status in ('angefragt','eingegangen'))::int as retouren_offen,
       (select count(*) from orderpoint_suggestions())::int as beschaffung,
       (select count(*) from employees_present)::int as anwesend,
       (select count(*) from absences where state = 'requested')::int as abwesenheiten,
@@ -223,6 +226,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               { href: '/versand', label: 'Versand', count: counts.versandbereit },
               // Optionaler Prozessschritt (0091): abgeschaltet → kein Menüpunkt.
               ...(kommissionierenAktiv ? [{ href: '/kommissionieren', label: 'Kommissionieren' }] : []),
+              { href: '/versand/retouren', label: 'Retouren', count: counts.retouren_offen },
             ]
           : []),
       ],
