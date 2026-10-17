@@ -63,8 +63,11 @@ describe('Theme-Tokens', () => {
       ...['--text', '--text-2', '--text-muted'].flatMap((t) =>
         ['--bg', '--surface', '--surface-2'].map((g): [string, string] => [t, g])),
       ['#fff', '--accent-fill'],
-      ['--accent-text', '--surface'],
+      ...['--bg', '--surface', '--surface-2', '--accent-soft'].map((g): [string, string] => ['--accent-text', g]),
+      ...['success', 'warn', 'danger', 'info'].flatMap((ton) =>
+        ['--bg', '--surface', '--surface-2', `--${ton}-soft`].map((g): [string, string] => [`--${ton}`, g])),
       ['--wichtig-kontrast', '--wichtig'],
+      ['--display-text', '--display'],
     ]
     const zuSchwach: string[] = []
     for (const [name, v] of Object.entries(themes)) {

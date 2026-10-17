@@ -9,6 +9,19 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Kontrast auch für Links, Warnton und Display-Kopf
+
+**Anlass:** Beim Nachziehen des Design-System-Artifacts fielen drei weitere
+Textpaare knapp unter 4,5:1 auf: `accent-text` (Links) auf `bg`/`surface-2`
+4,2–4,3:1, `warn` 4,1–4,2:1, Display-Kopfzeile #6a6c70 3,65:1.
+
+**Entschieden:** dieselbe Regel wie im Eintrag darunter, nur nachdunkeln:
+hell `--accent-text` #b8431a → #b14019, hell `--warn` #8a6516 → #825f15,
+Display-Kopf #85878c. Der Kontrast-Wächter prüft jetzt zusätzlich
+`accent-text` und die Töne success/warn/danger/info auf allen Gründen samt
+`-soft` sowie `display-text` auf `display`. Offen bleiben die Nicht-Text-
+Paare Fokusrahmen und `border-strong` (Ziel 3:1), notiert im Design-System.
+
 ## 2026-10-17 — Design: KRNL-Stil bleibt; Text-Kontrast ≥ 4,5:1 mit Wächter
 
 **Anlass:** Offene Design-Frage aus dem UX-Audit: KRNL-Stil beibehalten oder

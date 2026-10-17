@@ -22,7 +22,7 @@
   --text-muted: #656561;
 
   --accent: #ff5a1f;        /* Flächen: Primärtaste, LED, Balken */
-  --accent-text: #b8431a;   /* Text und Links (kontraststark auf Papier) */
+  --accent-text: #b14019;   /* Text und Links (kontraststark auf Papier) */
   --accent-soft: #f7e6dd;
   --accent-fill: #c94a1c;   /* Primärtaste mit weißer Schrift (≥ 4,5:1, Kontrast-Wächter) */
 
@@ -36,7 +36,7 @@
 
   --success: #2f6b45;
   --success-soft: #e1e8e0;
-  --warn: #8a6516;
+  --warn: #825f15;
   --warn-soft: #eeead9;
   --danger: #b23718;
   --danger-soft: #f2e3db;
@@ -696,7 +696,7 @@ label.field > span, .field > .feld-titel {
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #6a6c70;
+  color: #85878c; /* 5,3:1 auf dem Display (vorher #6a6c70, 3,65:1) */
   padding: 2px 6px 10px;
 }
 
