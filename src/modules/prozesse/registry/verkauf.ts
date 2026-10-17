@@ -234,8 +234,8 @@ export const VERKAUF = {
     ki: true,
     beschreibung:
       'Erzeugt die Kundenrechnung zu einer gebuchten Lieferung (Warenausgang eines Verkaufsauftrags): ' +
-      'gelieferte Mengen zu den Auftragspreisen, Versand einmal je Auftrag; Shop-Aufträge gelten als ' +
-      'bezahlt. Mit eingeschalteter Automatik passiert das bei jeder Lieferung von selbst. Beleg = die Lieferung.',
+      'gelieferte Mengen zu den Auftragspreisen, Versand einmal je Auftrag; Shop-Aufträge sind bezahlt, ' +
+      'außer Shopify meldet noch einen offenen Betrag (dann offen mit dem Rest). Mit eingeschalteter Automatik passiert das bei jeder Lieferung von selbst. Beleg = die Lieferung.',
     bindung: 'beleg',
     modell: 'stock_picking',
     schema: z.object({}),

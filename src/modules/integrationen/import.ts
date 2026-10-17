@@ -113,6 +113,20 @@ export function positionsPreis(
 }
 
 /**
+ * Zahlstatus nachziehen (0130, Entscheidungslog 2026-10-17): der Import hat
+ * den offenen Betrag laut Shopify schon am Auftrag gespeichert;
+ * kundenrechnung_shop_abgleich verteilt ihn auf offene Shop-Rechnungen und
+ * schließt, was jetzt bezahlt ist.
+ */
+async function zahlstatusNachziehen(t: TransactionSql, auftragId: string): Promise<string | null> {
+  const [{ bezahlt }] = await t<{ bezahlt: number }[]>`
+    select kundenrechnung_shop_abgleich(${auftragId}, 'shopify') as bezahlt`
+  return Number(bezahlt) > 0
+    ? `${plural(Number(bezahlt), 'Rechnung', 'Rechnungen')} laut Shopify bezahlt`
+    : null
+}
+
+/**
  * Erstattung zu offenen Retouren (0119, Entscheidungslog 2026-10-17): die
  * Erstattung bleibt im Shopify-Admin, KRNL liest sie ab. Erstattet heißt:
  * der Shop meldet die Bestellung ganz erstattet, oder ihr Gesamtbetrag
@@ -156,6 +170,17 @@ export function shopBrutto(order: Pick<ShopifyOrder, 'totalPriceSet' | 'currentT
   const roh = order.currentTotalPriceSet?.shopMoney.amount ?? order.totalPriceSet?.shopMoney.amount
   const wert = Number(roh)
   return roh != null && Number.isFinite(wert) ? Math.round(wert * 100) / 100 : null
+}
+
+/**
+ * Offener Betrag laut Shopify (0130): ein Aufpreis nach einer Bestelländerung,
+ * den der Kunde noch nicht gezahlt hat (PARTIALLY_PAID). null = unbekannt
+ * (ältere Antworten, Attrappen) — dann gilt das bisherige „Shop hat bezahlt".
+ */
+export function shopOffen(order: Pick<ShopifyOrder, 'totalOutstandingSet'>): number | null {
+  const roh = order.totalOutstandingSet?.shopMoney.amount
+  const wert = Number(roh)
+  return roh != null && Number.isFinite(wert) ? Math.max(0, Math.round(wert * 100) / 100) : null
 }
 
 /** Versandkosten netto nach Rabatt (0 ohne Versandzeile). */
@@ -250,6 +275,12 @@ export async function importShopifyOrder(
     }
 
     if (existing) {
+      // Zahlstatus laut Shopify (0130) zuerst: eine Rechnung, die in diesem
+      // Lauf aus einer Lieferung entsteht, liest ihn schon.
+      await t`update sales_orders
+                 set shopify_zahlstatus = ${order.displayFinancialStatus ?? null},
+                     shopify_offen = coalesce(${shopOffen(order)}, shopify_offen)
+               where id = ${existing.id}`
       // Nachzügler-Heilung für noch unbestätigte Shop-Aufträge: inzwischen
       // aufgelöste Klärzeilen als Positionen nachziehen (echter Preis aus
       // der Bestellung) und — wenn nichts mehr offen ist und bezahlt wurde —
@@ -263,11 +294,13 @@ export async function importShopifyOrder(
         const extern = await externVersandNachziehen(t, existing.id, order)
         // Retoure (0119): Erstattung im Shop erkannt → Retoure erstattet/abgeschlossen.
         const retoure = await retourenErstattungNachziehen(t, existing.id, order)
+        // Zahlstatus (0130): offene Shop-Rechnungen schließen, sobald Shopify nichts mehr offen meldet.
+        const zahlung = await zahlstatusNachziehen(t, existing.id)
         return {
           salesOrderId: existing.id,
           created: false,
           unmatched: 0,
-          message: [geaendert, extern, retoure].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
+          message: [geaendert, extern, retoure, zahlung].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
         }
       }
 
@@ -342,13 +375,14 @@ export async function importShopifyOrder(
     const [created] = await t<{ id: string }[]>`
       insert into sales_orders (
         number, partner_id, source, shopify_order_id, shopify_order_name,
-        order_date, currency, versandkosten, shopify_brutto,
+        order_date, currency, versandkosten, shopify_brutto, shopify_zahlstatus, shopify_offen,
         ship_name, ship_street, ship_house_number, ship_street2,
         ship_zip, ship_city, ship_country_code, ship_phone, ship_email,
         rechnungsanschrift, zahlungsart)
       values (
         next_sequence('sale'), ${partnerId}, 'shopify', ${order.id}, ${order.name},
         ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode}, ${versandNetto(order)}, ${shopBrutto(order)},
+        ${order.displayFinancialStatus ?? null}, ${shopOffen(order)},
         ${addr?.name ?? null}, ${street}, ${houseNumber}, ${addr?.address2 ?? null},
         ${addr?.zip ?? null}, ${addr?.city ?? null}, ${addr?.countryCodeV2 ?? 'DE'},
         ${addr?.phone ?? null}, ${order.email ?? null},

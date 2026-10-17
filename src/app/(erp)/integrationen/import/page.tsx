@@ -76,7 +76,7 @@ async function alleUebernehmen(formData: FormData) {
 /** Shopify-Zustände in Betriebsdeutsch. */
 const ZAHLUNG: Record<string, string> = {
   PAID: 'bezahlt', PENDING: 'ausstehend', AUTHORIZED: 'autorisiert',
-  REFUNDED: 'erstattet', PARTIALLY_REFUNDED: 'teilerstattet', VOIDED: 'aufgehoben',
+  REFUNDED: 'erstattet', PARTIALLY_REFUNDED: 'teilerstattet', PARTIALLY_PAID: 'teilbezahlt', VOIDED: 'aufgehoben',
 }
 const VERSAND: Record<string, string> = {
   FULFILLED: 'versandt', UNFULFILLED: 'offen', PARTIALLY_FULFILLED: 'teilweise',

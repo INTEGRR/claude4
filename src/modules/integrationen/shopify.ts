@@ -291,6 +291,8 @@ export interface ShopifyOrder {
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } }
   /** Gesamtbetrag nach Bestelländerungen (brutto inkl. Versand) — fehlt in älteren Antworten und Attrappen. */
   currentTotalPriceSet?: { shopMoney: { amount: string } } | null
+  /** Noch offener Betrag (Aufpreis nach Bestelländerung, 0130) — fehlt in älteren Antworten und Attrappen. */
+  totalOutstandingSet?: { shopMoney: { amount: string } } | null
   customer: {
     id: string
     firstName: string | null
@@ -353,6 +355,7 @@ const ORDER_FIELDS = `
   cancelledAt
   totalPriceSet { shopMoney { amount currencyCode } }
   currentTotalPriceSet { shopMoney { amount } }
+  totalOutstandingSet { shopMoney { amount } }
   customer { id firstName lastName defaultEmailAddress { emailAddress } }
   shippingAddress { name address1 address2 zip city countryCodeV2 phone }
   billingAddress { name company address1 address2 zip city countryCodeV2 }

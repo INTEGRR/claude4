@@ -64,11 +64,12 @@ Artikel sind praktisch nicht mehr änderbar. Quellen:
 [Shopify – Bestellungen bearbeiten](https://help.shopify.com/en/manual/orders/edit-orders),
 [Shopify – Rabatte beim Bearbeiten](https://help.shopify.com/cs/manual/fulfillment/managing-orders/editing-orders/discounts).
 
-**Befund dazu (offen):** `kundenrechnung_aus_lieferung` legt jede
+**Befund dazu (erledigt am 17.10.2026, 0130 — siehe Entscheidungslog):** `kundenrechnung_aus_lieferung` legte jede
 Shop-Rechnung als `bezahlt` an, mit der Begründung „der Shop hat das Geld
 vor dem Versand“. Wird nach einem Aufpreis versendet, bevor der Kunde
 nachgezahlt hat (Shopify: `PARTIALLY_PAID`), steht die Rechnung trotzdem
-auf bezahlt. Die offene Forderung sieht man dann nur im Shop.
+auf bezahlt. Die offene Forderung sah man dann nur im Shop. Jetzt bleibt
+sie offen mit dem Restbetrag und schließt, sobald Shopify `PAID` meldet.
 
 ## Rechtlicher Rahmen (Einordnung, ohne Gewähr)
 

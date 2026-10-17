@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Shop-Rechnung bezahlt nur, wenn Shopify nichts mehr offen meldet
+
+**Anlass:** Punkt 3 der Vorlage [auftragsaenderung.md](vorlagen/auftragsaenderung.md):
+Jede Shop-Rechnung entstand „bezahlt". Nach einer Bestelländerung mit
+Aufpreis meldet Shopify `PARTIALLY_PAID`, bis der Kunde nachzahlt — die
+Forderung war in KRNL unsichtbar. Der Betreiber hat entschieden: offen mit
+Restbetrag, schließt beim nächsten Shopify-Update.
+
+**Entschieden:**
+- 0130: `sales_orders.shopify_zahlstatus`/`shopify_offen` (Import schreibt
+  beides, Feld `totalOutstandingSet`), `kundenrechnungen.shop_offen` =
+  Restbetrag. `kundenrechnung_offen` rechnet bei Shop-Rechnungen mit dem
+  Rest statt dem Brutto.
+- Keine Schein-Zahlung im Zahlungsregister für den Teil, den Shopify schon
+  hat — das ist kein Bankeingang. Abweichung vom Plan (dort „Zahlung
+  verbuchen"), weil vollständig bezahlte Shop-Rechnungen auch keine
+  Zahlung haben.
+- `kundenrechnung_shop_abgleich` verteilt den offenen Betrag auf die
+  offenen Shop-Rechnungen des Auftrags (neueste zuerst) und schließt, was
+  bezahlt ist; der Import ruft ihn bei jedem `orders/updated`.
+- Offene Shop-Rechnungen bekommen das reguläre Zahlungsziel und stehen in
+  Forderungen und Mahnliste wie jede offene Rechnung. Das PDF nennt den
+  Rest und verweist auf die Zahlungsaufforderung des Shops.
+- Ohne Angabe von Shopify (ältere Antworten, Attrappen) bleibt es bei
+  „bezahlt"; teil- und voll erstattete Bestellungen melden nichts offen.
+- Tests: tests/prozesse/shop-zahlstatus.test.ts. Doku:
+  [module/verkauf.md](module/verkauf.md).
+
 ## 2026-10-17 — Kontrast auch für Links, Warnton und Display-Kopf
 
 **Anlass:** Beim Nachziehen des Design-System-Artifacts fielen drei weitere

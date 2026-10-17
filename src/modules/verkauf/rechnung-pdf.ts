@@ -101,6 +101,10 @@ export function zahlungsHinweis(k: RechnungKopf, firma: Firma): string {
     return `Der Betrag wurde am ${datum(k.bezahlt_am)} bereits beglichen${k.zahlungsart ? ` (${k.zahlungsart})` : ''}. Es ist keine Zahlung mehr offen.`
   }
   if (k.status === 'storniert') return 'Diese Rechnung wurde durch eine Gutschrift storniert.'
+  // Shop-Rechnung mit Aufpreis (0130): den Rest fordert Shopify per Zahlungsaufforderung an.
+  if (k.quelle === 'shopify') {
+    return `Offener Restbetrag: ${geld(k.offen, k.waehrung)}. Die Zahlungsaufforderung erhalten Sie per E-Mail aus unserem Shop; der übrige Betrag ist bereits beglichen.`
+  }
   const bank = [firma.iban && `IBAN ${firma.iban}`, firma.bic && `BIC ${firma.bic}`, firma.bank].filter(Boolean).join(' · ')
   return `Bitte überweisen Sie den Gesamtbetrag bis zum ${datum(k.faellig_am)} ohne Abzug${bank ? ` auf ${bank}` : ''}. Verwendungszweck: ${k.nummer}.`
 }

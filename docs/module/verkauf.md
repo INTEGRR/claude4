@@ -65,8 +65,17 @@ der gebuchten Lieferung, Registry `verkauf.rechnung_erstellen`):
   (`sales_order_lines.listenpreis`, nur wenn der Shop einen Rabatt gab).
 - **Versand** einmal je Auftrag auf der ersten gültigen Rechnung
   (`sales_orders.versandkosten` netto, Steuer zum Satz der Positionen).
-- **Shop-Aufträge sind sofort bezahlt** — die Zahlung lief im Shop;
-  Zahlungsart aus `paymentGatewayNames` („Shopify Payments", „PayPal",
+- **Shop-Aufträge sind sofort bezahlt** — die Zahlung lief im Shop.
+  **Ausnahme seit 0130:** meldet Shopify einen offenen Betrag (Aufpreis
+  nach Bestelländerung, `PARTIALLY_PAID`), bleibt die Rechnung offen mit
+  dem Restbetrag (`kundenrechnungen.shop_offen`, reguläres Zahlungsziel,
+  steht in Forderungen und Mahnliste; das PDF nennt den Rest und verweist
+  auf die Zahlungsaufforderung des Shops). Der Import speichert
+  `sales_orders.shopify_zahlstatus`/`shopify_offen` bei jedem
+  `orders/updated`; `kundenrechnung_shop_abgleich` verteilt den offenen
+  Betrag auf die offenen Shop-Rechnungen (neueste zuerst) und schließt sie,
+  sobald Shopify nichts mehr offen meldet. Ohne Angabe von Shopify gilt
+  das alte „bezahlt". Zahlungsart aus `paymentGatewayNames` („Shopify Payments", „PayPal",
   „Klarna" …), Rechnungsanschrift aus `billingAddress`. **Firmenkunden
   (manuelle Aufträge)** sind offen: Zahlungsart „Überweisung", fällig nach
   Zahlungsbedingung des Kunden, sonst `rechnung.zahlungsziel_tage` (14).
@@ -95,7 +104,7 @@ positionen, grund)` erzeugt die GU-Nummer mit Bezug zur Rechnung
 **Zahlung, Mahnung, Forderungen.** `verkauf.rechnung_zahlen` bucht die
 Einzahlung ins Zahlungsregister (`zahlungen.quelle = 'kundenrechnung'`,
 mit Bankkonto und Betrag — Teilzahlungen erlaubt) oder markiert ohne Konto
-als bezahlt (Bar, Shop). `kundenrechnung_offen(id)` = brutto − Zahlungen;
+als bezahlt (Bar, Shop). `kundenrechnung_offen(id)` = brutto (bei Shop-Rechnungen mit Rest: `shop_offen`) − Zahlungen;
 bei 0 kippt der Status auf `bezahlt`. Eine Rechnung über 0,00 € (Garantie,
 Ersatz zum Nulltarif) entsteht seit 0124 gleich als `bezahlt` —
 ausgeglichen, nie offen, nie gemahnt. Offene Rechnungen (Forderung, `ein`)
@@ -190,6 +199,6 @@ beim Scharfschalten, Löschen mit Rückrechnung, danach nahtlose RE-Nummer.
 3. Stornieren storniert die offene Lieferung, MO bleibt mit Warnhinweis bestehen.
 4. Gesperrter Auftrag lässt sich weder in UI noch per API ändern, bis entsperrt.
 5. Validierte Teillieferung setzt `qty_delivered` der Positionen und `delivery_status = partial`.
-6. Gebuchte Lieferung eines Shop-Auftrags erzeugt genau eine bezahlte Rechnung (Positionen mit Variantenname, Versand einmal); die eines Firmenauftrags eine offene mit Fälligkeit — sie steht in `finanz_faellig`.
+6. Gebuchte Lieferung eines Shop-Auftrags erzeugt genau eine bezahlte Rechnung (Positionen mit Variantenname, Versand einmal) — offen mit Restbetrag, solange Shopify einen Aufpreis offen meldet; die eines Firmenauftrags eine offene mit Fälligkeit — sie steht in `finanz_faellig`.
 7. Shop-Änderung vor dem Versand ändert Auftrag, Lieferung und Fertigung, aber keinen Beleg; nach der Rechnung entsteht die Gutschrift (Menge weniger) bzw. die zweite Rechnung (Ware dazu) von selbst.
 8. Storno = volle Gutschrift mit Bezug, Rechnung `storniert`; Teilgutschrift lässt die Rechnung bestehen; keine Rechnung wird je editiert.
