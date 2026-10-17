@@ -10,7 +10,7 @@ import {
   letzteBenachrichtigungen,
   schalter as benachrichtigungsSchalter,
 } from '@/modules/integrationen/benachrichtigungen'
-import { dateTime } from '@/modules/shared/format'
+import { dateTime, label } from '@/modules/shared/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,7 +98,7 @@ export default async function BenachrichtigungenPage() {
                     <td className="nowrap small muted mono">{dateTime(m.erstellt_at)}</td>
                     <td className="small">{m.art}</td>
                     <td>
-                      <Zustand ton={STATUS_TON[m.status as keyof typeof STATUS_TON] ?? 'off'}>{m.status}</Zustand>
+                      <Zustand ton={STATUS_TON[m.status as keyof typeof STATUS_TON] ?? 'off'}>{label('benachrichtigung', m.status)}</Zustand>
                       {m.fehler && <div className="small muted">{m.fehler}</div>}
                     </td>
                     <td className="small" style={{ whiteSpace: 'pre-line' }}>

@@ -105,13 +105,19 @@ export function dateTime(value: string | Date | null | undefined): string {
   return dateTimeFormat.format(new Date(value))
 }
 
-/** Beschriftungen der Statuswerte (die technischen Werte folgen Odoo). */
+/**
+ * Die Zustandstabelle (F1, Entscheidungslog 2026-10-17): Beschriftung jedes
+ * Statuswerts je Belegart — die einzige Quelle. Lokale Status-Maps in Seiten
+ * sind verboten (Wächter tests/zustandstabelle.test.ts); jeder Wert der
+ * Status-Enums der Datenbank hat hier ein Label. Die technischen Werte
+ * folgen Odoo. `cancel` heißt bei Belegen einheitlich „Storniert".
+ */
 export const LABELS = {
   sale: {
     draft: 'Angebot',
     sent: 'Angebot gesendet',
     sale: 'Verkaufsauftrag',
-    cancel: 'Abgebrochen',
+    cancel: 'Storniert',
   },
   delivery: {
     pending: 'Nicht geliefert',
@@ -130,7 +136,7 @@ export const LABELS = {
     sent: 'Anfrage gesendet',
     purchase: 'Bestellung',
     done: 'Gesperrt',
-    cancel: 'Abgebrochen',
+    cancel: 'Storniert',
   },
   billing: {
     nothing: 'Nichts abzurechnen',
@@ -163,7 +169,7 @@ export const LABELS = {
     confirmed: 'Wartend auf Verfügbarkeit',
     assigned: 'Bereit',
     done: 'Erledigt',
-    cancel: 'Abgebrochen',
+    cancel: 'Storniert',
   },
   mo: {
     draft: 'Entwurf',
@@ -171,7 +177,7 @@ export const LABELS = {
     progress: 'In Bearbeitung',
     to_close: 'Abzuschließen',
     done: 'Erledigt',
-    cancel: 'Abgebrochen',
+    cancel: 'Storniert',
   },
   repair: {
     new: 'Neu',
@@ -181,7 +187,7 @@ export const LABELS = {
     under_repair: 'In Reparatur',
     repaired: 'Repariert',
     shipped: 'Versendet',
-    cancel: 'Abgebrochen',
+    cancel: 'Storniert',
   },
   absence: {
     requested: 'Beantragt',
@@ -264,10 +270,132 @@ export const LABELS = {
     gekuendigt: 'Gekündigt',
     beendet: 'Beendet',
   },
+  move: {
+    draft: 'Entwurf',
+    waiting: 'Wartend',
+    confirmed: 'Wartend auf Verfügbarkeit',
+    assigned: 'Reserviert',
+    done: 'Erledigt',
+    cancel: 'Storniert',
+  },
+  mo_operation: {
+    pending: 'Offen',
+    progress: 'Läuft',
+    done: 'Erledigt',
+    cancel: 'Storniert',
+  },
+  shift: {
+    draft: 'Entwurf',
+    published: 'Veröffentlicht',
+    cancel: 'Storniert',
+  },
+  aufgabe: {
+    offen: 'Offen',
+    erledigt: 'Erledigt',
+    verworfen: 'Verworfen',
+  },
+  ticket: {
+    offen: 'Offen',
+    in_arbeit: 'In Arbeit',
+    behoben: 'Behoben',
+    verworfen: 'Verworfen',
+  },
+  ticket_schwere: {
+    kritisch: 'Kritisch',
+    stoerend: 'Störend',
+    kosmetisch: 'Kosmetisch',
+  },
+  // Outbox (integration_jobs). „skipped" gibt es nur in der Anzeige: ein Job,
+  // der mit „Übersprungen…" als done endete (Schreibschutz, fehlende Konfiguration).
+  job: {
+    pending: 'Wartet',
+    running: 'Läuft',
+    done: 'Erledigt',
+    failed: 'Fehlgeschlagen',
+    skipped: 'Übersprungen',
+  },
+  webhook: {
+    pending: 'Wartet',
+    running: 'Läuft',
+    done: 'Erledigt',
+    failed: 'Fehlgeschlagen',
+    skipped: 'Übersprungen',
+  },
+  // Assistenten-Läufe (prozess_instanzen.status, text).
+  prozess_instanz: {
+    laufend: 'Läuft',
+    fertig: 'Fertig',
+    abgebrochen: 'Abgebrochen',
+  },
+  // Benachrichtigungen (Telegram-Outbox, benachrichtigungen.status, text).
+  benachrichtigung: {
+    offen: 'Offen',
+    gesendet: 'Gesendet',
+    fehlgeschlagen: 'Fehlgeschlagen',
+    uebersprungen: 'Übersprungen',
+  },
+  // Prüfung einer Retourenposition (retoure_positionen.pruefung, text).
+  retoure_pruefung: {
+    verkaufsfaehig: 'Verkaufsfähig → Lager',
+    bware: 'B-Ware',
+    defekt: 'Defekt → B-Ware',
+  },
+  // KI-Lesbarkeit eines Dokuments (dokumente.text_status, text).
+  dokument_text: {
+    gelesen: 'von der KI gelesen',
+    nicht_lesbar: 'für die KI nicht lesbar',
+    fehler: 'KI-Lesen gescheitert',
+  },
+  // Abwesenheitsart (absence_kind) und Beschäftigungsart (employment_type).
+  absence_art: {
+    vacation: 'Urlaub',
+    sick: 'Krank',
+    training: 'Schulung',
+    unpaid: 'Unbezahlt',
+    other: 'Sonstiges',
+  },
+  beschaeftigung: {
+    full_time: 'Vollzeit',
+    part_time: 'Teilzeit',
+    mini_job: 'Minijob',
+    temp: 'Aushilfe',
+    apprentice: 'Auszubildende(r)',
+  },
 } as const
 
-/** Farbton für Status-Badges. */
-export function tone(state: string): 'neutral' | 'info' | 'success' | 'warn' | 'danger' {
+export type LabelArt = keyof typeof LABELS
+
+/** Beschriftung eines Statuswerts; unbekannte Werte erscheinen roh (der Wächter verhindert das bei Enums). */
+export function label(art: LabelArt, wert: string): string {
+  return (LABELS[art] as Record<string, string>)[wert] ?? wert
+}
+
+type Ton = 'neutral' | 'info' | 'success' | 'warn' | 'danger'
+
+/**
+ * Farbton je Belegart, wo der Code allein nicht reicht: „genehmigt" ist bei
+ * einer Retoure ein Zwischenschritt (info), bei einer Abwesenheit das Ziel.
+ */
+const TON_JE_ART: Partial<Record<LabelArt, Record<string, Ton>>> = {
+  retoure: { genehmigt: 'info', eingegangen: 'info', geprueft: 'warn' },
+  absence: { cancel: 'neutral' },
+  aufgabe: { offen: 'warn', verworfen: 'neutral' },
+  ticket: { offen: 'warn', in_arbeit: 'info', behoben: 'success', verworfen: 'neutral' },
+  ticket_schwere: { kritisch: 'danger', stoerend: 'warn', kosmetisch: 'neutral' },
+  job: { pending: 'warn', running: 'info', failed: 'danger', skipped: 'neutral' },
+  webhook: { pending: 'warn', running: 'info', failed: 'danger', skipped: 'neutral' },
+  prozess_instanz: { laufend: 'info', fertig: 'success' },
+  benachrichtigung: { offen: 'warn', fehlgeschlagen: 'danger', uebersprungen: 'neutral' },
+  retoure_pruefung: { verkaufsfaehig: 'success', bware: 'warn', defekt: 'warn' },
+  move: { assigned: 'info' },
+  mo_operation: { pending: 'neutral' },
+  shift: { published: 'success' },
+}
+
+/** Farbton für Status-Badges — mit Belegart, wo derselbe Code je Art anders wiegt. */
+export function tone(state: string, art?: LabelArt): Ton {
+  const jeArt = art ? TON_JE_ART[art]?.[state] : undefined
+  if (jeArt) return jeArt
   switch (state) {
     case 'done':
     case 'sale':

@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { date, dateTime, isoDatum } from '@/modules/shared/format'
+import { date, dateTime, isoDatum, label, LABELS } from '@/modules/shared/format'
 import { decideAbsence, requestAbsence } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 
@@ -13,14 +13,6 @@ export const dynamic = 'force-dynamic'
  * Abwesenheiten mit Genehmigung. Offene Anträge stehen oben — sie sind das
  * Einzige, was hier eine Handlung verlangt.
  */
-
-const ABSENCE_LABEL: Record<string, string> = {
-  vacation: 'Urlaub',
-  sick: 'Krank',
-  training: 'Schulung',
-  unpaid: 'Unbezahlt',
-  other: 'Sonstiges',
-}
 
 export default async function AbwesenheitenPage() {
   await requireArea('personal')
@@ -118,7 +110,7 @@ export default async function AbwesenheitenPage() {
                     <td>
                       <Link href={`/personal/${a.employee_id}`}>{a.employee}</Link>
                     </td>
-                    <td>{ABSENCE_LABEL[a.kind] ?? a.kind}</td>
+                    <td>{label('absence_art', a.kind)}</td>
                     <td className="mono small nowrap">{date(a.starts_on)}</td>
                     <td className="mono small nowrap">
                       {a.half_day ? 'halber Tag' : date(a.ends_on)}
@@ -194,8 +186,8 @@ export default async function AbwesenheitenPage() {
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Art</span>
               <Auswahl name="kind" defaultValue="vacation">
-                {Object.entries(ABSENCE_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                {Object.entries(LABELS.absence_art).map(([value, text]) => (
+                  <option key={value} value={value}>{text}</option>
                 ))}
               </Auswahl>
             </label>

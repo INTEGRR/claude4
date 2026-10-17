@@ -5,7 +5,7 @@ import { Card, Empty } from '@/components/ui'
 import { DOKUMENT_ARTEN, type DokumentModell } from '@/modules/einkauf/dokument-modelle'
 import { driveKonfiguriert } from '@/modules/google/auth'
 import { driveLink } from '@/modules/google/drive'
-import { dateTime } from '@/modules/shared/format'
+import { dateTime, label } from '@/modules/shared/format'
 import { DokumentUpload, DokumentZeilenKnoepfe } from './dokument-upload'
 
 /**
@@ -15,7 +15,6 @@ import { DokumentUpload, DokumentZeilenKnoepfe } from './dokument-upload'
  */
 
 /** Lesestatus des Einkaufs-Agenten (0109). */
-const TEXT_STATUS: Record<string, string> = { gelesen: 'von der KI gelesen', nicht_lesbar: 'für die KI nicht lesbar', fehler: 'KI-Lesen gescheitert' }
 
 export function groesseText(bytes: number | null): string {
   if (bytes == null) return '—'
@@ -82,7 +81,7 @@ export async function DokumenteKarte({
                   <span className="mono-label">{DOKUMENT_ARTEN[d.art] ?? d.art}</span>
                   {d.revision ? <> · Rev. {d.revision}</> : null} · {groesseText(d.groesse)} ·{' '}
                   {d.hochgeladen_von ?? d.quelle} · {dateTime(d.created_at)}
-                  {d.text_status ? ` · ${TEXT_STATUS[d.text_status] ?? d.text_status}` : ''}
+                  {d.text_status ? ` · ${label('dokument_text', d.text_status)}` : ''}
                 </div>
                 {d.notiz && <div className="small">{d.notiz}</div>}
               </div>

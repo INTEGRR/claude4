@@ -4,7 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { HBars } from '@/components/charts'
-import { date, hours, money } from '@/modules/shared/format'
+import { date, hours, label, LABELS, money } from '@/modules/shared/format'
 import { createEmployee } from './actions'
 import { Auswahl } from '@/components/auswahl'
 
@@ -15,14 +15,6 @@ export const dynamic = 'force-dynamic'
  * Monat erfasst. Die Personalkosten stehen bewusst hier und nirgends sonst —
  * sie sind der einzige Wert, den nur das Büro sehen darf.
  */
-
-const EMPLOYMENT_LABEL: Record<string, string> = {
-  full_time: 'Vollzeit',
-  part_time: 'Teilzeit',
-  mini_job: 'Minijob',
-  temp: 'Aushilfe',
-  apprentice: 'Auszubildende(r)',
-}
 
 export default async function PersonalPage() {
   await requireArea('personal')
@@ -148,7 +140,7 @@ export default async function PersonalPage() {
                     </td>
                     <td className="small">{m.job_title ?? '—'}</td>
                     <td className="small muted">
-                      {EMPLOYMENT_LABEL[m.employment_type] ?? m.employment_type}
+                      {label('beschaeftigung', m.employment_type)}
                     </td>
                     <td className="num mono">{money(m.hourly_cost)} / Std.</td>
                     <td className="num mono">{Number(m.weekly_hours)} h</td>
@@ -201,8 +193,8 @@ export default async function PersonalPage() {
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Vertrag</span>
               <Auswahl name="employment_type" defaultValue="full_time">
-                {Object.entries(EMPLOYMENT_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                {Object.entries(LABELS.beschaeftigung).map(([value, text]) => (
+                  <option key={value} value={value}>{text}</option>
                 ))}
               </Auswahl>
             </label>

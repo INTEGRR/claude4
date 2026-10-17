@@ -4,7 +4,7 @@ import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { dateTime, qty } from '@/modules/shared/format'
+import { dateTime, label, qty, tone } from '@/modules/shared/format'
 import { shopifyConfigured, shopifyModus } from '@/modules/integrationen/shopify'
 import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
@@ -187,29 +187,13 @@ async function resolveUnmatched(lineId: string, formData: FormData) {
   return serverAktion('integrationen.klaerfall_aufloesen', { recordId: lineId, formData })
 }
 
-/** Deutsche Beschriftungen der technischen Queue-Zustände. */
-const JOB_STATUS: Record<string, string> = {
-  pending: 'wartet',
-  running: 'läuft',
-  done: 'erledigt',
-  failed: 'fehlgeschlagen',
-  skipped: 'übersprungen',
-}
-
-const EVENT_STATUS: Record<string, string> = {
-  pending: 'wartet',
-  running: 'läuft',
-  done: 'erledigt',
-  failed: 'fehlgeschlagen',
-  skipped: 'übersprungen',
-}
-
 /**
  * Zustand einer Warteschlange: „läuft" ist ein Betriebszustand und bekommt
  * die Leuchte, alles andere bleibt ein abgeschlossenes Ergebnis (Chip).
  */
-function QueueStatus({ status, labels }: { status: string; labels: Record<string, string> }) {
-  const wort = labels[status] ?? status
+/** Queue-Zustand (Outbox bzw. Webhook) — Beschriftung und Ton aus der Zustandstabelle. */
+function QueueStatus({ status, art }: { status: string; art: 'job' | 'webhook' }) {
+  const wort = label(art, status)
   if (status === 'running') {
     return (
       <span className="mono-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -218,8 +202,7 @@ function QueueStatus({ status, labels }: { status: string; labels: Record<string
       </span>
     )
   }
-  const ton = status === 'done' ? ' success' : status === 'failed' ? ' danger' : status === 'skipped' ? '' : ' warn'
-  return <span className={`badge${ton}`}>{wort}</span>
+  return <span className={`badge ${tone(status, art)}`}>{wort}</span>
 }
 
 /** Verbindungszustand einer Anbindung: Leuchte plus Wort, nicht als Kennzahl. */
@@ -768,7 +751,7 @@ export default async function IntegrationenPage() {
                           als done — „erledigt" täuschte Vollzug vor (UX-Audit). */}
                       <QueueStatus
                         status={j.status === 'done' && j.last_result?.startsWith('Übersprungen') ? 'skipped' : j.status}
-                        labels={JOB_STATUS}
+                        art="job"
                       />
                       {j.status === 'running' && j.started_at && (
                         <span className="muted small mono"> seit {dateTime(j.started_at)}</span>
@@ -839,7 +822,7 @@ export default async function IntegrationenPage() {
                       )}
                     </td>
                     <td>
-                      <QueueStatus status={e.status} labels={EVENT_STATUS} />
+                      <QueueStatus status={e.status} art="webhook" />
                     </td>
                     <td className="small" style={{ maxWidth: 420 }}>{e.error ?? '—'}</td>
                     <td className="num">

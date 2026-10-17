@@ -1,24 +1,11 @@
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
-import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { commitUrl, kurzerSha } from '@/modules/shared/repo'
 
 export const dynamic = 'force-dynamic'
-
-const SCHWERE_BADGE: Record<string, string> = {
-  kritisch: 'danger',
-  stoerend: 'warn',
-  kosmetisch: 'neutral',
-}
-
-const STATUS_BADGE: Record<string, string> = {
-  offen: 'warn',
-  in_arbeit: 'info',
-  behoben: 'success',
-  verworfen: 'neutral',
-}
 
 export default async function TicketsPage({
   searchParams,
@@ -114,12 +101,10 @@ export default async function TicketsPage({
                       )}
                     </td>
                     <td>
-                      <span className={`badge ${SCHWERE_BADGE[t.schwere] ?? ''}`}>{t.schwere}</span>
+                      <Badge kind="ticket_schwere" state={t.schwere} />
                     </td>
                     <td>
-                      <Link className={`badge ${STATUS_BADGE[t.status] ?? ''}`} href={`/tickets/${t.id}`}>
-                        {t.status.replace('_', ' ')}
-                      </Link>
+                      <Badge kind="ticket" state={t.status} href={`/tickets/${t.id}`} />
                     </td>
                     <td className="small">
                       {t.commit_sha ? (

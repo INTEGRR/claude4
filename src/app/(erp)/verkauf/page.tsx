@@ -78,7 +78,7 @@ export default async function VerkaufPage({
     { key: undefined, label: 'Alle' },
     { key: 'draft', label: 'Angebote' },
     { key: 'sale', label: 'Aufträge' },
-    { key: 'cancel', label: 'Abgebrochen' },
+    { key: 'cancel', label: 'Storniert' },
   ]
 
   return (

@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-17 — Zustandstabelle: eine Quelle für Statusbeschriftungen, „Storniert" statt „Abgebrochen"
+
+**Anlass (UX-Audit, Muster „ein Zustand, mehrere Wörter"):** Etwa zehn
+Seiten führten eigene Status-Maps (Tickets, Personal, Outbox, Retouren-
+Prüfung, Prozess-Läufe, Einkaufs-Konstanten). Folgen: rohe Codes ohne
+Umlaut („STOEREND", „uebersprungen"), derselbe Zustand mit zwei Wörtern
+(Kopf „Abgebrochen", Verlauf „Storniert"), „Genehmigt" mal grün, mal neutral.
+
+**Entschieden:** `LABELS` in `src/modules/shared/format.ts` ist die einzige
+Quelle (neue Arten u. a. `ticket`, `job`, `webhook`, `aufgabe`,
+`prozess_instanz`, `retoure_pruefung`, `absence_art`, `beschaeftigung`);
+`tone(wert, art)` kennt Belegarten (Retoure „genehmigt" = Zwischenschritt).
+`cancel` heißt bei Verkauf, Einkauf, Transfer, Fertigung, Reparatur
+einheitlich **„Storniert"** — so heißt der Vorgang im Verlauf und in den
+Knöpfen; das Einkaufsprojekt bleibt „Abgebrochen" (ein Vorhaben wird
+abgebrochen, kein Beleg storniert). Wächter tests/zustandstabelle.test.ts:
+(a) jeder Wert jedes Status-Enums hat ein Label (Abgleich gegen `pg_enum`),
+(b) keine lokalen Status-Maps mit eigenen Texten (geschlossene
+Ausnahmeliste). Doku: [entwicklung.md](entwicklung.md).
+
 ## 2026-10-17 — Änderungen von Hand am bestätigten Auftrag ziehen Lieferung und Fertigung nach
 
 **Anlass (Recherche zur Entscheidungsvorlage Auftragsänderung):**

@@ -1,4 +1,5 @@
 import { zahlLesen } from './einkaufsprojekt.ts'
+import { LABELS } from '../shared/format.ts'
 
 /**
  * Eingangssendungen (0108), pur: Beschriftungen, die Verteilung auf die
@@ -7,14 +8,8 @@ import { zahlLesen } from './einkaufsprojekt.ts'
  * Registry, Ausführung, Oberfläche und Tests.
  */
 
-export const SENDUNG_STATUS = {
-  geplant: 'Geplant',
-  verschifft: 'Verschifft',
-  verzollt: 'Verzollt',
-  angekommen: 'Angekommen',
-  abgerechnet: 'Abgerechnet',
-  storniert: 'Storniert',
-} as const
+/** Beschriftung aus der Zustandstabelle (F1). */
+export const SENDUNG_STATUS = LABELS.eingangs_sendung
 export type SendungStatus = keyof typeof SENDUNG_STATUS
 
 /** Solange die Sendung reist oder auf die Abrechnung wartet. */

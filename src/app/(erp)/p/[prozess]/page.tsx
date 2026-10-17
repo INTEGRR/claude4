@@ -4,7 +4,7 @@ import { requireUser } from '@/modules/auth'
 import { type Area, canAccess, canWrite } from '@/modules/auth/permissions'
 import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
-import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { instanzStarten } from '../actions'
 
@@ -29,12 +29,6 @@ export default async function AssistentPage({
     select name, beschreibung, bereich from prozesse
     where code = ${code} and aktiv and modell is null`
   if (!prozess || !canAccess(user.rollen, prozess.bereich)) notFound()
-
-  const STATUS_TEXT: Record<string, string> = {
-    laufend: 'läuft',
-    fertig: 'fertig',
-    abgebrochen: 'abgebrochen',
-  }
 
   const instanzen = await sql<
     {
@@ -89,9 +83,7 @@ export default async function AssistentPage({
                       <Link className="mono" href={`/p/${code}/${i.id}`}>{i.number}</Link>
                     </td>
                     <td>
-                      <span className={`badge ${i.status === 'laufend' ? 'info' : 'neutral'}`}>
-                        {STATUS_TEXT[i.status] ?? i.status}
-                      </span>
+                      <Badge kind="prozess_instanz" state={i.status} />
                     </td>
                     <td className="mono">{i.schritt_code}</td>
                     <td>{i.gestartet_von}</td>

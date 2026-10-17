@@ -13,12 +13,6 @@ import { retoureLabelSenden, retourePruefen } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
-const PRUEFUNG_TEXT: Record<string, string> = {
-  verkaufsfaehig: 'verkaufsfähig → Lager',
-  bware: 'B-Ware',
-  defekt: 'defekt → B-Ware',
-}
-
 /**
  * Retoure (0119): Positionen, Prüfung je Position (Fachmaske — die
  * generierte Prozessmaske könnte die Liste nur als JSON erfassen), Label,
@@ -230,7 +224,7 @@ export default async function RetourePage({
                     <td className="muted">{p.grund ?? '—'}</td>
                     <td>
                       {p.pruefung ? (
-                        <span className={`badge ${p.pruefung === 'verkaufsfaehig' ? 'ok' : 'warn'}`}>{PRUEFUNG_TEXT[p.pruefung]}</span>
+                        <Badge kind="retoure_pruefung" state={p.pruefung} />
                       ) : (
                         <span className="muted">offen</span>
                       )}

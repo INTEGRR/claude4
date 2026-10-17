@@ -38,7 +38,7 @@ export function Badge({
   title?: string
 }) {
   const labels = LABELS[kind] as Record<string, string>
-  const t = tone(state)
+  const t = tone(state, kind)
   const text = labels[state] ?? state
   const badge = href ? (
     <Link className={`badge badge-link ${t}`} href={href} title={title}>

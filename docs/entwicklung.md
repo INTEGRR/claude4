@@ -144,6 +144,11 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   `kurzanlage.ts`.
 - **Formatierung** → `modules/shared/format.ts` (`qty`, `money`, `pct`,
   `date`, `isoDatum` — bitte nichts davon lokal nachbauen)
+- **Statuswerte** → die Zustandstabelle `LABELS` in `format.ts`:
+  `<Badge kind="…" state={…} />` bzw. `label(art, wert)` und
+  `tone(wert, art)`. Ein neues Status-Enum bekommt dort seine Art und
+  Beschriftungen und in `tests/zustandstabelle.test.ts` seinen Eintrag in
+  `ENUM_ART`; lokale Status-Maps in Seiten lässt der Wächter nicht zu.
 
 Der aktuelle Zustand der Codebasis samt offener Punkte:
 [code-review.md](code-review.md).

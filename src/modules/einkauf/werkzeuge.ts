@@ -2,6 +2,7 @@
  * Werkzeuge/Formen (0107), pur: Beschriftungen und die Lebensdauer-Regel —
  * geteilt von Registry, Ausführung, Oberfläche und Unit-Tests.
  */
+import { LABELS } from '../shared/format.ts'
 
 export const WERKZEUG_ARTEN = {
   form: 'Form (Spritzguss/Guss)',
@@ -16,12 +17,8 @@ export const EIGENTUEMER = { wir: 'Wir', lieferant: 'Lieferant' } as const
 export type Eigentuemer = keyof typeof EIGENTUEMER
 export const EIGENTUEMER_NAMEN = Object.keys(EIGENTUEMER) as [Eigentuemer, ...Eigentuemer[]]
 
-export const WERKZEUG_STATUS = {
-  in_auftrag: 'In Auftrag',
-  aktiv: 'Aktiv',
-  gesperrt: 'Gesperrt',
-  ausgemustert: 'Ausgemustert',
-} as const
+/** Beschriftung aus der Zustandstabelle (F1). */
+export const WERKZEUG_STATUS = LABELS.werkzeug
 export type WerkzeugStatus = keyof typeof WERKZEUG_STATUS
 export const WERKZEUG_STATUS_NAMEN = Object.keys(WERKZEUG_STATUS) as [WerkzeugStatus, ...WerkzeugStatus[]]
 

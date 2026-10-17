@@ -6,18 +6,11 @@ import { ActionForm } from '@/components/action-button'
 import { Card, PageHeader } from '@/components/ui'
 import { RecordComments } from '@/components/record-comments'
 import { ProzessPanel } from '@/components/prozess-panel'
-import { dateTime } from '@/modules/shared/format'
+import { dateTime, label } from '@/modules/shared/format'
 import { commitUrl, kurzerSha } from '@/modules/shared/repo'
 import { statusSetzen } from '../actions'
 
 export const dynamic = 'force-dynamic'
-
-const STATUS_TEXT: Record<string, string> = {
-  offen: 'offen',
-  in_arbeit: 'in Arbeit',
-  behoben: 'behoben',
-  verworfen: 'verworfen',
-}
 
 export default async function TicketDetail({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireArea('fehler')
@@ -58,7 +51,7 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
     <>
       <PageHeader
         title={`${m.number} — ${m.titel}`}
-        subtitle={`${STATUS_TEXT[m.status] ?? m.status} · ${m.schwere} · gemeldet von ${m.gemeldet_von} am ${dateTime(m.created_at)}`}
+        subtitle={`${label('ticket', m.status)} · ${label('ticket_schwere', m.schwere)} · gemeldet von ${m.gemeldet_von} am ${dateTime(m.created_at)}`}
         actions={<Link className="btn" href="/tickets">Zur Liste</Link>}
       />
 

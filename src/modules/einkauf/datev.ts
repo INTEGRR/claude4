@@ -11,12 +11,10 @@
  * verdrahtet: es gibt keinen Job, keine Registry-Aktion und keinen Cron, der
  * sendet.
  */
+import { LABELS } from '../shared/format.ts'
 
-export const DATEV_STATUS = {
-  bereit: 'bereit',
-  fehlt_beleg: 'fehlt Beleg',
-  uebergeben: 'übergeben',
-} as const
+/** Beschriftung aus der Zustandstabelle (F1). */
+export const DATEV_STATUS = LABELS.datev
 export type DatevStatus = keyof typeof DATEV_STATUS
 
 /** Größte Datei je Beleg-Mail — Annahme bis zur Klärung mit dem Steuerberater. */

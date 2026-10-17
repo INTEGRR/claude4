@@ -1,4 +1,5 @@
 import { zahlLesen } from './einkaufsprojekt.ts'
+import { LABELS } from '../shared/format.ts'
 
 /**
  * Lieferantenverträge (0107), pur: Beschriftungen, die Lage eines Vertrags
@@ -23,18 +24,17 @@ export const VERTRAG_ART_NAMEN = Object.keys(VERTRAG_ARTEN) as [VertragArt, ...V
 /** Arten, aus denen Lieferantenpreise entstehen können. */
 export const MIT_PREISEN: readonly VertragArt[] = ['preisliste', 'rahmenvertrag']
 
-export const VERTRAG_STATUS = { aktiv: 'Aktiv', gekuendigt: 'Gekündigt', beendet: 'Beendet' } as const
+/** Die Werte des DB-Enums; Beschriftung aus der Zustandstabelle (F1). */
+export const VERTRAG_STATUS = {
+  aktiv: LABELS.lieferantenvertrag.aktiv,
+  gekuendigt: LABELS.lieferantenvertrag.gekuendigt,
+  beendet: LABELS.lieferantenvertrag.beendet,
+} as const
 export type VertragStatus = keyof typeof VERTRAG_STATUS
 export const VERTRAG_STATUS_NAMEN = Object.keys(VERTRAG_STATUS) as [VertragStatus, ...VertragStatus[]]
 
-/** Lage für Schild und Liste — aus Status und den Daten der Datenbank. */
-export const VERTRAG_LAGEN = {
-  aktiv: 'Aktiv',
-  faellig: 'Frist läuft',
-  abgelaufen: 'Abgelaufen',
-  gekuendigt: 'Gekündigt',
-  beendet: 'Beendet',
-} as const
+/** Lage für Schild und Liste — aus Status und den Daten der Datenbank (Beschriftung: Zustandstabelle). */
+export const VERTRAG_LAGEN = LABELS.lieferantenvertrag
 export type VertragLage = keyof typeof VERTRAG_LAGEN
 
 function tageZurueck(iso: string, tage: number): string {

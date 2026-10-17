@@ -1,4 +1,5 @@
 import type { Sprache } from './mail-vorlagen.ts'
+import { LABELS } from '../shared/format.ts'
 
 /**
  * Einkaufsprojekt (0097), pur: Beschriftungen, Staffeln aus Text lesen,
@@ -21,12 +22,8 @@ export const FRACHT_MODI = { see: 'See', luft: 'Luft', express: 'Express' } as c
 export type FrachtModus = keyof typeof FRACHT_MODI
 export const FRACHT_MODUS_NAMEN = Object.keys(FRACHT_MODI) as [FrachtModus, ...FrachtModus[]]
 
-export const ANFRAGE_STATUS = {
-  entwurf: 'Entwurf',
-  angefragt: 'Angefragt',
-  angebot: 'Angebot da',
-  abgesagt: 'Abgesagt',
-} as const
+/** Beschriftung aus der Zustandstabelle (F1). */
+export const ANFRAGE_STATUS = LABELS.lieferantenanfrage
 
 /** Hinweise aus einstand_schaetzen — was der Schätzung fehlt. */
 export const HINWEISE = {
