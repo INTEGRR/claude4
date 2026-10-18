@@ -7,14 +7,14 @@ import { plural, qty } from '@/modules/shared/format'
 import { scrapProduct } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
-import { Seiten } from '@/components/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BestandPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string; seite?: string }>
+  searchParams: Promise<{ q?: string; filter?: string; seite?: string; pro?: string }>
 }) {
   await requireArea('lager')
   const params = await searchParams
@@ -86,6 +86,7 @@ export default async function BestandPage({
           <form className="row" style={{ flex: 1 }}>
             <label className="field" style={{ maxWidth: 340, marginBottom: 0 }}>
               <span>Suche</span>
+              <GroesseBehalten params={params} />
               <input type="search" name="q" placeholder="Produkt oder Artikelnummer" defaultValue={q ?? ''} />
             </label>
             <div className="shrink field">

@@ -5,6 +5,8 @@ import { ActionButton } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap, Ueberfaellig } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
 import { steuerZahlen, ustVorschlagUebernehmen } from '../actions'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,18 +22,30 @@ const ART: Record<string, string> = {
  * Belegen VORGESCHLAGEN — mit sichtbarem Rechenweg, übernommen wird
  * bewusst per Klick, gebucht nie automatisch.
  */
-export default async function SteuernSeite() {
+export default async function SteuernSeite({
+  searchParams,
+}: {
+  searchParams: Promise<{ seite?: string; pro?: string }>
+}) {
   await requireArea('finanzen')
+  const params = await searchParams
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar) — Termine wachsen
+  // jeden Monat (USt, GewSt, KSt); offene zuerst, Erledigte jüngste zuerst.
+  const seite = seitenParameter(params)
 
   const termine = await sql<
     { id: string; art: string; zeitraum_von: string; zeitraum_bis: string;
       bezeichnung: string; betrag: number; faellig_am: string;
-      quelle: string; bezahlt_am: string | null }[]
+      quelle: string; bezahlt_am: string | null; gesamt: number }[]
   >`
-    select id, art, zeitraum_von, zeitraum_bis, bezeichnung, betrag,
+    select count(*) over ()::int as gesamt, id, art, zeitraum_von, zeitraum_bis, bezeichnung, betrag,
            faellig_am::text as faellig_am, quelle, bezahlt_am
     from steuerzahlungen
-    order by bezahlt_am is not null, faellig_am`
+    order by bezahlt_am is not null,
+             case when bezahlt_am is null then faellig_am end,
+             faellig_am desc
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(termine)
 
   // Vorschlag für den Vormonat — nur wenn noch kein Termin existiert.
   const [vormonat] = await sql<
@@ -82,7 +96,7 @@ export default async function SteuernSeite() {
         </Card>
       )}
 
-      <Card title="Steuertermine" tight>
+      <Card title={`Steuertermine (${gesamt})`} tight>
         {termine.length === 0 ? (
           <Empty>Noch keine Steuertermine erfasst.</Empty>
         ) : (
@@ -137,6 +151,7 @@ export default async function SteuernSeite() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/finanzen/steuern" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

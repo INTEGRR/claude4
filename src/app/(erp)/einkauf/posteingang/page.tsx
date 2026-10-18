@@ -11,6 +11,8 @@ import { dateTime } from '@/modules/shared/format'
 import { nachrichtErfassen, postfachAbgleichen } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzLieferant } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,12 +36,14 @@ type Ansicht = (typeof ANSICHTEN)[number]['key']
 export default async function PosteingangPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ansicht?: string; q?: string }>
+  searchParams: Promise<{ ansicht?: string; q?: string; seite?: string; pro?: string }>
 }) {
   const user = await requireArea('einkauf')
   const sp = await searchParams
   const ansicht: Ansicht = ANSICHTEN.some((a) => a.key === sp.ansicht) ? (sp.ansicht as Ansicht) : 'offen'
   const q = (sp.q ?? '').trim()
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(sp)
 
   const filter = {
     offen: sql`t.status = 'offen'`,
@@ -71,9 +75,10 @@ export default async function PosteingangPage({
         vorschau: string | null
         von: string | null
         anhaenge: number
+        gesamt: number
       }[]
     >`
-      select t.id, t.betreff, t.status::text as status, t.kanal::text as kanal,
+      select count(*) over ()::int as gesamt, t.id, t.betreff, t.status::text as status, t.kanal::text as kanal,
              t.letzte_richtung::text as letzte_richtung, t.letzte_am::text as letzte_am, t.anzahl,
              p.name as lieferant, t.partner_id, t.purchase_order_id, po.number as bestellung,
              t.einkaufsprojekt_id as projekt_id, ep.nummer as projekt, u.name as zustaendig,
@@ -96,7 +101,7 @@ export default async function PosteingangPage({
                         where n.thread_id = t.id
                           and (n.suche @@ plainto_tsquery('simple', ${q}) or n.von ilike ${'%' + q + '%'})))
       order by t.letzte_am desc nulls last
-      limit 200`,
+      limit ${seite.limit} offset ${seite.offset}`,
     sql<{ offen: number; uns: number; ohne: number; meine: number }[]>`
       select count(*) filter (where status = 'offen')::int as offen,
              count(*) filter (where status = 'offen' and letzte_richtung = 'eingang')::int as uns,
@@ -107,6 +112,7 @@ export default async function PosteingangPage({
       select id, name from partners where is_vendor and active and parent_id is null order by name`,
     postfachStand(),
   ])
+  const gesamt = gesamtAus(threads)
   const z = zahlen[0]
   const zaehler: Partial<Record<Ansicht, number>> = { offen: z.offen, uns: z.uns, ohne: z.ohne, meine: z.meine }
   const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
@@ -145,6 +151,7 @@ export default async function PosteingangPage({
         </div>
         <form method="get" className="row" style={{ padding: '0 12px 10px' }}>
           <input type="hidden" name="ansicht" value={ansicht} />
+          <GroesseBehalten params={sp} />
           <label className="field">
             <span>Suche (Betreff, Lieferant, Absender, Text)</span>
             <input name="q" defaultValue={q} placeholder="z. B. PCB rev C, tracking, 样品" />
@@ -214,6 +221,7 @@ export default async function PosteingangPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/posteingang" params={sp} seite={seite} gesamt={gesamt} />
       </Card>
 
       {darf && (

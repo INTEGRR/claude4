@@ -4,7 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
-import { Seiten } from '@/components/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export default async function LosePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; seite?: string }>
+  searchParams: Promise<{ q?: string; seite?: string; pro?: string }>
 }) {
   await requireArea('lager')
   const params = await searchParams
@@ -58,6 +58,7 @@ export default async function LosePage({
           <form>
             <label className="field" style={{ maxWidth: 340, marginBottom: 0 }}>
               <span>Suche</span>
+              <GroesseBehalten params={params} />
               <input
                 type="search"
                 name="q"

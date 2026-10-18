@@ -2,11 +2,13 @@ import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionButton } from '@/components/action-button'
-import { Card, PageHeader, TableWrap } from '@/components/ui'
+import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { repository } from '@/modules/prozesse/introspektion'
 import { FIXTURES } from '@/modules/prozesse/fixtures'
 import { paketAktivieren } from './actions'
 import { plural } from '@/modules/shared/format'
+import { seitenParameter } from '@/modules/shared/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,14 +21,29 @@ export const dynamic = 'force-dynamic'
 export default async function ProzesseRepositoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reiter?: string }>
+  searchParams: Promise<{ reiter?: string; q?: string; seite?: string; pro?: string }>
 }) {
   const user = await requireArea('einstellungen')
   const admin = user.role === 'admin'
-  const { reiter } = await searchParams
+  const params = await searchParams
+  const { reiter } = params
   const aktiv =
     reiter === 'dienste' ? 'dienste' : reiter === 'ablaeufe' ? 'ablaeufe' : 'aktionen'
   const repo = repository()
+
+  // Aktionen-Katalog (UX-Audit 960#1: „Alle 308 Aktionen untereinander"):
+  // Suche über Name, Knopf und Bereich, dann seitenweise.
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const q = (params.q ?? '').trim()
+  const suche = q.toLowerCase()
+  const seite = seitenParameter(params)
+  const gefunden = suche
+    ? repo.aktionen.filter((a) =>
+        [a.name, a.label, a.bereich].some((t) => t.toLowerCase().includes(suche)),
+      )
+    : repo.aktionen
+  const gesamt = gefunden.length
+  const aktionenSeite = gefunden.slice(seite.offset, seite.offset + seite.limit)
 
   const prozesse =
     aktiv === 'ablaeufe'
@@ -205,54 +222,76 @@ export default async function ProzesseRepositoryPage({
             Prozesstests und künftige generierte Masken sind nur verschiedene Wege zum selben
             Torwächter. Noch nicht registrierte Bereiche folgen Modul für Modul.
           </div>
-          <Card title={`Registrierte Aktionen (${repo.aktionen.length})`} tight>
-            <TableWrap>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Knopf</th>
-                    <th>Bereich</th>
-                    <th>Beleg</th>
-                    <th>Statusübergang</th>
-                    <th>Felder</th>
-                    <th>Kennzeichen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {repo.aktionen.map((a) => (
-                    <tr key={a.name}>
-                      <td className="mono small nowrap">{a.name}</td>
-                      <td>{a.label}</td>
-                      <td>
-                        <span className="mono-label">{a.bereich}</span>
-                      </td>
-                      <td className="mono small">
-                        {a.bindung === 'beleg' ? (a.modell ?? 'beleg') : '—'}
-                      </td>
-                      <td className="mono small nowrap">
-                        {a.uebergang
-                          ? `${a.uebergang.von.join('|') || '·'} → ${a.uebergang.nach.join('|')}`
-                          : '—'}
-                      </td>
-                      <td className="small">
-                        {a.felder.length === 0
-                          ? '—'
-                          : a.felder
-                              .map((f) => (f.pflicht ? f.name : `${f.name}?`))
-                              .join(', ')}
-                      </td>
-                      <td>
-                        <span className="actions" style={{ gap: 4 }}>
-                          {a.nurAdmin && <span className="badge warn">nur Admin</span>}
-                          {a.prozessfrei && <span className="badge neutral">prozessfrei</span>}
-                        </span>
-                      </td>
+          <Card
+            title={
+              q
+                ? `Registrierte Aktionen (${gesamt} von ${repo.aktionen.length})`
+                : `Registrierte Aktionen (${repo.aktionen.length})`
+            }
+            tight
+          >
+            <form method="get" action="/prozesse" className="row" style={{ padding: '10px 12px 0' }}>
+              <label className="field">
+                <span>Suche (Name, Knopf oder Bereich)</span>
+                <GroesseBehalten params={params} />
+                <input name="q" defaultValue={q} placeholder="z. B. rechnung oder lager" />
+              </label>
+              <div className="shrink field">
+                <button className="small" type="submit">Suchen</button>
+              </div>
+            </form>
+            {gesamt === 0 ? (
+              <Empty>Keine Aktion passt zu „{q}".</Empty>
+            ) : (
+              <TableWrap>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Knopf</th>
+                      <th>Bereich</th>
+                      <th>Beleg</th>
+                      <th>Statusübergang</th>
+                      <th>Felder</th>
+                      <th>Kennzeichen</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableWrap>
+                  </thead>
+                  <tbody>
+                    {aktionenSeite.map((a) => (
+                      <tr key={a.name}>
+                        <td className="mono small nowrap">{a.name}</td>
+                        <td>{a.label}</td>
+                        <td>
+                          <span className="mono-label">{a.bereich}</span>
+                        </td>
+                        <td className="mono small">
+                          {a.bindung === 'beleg' ? (a.modell ?? 'beleg') : '—'}
+                        </td>
+                        <td className="mono small nowrap">
+                          {a.uebergang
+                            ? `${a.uebergang.von.join('|') || '·'} → ${a.uebergang.nach.join('|')}`
+                            : '—'}
+                        </td>
+                        <td className="small">
+                          {a.felder.length === 0
+                            ? '—'
+                            : a.felder
+                                .map((f) => (f.pflicht ? f.name : `${f.name}?`))
+                                .join(', ')}
+                        </td>
+                        <td>
+                          <span className="actions" style={{ gap: 4 }}>
+                            {a.nurAdmin && <span className="badge warn">nur Admin</span>}
+                            {a.prozessfrei && <span className="badge neutral">prozessfrei</span>}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+            )}
+            <Seiten pfad="/prozesse" params={params} seite={seite} gesamt={gesamt} />
           </Card>
         </>
       ) : (

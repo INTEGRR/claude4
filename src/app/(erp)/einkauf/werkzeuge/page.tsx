@@ -11,6 +11,8 @@ import { money } from '@/modules/shared/format'
 import { werkzeugAnlegen } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { kurzLieferant } from '@/app/(erp)/kurzanlage'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +33,7 @@ const ANSICHTEN = [
 export default async function WerkzeugePage({
   searchParams,
 }: {
-  searchParams: Promise<{ ansicht?: string; projekt?: string; lieferant?: string }>
+  searchParams: Promise<{ ansicht?: string; projekt?: string; lieferant?: string; seite?: string; pro?: string }>
 }) {
   const user = await requireArea('einkauf')
   const darf = canWrite(user.rollen, 'einkauf', user.befugnisse)
@@ -39,6 +41,8 @@ export default async function WerkzeugePage({
   const ansicht = ANSICHTEN.find((a) => a.key === sp.ansicht) ?? ANSICHTEN[0]
   const vorProjekt = sp.projekt && UUID.test(sp.projekt) ? sp.projekt : ''
   const vorLieferant = sp.lieferant && UUID.test(sp.lieferant) ? sp.lieferant : ''
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(sp)
 
   const [rows, lieferanten, projekte, waehrungen, zeilen] = await Promise.all([
     sql<
@@ -61,9 +65,10 @@ export default async function WerkzeugePage({
         projekt_nummer: string | null
         po_id: string | null
         po_nummer: string | null
+        gesamt: number
       }[]
     >`
-      select w.id, w.nummer, w.bezeichnung, w.art, w.eigentuemer, w.status::text as status, w.schuss_zaehler,
+      select count(*) over ()::int as gesamt, w.id, w.nummer, w.bezeichnung, w.art, w.eigentuemer, w.status::text as status, w.schuss_zaehler,
              w.lebensdauer_schuss, w.kosten::float as kosten, w.waehrung,
              pa.id as partner_id, pa.name as lieferant, pt.id as template_id, pt.name as artikel,
              ep.id as projekt_id, ep.nummer as projekt_nummer, po.id as po_id, po.number as po_nummer
@@ -75,7 +80,7 @@ export default async function WerkzeugePage({
       left join purchase_orders po on po.id = l.order_id
       where w.status = any(${ansicht.filter as unknown as string[]}::werkzeug_status[])
       order by pa.name, w.nummer
-      limit 500`,
+      limit ${seite.limit} offset ${seite.offset}`,
     sql<{ id: string; name: string }[]>`select id, name from partners where is_vendor and active order by lower(name) limit 500`,
     sql<{ id: string; label: string }[]>`
       select id, nummer || ' · ' || titel as label from einkaufsprojekte
@@ -93,6 +98,7 @@ export default async function WerkzeugePage({
         and not exists (select 1 from werkzeuge w where w.purchase_order_line_id = l.id)
       order by po.created_at desc limit 50`,
   ])
+  const gesamt = gesamtAus(rows)
 
   return (
     <>
@@ -291,6 +297,7 @@ export default async function WerkzeugePage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/werkzeuge" params={sp} seite={seite} gesamt={gesamt} />
       </Card>
 
     </>

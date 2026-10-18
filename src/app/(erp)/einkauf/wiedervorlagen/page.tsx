@@ -5,6 +5,8 @@ import { ActionButton } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, dateTime } from '@/modules/shared/format'
 import { wiedervorlageErledigen } from '../posteingang/actions'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,10 +34,17 @@ const ZIEL: Record<string, { art: string; pfad: (id: string) => string }> = {
  * Lebensdauer, überfällige ETA. Fehlende Pflichtdokumente stehen im
  * Cockpit (/einkauf/cockpit).
  */
-export default async function WiedervorlagenPage({ searchParams }: { searchParams: Promise<{ alle?: string }> }) {
+export default async function WiedervorlagenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ alle?: string; seite?: string; pro?: string }>
+}) {
   const user = await requireArea('einkauf')
-  const { alle } = await searchParams
+  const params = await searchParams
+  const { alle } = params
   const nurMeine = alle !== '1'
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(params)
 
   const [offen, erledigt, regeln] = await Promise.all([
     sql<
@@ -50,9 +59,10 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
         ueberfaellig: boolean
         heute: boolean
         bezeichnung: string | null
+        gesamt: number
       }[]
     >`
-      select w.id, w.modell, w.record_id, w.faellig_am::text as faellig_am, w.grund, u.name as zustaendig,
+      select count(*) over ()::int as gesamt, w.id, w.modell, w.record_id, w.faellig_am::text as faellig_am, w.grund, u.name as zustaendig,
              w.erstellt_von, w.faellig_am < current_date as ueberfaellig, w.faellig_am = current_date as heute,
              case w.modell
                when 'mail_thread' then (select coalesce(t.betreff, '(ohne Betreff)') || coalesce(' · ' || p.name, '')
@@ -77,7 +87,7 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
       left join users u on u.id = w.zustaendig_id
       where w.erledigt_am is null and (${!nurMeine} or w.zustaendig_id = ${user.id} or w.zustaendig_id is null)
       order by w.faellig_am, w.created_at
-      limit 300`,
+      limit ${seite.limit} offset ${seite.offset}`,
     sql<{ id: string; grund: string; erledigt_am: string; erledigt_von: string | null }[]>`
       select id, grund, erledigt_am::text as erledigt_am, erledigt_von from wiedervorlagen
       where erledigt_am is not null order by erledigt_am desc limit 20`,
@@ -104,6 +114,7 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
       where (${!nurMeine} or r.zustaendig_id = ${user.id} or r.zustaendig_id is null)
       order by coalesce(r.frist, r.faellig_am), r.grund`,
   ])
+  const gesamt = gesamtAus(offen)
 
   return (
     <>
@@ -172,6 +183,7 @@ export default async function WiedervorlagenPage({ searchParams }: { searchParam
             </table>
           </TableWrap>
         )}
+        <Seiten pfad={PFAD} params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       {regeln.length > 0 && (

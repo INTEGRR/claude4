@@ -4,7 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime } from '@/modules/shared/format'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
-import { Seiten } from '@/components/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,7 +56,7 @@ function Json({
 export default async function TransaktionenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ system?: string; nur?: string; q?: string; seite?: string }>
+  searchParams: Promise<{ system?: string; nur?: string; q?: string; seite?: string; pro?: string }>
 }) {
   await requireArea('integrationen')
   const params = await searchParams
@@ -149,6 +149,7 @@ export default async function TransaktionenPage({
           <form style={{ marginLeft: 'auto' }}>
             {system && <input type="hidden" name="system" value={system} />}
             {nurFehler && <input type="hidden" name="nur" value="fehler" />}
+            <GroesseBehalten params={params} />
             <input
               type="search"
               name="q"

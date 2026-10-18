@@ -6,6 +6,8 @@ import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui
 import { date, dateTime, isoDatum, label, LABELS, plural } from '@/modules/shared/format'
 import { decideAbsence, requestAbsence } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,8 +16,15 @@ export const dynamic = 'force-dynamic'
  * Einzige, was hier eine Handlung verlangt.
  */
 
-export default async function AbwesenheitenPage() {
+export default async function AbwesenheitenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seite?: string; pro?: string }>
+}) {
   await requireArea('personal')
+  const params = await searchParams
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(params)
 
   const antraege = await sql<
     {
@@ -32,9 +41,10 @@ export default async function AbwesenheitenPage() {
       decided_at: string | null
       tage: number
       schichten: number
+      gesamt: number
     }[]
   >`
-    select a.id, a.employee_id, e.name as employee, a.kind::text,
+    select count(*) over ()::int as gesamt, a.id, a.employee_id, e.name as employee, a.kind::text,
            a.starts_on::text, a.ends_on::text, a.half_day, a.state::text,
            a.reason, a.decision_note, a.decided_at, absence_days(a.id) as tage,
            (select count(*)::int from shift_assignments s
@@ -44,21 +54,32 @@ export default async function AbwesenheitenPage() {
     from absences a
     join employees e on e.id = a.employee_id
     order by (a.state = 'requested') desc, a.starts_on desc
-    limit 100`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(antraege)
+
+  // Kennzahlen über alle Anträge, nicht nur die gezeigte Seite.
+  const heuteIso = isoDatum(new Date())
+  const [kennzahlen] = await sql<
+    { offen: number; heute: number; urlaubstage: number; kollision: boolean }[]
+  >`
+    select count(*) filter (where a.state = 'requested')::int as offen,
+           count(*) filter (where a.state = 'approved'
+                              and a.starts_on <= ${heuteIso}::date
+                              and a.ends_on >= ${heuteIso}::date)::int as heute,
+           coalesce(sum(absence_days(a.id)) filter (where a.state = 'approved' and a.kind = 'vacation'), 0)::float8 as urlaubstage,
+           coalesce(bool_or(a.state = 'requested' and exists (
+             select 1 from shift_assignments s
+              where s.employee_id = a.employee_id and s.state <> 'cancel'
+                and s.starts_at < (a.ends_on + 1)::timestamptz
+                and s.ends_at > a.starts_on::timestamptz)), false) as kollision
+    from absences a`
 
   const mitarbeiter = await sql<{ id: string; name: string }[]>`
     select id, name from employees where active order by name`
 
-  const offen = antraege.filter((a) => a.state === 'requested')
-  const heute = antraege.filter(
-    (a) =>
-      a.state === 'approved' &&
-      a.starts_on <= isoDatum(new Date()) &&
-      a.ends_on >= isoDatum(new Date()),
-  )
-  const urlaubstage = antraege
-    .filter((a) => a.state === 'approved' && a.kind === 'vacation')
-    .reduce((s, a) => s + Number(a.tage), 0)
+  const offen = Number(kennzahlen?.offen ?? 0)
+  const heute = Number(kennzahlen?.heute ?? 0)
+  const urlaubstage = Number(kennzahlen?.urlaubstage ?? 0)
 
   return (
     <>
@@ -71,14 +92,14 @@ export default async function AbwesenheitenPage() {
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Stat
           label="Offene Anträge"
-          value={String(offen.length)}
-          hint={offen.length === 0 ? 'nichts zu entscheiden' : 'warten auf Entscheidung'}
+          value={String(offen)}
+          hint={offen === 0 ? 'nichts zu entscheiden' : 'warten auf Entscheidung'}
         />
-        <Stat label="Heute abwesend" value={String(heute.length)} hint="genehmigt und laufend" />
-        <Stat label="Genehmigte Urlaubstage" value={String(urlaubstage)} hint="im gezeigten Zeitraum" />
+        <Stat label="Heute abwesend" value={String(heute)} hint="genehmigt und laufend" />
+        <Stat label="Genehmigte Urlaubstage" value={String(urlaubstage)} hint="alle erfassten Anträge" />
       </div>
 
-      {offen.some((a) => a.schichten > 0) && (
+      {kennzahlen?.kollision && (
         <div className="notice warn">
           Bei mindestens einem offenen Antrag sind im Zeitraum bereits Schichten geplant. Die
           Genehmigung ist trotzdem möglich — der Plan muss danach aber angepasst werden, sonst
@@ -86,7 +107,7 @@ export default async function AbwesenheitenPage() {
         </div>
       )}
 
-      <Card title={`Anträge (${antraege.length})`} tight>
+      <Card title={`Anträge (${gesamt})`} tight>
         {antraege.length === 0 ? (
           <Empty>Noch keine Abwesenheit erfasst.</Empty>
         ) : (
@@ -169,6 +190,7 @@ export default async function AbwesenheitenPage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/personal/abwesenheiten" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       <Card title="Abwesenheit erfassen">

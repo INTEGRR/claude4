@@ -3,7 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
-import { Seiten } from '@/components/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,7 @@ const SPRACHEN: Record<string, string> = { de: 'Deutsch', en: 'Englisch', zh: 'C
  * zuständigem Einkäufer, offenen Bestellungen und Dateien — der Einstieg,
  * der quer über alle Projekte zeigt, was bei einem Lieferanten läuft.
  */
-export default async function LieferantenPage({ searchParams }: { searchParams: Promise<{ q?: string; seite?: string }> }) {
+export default async function LieferantenPage({ searchParams }: { searchParams: Promise<{ q?: string; seite?: string; pro?: string }> }) {
   await requireArea('einkauf')
   const params = await searchParams
   const { q = '' } = params
@@ -54,6 +54,7 @@ export default async function LieferantenPage({ searchParams }: { searchParams: 
         <form method="get" className="row" style={{ padding: '10px 12px 0' }}>
           <label className="field">
             <span>Suche (Name oder Maildomain)</span>
+            <GroesseBehalten params={params} />
             <input name="q" defaultValue={q} placeholder="z. B. gateron oder example.cn" />
           </label>
           <div className="shrink field">

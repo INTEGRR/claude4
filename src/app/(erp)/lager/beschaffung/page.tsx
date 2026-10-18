@@ -13,6 +13,8 @@ import {
   wakeOrderpoint,
 } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,8 +24,16 @@ export const dynamic = 'force-dynamic'
  * Entwurfs-Bestellung oder Fertigungsauftrag.
  */
 
-export default async function BeschaffungPage() {
+export default async function BeschaffungPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seite?: string; pro?: string }>
+}) {
   await requireArea('lager')
+  const params = await searchParams
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar) — die Vorschläge;
+  // die Regelliste darunter bleibt ganz (Schlummer-Hinweis zählt über alle).
+  const seite = seitenParameter(params)
 
   const vorschlaege = await sql<
     {
@@ -43,14 +53,18 @@ export default async function BeschaffungPage() {
       qty_empfohlen: number
       unit_price: number | null
       staffeln: { min_qty: number; netto: number }[]
+      gesamt: number
     }[]
   >`
-    select s.*,
+    select count(*) over ()::int as gesamt, s.*,
            coalesce((select json_agg(json_build_object('min_qty', st.min_qty, 'netto', st.netto)
                                      order by st.min_qty)
                      from vendor_staffeln(s.variant_id, s.vendor_id) st), '[]'::json)
              as staffeln
-    from orderpoint_suggestions() s`
+    from orderpoint_suggestions() s
+    order by s.product, s.orderpoint_id
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(vorschlaege)
 
   // Was aus früheren Klicks schon offen ist. Der offene Zulauf zählt seit
   // 0053 in die Vorschlagsrechnung (ausgeführte Vorschläge verschwinden) —
@@ -110,7 +124,7 @@ export default async function BeschaffungPage() {
         </div>
       )}
 
-      <Card title={`Beschaffungsvorschläge (${vorschlaege.length})`} tight>
+      <Card title={`Beschaffungsvorschläge (${gesamt})`} tight>
         {vorschlaege.length === 0 ? (
           <Empty>Kein Bedarf — alle Prognosen liegen über dem Mindestbestand.</Empty>
         ) : (
@@ -230,6 +244,7 @@ export default async function BeschaffungPage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/lager/beschaffung" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
       <Card title={`Meldebestand-Regeln (${regeln.length})`} tight>

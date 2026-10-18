@@ -5,6 +5,8 @@ import { canAccess } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { date, dateTime, hours, } from '@/modules/shared/format'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 import { clockByBarcode, clockToggle, stopEntry } from '../personal/actions'
 
 export const dynamic = 'force-dynamic'
@@ -14,8 +16,15 @@ export const dynamic = 'force-dynamic'
  * fertig. Der erste Scan meldet an, der zweite ab. Die Knöpfe daneben sind
  * für den Fall, dass der Ausweis mal wieder in der Jacke steckt.
  */
-export default async function ZeiterfassungPage() {
+export default async function ZeiterfassungPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seite?: string; pro?: string }>
+}) {
   const user = await requireArea('zeiterfassung')
+  const params = await searchParams
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(params)
   const sieht = (bereich: Parameters<typeof canAccess>[1]) => canAccess(user.rollen, bereich)
 
   const anwesend = await sql<
@@ -52,9 +61,10 @@ export default async function ZeiterfassungPage() {
       mo_id: string | null
       auftrag: string | null
       arbeitsgang: string | null
+      gesamt: number
     }[]
   >`
-    select t.id, t.employee_id, e.name, t.kind::text, t.started_at, t.ended_at, t.break_minutes, t.minutes,
+    select count(*) over ()::int as gesamt, t.id, t.employee_id, e.name, t.kind::text, t.started_at, t.ended_at, t.break_minutes, t.minutes,
            mo.id as mo_id, mo.number as auftrag, o.name as arbeitsgang
     from time_entries t
     join employees e on e.id = t.employee_id
@@ -62,19 +72,23 @@ export default async function ZeiterfassungPage() {
     left join manufacturing_orders mo on mo.id = o.mo_id
     where t.started_at >= date_trunc('day', now())
     order by t.started_at desc
-    limit 60`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(heute)
+
+  // Tagessummen über alle Buchungen von heute, nicht nur die gezeigte Seite.
+  const [summen] = await sql<{ anwesenheit: number; auftrag: number }[]>`
+    select coalesce(sum(t.minutes) filter (where t.kind = 'attendance'), 0)::float8 as anwesenheit,
+           coalesce(sum(t.minutes) filter (where t.kind = 'production'), 0)::float8 as auftrag
+    from time_entries t
+    where t.started_at >= date_trunc('day', now())`
 
   // Querverweise nur, wo die Rolle auch hinkommt — die Stempeluhr steht
   // auch Werkstattrollen ohne Personal- oder Fertigungsbereich offen.
   const personalLink = sieht('personal')
   const fertigungLink = sieht('fertigung')
 
-  const tagesminuten = heute
-    .filter((h) => h.kind === 'attendance')
-    .reduce((sum, h) => sum + Number(h.minutes), 0)
-  const auftragsminuten = heute
-    .filter((h) => h.kind === 'production')
-    .reduce((sum, h) => sum + Number(h.minutes), 0)
+  const tagesminuten = Number(summen?.anwesenheit ?? 0)
+  const auftragsminuten = Number(summen?.auftrag ?? 0)
 
   return (
     <>
@@ -203,7 +217,7 @@ export default async function ZeiterfassungPage() {
         )}
       </Card>
 
-      <Card title="Buchungen heute" actions={<span className="mono-label">{date(new Date())}</span>} tight>
+      <Card title={`Buchungen heute (${gesamt})`} actions={<span className="mono-label">{date(new Date())}</span>} tight>
         {heute.length === 0 ? (
           <Empty>Heute noch keine Buchung.</Empty>
         ) : (
@@ -258,6 +272,7 @@ export default async function ZeiterfassungPage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/zeiterfassung" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

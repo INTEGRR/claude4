@@ -152,7 +152,9 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   und `gesamtAus()` aus `modules/shared/seiten.ts`, in der Abfrage
   `count(*) over () as gesamt` und `limit ${seite.limit} offset
   ${seite.offset}`, unter der Tabelle `<Seiten …/>`
-  (`components/seiten.tsx`, „1–50 von 318 ‹ ›“). Filter und Zähler gehören
+  (`components/seiten.tsx`, „21–30 von 158 · Anzeigen 10 · 25 · 100 ·
+  1 … 4 5 6 … 16“; Größe als `?pro=`, Standard 25; GET-Suchformulare
+  tragen sie mit `<GroesseBehalten params={params} />` weiter). Filter und Zähler gehören
   in die Abfrage, nicht als `rows.filter` auf die Seite. Der Wächter
   `tests/seiten.test.ts` lässt neue Listen-Seiten mit `limit ≥ 100` ohne
   Helfer nicht zu (Auswahllisten `order by name/label` sind ausgenommen).

@@ -7,6 +7,8 @@ import { Schublade } from '@/components/schublade'
 import { qty } from '@/modules/shared/format'
 import { createBom } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +18,16 @@ export const dynamic = 'force-dynamic'
  * Fertigungsaufträge erhalten, stehen aber nicht mehr in der Liste
  * (Entscheidungslog 2026-09-30, „Stücklisten-Liste nur aktive").
  */
-export default async function BomListPage({ searchParams }: { searchParams: Promise<{ inaktiv?: string }> }) {
+export default async function BomListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ inaktiv?: string; seite?: string; pro?: string }>
+}) {
   await requireArea('fertigung')
-  const alle = (await searchParams).inaktiv === '1'
+  const params = await searchParams
+  const alle = params.inaktiv === '1'
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(params)
   const [{ inaktiv }] = await sql<{ inaktiv: number }[]>`select count(*)::int as inaktiv from boms where not active`
   const boms = await sql<
     {
@@ -30,9 +39,10 @@ export default async function BomListPage({ searchParams }: { searchParams: Prom
       lines: number
       filtered: number
       active: boolean
+      gesamt: number
     }[]
   >`
-    select b.id, pt.name as product,
+    select count(*) over ()::int as gesamt, b.id, pt.name as product,
            case when b.variant_id is not null then variant_display_name(b.variant_id) end as variant,
            b.qty, u.name as uom, b.active,
            (select count(*) from bom_lines l where l.bom_id = b.id)::int as lines,
@@ -43,7 +53,9 @@ export default async function BomListPage({ searchParams }: { searchParams: Prom
     join product_templates pt on pt.id = b.template_id
     join uoms u on u.id = b.uom_id
     where b.active or ${alle}
-    order by b.active desc, pt.name, b.created_at desc`
+    order by b.active desc, pt.name, b.created_at desc
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(boms)
 
   const templates = await sql<{ id: string; name: string }[]>`
     select id, name from product_templates where active and type = 'goods' order by name limit 300`
@@ -129,6 +141,7 @@ export default async function BomListPage({ searchParams }: { searchParams: Prom
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/fertigung/stuecklisten" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

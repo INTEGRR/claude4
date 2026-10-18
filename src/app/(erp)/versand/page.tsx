@@ -20,6 +20,8 @@ import {
 } from './actions'
 import { AuswahlAlle, AuswahlBereich, AuswahlBox, PackzettelLeiste } from './packzettel-auswahl'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +35,7 @@ const PRODUCTS = [
 export default async function VersandPage({
   searchParams,
 }: {
-  searchParams: Promise<{ einzel?: string; sku?: string; land?: string; produkt?: string }>
+  searchParams: Promise<{ einzel?: string; sku?: string; land?: string; produkt?: string; seite?: string; pro?: string }>
 }) {
   await requireArea('versand')
   const params = await searchParams
@@ -84,6 +86,9 @@ export default async function VersandPage({
     order by count(distinct p.id) desc, 2
     limit 30`
 
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar) — nur die
+  // Sendungshistorie; Versandbereit und „Gewichte fehlen" sind Arbeitslisten.
+  const seite = seitenParameter(params)
   const shipments = await sql<
     {
       id: string
@@ -103,9 +108,10 @@ export default async function VersandPage({
       last_event: { description?: string } | null
       last_tracking_check: string | null
       ersatz_moeglich: boolean
+      gesamt: number
     }[]
   >`
-    select s.id, s.shipment_number, s.state, s.tracking_url, s.dhl_product,
+    select count(*) over ()::int as gesamt, s.id, s.shipment_number, s.state, s.tracking_url, s.dhl_product,
            (s.label_pdf is not null or s.label_path is not null) as hat_label,
            s.created_at, p.number as picking_number, p.id as picking_id,
            r.id as repair_id, r.number as repair_number,
@@ -127,7 +133,8 @@ export default async function VersandPage({
     left join repair_orders r on r.id = s.repair_order_id
     left join partners rpart on rpart.id = r.partner_id
     order by s.created_at desc
-    limit 60`
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(shipments)
 
   const configured = dhlConfigured()
 
@@ -515,7 +522,7 @@ export default async function VersandPage({
       </Card>
       </AuswahlBereich>
 
-      <Card title="Sendungen" tight>
+      <Card title={`Sendungen (${gesamt})`} tight>
         {shipments.length === 0 ? (
           <Empty>Noch keine Sendungen.</Empty>
         ) : (
@@ -614,6 +621,7 @@ export default async function VersandPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/versand" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

@@ -9,6 +9,38 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Listen: Seitenaufteilung mit Auswahl 10 / 25 / 100
+
+**Anlass:** Nutzerwunsch „Listen brauchen Pagination und angezeigte Objekte
+10 / 25 / 100". Bisher gab es feste 50 Zeilen mit ‹ › (Eintrag
+2026-10-17), und mehrere wachsende Listen hatten noch gar keine
+Seitenaufteilung.
+
+**Entschieden:**
+- Die Seitengröße ist wählbar: 10, 25 oder 100, Standard 25. Sie steht als
+  `?pro=` in der Adresse, wie die Filter. Fremde Werte fallen auf 25 zurück.
+- Unter der Liste stehen „21–30 von 158", „Anzeigen 10 · 25 · 100" und
+  die Seitenzahlen mit Lücken (1 … 4 5 6 … 16).
+- Die Leiste erscheint erst ab mehr als 10 Einträgen.
+- Die Größe bleibt beim Blättern und Filtern erhalten. GET-Suchformulare
+  tragen sie über `<GroesseBehalten>` mit.
+- Nachgerüstet wurden Stücklisten, Demontage, Werkzeuge, Wiedervorlagen,
+  Kurshistorie, Posteingang, Abwesenheiten, Zeiterfassung (Buchungen
+  heute), Versand (Sendungen), Beschaffung (Vorschläge), Steuertermine,
+  Bestandsbewertung (je Variante) sowie Prozesse → Aktionen, diese mit
+  neuer Suche.
+- Kennzahlen und Summen, die zuvor über die geladenen Zeilen liefen, rechnen
+  jetzt über alle Daten (Abwesenheiten, Zeiterfassung, Bewertung).
+- Bezahlte Steuertermine zeigen die neuesten zuerst.
+- **Bewusst ohne Seiten:** Arbeitswarteschlangen (Versandbereit, Gewichte
+  fehlen, Meldebestand-Regeln), kurze Stammdaten- und Einstellungstabellen,
+  Verträge (die Kacheln brauchen alle Zeilen) und die Shop-Verfügbarkeit
+  (Projektübersicht, keine Liste).
+
+**Umgesetzt:** `modules/shared/seiten.ts` (`SEITE_GROESSEN`,
+`groesseHref`, `seitenZahlen`), `components/seiten.tsx`; Wächter und
+Tests in `tests/seiten.test.ts`; Konvention in docs/entwicklung.md.
+
 ## 2026-10-18 — Paket U6: Tabellen als Karten am Handy, Kopfleiste dreizeilig
 
 **Anlass:** UX-Audit M17 (m07#1, m01#2/#3, m04#1, m08#2, m10#2/#3):

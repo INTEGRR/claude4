@@ -465,8 +465,14 @@ td.mono { font-size: 12.5px; letter-spacing: 0.02em; }
 .empty { padding: 34px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
 
 /* Seitenleiste unter Listen (F3): Zähler links, Blättern rechts. */
-.seiten { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.seiten { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 10px 12px; border-top: 1px solid var(--border); }
 .seiten .btn.disabled { opacity: 0.4; pointer-events: none; }
+.seiten-info, .seiten-groesse, .seiten-blaettern { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.seiten-info { gap: 16px; color: var(--text-2); }
+.seiten .btn.small { min-width: 32px; justify-content: center; font-variant-numeric: tabular-nums; }
+/* Aktuelle Seite und Größe: dasselbe dunkle Schild wie aktive Filter. */
+.seiten .btn[aria-current] { background: var(--text); border-color: var(--text); color: var(--surface); font-weight: 550; }
+.seiten-luecke { color: var(--text-muted); padding: 0 2px; }
 
 /* --- Status ---------------------------------------------------------------- */
 /* Rechteckig statt Pille: Typenschild, nicht Bonbon. */

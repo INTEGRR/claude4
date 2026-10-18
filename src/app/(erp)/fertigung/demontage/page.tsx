@@ -6,11 +6,16 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { dateTime, qty } from '@/modules/shared/format'
 import { applyUnbuild, createUnbuild } from '../actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DemontagePage() {
+export default async function DemontagePage({ searchParams }: { searchParams: Promise<{ seite?: string; pro?: string }> }) {
   await requireArea('fertigung')
+  const params = await searchParams
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(params)
   const orders = await sql<
     {
       id: string
@@ -23,14 +28,17 @@ export default async function DemontagePage() {
       state: string
       created_at: string
       on_hand: number
+      gesamt: number
     }[]
   >`
-    select u.id, u.number, variant_display_name(u.variant_id) as product, u.variant_id,
+    select count(*) over ()::int as gesamt, u.id, u.number, variant_display_name(u.variant_id) as product, u.variant_id,
            u.mo_id, mo.number as mo_number, u.qty, u.state,
            u.created_at, on_hand_qty(u.variant_id, u.src_location_id) as on_hand
     from unbuild_orders u
     left join manufacturing_orders mo on mo.id = u.mo_id
-    order by u.created_at desc limit 60`
+    order by u.created_at desc
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(orders)
 
   const products = await sql<{ id: string; label: string; on_hand: number }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) as label, on_hand_qty(pv.id) as on_hand
@@ -150,6 +158,7 @@ export default async function DemontagePage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/fertigung/demontage" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

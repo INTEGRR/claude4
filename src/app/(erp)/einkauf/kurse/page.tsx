@@ -6,6 +6,8 @@ import { date, isoDatum, kurs, plural } from '@/modules/shared/format'
 import { setExchangeRate } from '../actions'
 import { ezbKurseHolen } from '../projekte/actions'
 import { Auswahl } from '@/components/auswahl'
+import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,17 +16,22 @@ export const dynamic = 'force-dynamic'
  * Bestellung wird der dann gültige Kurs eingefroren — spätere Kursänderungen
  * verändern bereits gebuchte Einstände nicht mehr.
  */
-export default async function KursePage() {
+export default async function KursePage({ searchParams }: { searchParams: Promise<{ seite?: string; pro?: string }> }) {
   await requireArea('einkauf')
+  const params = await searchParams
+  // Seitenaufteilung (F3, 2026-10-18: 10/25/100 wählbar).
+  const seite = seitenParameter(params)
 
   const currencies = await sql<{ code: string; name: string }[]>`
     select code, name from currencies where active and code <> 'EUR' order by code`
 
   const kurse = await sql<
-    { id: string; currency: string; rate: number; valid_from: string; source: string | null }[]
+    { id: string; currency: string; rate: number; valid_from: string; source: string | null; gesamt: number }[]
   >`
-    select id, currency, rate, valid_from::text, source
-    from exchange_rates order by currency, valid_from desc limit 100`
+    select count(*) over ()::int as gesamt, id, currency, rate, valid_from::text, source
+    from exchange_rates order by currency, valid_from desc
+    limit ${seite.limit} offset ${seite.offset}`
+  const gesamt = gesamtAus(kurse)
 
   const aktuell = await sql<{ currency: string; rate: number | null; offene: number }[]>`
     select c.code as currency, exchange_rate_kurs(c.code) as rate,
@@ -98,7 +105,7 @@ export default async function KursePage() {
         </ActionForm>
       </Card>
 
-      <Card title={`Kurshistorie (${kurse.length})`} tight>
+      <Card title={`Kurshistorie (${gesamt})`} tight>
         {kurse.length === 0 ? (
           <Empty>Noch keine Kurse erfasst — Einkäufe in Fremdwährung werden 1:1 umgerechnet.</Empty>
         ) : (
@@ -125,6 +132,7 @@ export default async function KursePage() {
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/einkauf/kurse" params={params} seite={seite} gesamt={gesamt} />
       </Card>
     </>
   )

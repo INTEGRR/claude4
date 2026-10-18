@@ -2,7 +2,7 @@ import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { gesamtAus, seitenHref, seitenParameter, seitenText } from '../src/modules/shared/seiten.ts'
+import { gesamtAus, groesseHref, seitenHref, seitenParameter, seitenText, seitenZahlen } from '../src/modules/shared/seiten.ts'
 
 /**
  * Seitenaufteilung (F3, Entscheidungslog 2026-10-17). Die Logik-Tests sichern
@@ -13,8 +13,8 @@ import { gesamtAus, seitenHref, seitenParameter, seitenText } from '../src/modul
 
 describe('Seitenaufteilung — Logik', () => {
   test('seitenParameter: 1-basiert, Unsinn wird Seite 1', () => {
-    assert.deepEqual(seitenParameter({}), { seite: 1, groesse: 50, limit: 50, offset: 0 })
-    assert.deepEqual(seitenParameter({ seite: '3' }), { seite: 3, groesse: 50, limit: 50, offset: 100 })
+    assert.deepEqual(seitenParameter({}), { seite: 1, groesse: 25, limit: 25, offset: 0 })
+    assert.deepEqual(seitenParameter({ seite: '3' }), { seite: 3, groesse: 25, limit: 25, offset: 50 })
     assert.equal(seitenParameter({ seite: '-2' }).seite, 1)
     assert.equal(seitenParameter({ seite: 'abc' }).seite, 1)
     assert.equal(seitenParameter({ seite: ['2', '5'] }).seite, 2)
@@ -26,9 +26,27 @@ describe('Seitenaufteilung — Logik', () => {
     assert.equal(seitenHref('/verkauf', { q: '' }, 1), '/verkauf')
   })
 
-  test('seitenText: „1–50 von 318", nichts bei einer Seite', () => {
-    assert.equal(seitenText(seitenParameter({}), 318), '1–50 von 318')
-    assert.equal(seitenText(seitenParameter({ seite: '7' }), 318), '301–318 von 318')
+  test('Seitengröße wählbar: 10, 25, 100 — sonst der Standard', () => {
+    assert.deepEqual(seitenParameter({ pro: '100', seite: '2' }), { seite: 2, groesse: 100, limit: 100, offset: 100 })
+    assert.equal(seitenParameter({ pro: '10' }).groesse, 10)
+    assert.equal(seitenParameter({ pro: '37' }).groesse, 25, 'nur die angebotenen Größen')
+    assert.equal(seitenParameter({ pro: ['100', '10'] }).groesse, 100)
+    assert.equal(groesseHref('/verkauf', { status: 'sale', seite: '4', pro: '10' }, 100), '/verkauf?status=sale&pro=100')
+    assert.equal(groesseHref('/verkauf', { status: 'sale', pro: '10' }, 25), '/verkauf?status=sale', 'Standard ohne Parameter, zurück auf Seite 1')
+    assert.equal(seitenHref('/verkauf', { pro: '100', seite: '1' }, 2), '/verkauf?pro=100&seite=2', 'Größe bleibt beim Blättern')
+  })
+
+  test('Seitenzahlen mit Auslassung', () => {
+    assert.deepEqual(seitenZahlen(1, 1), [1])
+    assert.deepEqual(seitenZahlen(5, 13), [1, '…', 4, 5, 6, '…', 13])
+    assert.deepEqual(seitenZahlen(1, 13), [1, 2, '…', 13])
+    assert.deepEqual(seitenZahlen(3, 13), [1, 2, 3, 4, '…', 13], 'eine einzelne Lücke wird zur Zahl')
+    assert.deepEqual(seitenZahlen(13, 13), [1, '…', 12, 13])
+  })
+
+  test('seitenText: „1–25 von 318", nichts bei einer Seite', () => {
+    assert.equal(seitenText(seitenParameter({}), 318), '1–25 von 318')
+    assert.equal(seitenText(seitenParameter({ seite: '13' }), 318), '301–318 von 318')
     assert.equal(seitenText(seitenParameter({}), 12), null)
     assert.equal(seitenText(seitenParameter({ seite: '9' }), 0), 'Seite 9 ist leer')
     assert.equal(gesamtAus([{ gesamt: '318' }]), 318)
@@ -49,15 +67,10 @@ describe('Seitenaufteilung — Wächter', () => {
       ['(erp)/sprechen/page.tsx', 'Sprachprotokoll der letzten Läufe (Diagnose), bewusst die jüngsten'],
       ['(erp)/lager/inventur/page.tsx', 'Zählliste der offenen Inventur, wird abgearbeitet'],
       ['(erp)/einkauf/datev/page.tsx', 'DATEV-Vorbereitung eines Zeitraums (auf Hold), Export braucht alle'],
-      ['(erp)/einkauf/werkzeuge/page.tsx', 'Werkzeugliste, wenige Dutzend je Firma'],
       ['(erp)/einkauf/werkzeuge/[id]/page.tsx', 'Detailseite: Auswahllisten und letzte Schüsse'],
-      ['(erp)/einkauf/wiedervorlagen/page.tsx', 'Arbeitsliste fälliger Wiedervorlagen, wird abgearbeitet'],
-      ['(erp)/einkauf/posteingang/page.tsx', 'Arbeitsliste offener Threads, wird abgearbeitet'],
       ['(erp)/einkauf/posteingang/[id]/page.tsx', 'Detailseite: Nachrichten eines Threads'],
       ['(erp)/einkauf/sendungen/[id]/page.tsx', 'Detailseite: Auswahl offener Bestellungen'],
       ['(erp)/einkauf/lieferanten/[id]/page.tsx', 'Detailseite: Preisliste eines Lieferanten'],
-      ['(erp)/einkauf/kurse/page.tsx', 'Kurshistorie, je Währung wenige Einträge'],
-      ['(erp)/personal/abwesenheiten/page.tsx', 'Anträge eines Zeitraums, kurz'],
       ['(erp)/p/[prozess]/page.tsx', 'Assistenten-Läufe eines Prozesses, jüngste zuerst'],
     ])
     const dateien = (pfad: string): string[] =>

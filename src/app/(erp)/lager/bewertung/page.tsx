@@ -6,6 +6,8 @@ import { ShareBar } from '@/components/charts'
 import { ActionButton } from '@/components/action-button'
 import { initializeValuation } from '../actions'
 import { dateTime, money, plural, qty } from '@/modules/shared/format'
+import { seitenParameter } from '@/modules/shared/seiten'
+import { Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,10 +28,14 @@ const LAYER_LABEL: Record<string, string> = {
 export default async function BewertungPage({
   searchParams,
 }: {
-  searchParams: Promise<{ variante?: string }>
+  searchParams: Promise<{ variante?: string; seite?: string; pro?: string }>
 }) {
   await requireArea('lager')
-  const { variante } = await searchParams
+  const params = await searchParams
+  const { variante } = params
+  // Seitenaufteilung (2026-10-18) in TS: Summe, Wertanteile und Abweichungen
+  // brauchen ohnehin alle Varianten, die Tabelle zeigt nur die Seite.
+  const seite = seitenParameter(params)
 
   const bestand = await sql<
     {
@@ -151,7 +157,7 @@ export default async function BewertungPage({
                 </tr>
               </thead>
               <tbody>
-                {bestand.map((b) => (
+                {bestand.slice(seite.offset, seite.offset + seite.limit).map((b) => (
                   <tr key={b.variant_id}>
                     <td>
                       <Link href={`/produkte/variante/${b.variant_id}`}>{b.product}</Link>
@@ -186,6 +192,7 @@ export default async function BewertungPage({
             </table>
           </TableWrap>
         )}
+        <Seiten pfad="/lager/bewertung" params={params} seite={seite} gesamt={bestand.length} />
       </Card>
 
       <Card

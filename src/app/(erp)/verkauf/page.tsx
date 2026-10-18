@@ -4,7 +4,7 @@ import { sql } from '@/db/client'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { date, money } from '@/modules/shared/format'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
-import { Seiten } from '@/components/seiten'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +42,7 @@ function lieferungHref(r: Row): string | undefined {
 export default async function VerkaufPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; seite?: string }>
+  searchParams: Promise<{ status?: string; q?: string; seite?: string; pro?: string }>
 }) {
   await requireArea('verkauf')
   const params = await searchParams
@@ -125,6 +125,7 @@ export default async function VerkaufPage({
           ))}
           <form className="actions" style={{ marginLeft: 'auto', gap: 6 }}>
             <span className="mono-label">Suche</span>
+            <GroesseBehalten params={params} />
             <input
               type="search"
               name="q"
