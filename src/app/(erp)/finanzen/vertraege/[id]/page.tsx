@@ -286,6 +286,8 @@ export default async function VertragSeite({ params }: { params: Promise<{ id: s
       </Card>
 
       <RecordComments model="vertrag" recordId={id} path={`/finanzen/vertraege/${id}`} />
+
+      <ProzessPanel prozessCode="vertrag_fixkosten" recordId={id} rolle={user.rollen} nurDiagramm />
     </>
   )
 }

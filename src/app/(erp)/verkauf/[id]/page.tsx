@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { MehrMenue } from '@/components/mehr-menue'
+import { Statusleiste } from '@/components/statusleiste'
 import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { TagEditor } from '@/components/tag-editor'
@@ -199,6 +201,32 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     order by label limit 500`
 
   const editable = order.state !== 'cancel' && !order.locked
+  // Statusleiste (2026-10-18, M1): Belegzustände aus dem Prozess „verkauf",
+  // dazu Lieferung und Rechnung als Folgestufen — sie haben keinen eigenen
+  // Zustand am Auftrag, stehen aber für den Kunden im Mittelpunkt.
+  const mengeGesamt = lines.reduce((sum, l) => sum + Number(l.qty), 0)
+  const mengeGeliefert = lines.reduce((sum, l) => sum + Math.min(Number(l.qty_delivered), Number(l.qty)), 0)
+  const gueltigeRechnungen = rechnungen.filter((r) => r.art === 'rechnung' && r.status !== 'storniert')
+  const folgestufen =
+    order.state === 'sale' || order.state === 'done'
+      ? [
+          {
+            name: 'Geliefert',
+            stand: (order.delivery_status === 'full' ? 'erledigt' : order.delivery_status === 'pending' ? 'offen' : 'aktuell') as
+              'erledigt' | 'aktuell' | 'offen',
+          },
+          {
+            name: 'Berechnet',
+            // Nur eine Stufe ist aktuell: berechnet wird mit der Lieferung —
+            // erst nach der letzten Lieferung ist „Berechnet" dran bzw. fertig.
+            stand: (order.delivery_status !== 'full'
+              ? 'offen'
+              : gueltigeRechnungen.length > 0
+                ? 'erledigt'
+                : 'aktuell') as 'erledigt' | 'aktuell' | 'offen',
+          },
+        ]
+      : []
   // Option (c), 0129: Positionen ändert bei Shop-Aufträgen Shopify, bei B2B nur bis zur ersten Lieferung.
   const [{ grund: positionenGrund }] = await sql<{ grund: string | null }[]>`
     select sales_order_positionen_aenderbar(${id}) as grund`
@@ -258,7 +286,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         }
         actions={
           <>
-            <Badge state={order.state} kind="sale" />
             {/* Sperre: Leuchte plus Wort statt grauem Chip. */}
             {order.locked && (
               <span className="actions nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}>
@@ -271,12 +298,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 Bestätigen
               </ActionButton>
             )}
-            {order.state === 'sale' &&
-              (order.locked ? (
-                <ActionButton action={setLocked.bind(null, id, false)}>Entsperren</ActionButton>
-              ) : (
-                <ActionButton action={setLocked.bind(null, id, true)}>Sperren</ActionButton>
-              ))}
+            {order.state === 'sale' && order.locked && (
+              <ActionButton action={setLocked.bind(null, id, false)}>Entsperren</ActionButton>
+            )}
             {/* Retoure (0119): gelieferte Shop-Ware zurücknehmen — Erstattung bleibt im Shop. */}
             {shopAuftrag && ['partial', 'full'].includes(order.delivery_status) && Number(retoureRest) > 0 && (
               <Link className="btn" href={`/versand/retouren/neu?auftrag=${id}`}>Retoure anlegen</Link>
@@ -286,39 +310,59 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 {r.nummer}
               </Link>
             ))}
-            {/* Storno führt Shopify (2026-10-02): Shop-Aufträge werden im
-                Shopify-Admin storniert (mit Erstattung); der Webhook storniert
-                hier samt Lieferung, Fertigung und Label. */}
-            {order.state !== 'cancel' && shopAuftrag && (
-              shopUrl ? (
-                <a
-                  className="btn danger"
-                  href={shopUrl}
-                  target="_blank"
-                  rel="noopener"
-                  title="Storno und Erstattung im Shopify-Admin — KRNL storniert den Auftrag dann automatisch samt Lieferung, Fertigung und DHL-Label"
-                >
-                  In Shopify stornieren ↗
-                </a>
-              ) : (
-                <span className="muted small" title="SHOPIFY_SHOP_DOMAIN fehlt — deshalb kein Link">
-                  Storno in Shopify
-                </span>
-              )
-            )}
-            {order.state !== 'cancel' && !shopAuftrag && (
-              <ActionButton
-                className="danger"
-                action={cancelOrder.bind(null, id)}
-                confirm="Auftrag wirklich stornieren? Offene Lieferungen, nicht begonnene Fertigung und DHL-Labels werden storniert."
-              >
-                Stornieren
-              </ActionButton>
-            )}
-            {!shopAuftrag && (order.state === 'cancel' || order.state === 'sent') && (
-              <ActionButton action={resetToDraft.bind(null, id)}>Auf Angebot zurücksetzen</ActionButton>
+            {/* Seltenes und Zerstörendes im ⋯-Menü (2026-10-18, M5). Storno
+                führt bei Shop-Aufträgen Shopify (2026-10-02): im Shopify-Admin
+                stornieren (mit Erstattung); der Webhook storniert hier samt
+                Lieferung, Fertigung und Label. */}
+            {(order.state !== 'cancel' || !shopAuftrag) && (
+              <MehrMenue>
+                {order.state === 'sale' && !order.locked && (
+                  <ActionButton action={setLocked.bind(null, id, true)}>Auftrag sperren</ActionButton>
+                )}
+                {!shopAuftrag && (order.state === 'cancel' || order.state === 'sent') && (
+                  <ActionButton action={resetToDraft.bind(null, id)}>Auf Angebot zurücksetzen</ActionButton>
+                )}
+                {order.state !== 'cancel' && shopAuftrag && (
+                  shopUrl ? (
+                    <a
+                      className="btn danger"
+                      href={shopUrl}
+                      target="_blank"
+                      rel="noopener"
+                      title="Storno und Erstattung im Shopify-Admin — KRNL storniert den Auftrag dann automatisch samt Lieferung, Fertigung und DHL-Label"
+                    >
+                      In Shopify stornieren ↗
+                    </a>
+                  ) : (
+                    <span className="muted small" title="SHOPIFY_SHOP_DOMAIN fehlt — deshalb kein Link">
+                      Storno in Shopify
+                    </span>
+                  )
+                )}
+                {order.state !== 'cancel' && !shopAuftrag && (
+                  <ActionButton
+                    className="danger"
+                    action={cancelOrder.bind(null, id)}
+                    confirm="Auftrag wirklich stornieren? Offene Lieferungen, nicht begonnene Fertigung und DHL-Labels werden storniert."
+                  >
+                    Stornieren …
+                  </ActionButton>
+                )}
+              </MehrMenue>
             )}
           </>
+        }
+      />
+
+      <Statusleiste
+        prozessCode="verkauf"
+        art="sale"
+        zustand={order.state}
+        danach={folgestufen}
+        hinweis={
+          order.delivery_status === 'partial' || order.delivery_status === 'started'
+            ? `${qty(mengeGeliefert)} von ${qty(mengeGesamt)} Stück geliefert — der Rest folgt mit der offenen Lieferung.`
+            : undefined
         }
       />
 

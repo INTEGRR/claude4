@@ -1,6 +1,7 @@
 import { sql } from '@/db/client'
-import { Card } from '@/components/ui'
 import { ProzessFlow } from '@/components/prozess-flow'
+import { Statusleiste } from '@/components/statusleiste'
+import type { LabelArt } from '@/modules/shared/format'
 import type { FlowKante, FlowSchritt } from '@/modules/prozesse/flow-daten'
 import { flowLayout } from '@/modules/prozesse/flow-layout'
 import { naechsteAngebote } from '@/modules/prozesse/angebote'
@@ -8,9 +9,13 @@ import type { Rollen } from '@/modules/auth/permissions'
 import { ProzessAktionen } from '@/components/prozess-aktionen'
 
 /**
- * Prozess-Panel einer Belegseite: wo steht der Beleg (Diagramm), und welche
- * Schritte sind JETZT möglich — aus der Prozessdefinition, den Overrides und
- * der Rolle des Betrachters, nicht aus verstreuten if-Bedingungen der Seite.
+ * Prozess-Panel einer Belegseite: wo steht der Beleg, und welche Schritte
+ * sind JETZT möglich — aus der Prozessdefinition, den Overrides und der
+ * Rolle des Betrachters, nicht aus verstreuten if-Bedingungen der Seite.
+ *
+ * Seit 2026-10-18 (UX-Audit M1–M3): oben die Statusleiste mit den nächsten
+ * Schritten (empfohlener zuerst, Abbruch im ⋯-Menü); das Diagramm steht
+ * mit `nurDiagramm` eingeklappt am Ende der Seite („Ablauf").
  *
  * Seit Phase 4 aktiv: die möglichen Schritte sind Tasten mit GENERIERTEN
  * Formularen aus den Registry-Schemas; ausgeführt wird über /api/aktion —
@@ -24,6 +29,7 @@ export async function ProzessPanel({
   befugnisse = [],
   nurDiagramm = false,
   sofortOffen,
+  art,
 }: {
   prozessCode: string
   recordId: string
@@ -41,6 +47,8 @@ export async function ProzessPanel({
    * Scan am Wareneingang: die Seite öffnet direkt „Gerät eingegangen".
    */
   sofortOffen?: string
+  /** Belegart der Zustandstabelle — beschriftet die Stufen der Statusleiste. */
+  art?: LabelArt
 }) {
   const [prozess] = await sql<{ id: string; name: string; beschreibung: string | null }[]>`
     select id, name, beschreibung from prozesse where code = ${prozessCode} and aktiv`
@@ -68,35 +76,41 @@ export async function ProzessPanel({
   const [standort] = await sql<{ schritt: string | null }[]>`
     select prozess_aktueller_schritt(${prozessCode}, ${recordId}) as schritt`
 
-  // Fortschritt der Teilprozesse — nur mit Beleg sinnvoll.
-  for (const s of schritte) {
-    if (s.art !== 'prozess' || !s.teilprozess) continue
-    const [stand] = await sql<{ gesamt: number; fertig: number }[]>`
-      select gesamt, fertig from teilprozess_stand(
-        ${s.teilprozess},
-        ${s.teilprozess_link ? sql.json(s.teilprozess_link as never) : null},
-        (select modell from prozesse where code = ${prozessCode}), ${recordId})`
-    s.teilprozessStand = { gesamt: Number(stand.gesamt), fertig: Number(stand.fertig) }
-  }
-
-  const diagramm = await flowLayout(schritte, kanten, standort?.schritt)
 
   if (nurDiagramm) {
+    // Fortschritt der Teilprozesse — nur mit Beleg sinnvoll.
+    for (const s of schritte) {
+      if (s.art !== 'prozess' || !s.teilprozess) continue
+      const [stand] = await sql<{ gesamt: number; fertig: number }[]>`
+        select gesamt, fertig from teilprozess_stand(
+          ${s.teilprozess},
+          ${s.teilprozess_link ? sql.json(s.teilprozess_link as never) : null},
+          (select modell from prozesse where code = ${prozessCode}), ${recordId})`
+      s.teilprozessStand = { gesamt: Number(stand.gesamt), fertig: Number(stand.fertig) }
+    }
+
+    const diagramm = await flowLayout(schritte, kanten, standort?.schritt)
+    const aktuell = schritte.find((x) => x.code === standort?.schritt)
     return (
-      <Card title={`Prozess: ${prozess.name}`}>
-        <ProzessFlow d={diagramm} />
-      </Card>
+      <details className="card ablauf">
+        <summary>
+          <span>Ablauf „{prozess.name}"{aktuell ? ` — Stand: ${aktuell.name}` : ''}</span>
+          <span className="ablauf-umschalter">ein-/ausblenden</span>
+        </summary>
+        <div className="ablauf-inhalt">
+          <ProzessFlow d={diagramm} />
+        </div>
+      </details>
     )
   }
 
   const { angebote, passiv } = await naechsteAngebote(prozessCode, recordId, rolle, befugnisse)
+  const zustand = schritte.find((x) => x.code === standort?.schritt)?.zustand ?? null
 
   return (
-    <Card title={`Prozess: ${prozess.name}`}>
-      <ProzessFlow d={diagramm} />
-      <div style={{ marginTop: 10 }}>
-        <span className="mono-label">Als Nächstes möglich</span>
-        <div style={{ marginTop: 6 }}>
+    <Statusleiste prozessCode={prozessCode} art={art} zustand={zustand}>
+      <div>
+        <div>
           {angebote.length === 0 && passiv.length === 0 ? (
             <span className="muted small">Nichts — der Prozess ist am Ende oder wartet.</span>
           ) : (
@@ -121,6 +135,6 @@ export async function ProzessPanel({
           )}
         </div>
       </div>
-    </Card>
+    </Statusleiste>
   )
 }

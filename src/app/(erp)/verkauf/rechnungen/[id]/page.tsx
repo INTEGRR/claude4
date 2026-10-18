@@ -6,6 +6,7 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Auswahl } from '@/components/auswahl'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { Statusleiste } from '@/components/statusleiste'
 import { RecordComments } from '@/components/record-comments'
 import { date, isoDatum, money, qty } from '@/modules/shared/format'
 import { zahlungStornieren } from '../../../finanzen/actions'
@@ -138,7 +139,6 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
         }
         actions={
           <>
-            <Badge state={k.status} kind="kundenrechnung" />
             <a className="btn" href={`/api/verkauf/rechnung/${k.id}`} target="_blank" rel="noreferrer">
               PDF
             </a>
@@ -160,6 +160,8 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
           </>
         }
       />
+
+      <Statusleiste prozessCode="kundenrechnung" art="kundenrechnung" zustand={k.status} />
 
       <div className="tiles" style={{ marginBottom: 12 }}>
         <div className="display-panel">

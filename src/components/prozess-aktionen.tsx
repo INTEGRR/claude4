@@ -1,6 +1,6 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { FeldEingabe } from '@/components/feld-eingabe'
 import type { FormularFeld } from '@/modules/prozesse/schema-felder'
 
@@ -28,6 +28,8 @@ export interface SchrittAngebot {
   /** Verlangte Befugnis (z. B. einkauf:freigabe) — der Schritt ist eine
       Entscheidung und trägt den violetten Akzent. */
   befugnis?: string
+  /** Abbruch-Weg (führt in Storno/Ablehnung) — steht im ⋯-Menü, nicht neben dem nächsten Schritt. */
+  abbruch?: boolean
 }
 
 function eingabeWert(feld: FormularFeld, roh: FormDataEntryValue | null): unknown {
@@ -127,24 +129,58 @@ export function ProzessAktionen({
   }
 
   const geoeffnet = schritte.find((s) => s.code === offen)
+  // Gewichtung (2026-10-18, UX-Audit M3/M5): der erste erlaubte Schritt des
+  // regulären Wegs ist der empfohlene (Primärtaste; eine Entscheidung mit
+  // Befugnis violett), Sonderwege bleiben normale Tasten, Abbruch-Wege
+  // (Storno, Ablehnen) liegen im ⋯-Menü.
+  const regulaer = schritte.filter((s) => !s.abbruch)
+  const abbruch = schritte.filter((s) => s.abbruch)
+  const empfohlen = regulaer.find((s) => s.erlaubt)
+  const menue = useRef<HTMLDetailsElement>(null)
 
   return (
     <div>
       <div className="actions" style={{ flexWrap: 'wrap', gap: 6 }}>
-        {schritte.map((s) => (
-          <button
-            key={s.code}
-            type="button"
-            className={`small ${offen === s.code ? (s.befugnis ? 'wichtig' : 'primary') : ''}`}
-            disabled={!s.erlaubt || pending}
-            title={s.hinweis ?? s.aktionsName}
-            onClick={() => klick(s)}
-          >
-            {s.befugnis && offen !== s.code && <span className="led wichtig" />}
-            {s.name}
-            {!s.erlaubt && ' 🔒'}
-          </button>
-        ))}
+        {regulaer.map((s) => {
+          const betont = offen === s.code || (offen === null && s === empfohlen)
+          return (
+            <button
+              key={s.code}
+              type="button"
+              className={betont ? (s.befugnis ? 'wichtig' : 'primary') : ''}
+              disabled={!s.erlaubt || pending}
+              title={s.hinweis ?? s.aktionsName}
+              onClick={() => klick(s)}
+            >
+              {s.befugnis && !betont && <span className="led wichtig" />}
+              {s.name}
+              {!s.erlaubt && ' 🔒'}
+            </button>
+          )
+        })}
+        {abbruch.length > 0 && (
+          <details className="mehr-menue" ref={menue}>
+            <summary className="btn" aria-label="Weitere Schritte" title="Weitere Schritte">⋯</summary>
+            <div className="mehr-menue-liste">
+              {abbruch.map((s) => (
+                <button
+                  key={s.code}
+                  type="button"
+                  className="danger"
+                  disabled={!s.erlaubt || pending}
+                  title={s.hinweis ?? s.aktionsName}
+                  onClick={() => {
+                    if (menue.current) menue.current.open = false
+                    klick(s)
+                  }}
+                >
+                  {s.name}
+                  {!s.erlaubt && ' 🔒'}
+                </button>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {geoeffnet && (

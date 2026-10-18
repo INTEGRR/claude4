@@ -101,9 +101,21 @@ src/components/prozess-diagramm.tsx       SVG (Server Component): Kreis Start/En
                                           Rechteck Aktion, Raute XOR; aktueller
                                           Schritt mit Akzent + LED, Erledigtes
                                           gedimmt + Häkchen, Abgeschaltetes gestrichelt
-src/components/prozess-panel.tsx          Diagramm + „Als Nächstes möglich"
-                                          (prozess_naechste_schritte × Rolle)
+src/components/prozess-panel.tsx          Statusleiste + „Als Nächstes möglich"
+                                          (prozess_naechste_schritte × Rolle);
+                                          nurDiagramm = eingeklappter „Ablauf"
+src/components/statusleiste.tsx           Stufen aus der aktiven Version (2026-10-18)
+src/modules/prozesse/statusleiste.ts      pur: Hauptpfad, Stand, Abbruch, Folgestufen
+src/components/mehr-menue.tsx             ⋯-Menü für Seltenes und Zerstörendes
 ```
+
+**Beleg-Kopf seit 2026-10-18 (Layout-Umbau U3):** oben die Statusleiste —
+die Stufen sind die nicht optionalen Schritte mit Zustand (nach `sequence`,
+ohne Abbruch-Zustände), der Belegstatus markiert die aktuelle Stufe. Rechts
+die nächsten Schritte: der erste erlaubte reguläre ist primär, Abbruch-Wege
+(Storno, Ablehnen) stehen im ⋯-Menü. Das Diagramm steht eingeklappt als
+„Ablauf" am Seitenende. Wer einen Prozess umbaut, ändert damit auch die
+Leiste — Chamäleon bis in den Kopf der Belegseite.
 
 Eingebaut auf `/tickets/[id]` und `/reparatur/[id]`: der Beleg zeigt, wo er
 im Prozess steht und was jetzt möglich ist. Die Reparatur ist dafür komplett

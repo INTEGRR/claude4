@@ -261,20 +261,15 @@ export default async function VorgangDetail({
       <RecordComments model="vorgang" recordId={v.id} path={`/vorgaenge/${v.id}`} />
 
       {/* Der Ablaufplan ist Kontext, nicht Inhalt: eingeklappt am Ende statt
-          560 px am Anfang. Wer wissen will, wo der Vorgang steht, sieht es
-          schon am Zustands-Badge — das Diagramm ist einen Klick entfernt. */}
-      <details style={{ marginTop: 4 }}>
-        <summary className="muted" style={{ cursor: 'pointer', padding: '6px 0' }}>
-          Ablauf anzeigen — aktueller Stand: {zustandsSchritt?.name ?? v.state}
-        </summary>
-        <ProzessPanel
-          prozessCode={v.prozess_code}
-          recordId={v.id}
-          rolle={user.rollen}
-          befugnisse={user.befugnisse}
-          nurDiagramm
-        />
-      </details>
+          560 px am Anfang (seit 2026-10-18 klappt ProzessPanel nurDiagramm
+          selbst ein — derselbe „Ablauf"-Baustein auf allen Belegseiten). */}
+      <ProzessPanel
+        prozessCode={v.prozess_code}
+        recordId={v.id}
+        rolle={user.rollen}
+        befugnisse={user.befugnisse}
+        nurDiagramm
+      />
     </>
   )
 }

@@ -3,7 +3,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { Badge, Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
+import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
+import { MehrMenue } from '@/components/mehr-menue'
+import { Statusleiste } from '@/components/statusleiste'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { RecordComments } from '@/components/record-comments'
 import { date, dateTime, LABELS, money, qty, schreibschutzGrund } from '@/modules/shared/format'
@@ -215,39 +217,43 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
         }
         actions={
           <>
-            <Badge state={mo.state} kind="mo" />
+            {/* Sieben gleichrangige Knöpfe waren es (UX-Audit 301#2): jetzt
+                Drucken und der nächste Schritt sichtbar, der Rest im ⋯-Menü. */}
             <ActionButton action={zettelDrucken.bind(null, id)}>Drucken</ActionButton>
-            <ActionButton
-              action={etikettDrucken.bind(null, id)}
-              linkOeffnen
-              title="Fertigungsetikett mit der Auftragsnummer als Barcode — am Etikettendrucker des Arbeitsplatzes"
-            >
-              Etikett drucken
-            </ActionButton>
-            <Link className="btn" href={`/fertigung/${id}/druck`} target="_blank">
-              Ansicht
-            </Link>
             {mo.state === 'draft' && (
               <ActionButton className="primary" action={confirmMo.bind(null, id)}>Bestätigen</ActionButton>
             )}
-            {open && mo.state !== 'draft' && (
-              <ActionButton action={checkAvailability.bind(null, id)}>Verfügbarkeit prüfen</ActionButton>
-            )}
             {mo.state === 'confirmed' && (
-              <ActionButton action={startMo.bind(null, id)}>Fertigung starten</ActionButton>
+              <ActionButton className="primary" action={startMo.bind(null, id)}>Fertigung starten</ActionButton>
             )}
-            {open && (
+            <MehrMenue>
               <ActionButton
-                className="danger"
-                action={cancelMo.bind(null, id)}
-                confirm="Fertigungsauftrag stornieren? Reservierungen werden freigegeben."
+                action={etikettDrucken.bind(null, id)}
+                linkOeffnen
+                title="Fertigungsetikett mit der Auftragsnummer als Barcode — am Etikettendrucker des Arbeitsplatzes"
               >
-                Stornieren
+                Etikett drucken
               </ActionButton>
-            )}
+              <Link className="btn" href={`/fertigung/${id}/druck`} target="_blank">
+                Druckansicht
+              </Link>
+              {open && mo.state !== 'draft' && (
+                <ActionButton action={checkAvailability.bind(null, id)}>Verfügbarkeit prüfen</ActionButton>
+              )}
+              {open && (
+                <ActionButton
+                  className="danger"
+                  action={cancelMo.bind(null, id)}
+                  confirm="Fertigungsauftrag stornieren? Reservierungen werden freigegeben."
+                >
+                  Stornieren …
+                </ActionButton>
+              )}
+            </MehrMenue>
           </>
         }
       />
+      <Statusleiste prozessCode="fertigung" art="mo" zustand={mo.state} />
       <div style={{ marginBottom: 12 }}>
         <ResponsibleForm action={updateMoDetails.bind(null, id)} userId={mo.user_id} priority={mo.priority} gesperrt={schreibschutzGrund('mo', mo.state)} />
       </div>

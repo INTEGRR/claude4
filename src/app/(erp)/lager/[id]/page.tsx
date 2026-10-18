@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, PageHeader, TableWrap } from '@/components/ui'
+import { MehrMenue } from '@/components/mehr-menue'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { LandedCosts } from '@/components/landed-costs'
 import { RecordComments } from '@/components/record-comments'
@@ -244,7 +245,6 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         }
         actions={
           <>
-            <Badge state={picking.state} kind="picking" />
             <a className="btn" href={`/lager/${id}/druck`} target="_blank" rel="noopener">
               Packzettel
             </a>
@@ -265,13 +265,23 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
               </ActionButton>
             )}
             {open && (
-              <ActionButton className="danger" action={cancelPicking.bind(null, id)} confirm="Transfer stornieren?">
-                Stornieren
-              </ActionButton>
+              <MehrMenue>
+                <ActionButton className="danger" action={cancelPicking.bind(null, id)} confirm="Transfer stornieren?">
+                  Stornieren …
+                </ActionButton>
+              </MehrMenue>
             )}
           </>
         }
       />
+      {/* Statusleiste mit den nächsten Schritten oben (2026-10-18, M1); welcher
+          Prozess den Transfer führt, entscheidet der Beleg-Filter (Eingang =
+          Wareneingang, Ausgang = Shop-Versand). Ohne Prozess: das Schild. */}
+      {prozessCode ? (
+        <ProzessPanel prozessCode={prozessCode} recordId={id} rolle={user.rollen} befugnisse={user.befugnisse} art="picking" />
+      ) : (
+        <div style={{ marginBottom: 12 }}><Badge state={picking.state} kind="picking" led /></div>
+      )}
       <div style={{ marginBottom: 12 }}>
         <ResponsibleForm action={updatePickingDetails.bind(null, id)} userId={picking.user_id} priority={picking.priority} gesperrt={schreibschutzGrund('picking', picking.state)} />
       </div>
@@ -537,11 +547,9 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         <LandedCosts pickingId={id} />
       )}
 
-      {/* Welcher Prozess diesen Transfer führt, entscheidet der Beleg-Filter
-          (Eingang = Wareneingang, Ausgang = Shop-Versand). */}
-      {prozessCode && <ProzessPanel prozessCode={prozessCode} recordId={id} rolle={user.rollen} befugnisse={user.befugnisse} />}
-
       <RecordComments model="stock_picking" recordId={id} path={`/lager/${id}`} />
+
+      {prozessCode && <ProzessPanel prozessCode={prozessCode} recordId={id} rolle={user.rollen} nurDiagramm />}
     </>
   )
 }

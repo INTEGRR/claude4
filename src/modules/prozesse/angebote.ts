@@ -1,4 +1,5 @@
 import { sql } from '@/db/client'
+import { istAbbruch } from './statusleiste.ts'
 import { type Rollen, hatRolle, schrittRollenErfuellt } from '../auth/permissions.ts'
 import { registrierteAktion } from './registry/index.ts'
 import { formularFelder } from './schema-felder.ts'
@@ -231,18 +232,18 @@ export async function naechsteAngebote(
     select code, name, art::text as art, aktion, rollen, params
     from prozess_naechste_schritte(${prozessCode}, ${recordId})`
 
-  // Schritt-Befugnisse (Override vor Schrittdefinition) — die Traversierung
-  // liefert sie nicht mit, deshalb einmal je Prozess nachgeladen.
-  const befugnisJeSchritt = new Map(
+  // Schritt-Befugnisse (Override vor Schrittdefinition) und Zielzustand —
+  // die Traversierung liefert sie nicht mit, deshalb einmal je Prozess nachgeladen.
+  const schrittInfo = new Map(
     (
-      await sql<{ code: string; befugnis: string | null }[]>`
-        select s.code, coalesce(o.befugnis, s.befugnis) as befugnis
+      await sql<{ code: string; befugnis: string | null; zustand: string | null }[]>`
+        select s.code, coalesce(o.befugnis, s.befugnis) as befugnis, s.zustand
         from prozesse p
         join prozess_schritte s on s.version_id = prozess_aktive_version(p.code)
         left join prozess_overrides o
           on o.prozess_code = p.code and o.schritt_code = s.code
         where p.code = ${prozessCode}`
-    ).map((r) => [r.code, r.befugnis]),
+    ).map((r) => [r.code, r]),
   )
 
   const angebote: SchrittAngebot[] = []
@@ -279,7 +280,7 @@ export async function naechsteAngebote(
       }
     }
     // Admin besteht Rollen- und Befugnisprüfung immer (wie im Torwächter).
-    const befugnis = befugnisJeSchritt.get(s.code) ?? null
+    const befugnis = schrittInfo.get(s.code)?.befugnis ?? null
     const erlaubt =
       aktionErlaubt(eintrag, rolle, befugnisse) &&
       (hatRolle(rolle, 'admin') ||
@@ -296,6 +297,8 @@ export async function naechsteAngebote(
       // Der Schritt verlangt eine persönliche Befugnis — die Oberfläche
       // zeigt ihn als Entscheidung (violett), nicht als Handgriff.
       ...(befugnis ? { befugnis } : {}),
+      // Abbruch-Wege (Storno, Ablehnen) wandern ins ⋯-Menü (2026-10-18, M5).
+      ...(istAbbruch(schrittInfo.get(s.code)?.zustand) ? { abbruch: true } : {}),
       hinweis: erlaubt
         ? s.aktion
         : befugnis && !befugnisse.includes(befugnis)

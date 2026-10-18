@@ -110,13 +110,10 @@ export default async function RetourePage({
             {' '}· {r.quelle === 'shop' ? 'aus dem Portal im Shop' : 'intern angelegt'}
           </>
         }
-        actions={
-          <>
-            <Badge state={r.status} kind="retoure" />
-            <Link className="btn" href="/versand/retouren">Alle Retouren</Link>
-          </>
-        }
+        actions={<Link className="btn" href="/versand/retouren">Alle Retouren</Link>}
       />
+
+      <ProzessPanel prozessCode="retoure" recordId={id} rolle={user.rollen} befugnisse={user.befugnisse} sofortOffen={sofortOffen} art="retoure" />
 
       <div className="grid-2">
         <Card title="Anfrage">
@@ -273,9 +270,9 @@ export default async function RetourePage({
         </Card>
       )}
 
-      <ProzessPanel prozessCode="retoure" recordId={id} rolle={user.rollen} befugnisse={user.befugnisse} sofortOffen={sofortOffen} />
-
       <RecordComments model="retoure" recordId={id} path={`/versand/retouren/${id}`} />
+
+      <ProzessPanel prozessCode="retoure" recordId={id} rolle={user.rollen} nurDiagramm />
     </>
   )
 }

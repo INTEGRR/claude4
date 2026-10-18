@@ -9,6 +9,38 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Paket U3: Statusleiste, empfohlener Schritt, ⋯-Menü, Ablauf unten
+
+**Anlass:** UX-Audit M1–M3, M5 (102#1/#7, 103#2, 213#1/#2, 301#2, 601#1,
+853#2): Der Zustand stand nur als kleines Etikett (oft die Belegart), das
+Prozessdiagramm stand 600 px groß vor dem Inhalt, „Als Nächstes möglich"
+zeigte alle Schritte gleich grau, Stornieren stand rot neben der
+Primäraktion. Der Betreiber hat den Beleg-Entwurf freigegeben.
+
+**Entschieden:**
+- **Statusleiste** (`src/components/statusleiste.tsx`, Logik pur in
+  `src/modules/prozesse/statusleiste.ts`): die Stufen kommen aus der
+  aktiven Prozessversion — nicht optionale Schritte mit Zustand nach
+  `sequence`, ohne Abbruch-Zustände (Storno, Ablehnung, Verwerfen). Der
+  Belegstatus bleibt die einzige Wahrheit; steht der Beleg abseits (z. B.
+  storniert), sagt die Leiste das in einem Satz. Folgestufen ohne eigenen
+  Zustand liefert die Seite (Verkauf: Geliefert, Berechnet; Einkauf:
+  Wareneingang, Rechnung); es ist immer höchstens eine Stufe aktuell.
+- **Prozess-Panel** = Statusleiste mit den nächsten Schritten: der erste
+  erlaubte Schritt des regulären Wegs ist primär (eine Entscheidung mit
+  Befugnis violett), Sonderwege normal, Abbruch-Wege im ⋯-Menü. Das
+  Diagramm steht als eingeklappter „Ablauf" am Seitenende
+  (`ProzessPanel nurDiagramm`) und wird nur dort berechnet.
+- **⋯-Menü** (`src/components/mehr-menue.tsx`, natives `<details>`):
+  Sperren, Stornieren, Zurücksetzen, Druckansicht und Etikett wandern aus
+  den Köpfen von Verkauf, Fertigung, Einkauf, Lager und Reparatur.
+- Reparatur: läuft der Prozess, führen Statusleiste und Schritte; die
+  alten Kopf-Knöpfe bleiben nur als Rückfall ohne aktiven Prozess.
+- Seiten: Verkauf, Fertigung, Einkauf, Kundenrechnung, Reparatur, Lager,
+  Retoure, Ticket, Fixkosten-Vertrag; die reinen Diagramm-Seiten (Einkauf,
+  Vorgänge) bekommen den eingeklappten Ablauf.
+- Test: tests/statusleiste.test.ts. Doku: [prozesse.md](prozesse.md).
+
 ## 2026-10-18 — Paket U1: Beschriftungen und Schilder in Satzschreibung
 
 **Anlass:** UX-Audit M8 (000-login#4, A00-rahmen#6, d01#1): Labels,

@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { MehrMenue } from '@/components/mehr-menue'
+import { Statusleiste } from '@/components/statusleiste'
 import { RecordComments } from '@/components/record-comments'
 import { DokumenteKarte } from '@/components/dokumente'
 import { KiVorschlaegeKarte } from '@/components/ki-vorschlaege'
@@ -230,21 +232,59 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                 Bestellung bestätigen
               </ActionButton>
             )}
-            {order.state === 'purchase' && (
-              <ActionButton action={lockPo.bind(null, id, true)}>Sperren</ActionButton>
-            )}
             {order.state === 'done' && (
               <ActionButton action={lockPo.bind(null, id, false)}>Entsperren</ActionButton>
             )}
             {(order.state === 'purchase' || order.state === 'done') && rechnungAktiv && (
               <ActionButton action={createBill.bind(null, id)}>Rechnung erstellen</ActionButton>
             )}
+            {/* Seltenes und Zerstörendes im ⋯-Menü (2026-10-18, M5). */}
             {order.state !== 'cancel' && (
-              <ActionButton className="danger" action={cancelPo.bind(null, id)} confirm="Bestellung stornieren?">
-                Stornieren
-              </ActionButton>
+              <MehrMenue>
+                {order.state === 'purchase' && (
+                  <ActionButton action={lockPo.bind(null, id, true)}>Bestellung sperren</ActionButton>
+                )}
+                {order.state !== 'cancel' && (
+                  <ActionButton className="danger" action={cancelPo.bind(null, id)} confirm="Bestellung stornieren?">
+                    Stornieren …
+                  </ActionButton>
+                )}
+              </MehrMenue>
             )}
           </>
+        }
+      />
+
+      <Statusleiste
+        prozessCode="einkauf_wareneingang_rechnung"
+        art="purchase"
+        zustand={order.state === 'done' ? 'purchase' : order.state}
+        danach={
+          order.state === 'purchase' || order.state === 'done'
+            ? [
+                {
+                  name: 'Wareneingang',
+                  stand: (() => {
+                    const gueltig = receipts.filter((r) => r.state !== 'cancel')
+                    if (gueltig.length > 0 && gueltig.every((r) => r.state === 'done')) return 'erledigt' as const
+                    return gueltig.some((r) => r.state === 'done') ? ('aktuell' as const) : ('offen' as const)
+                  })(),
+                },
+                ...(rechnungAktiv || bills.length > 0
+                  ? [
+                      {
+                        name: 'Rechnung',
+                        stand:
+                          order.billing_status === 'fully_billed'
+                            ? ('erledigt' as const)
+                            : bills.some((b) => b.state !== 'cancel')
+                              ? ('aktuell' as const)
+                              : ('offen' as const),
+                      },
+                    ]
+                  : []),
+              ]
+            : []
         }
       />
 

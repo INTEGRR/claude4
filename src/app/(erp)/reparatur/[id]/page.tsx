@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { MehrMenue } from '@/components/mehr-menue'
 import { ResponsibleForm } from '@/components/responsible-form'
 import { TagEditor } from '@/components/tag-editor'
 import { RecordComments } from '@/components/record-comments'
@@ -144,6 +145,10 @@ export default async function RepairPage({
     repair.state,
   )
   const open = !['repaired', 'shipped', 'cancel'].includes(repair.state)
+  // Läuft der Prozess, führen Statusleiste und Schritte (2026-10-18, M1/M3);
+  // die alten Kopf-Knöpfe bleiben nur als Rückfall ohne aktiven Prozess.
+  const [{ prozessAktiv }] = await sql<{ prozessAktiv: boolean }[]>`
+    select exists (select 1 from prozesse where code = 'reparatur' and aktiv) as "prozessAktiv"`
 
   return (
     <>
@@ -191,40 +196,36 @@ export default async function RepairPage({
             <a className="btn" href={`/api/reparatur/${id}/pdf`} target="_blank" rel="noreferrer">
               {['repaired', 'shipped'].includes(repair.state) ? 'Bericht (PDF)' : 'Auftrag (PDF)'}
             </a>
-            <Badge state={repair.state} kind="repair" />
             {/* Abrechnung immer zeigen — vorher war „kostenpflichtig“ unsichtbar. */}
             <span className="nowrap">
               <span className={`led ${repair.under_warranty ? 'ok' : 'off'}`} />{' '}
               {repair.under_warranty ? 'Garantie' : 'kostenpflichtig'}
             </span>
-            {(repair.state === 'new' || repair.state === 'received') && (
+            {!prozessAktiv && (repair.state === 'new' || repair.state === 'received') && (
               <ActionButton className="primary" action={confirmRepair.bind(null, id)}>
                 Bestätigen
               </ActionButton>
             )}
-            {repair.state === 'confirmed' && (
+            {!prozessAktiv && repair.state === 'confirmed' && (
               <ActionButton action={startRepair.bind(null, id)}>Reparatur starten</ActionButton>
             )}
-            {repair.state === 'repaired' && !repair.under_warranty && !repair.sales_order_id && (
+            {!prozessAktiv && repair.state === 'repaired' && !repair.under_warranty && !repair.sales_order_id && (
               <ActionButton action={createQuotation.bind(null, id)}>Angebot erstellen</ActionButton>
             )}
-            {open && (
-              <ActionButton
-                className="danger"
-                action={cancelRepair.bind(null, id)}
-                confirm="Reparatur stornieren? Reservierte Teile werden freigegeben."
-              >
-                Stornieren
-              </ActionButton>
+            {!prozessAktiv && open && (
+              <MehrMenue>
+                <ActionButton
+                  className="danger"
+                  action={cancelRepair.bind(null, id)}
+                  confirm="Reparatur stornieren? Reservierte Teile werden freigegeben."
+                >
+                  Stornieren …
+                </ActionButton>
+              </MehrMenue>
             )}
           </>
         }
       />
-
-      <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <ResponsibleForm action={updateRepairDetails.bind(null, id)} userId={repair.user_id} priority={repair.priority} gesperrt={schreibschutzGrund('repair', repair.state)} />
-        <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
-      </div>
 
       <ProzessPanel
         prozessCode="reparatur"
@@ -232,7 +233,13 @@ export default async function RepairPage({
         rolle={user.rollen}
         befugnisse={user.befugnisse}
         sofortOffen={sofortOffen}
+        art="repair"
       />
+
+      <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <ResponsibleForm action={updateRepairDetails.bind(null, id)} userId={repair.user_id} priority={repair.priority} gesperrt={schreibschutzGrund('repair', repair.state)} />
+        <TagEditor model="repair_order" recordId={id} path={`/reparatur/${id}`} />
+      </div>
 
       {(retoure || sendung || repair.state === 'awaiting_device') && (
         <Card title="Versand">
@@ -452,6 +459,8 @@ export default async function RepairPage({
       </Card>
 
       <RecordComments model="repair_order" recordId={id} path={`/reparatur/${id}`} />
+
+      <ProzessPanel prozessCode="reparatur" recordId={id} rolle={user.rollen} nurDiagramm />
     </>
   )
 }
