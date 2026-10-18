@@ -422,6 +422,32 @@ a:hover { text-decoration: underline; }
 .card > .body.tight { padding: 0; }
 
 .table-wrap { overflow-x: auto; }
+/* Am Handy jede Zeile eine Karte (2026-10-18, M17): Beschriftung aus dem
+   Spaltenkopf (data-label, gesetzt von KartenTabelle). */
+@media (max-width: 560px) {
+  .table-wrap.karten table, .table-wrap.karten tbody, .table-wrap.karten tfoot,
+  .table-wrap.karten tr, .table-wrap.karten td { display: block; width: 100%; }
+  .table-wrap.karten thead { display: none; }
+  .table-wrap.karten tbody tr { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .table-wrap.karten tfoot tr { padding: 4px 12px; display: flex; justify-content: space-between; gap: 12px; }
+  .table-wrap.karten tfoot td { width: auto; display: block; padding: 2px 0; }
+  .table-wrap.karten tfoot td::before { content: none; }
+  .table-wrap.karten td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 3px 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+  }
+  .table-wrap.karten td::before { content: attr(data-label); color: var(--text-2); font-size: 12.5px; text-align: left; flex: none; }
+  .table-wrap.karten td[data-label='']::before, .table-wrap.karten td:not([data-label])::before { content: none; }
+  .table-wrap.karten tbody td:first-child { font-weight: 600; justify-content: flex-start; text-align: left; }
+  .table-wrap.karten tbody td:first-child::before { content: none; }
+  .table-wrap.karten td:empty { display: none; }
+}
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
 th {
@@ -1336,10 +1362,11 @@ label.field > span, .field > .feld-titel {
      damit deren Kinder direkt im Raster liegen. */
   .topbar {
     display: grid;
-    grid-template-columns: auto auto 1fr auto auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
-      'schalter zustand platz befehle thema'
-      'scan     scan    scan  fehler  ki';
+      'schalter zustand platz befehle'
+      'scan     scan    scan  scan'
+      'fehler   ki      thema thema';
     align-items: center;
     gap: 10px;
   }
@@ -1347,7 +1374,7 @@ label.field > span, .field > .feld-titel {
   .nav-schalter { grid-area: schalter; }
   .systemzeile { grid-area: zustand; width: auto; }
   .befehls-knopf { grid-area: befehle; }
-  .theme-toggle { grid-area: thema; }
+  .theme-toggle { grid-area: thema; justify-self: end; }
   .scan-form { grid-area: scan; }
   .fehler-knopf { grid-area: fehler; }
   .ki-knopf { grid-area: ki; }

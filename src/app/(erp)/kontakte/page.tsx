@@ -147,7 +147,7 @@ export default async function KontaktePage({
         {rows.length === 0 ? (
           <Empty>Keine Kontakte gefunden.</Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

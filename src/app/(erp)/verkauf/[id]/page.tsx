@@ -522,7 +522,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {lines.length === 0 ? (
           <Empty>Noch keine Positionen.</Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

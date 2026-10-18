@@ -149,7 +149,7 @@ export default async function ReparaturPage({
         {rows.length === 0 ? (
           <Empty>Keine Reparaturaufträge{filter ? ` im Zustand „${LABELS.repair[filter]}"` : ''}.</Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

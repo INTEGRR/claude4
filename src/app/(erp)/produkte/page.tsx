@@ -124,7 +124,7 @@ export default async function ProduktePage({
         {rows.length === 0 ? (
           <Empty>Keine Produkte gefunden.</Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

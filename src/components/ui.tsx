@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { KartenTabelle } from '@/components/karten-tabelle'
 import { LABELS, date, dateTime, money, plural, tone, ueberfaellig } from '@/modules/shared/format'
 
 /**
@@ -181,8 +182,12 @@ export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="empty">{children}</div>
 }
 
-/** Tabelle mit horizontalem Scroll — Belegtabellen werden schnell breit. */
-export function TableWrap({ children }: { children: React.ReactNode }) {
+/**
+ * Tabelle mit horizontalem Scroll — Belegtabellen werden schnell breit.
+ * `karten`: am Handy jede Zeile als Karte (2026-10-18, UX-Audit M17).
+ */
+export function TableWrap({ children, karten }: { children: React.ReactNode; karten?: boolean }) {
+  if (karten) return <KartenTabelle>{children}</KartenTabelle>
   return <div className="table-wrap">{children}</div>
 }
 

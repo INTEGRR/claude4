@@ -233,7 +233,7 @@ export default async function KundenrechnungenPage({
               : `Keine Belege${filter !== 'alle' ? ' in dieser Auswahl' : ' — die erste Rechnung entsteht mit der ersten gebuchten Lieferung'}.`}
           </Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

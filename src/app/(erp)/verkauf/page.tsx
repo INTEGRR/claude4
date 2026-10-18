@@ -139,7 +139,7 @@ export default async function VerkaufPage({
         {rows.length === 0 ? (
           <Empty>Keine Aufträge gefunden.</Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

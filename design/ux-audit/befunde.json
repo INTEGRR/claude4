@@ -298,7 +298,8 @@
      "befund": "Alle Zahlen stehen in derselben Warnfarbe (Orange-Rot), egal ob „Deine Aufgaben 7“, „Versandbereit 1“ oder „Unterdeckung 175.162 €“. Dringlichkeit ist nicht unterscheidbar; die Farbpunkte (lila/orange/braun) erklären sich nicht.",
      "vorschlag": "Zahlenfarbe nach Zustand: neutral (normal), Warnung (überfällig), Gefahr (kritisch). Farbpunkte entweder mit Legende oder weglassen.",
      "id": "010-uebersicht#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     },
     {
      "schwere": "hoch",
@@ -1117,7 +1118,8 @@
      "befund": "Die Shopify-Verknüpfung ist als einzige Karte schwarz (Terminal-Optik) – stärkster Kontrast der Seite für die unwichtigste Information (GID).",
      "vorschlag": "Gleiche Kartenoptik wie Lieferadresse; Link ‚In Shopify öffnen‘ statt roher GID.",
      "id": "105-verkauf-shop-geliefert#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     },
     {
      "schwere": "mittel",
@@ -1295,7 +1297,8 @@
      "befund": "Die drei Kennzahlen (Offene Forderungen, Überfällig, Umsatz) stehen als drei volle, schwarze Balken untereinander – ~250 px Höhe für drei Zahlen, stärkster Kontrast der Seite.",
      "vorschlag": "Kennzahlen in einer Zeile (3 Spalten), helle Karten, Akzentfarbe nur bei Handlungsbedarf (Überfällig > 0).",
      "id": "110-rechnungen#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     },
     {
      "schwere": "hoch",
@@ -1423,7 +1426,8 @@
      "befund": "Anschrift, Belegdaten und Beträge als drei volle schwarze Balken untereinander (~430 px) – das wirkt wie ein Terminal, nicht wie eine Rechnung, und drückt Positionen nach unten.",
      "vorschlag": "Rechnungskopf als helle 3-Spalten-Karte (Anschrift | Belegdaten | Beträge) wie auf dem PDF.",
      "id": "112-rechnung-offen#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     },
     {
      "schwere": "hoch",
@@ -1504,7 +1508,8 @@
      "befund": "Gleiche schwarze Balken wie 112.",
      "vorschlag": "Siehe 112.",
      "id": "113-rechnung-bezahlt#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     }
    ],
    "messwerte": {
@@ -4989,7 +4994,8 @@
      "befund": "Formular ‚Neuer Reparaturauftrag‘ dominiert den Kopf; Filter ‚alle‘ kleingeschrieben im Gegensatz zu den anderen.",
      "vorschlag": "Knopf + Dialog; einheitliche Schreibweise.",
      "id": "600-reparaturen#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     }
    ],
    "messwerte": {
@@ -5061,7 +5067,8 @@
      "befund": "Fehlerbild als schwarzer Terminal-Block – stilfremd zum Rest.",
      "vorschlag": "Helle Hinweiskarte.",
      "id": "602-reparatur-wartet#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     }
    ],
    "messwerte": {
@@ -6080,7 +6087,8 @@
      "befund": "Etikettenvorschau als schwarzer Rahmen um weißes Etikett.",
      "vorschlag": "Etikett ohne Terminal-Rahmen.",
      "id": "902-variante#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "3612a11"
     }
    ],
    "messwerte": {

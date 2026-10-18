@@ -151,7 +151,7 @@ export default async function EinkaufPage({
         {rows.length === 0 ? (
           <Empty>Keine Bestellungen.</Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

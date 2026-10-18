@@ -151,7 +151,7 @@ export default async function LagerPage({
               : 'Keine Transfers.'}
           </Empty>
         ) : (
-          <TableWrap>
+          <TableWrap karten>
             <table>
               <thead>
                 <tr>

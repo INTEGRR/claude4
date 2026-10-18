@@ -9,6 +9,23 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Paket U6: Tabellen als Karten am Handy, Kopfleiste dreizeilig
+
+**Anlass:** UX-Audit M17 (m07#1, m01#2/#3, m04#1, m08#2, m10#2/#3):
+Positionstabellen waren am Handy nur seitlich wischbar (Preis
+angeschnitten), die Kopfleiste quetschte Arbeitsplatz-Auswahl und Knöpfe.
+
+**Entschieden:**
+- `TableWrap karten`: bis 560 px wird jede Zeile eine Karte, jede Zelle
+  „Spaltenkopf: Wert" (Beschriftung aus dem `<thead>`, gesetzt von
+  `KartenTabelle`; bis zur Hydration bleibt die Tabelle quer scrollbar).
+  Summenzeilen stehen als Paar nebeneinander. Eingebaut in den
+  Hauptlisten Verkauf, Rechnungen, Einkauf, Lager, Reparatur, Kontakte,
+  Produkte und in den Positionen des Verkaufsauftrags.
+- Kopfleiste am Handy in drei Zeilen: Menü/Zustand/Arbeitsplatz/Befehle,
+  das Scanfeld über die ganze Breite, darunter Fehler melden, KI und das
+  Erscheinungsbild.
+
 ## 2026-10-18 — Paket U5: Farbe nach Handlungsbedarf, Display nur für Live
 
 **Anlass:** UX-Audit M7/M15 (010#1, 105#2, 110#1, 112#1, 113#3, 602#1,
