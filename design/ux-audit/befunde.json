@@ -8453,7 +8453,8 @@
      "befund": "Seitliche Laschen ‚Fehler?‘ und ‚KI‘ überlappen die Kacheln am rechten Rand.",
      "vorschlag": "Am Handy ins Menü verlegen.",
      "id": "m01-uebersicht#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     }
    ],
    "messwerte": {
@@ -8552,7 +8553,8 @@
      "befund": "Lasche ‚Fehler?‘ überdeckt den Knopf ‚Sammeln‘ teilweise.",
      "vorschlag": "Siehe m01.",
      "id": "m04-kommissionieren#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     }
    ],
    "messwerte": {
@@ -8661,7 +8663,8 @@
      "befund": "Positionstabelle nur seitlich scrollbar (Einzelpreis angeschnitten, Netto/Entfernen erst nach Wischen sichtbar, kein Scroll-Hinweis); Produktnamen brechen Wort für Wort um.",
      "vorschlag": "Positionen am Handy als Karten (Name, Menge × Preis, Summe).",
      "id": "m07-verkauf-detail#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "ddd21d6"
     },
     {
      "schwere": "mittel",
@@ -8708,7 +8711,8 @@
      "befund": "Prozessdiagramm am Handy winzig und nutzlos.",
      "vorschlag": "Am Handy nur Stepper.",
      "id": "m08-retoure-pruefen#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     }
    ],
    "messwerte": {
@@ -8779,7 +8783,8 @@
      "befund": "‚Übersicht‘ (aktiv, orange) und ‚Scannen‘ (violetter Punkt) gleichzeitig hervorgehoben (siehe A00); Violett ist laut Designsystem der Entscheidungsakzent und passt nicht zu einem Menüpunkt.",
      "vorschlag": "Ein aktiver Zustand.",
      "id": "m10-navigation#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     },
     {
      "schwere": "niedrig",
@@ -8787,7 +8792,8 @@
      "befund": "Bereiche nur aufklappbar, kein Direkteinstieg; Versalien-Mono-Schrift 11 px.",
      "vorschlag": "Größere Touch-Ziele (≥ 44 px), normale Schrift.",
      "id": "m10-navigation#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     }
    ],
    "messwerte": {
