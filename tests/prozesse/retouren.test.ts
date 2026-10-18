@@ -133,6 +133,20 @@ describe('Retouren: Portal, Erstattung vor der Prüfung, Gegenrechnung bei der n
     assert.equal((await bestellungFinden('#7701', '', '5550001')).art, 'ok')
     assert.equal((await bestellungFinden('#7701', '', '5550002')).art, 'nicht_gefunden')
 
+    // Suchdrossel (0131): nach 10 Fehlversuchen zu einer E-Mail ist die Suche
+    // für sie gesperrt — auch mit der richtigen Nummer; ebenso je Nummer.
+    for (let i = 0; i < 9; i++) assert.equal((await bestellungFinden(`#88${i}`, 'rater@example.com', null)).art, 'nicht_gefunden')
+    assert.equal((await bestellungFinden('#7701', 'rater@example.com', null)).art, 'nicht_gefunden', 'der zehnte Fehlversuch zählt noch')
+    assert.equal((await bestellungFinden('#7701', 'rater@example.com', null)).art, 'gedrosselt')
+    assert.equal((await retoureAufnehmen({ bestellnummer: '#7701', email: 'rater@example.com' }, { kundeId: null })).art, 'gedrosselt')
+    for (let i = 0; i < 10; i++) assert.equal((await bestellungFinden('#9998', `p${i}@example.com`, null)).art, 'nicht_gefunden')
+    assert.equal((await bestellungFinden('#9998', 'p99@example.com', null)).art, 'gedrosselt', 'Nummer durchprobieren mit vielen Adressen')
+    assert.equal((await bestellungFinden('7701', 'kundin@example.com', null)).art, 'ok', 'Unbeteiligte bleiben frei')
+    const [{ klartext }] = await h.sql<{ klartext: number }[]>`
+      select count(*)::int as klartext from portal_suchversuche where kennung_hash ilike '%example.com%' or kennung_hash like '#%'`
+    assert.equal(klartext, 0, 'nur Hashes gespeichert')
+    await h.sql`delete from portal_suchversuche`
+
     const z = suche.bestellung.zeilen[0].id
     assert.equal((await retoureAufnehmen({ bestellnummer: '#7701', email: 'kundin@example.com', webseite: 'spam', [`menge_${z}`]: '1' }, { kundeId: null })).art, 'honigtopf')
     const zuviel = await retoureAufnehmen({ bestellnummer: '#7701', email: 'kundin@example.com', [`menge_${z}`]: '4' }, { kundeId: null })

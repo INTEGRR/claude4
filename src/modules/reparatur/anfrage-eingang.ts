@@ -55,6 +55,8 @@ export const QUELLE_JE_KANAL: Record<AnfrageKanal, string> = {
 export const PROZESS = 'reparatur_anfrage'
 export const DROSSEL_MINUTEN = 10
 export const DROSSEL_ANZAHL = 5
+/** Obergrenze über ALLE Absender im Fenster — gegen Massenanlage mit wechselnden Adressen (Review 2026-10-18). */
+export const DROSSEL_GESAMT = 30
 /** Fenster, in dem eine identische Anfrage als Doppelklick gilt. */
 export const DOPPELT_MINUTEN = 10
 
@@ -133,6 +135,14 @@ export async function reparaturanfrageAufnehmen(
           and created_at > now() - (${DROSSEL_MINUTEN} || ' minutes')::interval`
       if (anzahl >= DROSSEL_ANZAHL) return { art: 'gedrosselt', sekunden: DROSSEL_MINUTEN * 60 }
     }
+    // Je Absender allein reicht nicht: mit 10 000 Adressen ließe sich das
+    // Formular als Spam-Kanon nutzen (jede Anfrage schickt eine Bestätigung).
+    // Mehr als DROSSEL_GESAMT echte Anfragen in zehn Minuten gibt es nicht.
+    const [{ gesamt }] = await t<{ gesamt: number }[]>`
+      select count(*)::int as gesamt from vorgaenge
+      where quelle in ('kundenformular', 'shop')
+        and created_at > now() - (${DROSSEL_MINUTEN} || ' minutes')::interval`
+    if (gesamt >= DROSSEL_GESAMT) return { art: 'gedrosselt', sekunden: DROSSEL_MINUTEN * 60 }
 
     const [prozess] = await t<{ code: string }[]>`
       select code from prozesse where code = ${PROZESS} and aktiv and modell = 'vorgang'`

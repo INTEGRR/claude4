@@ -7,6 +7,7 @@ import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
 import { HANDARBEIT, type ProduktivgangStand, produktivgangBewerten } from '@/modules/einstellungen/produktivgang'
+import auditStand from '@/modules/einstellungen/audit-stand.json'
 import { shopifyModus } from '@/modules/integrationen/shopify-modus'
 import { gestoerteDienste } from '@/modules/integrationen/wache'
 import { kiPfadBereit, kiRegionAufloesen } from '@/modules/ki/region'
@@ -57,6 +58,8 @@ async function standLesen(): Promise<ProduktivgangStand> {
     adminsOhne2fa: konten.ohne2fa,
     startkontoAktiv: Boolean(konten.startkonto),
     offeneEinrichtung: aufgaben.offen,
+    // Aus dem Build dieser Fassung (scripts/audit-stand.ts), nicht live.
+    abhaengigkeiten: auditStand,
   }
 }
 

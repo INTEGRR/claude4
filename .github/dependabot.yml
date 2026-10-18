@@ -1,0 +1,32 @@
+# Dependabot (Entscheidungslog 2026-10-18, Sicherheit der Abhängigkeiten):
+# Sicherheitsupdates und wöchentliche Versionspflege kommen als Pull
+# Request, die Prüfung (check.yml) läuft darüber, gemergt wird von Hand.
+# Minor- und Patch-Stände werden je Ökosystem gebündelt, damit nicht jede
+# Woche zwölf einzelne PRs aufschlagen; Major-Sprünge bleiben einzeln.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    groups:
+      npm-klein:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'Abhängigkeiten'
+    labels: [abhaengigkeiten]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: 'CI'
+    labels: [abhaengigkeiten]

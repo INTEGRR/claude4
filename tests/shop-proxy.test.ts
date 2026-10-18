@@ -178,6 +178,8 @@ describe('App Proxy: Signatur', () => {
     assert.equal(proxySchluessel({ SHOPIFY_PROXY_SECRET: 'proxy', SHOPIFY_CLIENT_SECRET: 'krnl' }), 'proxy')
     assert.equal(proxySchluessel({ SHOPIFY_PROXY_SECRET: '  ', SHOPIFY_CLIENT_SECRET: 'krnl' }), 'krnl')
     assert.equal(proxySchluessel({ SHOPIFY_FAKE: '1' }), PROXY_FAKE_SECRET)
+    // Produktions-Build: die Attrappe gilt nie, auch nicht bei versehentlichem SHOPIFY_FAKE=1.
+    assert.equal(proxySchluessel({ SHOPIFY_FAKE: '1', NODE_ENV: 'production' }), '')
     assert.equal(proxySchluessel({ SHOPIFY_CLIENT_SECRET: '  ' }), '')
     assert.equal(proxySchluessel({}), '')
   })

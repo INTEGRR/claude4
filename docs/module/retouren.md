@@ -24,6 +24,9 @@ Betreibers: [Entscheidungslog 2026-10-17](../entscheidungen.md).
    Aufruf mehrfach kommt; Grund aus einer festen Liste
    (`modules/versand/retoure-gruende.ts`), Anliegen als Freitext. Das Portal
    schickt eine Eingangsbestätigung (Outbox-Job `send_return_request_email`).
+   Fehlversuche der Suche sind je E-Mail, Bestellnummer und Shop-Kunde
+   gedrosselt (10 je Stunde, `portal_suchversuche`, 0131) — damit lassen
+   sich zu einer bekannten Adresse keine Bestellnummern durchprobieren.
    Gespeichert wird der Shop-Gesamtbetrag zum Zeitpunkt der Anfrage
    (`shop_brutto_vorher`) — die Vergleichsbasis der Erstattung.
 2. **Genehmigen** (`genehmigt`, `versand.retoure_genehmigen`) — mit

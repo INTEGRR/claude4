@@ -308,7 +308,11 @@ Bestellung (angemeldete Kunden wählen aus ihren gelieferten Bestellungen,
 die signierte Kunden-ID genügt). Schritt 2: Artikel, Menge und Grund. Eine
 falsche Kombination ergibt immer dieselbe Meldung („nicht gefunden"), eine
 Nummer allein reicht nie; Honigtopf und Drossel (5 Anfragen je Absender in
-10 Minuten) wie bei der Reparaturanfrage. Code:
+10 Minuten) wie bei der Reparaturanfrage, dazu seit 0131 eine Drossel der
+Suche selbst (10 Fehlversuche je Stunde je E-Mail, Nummer oder Kunde). Die
+Reparaturanfrage hat zusätzlich eine Obergrenze über alle Absender (30 in
+10 Minuten), damit wechselnde Adressen das Formular nicht zur
+Massenanlage mit Bestätigungsmails machen. Code:
 `modules/versand/retoure-shop-seiten.ts` (Seiten),
 `modules/versand/retoure-eingang.ts` (Eingang); Prozess in
 [module/retouren.md](module/retouren.md). Im Shop gehört ein Link
@@ -318,7 +322,9 @@ Nummer allein reicht nie; Honigtopf und Drossel (5 Anfragen je Absender in
 scripts/shop-proxy-url.ts [--kunde 123] [--basis http://localhost:3000]`
 druckt eine signierte Adresse (90 Sekunden gültig) und ein `curl` zum
 Absenden. Lokal rendert niemand das Liquid — `{{ shop.name }}` bleibt
-stehen.
+stehen. Der Attrappen-Schlüssel gilt nur unter `next dev`: ein
+Produktions-Build (`NODE_ENV=production`) weist ihn ab, auch mit
+`SHOPIFY_FAKE=1` (Sicherheitsreview 2026-10-18).
 
 ### Einrichtung (Betreiber)
 

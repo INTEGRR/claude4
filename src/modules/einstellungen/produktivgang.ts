@@ -35,6 +35,21 @@ export interface ProduktivgangStand {
   startkontoAktiv: boolean
   /** Offene Einrichtungsaufgaben (Stichtag-Todos, 0116). */
   offeneEinrichtung: number
+  /** `npm audit` aus dem Build dieser Fassung (scripts/audit-stand.ts). */
+  abhaengigkeiten: AuditStand
+}
+
+export interface AuditStand {
+  /** Zeitpunkt der Prüfung im Build; null = diese Fassung wurde ohne Prüfung gebaut. */
+  geprueftAm: string | null
+  kritisch: number
+  hoch: number
+  mittel: number
+  niedrig: number
+  /** Pakete mit hoher oder kritischer Lücke. */
+  pakete: string[]
+  /** Letzte Prüfung gescheitert (kein Netz o. Ä.) — die Zahlen sind dann der Stand davor. */
+  fehler: string | null
 }
 
 export interface Ergebnis {
@@ -46,6 +61,7 @@ export interface Pruefpunkt {
   schluessel: string
   titel: string
   gruppe: 'Betrieb' | 'Firma & Belege' | 'Shopify' | 'Anbindungen' | 'Konten'
+  /** Wo man den Punkt erledigt: Seite in KRNL oder (Abhängigkeiten) die Dependabot-Seite im Repo. */
   link: string
   bewerten: (s: ProduktivgangStand) => Ergebnis
 }
@@ -94,6 +110,24 @@ export const PRUEFPUNKTE: readonly Pruefpunkt[] = [
     bewerten: (s) => {
       const stand = anbindungsStand(ANBINDUNGEN.find((a) => a.schluessel === 'system')!, s.env)
       return stand.vollstaendig ? ok('CRON_SECRET und SESSION_SECRET gesetzt') : rot(`es fehlt ${stand.fehlend.join(', ')}`)
+    },
+  },
+  {
+    schluessel: 'abhaengigkeiten',
+    titel: 'Abhängigkeiten ohne bekannte Lücke',
+    gruppe: 'Betrieb',
+    link: 'https://github.com/integrr/claude4/security/dependabot',
+    bewerten: (s) => {
+      const a = s.abhaengigkeiten
+      if (!a.geprueftAm) return grau('diese Fassung wurde ohne npm audit gebaut (nur Vercel-Build und CI prüfen)')
+      const wann = new Date(a.geprueftAm).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })
+      const ernst = a.kritisch + a.hoch
+      if (ernst > 0) {
+        const art = [a.kritisch ? `${a.kritisch} kritisch` : null, a.hoch ? `${a.hoch} hoch` : null].filter(Boolean).join(', ')
+        return rot(`${art} in ${a.pakete.join(', ')} — Update einspielen (Dependabot-PR) und neu deployen`)
+      }
+      if (a.fehler) return rot(`Prüfung im Build gescheitert (${a.fehler}) — Stand vom ${wann} ohne hohe Lücke`)
+      return ok(`geprüft am ${wann}${a.mittel ? `, ${a.mittel} mittlere offen` : ', keine Befunde ab mittel'}`)
     },
   },
   {

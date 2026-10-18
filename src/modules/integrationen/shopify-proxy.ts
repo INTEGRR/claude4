@@ -32,7 +32,10 @@ export const PROXY_ZEITFENSTER_SEKUNDEN = 90
 /**
  * Fester Schlüssel für SHOPIFY_FAKE=1 ohne Client Secret (lokal, Tests).
  * Die Prüfung wird damit NIE übersprungen — nur der Schlüssel ist bekannt.
- * In Produktion greift er nicht: dort ist SHOPIFY_FAKE nicht gesetzt.
+ * In Produktion greift er nicht: unter NODE_ENV=production wird er seit dem
+ * Sicherheitsreview 2026-10-18 auch dann verweigert, wenn SHOPIFY_FAKE aus
+ * Versehen gesetzt ist — sonst könnte jeder mit dem öffentlichen String
+ * signierte Anfragen samt fremder Kunden-ID stellen.
  */
 export const PROXY_FAKE_SECRET = 'reparatur-proxy-attrappe'
 
@@ -56,7 +59,7 @@ type Env = Record<string, string | undefined>
 export function proxySchluessel(env: Env = process.env): string {
   const secret = env.SHOPIFY_PROXY_SECRET?.trim() || env.SHOPIFY_CLIENT_SECRET?.trim() || ''
   if (secret) return secret
-  return env.SHOPIFY_FAKE === '1' ? PROXY_FAKE_SECRET : ''
+  return env.SHOPIFY_FAKE === '1' && env.NODE_ENV !== 'production' ? PROXY_FAKE_SECRET : ''
 }
 
 /** Die signierte Nachricht — exportiert, damit der Test sie gegen Shopifys Beispiel halten kann. */

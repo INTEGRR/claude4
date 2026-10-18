@@ -9,6 +9,103 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Sicherheitsreview der öffentlichen Oberflächen
+
+**Anlass:** Zusammen mit dem Abhängigkeits-Wächter wurden alle ohne
+Anmeldung erreichbaren Wege durchgesehen: App Proxy (Reparaturformular,
+Retourenportal), Shopify- und 17TRACK-Webhooks, `/api/cron`, Login mit
+zweitem Faktor, Server Actions, `src/proxy.ts`. Ergebnis: keine hohen
+Befunde. Signaturen sind zeitkonstant geprüft, SQL läuft durchgehend
+parametrisiert, Shop-Seiten kodieren jeden Wert, Sitzungs- und
+Passwortbehandlung sind solide.
+
+**Behoben in diesem Commit:**
+- Retourenportal: Drossel der Bestellsuche (eigener Eintrag oben).
+- Reparaturformular: Obergrenze über alle Absender (30 Anfragen in 10
+  Minuten, `DROSSEL_GESAMT`) — vorher nur 5 je E-Mail, also mit wechselnden
+  Adressen unbegrenzt, und jede Anfrage schickt eine Bestätigungsmail.
+- App Proxy: der Attrappen-Schlüssel (`SHOPIFY_FAKE=1` ohne Secret) gilt
+  unter `NODE_ENV=production` nicht mehr — ein Konfigurationsfehler hätte
+  sonst signierte Anfragen mit fremder Kunden-ID erlaubt.
+- Retourenportal: Datenbank-Interna (Constraint-, Spalten-, Syntaxfehler)
+  gehen nicht mehr als Meldung an den Kunden, nur die fachlichen Sätze aus
+  `retoure_anlegen`.
+
+**Bewusst vertagt (niedrig, eigene Entscheidung nötig):**
+- 17TRACK-Webhook ohne Replay-Schutz (Signatur ja, keine Dedupe) — der
+  Stundenabruf korrigiert alte Stände; ein Dedupe-Schlüssel wie bei Shopify
+  wäre der nächste Schritt.
+- KI-SQL-Werkzeug sperrt Tabellen per Wortliste; sauberer wäre eine eigene
+  Datenbankrolle mit `GRANT SELECT` nur auf Fachtabellen.
+- `SESSION_SECRET` fehlt → Drossel- und Backup-Code-Hashes nutzen das
+  bekannte Salz `krnl`; hart fehlschlagen wie bei `geheimnis.ts` wäre
+  konsequenter.
+- Kein CSP-Header (bereits bewusst vertagt), keine Sitzungsrotation,
+  X-Forwarded-For im Docker-Betrieb nur mit eigenem Reverse-Proxy
+  belastbar (betrieb.md).
+
+## 2026-10-18 — Sicherheit der Abhängigkeiten: Audit-Wächter, Dependabot, Produktivgang-Punkt
+
+**Anlass:** Frage des Betreibers, ob Abhängigkeiten und Infrastruktur auf
+bekannte Lücken überwacht werden. Antwort war nein: die CI prüfte Linter,
+Typen, Tests und Build, aber kein `npm audit`; es gab weder Dependabot noch
+einen Prüfpunkt in KRNL. `npm audit` meldete zu dem Zeitpunkt vier Lücken,
+eine kritische in Next 16.3.0 (RCE über `next/image`, `next/og` und
+Windows-Server, SSRF in der Bildoptimierung) — nichts davon traf die
+eingesetzten Funktionen, aber es hätte niemand gemerkt.
+
+**Entschieden:**
+- **Update zuerst:** Next 16.4.2, `npm audit` ohne Befunde (eigener Commit).
+- **Wächter in der CI:** `npm audit --audit-level=high` direkt nach
+  `npm ci`. Eine hohe oder kritische Lücke macht die Prüfung rot, auch ohne
+  Codeänderung: der Workflow läuft zusätzlich jeden Montag (`schedule`) auf
+  dem Hauptzweig. Mittlere und niedrige Befunde blockieren nicht.
+- **Dependabot** (`.github/dependabot.yml`): Sicherheitsupdates sofort,
+  Versionspflege wöchentlich als PR, Minor und Patch gebündelt, Major
+  einzeln; GitHub Actions ebenfalls. Gemergt wird von Hand, die CI prüft.
+- **Produktivgang-Punkt „Abhängigkeiten ohne bekannte Lücke":** der
+  Vercel-Build (und die CI) führt `scripts/audit-stand.ts` aus und schreibt
+  das Ergebnis nach `src/modules/einstellungen/audit-stand.json`; die Seite
+  zeigt den Stand der **ausgelieferten Fassung** (rot ab hoch, grau wenn
+  ohne Prüfung gebaut, rot mit Hinweis wenn die Prüfung im Build scheiterte).
+  Es ist bewusst kein Live-Abruf: KRNL ruft zur Laufzeit keine Registry an.
+  Die JSON im Repo bleibt der neutrale Stand (`geprueftAm: null`); der
+  Build überschreibt sie lokal, nicht im Commit.
+- **Infrastruktur:** Supabase-Advisors wurden gelesen (nur Hinweise:
+  `search_path` an 39 SQL-Funktionen nicht fixiert, `btree_gist` im Schema
+  `public`, fehlende FK-Indizes). Beides ist für KRNL ohne exponierte Data
+  API und ohne fremde Rollen unkritisch und bleibt vorerst so; eine
+  Fixierung des `search_path` wäre eine eigene Migration über alle
+  Funktionen. Vercel-Firewall und Deployment-Schutz konnten in dieser
+  Sitzung nicht abgefragt werden (Lesezugriff abgelehnt) — offen.
+
+**Umgesetzt:** `.github/workflows/check.yml`, `.github/dependabot.yml`,
+`scripts/audit-stand.ts`, `package.json` (`audit:stand`, `vercel-build`),
+`modules/einstellungen/produktivgang.ts`, `tests/produktivgang.test.ts`;
+Doku in docs/entwicklung.md (Wächter), docs/betrieb.md, docs/module/einstellungen.md.
+
+## 2026-10-18 — Retourenportal: Fehlversuche der Bestellsuche drosseln
+
+**Anlass:** Nachfrage des Betreibers, ob die Abfrage von Bestellnummern im
+Portal sicher ist. Nummer + E-Mail mussten passen, jede falsche Kombination
+bekam dieselbe Antwort, Absenden war gedrosselt — die **Suche** davor aber
+nicht. Wer eine E-Mail-Adresse kennt, konnte Bestellnummern automatisiert
+durchprobieren und so die Bestellungen einer Person samt Artikeln sehen
+(keine Adressen, keine Preise — trotzdem ein Datenleck).
+
+**Entschieden:** Fehlversuche der Suche zählen pseudonym je E-Mail, je
+Bestellnummer und je Shop-Kunde (Hash mit `SESSION_SECRET`, Tabelle
+`portal_suchversuche`, 0131; Muster der Login-Drossel). Ab 10 Fehlversuchen
+in einer Stunde ist die Suche für diese Kennung gesperrt — der Kunde sieht
+„zu viele Versuche", Status 429; Unbeteiligte bleiben frei. Keine Drossel
+über die IP, weil alle Aufrufe über Shopify kommen. Die Tabelle räumt sich
+beim Zählen selbst auf (älter als ein Tag) und ist für das KI-SQL-Werkzeug
+gesperrt.
+
+**Umgesetzt:** `modules/versand/retoure-eingang.ts`, Proxy-Route,
+`tests/prozesse/retouren.test.ts`; Doku in docs/module/retouren.md und
+docs/website.md.
+
 ## 2026-10-18 — Listen: Seitenaufteilung mit Auswahl 10 / 25 / 100
 
 **Anlass:** Nutzerwunsch „Listen brauchen Pagination und angezeigte Objekte

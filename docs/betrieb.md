@@ -129,6 +129,11 @@ des `db`-Dienstes.
 | Einkaufs-Zusammenfassung (Cockpit je Einkäufer → Telegram) | täglich | `/api/cron?task=einkauf` |
 
 Weitere Punkte:
+- **Bekannte Lücken in Abhängigkeiten:** die CI prüft `npm audit` bei
+  jedem Push und jeden Montag; Dependabot öffnet Update-PRs. Rot in der
+  Prüfung oder ein roter Punkt „Abhängigkeiten" auf
+  `/einstellungen/produktivgang` heißt: PR mergen, Deployment abwarten
+  (Entscheidungslog 2026-10-18).
 - **Label-Dateien** liegen unter `STORAGE_DIR` (Standard: `./storage`). Bei
   mehreren Instanzen ein gemeinsames Volume mounten oder auf Objektspeicher
   umstellen — DHL hält Labels nur rund drei Tage vor.

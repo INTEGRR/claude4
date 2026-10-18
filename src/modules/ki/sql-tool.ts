@@ -11,7 +11,7 @@ export const MAX_ROWS = 500
 
 /** Tabellen/Spalten, die die KI nie sehen darf. */
 const GESPERRT =
-  /\b(users|sessions|settings|password_hash|integration_jobs|login_versuche|sprachprotokoll\w*|backup_codes|vertraute_geraete|totp_\w*|benachrichtigungen|upload_sitzungen)\b/i
+  /\b(users|sessions|settings|password_hash|integration_jobs|login_versuche|portal_suchversuche|sprachprotokoll\w*|backup_codes|vertraute_geraete|totp_\w*|benachrichtigungen|upload_sitzungen)\b/i
 
 /**
  * Finanztabellen und -funktionen — für Fragende OHNE Finanzen-Berechtigung

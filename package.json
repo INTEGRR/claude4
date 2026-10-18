@@ -20,7 +20,8 @@
     "funktion": "node --experimental-strip-types scripts/funktion.ts",
     "prozesse:staging": "SHOPIFY_FAKE=1 DHL_FAKE=1 node --experimental-strip-types --import ./scripts/prozess-loader.mjs --test --test-concurrency=1 tests/prozesse/*.test.ts",
     "check": "npm run lint && npm run typecheck && npm run test && npm run test:prozesse",
-    "vercel-build": "node --experimental-strip-types scripts/vorbereiten.ts && next build"
+    "audit:stand": "node --experimental-strip-types scripts/audit-stand.ts",
+    "vercel-build": "node --experimental-strip-types scripts/vorbereiten.ts && npm run audit:stand && next build"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.35.0",

@@ -37,6 +37,7 @@ const BEREIT: ProduktivgangStand = {
   adminsOhne2fa: 0,
   startkontoAktiv: false,
   offeneEinrichtung: 0,
+  abhaengigkeiten: { geprueftAm: '2026-10-18T06:00:00Z', kritisch: 0, hoch: 0, mittel: 0, niedrig: 0, pakete: [], fehler: null },
 }
 
 const ton = (s: ProduktivgangStand) => Object.fromEntries(produktivgangBewerten(s).map((p) => [p.schluessel, p.ton]))
@@ -80,6 +81,17 @@ describe('Produktivgang', () => {
     assert.match(nur.text, /^GU- beginnt noch bei 1/)
   })
 
+  test('Abhängigkeiten: hohe oder kritische Lücke rot, ungeprüfte Fassung grau, gescheiterte Prüfung rot', () => {
+    const a = BEREIT.abhaengigkeiten
+    const luecke = produktivgangBewerten({ ...BEREIT, abhaengigkeiten: { ...a, kritisch: 1, hoch: 2, pakete: ['next', 'sharp'] } })
+      .find((p) => p.schluessel === 'abhaengigkeiten')!
+    assert.equal(luecke.ton, 'warn')
+    assert.match(luecke.text, /^1 kritisch, 2 hoch in next, sharp/)
+    assert.equal(ton({ ...BEREIT, abhaengigkeiten: { ...a, mittel: 3 } }).abhaengigkeiten, 'ok', 'mittlere Befunde machen den Punkt nicht rot')
+    assert.equal(ton({ ...BEREIT, abhaengigkeiten: { ...a, geprueftAm: null } }).abhaengigkeiten, 'off')
+    assert.equal(ton({ ...BEREIT, abhaengigkeiten: { ...a, fehler: 'ENOTFOUND registry.npmjs.org' } }).abhaengigkeiten, 'warn')
+  })
+
   test('optionale Anbindungen ohne Schlüssel sind grau, nicht rot', () => {
     const { TRACK17_API_KEY: _t, TELEGRAM_BOT_TOKEN: _b, TELEGRAM_CHAT_ID: _c, ...ohne } = BEREIT.env
     const t = ton({ ...BEREIT, env: ohne })
@@ -90,7 +102,7 @@ describe('Produktivgang', () => {
   test('Schlüssel eindeutig, jeder Punkt verlinkt, Handarbeit nicht leer', () => {
     const schluessel = PRUEFPUNKTE.map((p) => p.schluessel)
     assert.equal(new Set(schluessel).size, schluessel.length)
-    for (const p of PRUEFPUNKTE) assert.match(p.link, /^\//, p.schluessel)
+    for (const p of PRUEFPUNKTE) assert.match(p.link, /^(\/|https:\/\/github\.com\/)/, p.schluessel)
     assert.ok(HANDARBEIT.length >= 3)
   })
 })

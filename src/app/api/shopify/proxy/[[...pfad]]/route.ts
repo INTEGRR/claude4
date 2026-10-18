@@ -196,6 +196,10 @@ async function retoureAbsenden(request: Request, aktion: string, kundeId: string
     if (suche.art === 'ok') {
       return liquid(auswahlSeite({ aktion, bestellnummer: suche.bestellung.bestellung, email, zeilen: suche.bestellung.zeilen }))
     }
+    // Suche gedrosselt (0131): zu viele Fehlversuche zu dieser E-Mail, Nummer oder diesem Kunden.
+    if (suche.art === 'gedrosselt') {
+      return liquid(suchSeite({ aktion, bestellungen, meldung: 'Zu viele Versuche in kurzer Zeit — bitte versuch es in einer Stunde erneut.' }), 429)
+    }
     return liquid(
       suchSeite({
         aktion,

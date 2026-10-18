@@ -9,6 +9,12 @@
 # Dieser Workflow führt `npm run check` (Linter + Typprüfung + Tests +
 # Prozessläufe) auf jedem Push und jedem Pull Request aus, gegen eine
 # frische Postgres-Instanz im Service-Container. Laufzeit ~2 Minuten.
+#
+# Seit 2026-10-18 außerdem `npm audit --audit-level=high`: eine bekannte
+# hohe oder kritische Lücke in einer Abhängigkeit macht die Prüfung rot —
+# und weil Lücken auch ohne Push bekannt werden, läuft sie zusätzlich jeden
+# Montagmorgen auf dem Hauptzweig. Updates liefert Dependabot als PR
+# (.github/dependabot.yml).
 
 name: Prüfung
 
@@ -16,6 +22,9 @@ on:
   push:
     branches-ignore: [staging]
   pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: pruefung-${{ github.ref }}
@@ -56,6 +65,11 @@ jobs:
       - name: Abhängigkeiten
         run: npm ci
 
+      # Der Wächter über den Abhängigkeiten: rot ab „high". Mittlere und
+      # niedrige Befunde stehen im Protokoll und auf dem Produktivgang.
+      - name: Bekannte Lücken (npm audit)
+        run: npm audit --audit-level=high
+
       - name: Schema einspielen
         run: npm run db:migrate
 
@@ -89,6 +103,11 @@ jobs:
       - name: Harness-Spur
         if: always()
         run: cat prozess-harness.log || echo "keine Spur geschrieben"
+
+      # Audit-Stand wie im Vercel-Build, damit der Produktivgang-Punkt hier
+      # genauso entsteht wie in Produktion.
+      - name: Audit-Stand
+        run: npm run audit:stand
 
       # Der Build fängt, was die Tests nicht sehen: fehlerhafte Server/Client-
       # Grenzen, kaputte Importe in Seiten, ungültige Route-Signaturen.
