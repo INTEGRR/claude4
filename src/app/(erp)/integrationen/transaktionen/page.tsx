@@ -132,7 +132,7 @@ export default async function TransaktionenPage({
                 key={s.label}
                 href={linkFor({ system: s.key })}
                 aria-current={aktiv ? 'true' : undefined}
-                className={`btn small${aktiv ? ' primary' : ''}`}
+                className="btn small"
               >
                 {s.label}
               </Link>
@@ -142,7 +142,7 @@ export default async function TransaktionenPage({
           <Link
             href={linkFor({ nur: nurFehler ? undefined : 'fehler' })}
             aria-current={nurFehler ? 'true' : undefined}
-            className={`btn small${nurFehler ? ' primary' : ''}`}
+            className="btn small"
           >
             Nur Fehler
           </Link>

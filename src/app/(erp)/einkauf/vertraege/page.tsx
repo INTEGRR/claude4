@@ -4,6 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { VERTRAG_ARTEN, type VertragStatus, vertragsLage } from '@/modules/einkauf/lieferantenvertraege'
 import { date } from '@/modules/shared/format'
 import { vertragAnlegen } from './actions'
@@ -81,6 +82,88 @@ export default async function VertraegePage({
       <PageHeader
         title="Lieferantenverträge"
         subtitle="NDA, Qualitätssicherung, Rahmenverträge und Preislisten — mit Laufzeit, Frist und Erinnerung"
+      actions={
+            darf && (
+          <Schublade id="neu-vertrag" knopf="+ Neuer Vertrag" titel="Neuer Vertrag">
+            <ActionForm action={vertragAnlegen}>
+              <div className="row">
+                <label className="field">
+                  <span>Lieferant</span>
+                  <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" required defaultValue={vorLieferant}>
+                    <option value="" disabled>
+                      — wählen —
+                    </option>
+                    {lieferanten.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field">
+                  <span>Art</span>
+                  <Auswahl name="art" defaultValue="nda">
+                    {Object.entries(VERTRAG_ARTEN).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field" style={{ flex: 2 }}>
+                  <span>Titel</span>
+                  <input name="titel" required placeholder="z. B. Rahmenvertrag Keycaps 2026/27" />
+                </label>
+              </div>
+              <div className="row">
+                <label className="field shrink">
+                  <span>Gültig von</span>
+                  <input type="date" name="gueltig_von" />
+                </label>
+                <label className="field shrink">
+                  <span>Gültig bis (leer = unbefristet)</span>
+                  <input type="date" name="gueltig_bis" />
+                </label>
+                <label className="field shrink">
+                  <span>Kündigungsfrist (Monate)</span>
+                  <input name="kuendigungsfrist_monate" inputMode="numeric" placeholder="0" />
+                </label>
+                <label className="field shrink">
+                  <span>Verlängert sich um (Monate)</span>
+                  <input name="verlaengerung_monate" inputMode="numeric" placeholder="—" />
+                </label>
+                <label className="field shrink">
+                  <span>Erinnern (Tage vorher)</span>
+                  <input name="erinnerung_tage" inputMode="numeric" defaultValue="30" />
+                </label>
+                <label className="field shrink">
+                  <span>Währung der Preise</span>
+                  <Auswahl name="waehrung" defaultValue="" className="mono">
+                    <option value="">wie Lieferant</option>
+                    {waehrungen.map((w) => (
+                      <option key={w.code} value={w.code}>
+                        {w.code}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+              </div>
+              <label className="field">
+                <span>Notiz</span>
+                <textarea name="notiz" rows={2} />
+              </label>
+              <button className="primary" type="submit">
+                Vertrag anlegen
+              </button>
+              <p className="small muted" style={{ margin: '8px 0 0' }}>
+                Die Vertragsdatei hängt danach als Dokument am Vertrag. Wiedervorlage: Laufzeitende − Kündigungsfrist −
+                Erinnerung (Standard 30 Tage) — sie verschwindet, sobald der Vertrag verlängert, gekündigt oder beendet ist.
+              </p>
+            </ActionForm>
+
+          </Schublade>
+          )
+        }
       />
       <Card tight>
         <div className="actions" style={{ padding: 12 }}>
@@ -154,85 +237,6 @@ export default async function VertraegePage({
         <Seiten pfad="/einkauf/vertraege" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
-      {darf && (
-        <Card title="Neuer Vertrag">
-          <ActionForm action={vertragAnlegen}>
-            <div className="row">
-              <label className="field">
-                <span>Lieferant</span>
-                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" required defaultValue={vorLieferant}>
-                  <option value="" disabled>
-                    — wählen —
-                  </option>
-                  {lieferanten.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field">
-                <span>Art</span>
-                <Auswahl name="art" defaultValue="nda">
-                  {Object.entries(VERTRAG_ARTEN).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field" style={{ flex: 2 }}>
-                <span>Titel</span>
-                <input name="titel" required placeholder="z. B. Rahmenvertrag Keycaps 2026/27" />
-              </label>
-            </div>
-            <div className="row">
-              <label className="field shrink">
-                <span>Gültig von</span>
-                <input type="date" name="gueltig_von" />
-              </label>
-              <label className="field shrink">
-                <span>Gültig bis (leer = unbefristet)</span>
-                <input type="date" name="gueltig_bis" />
-              </label>
-              <label className="field shrink">
-                <span>Kündigungsfrist (Monate)</span>
-                <input name="kuendigungsfrist_monate" inputMode="numeric" placeholder="0" />
-              </label>
-              <label className="field shrink">
-                <span>Verlängert sich um (Monate)</span>
-                <input name="verlaengerung_monate" inputMode="numeric" placeholder="—" />
-              </label>
-              <label className="field shrink">
-                <span>Erinnern (Tage vorher)</span>
-                <input name="erinnerung_tage" inputMode="numeric" defaultValue="30" />
-              </label>
-              <label className="field shrink">
-                <span>Währung der Preise</span>
-                <Auswahl name="waehrung" defaultValue="" className="mono">
-                  <option value="">wie Lieferant</option>
-                  {waehrungen.map((w) => (
-                    <option key={w.code} value={w.code}>
-                      {w.code}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-            </div>
-            <label className="field">
-              <span>Notiz</span>
-              <textarea name="notiz" rows={2} />
-            </label>
-            <button className="primary" type="submit">
-              Vertrag anlegen
-            </button>
-            <p className="small muted" style={{ margin: '8px 0 0' }}>
-              Die Vertragsdatei hängt danach als Dokument am Vertrag. Wiedervorlage: Laufzeitende − Kündigungsfrist −
-              Erinnerung (Standard 30 Tage) — sie verschwindet, sobald der Vertrag verlängert, gekündigt oder beendet ist.
-            </p>
-          </ActionForm>
-        </Card>
-      )}
     </>
   )
 }

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { date, money } from '@/modules/shared/format'
 import { createPurchaseOrder } from './actions'
 import { belegLink } from './querverweise'
@@ -98,32 +99,34 @@ export default async function EinkaufPage({
       <PageHeader
         title="Bestellungen"
         subtitle="Angebotsanfragen und Bestellungen bei Lieferanten"
-        actions={<Link className="btn" href="/einkauf/rechnungen">Rechnungen</Link>}
+        actions={<>
+            <Link className="btn" href="/einkauf/rechnungen">Rechnungen</Link>
+            <Schublade id="neu-bestellung" knopf="+ Neue Bestellung" titel="Neue Bestellung">
+              <ActionForm action={createPurchaseOrder}>
+                <div className="row">
+                  <label className="field" style={{ flex: 3 }}>
+                    <span>Lieferant</span>
+                    <Auswahl kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
+                      <option value="" disabled>— auswählen —</option>
+                      {vendors.map((v) => (
+                        <option key={v.id} value={v.id}>{v.name}</option>
+                      ))}
+                    </Auswahl>
+                  </label>
+                  <div className="shrink field">
+                    <button className="primary" type="submit">Anlegen</button>
+                  </div>
+                </div>
+              </ActionForm>
+              {vendors.length === 0 && (
+                <div className="notice warn" style={{ marginBottom: 0 }}>
+                  Noch keine Lieferanten. Lege einen unter <Link href="/kontakte">Kontakte</Link> an.
+                </div>
+              )}
+  
+            </Schublade>
+          </>}
       />
-
-      <Card title="Neue Bestellung">
-        <ActionForm action={createPurchaseOrder}>
-          <div className="row">
-            <label className="field" style={{ flex: 3 }}>
-              <span>Lieferant</span>
-              <Auswahl kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
-                <option value="" disabled>— auswählen —</option>
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </Auswahl>
-            </label>
-            <div className="shrink field">
-              <button className="primary" type="submit">Anlegen</button>
-            </div>
-          </div>
-        </ActionForm>
-        {vendors.length === 0 && (
-          <div className="notice warn" style={{ marginBottom: 0 }}>
-            Noch keine Lieferanten. Lege einen unter <Link href="/kontakte">Kontakte</Link> an.
-          </div>
-        )}
-      </Card>
 
       <Card tight>
         <div className="actions" style={{ padding: 12 }}>
@@ -137,15 +140,6 @@ export default async function EinkaufPage({
                 href={f.key ? `/einkauf?filter=${f.key}` : '/einkauf'}
                 className="btn small"
                 aria-current={aktiv ? 'page' : undefined}
-                style={
-                  aktiv
-                    ? {
-                        background: 'var(--surface-2)',
-                        borderLeft: '2px solid var(--accent)',
-                        fontWeight: 600,
-                      }
-                    : undefined
-                }
               >
                 {f.label}
                 {f.count !== undefined && <span className="mono">({f.count})</span>}

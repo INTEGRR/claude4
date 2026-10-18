@@ -534,7 +534,8 @@
      "befund": "„Scannen“ ist dauerhaft violett hinterlegt/markiert und wirkt wie der aktive Menüpunkt — auch auf Sprechen, Konto oder Aufgaben. Der echte aktive Punkt (z. B. Aufgaben, orangefarbene Linie) konkurriert damit.",
      "vorschlag": "Kernfunktionen über Icon/Farbe kennzeichnen, aber nur den aktiven Punkt hinterlegen.",
      "id": "A00-rahmen#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     },
     {
      "schwere": "hoch",
@@ -542,7 +543,8 @@
      "befund": "Alle Gruppen sind zugeklappt; die Seitenleiste zeigt nur Versalien-Überschriften (VERKAUF, FERTIGUNG …). Ein neuer Nutzer sieht keinen einzigen Menüpunkt und muss raten, wo „Retouren“ oder „Stücklisten“ liegen.",
      "vorschlag": "Aktive Gruppe immer offen, zuletzt genutzte Gruppen offen merken; Gruppen-Icons; Suche im Menü.",
      "id": "A00-rahmen#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     },
     {
      "schwere": "mittel",
@@ -874,7 +876,8 @@
      "befund": "Der Status steht nur als kleines graues Etikett „ANGEBOT“ neben den Knöpfen; es gibt keine Statusleiste/Prozessanzeige (Angebot → Auftrag → geliefert → berechnet). Die Retoure hat ein Prozess-Panel, der Verkaufsauftrag nicht – inkonsistent zum Grundsatz ‚Prozess First‘.",
      "vorschlag": "Einheitliche Stufenleiste (Stepper) im Kopf aller Belege, aktueller Schritt hervorgehoben, nächste Aktion daneben.",
      "id": "102-verkauf-entwurf#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     },
     {
      "schwere": "hoch",
@@ -923,7 +926,8 @@
      "befund": "„Stornieren“ steht gleichrangig (rot umrandet) direkt neben „Bestätigen“ – destruktive Aktion zu prominent.",
      "vorschlag": "Stornieren in ein Mehr-Menü (⋯) verschieben.",
      "id": "102-verkauf-entwurf#7",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     }
    ],
    "messwerte": {
@@ -964,7 +968,8 @@
      "befund": "Statusetikett heißt „VERKAUFSAUFTRAG“ – das ist die Belegart, kein Zustand. Gleichzeitig ‚Lieferstatus: nicht geliefert‘, Lieferung ‚wartend auf Verfügbarkeit‘, FA ‚bestätigt‘: vier Statusbegriffe, keiner sagt ‚wartet auf Fertigung (0/5 gefertigt)‘.",
      "vorschlag": "Ein zusammengefasster Zustand im Kopf (z. B. ‚In Fertigung · 0 von 5 gefertigt · Liefertermin —‘) plus Stepper.",
      "id": "103-verkauf-bestaetigt#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     },
     {
      "schwere": "mittel",
@@ -2276,7 +2281,8 @@
      "befund": "Unter ‚Als Nächstes möglich‘ stehen vier gleichrangige graue Knöpfe (Genehmigen + Retourenlabel, Ablehnen, Ware eingegangen, Stornieren) – keine Primäraktion, der Normalfall (Genehmigen) ist nicht hervorgehoben.",
      "vorschlag": "Genehmigen als Primärknopf oben im Kopf, Ablehnen sekundär, Sonderwege (Eingang ohne Genehmigung, Stornieren) im Mehr-Menü.",
      "id": "213-retoure-angefragt#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     },
     {
      "schwere": "hoch",
@@ -2284,7 +2290,8 @@
      "befund": "Prozessdiagramm in Originalgröße unlesbar (Schrift ~7 px), Knotentitel abgeschnitten (‚Genehmigen + Retourer‘, ‚Prüfen und zurückbuche‘), technische Aktionsnamen (versand.retoure_anlegen) für Anwender sichtbar; nimmt ~600 px Höhe ein.",
      "vorschlag": "Kompakter horizontaler Stepper der Hauptschritte; Diagramm einklappbar; Codes nur im Designer.",
      "id": "213-retoure-angefragt#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     },
     {
      "schwere": "niedrig",
@@ -2678,7 +2685,8 @@
      "befund": "Sieben gleichrangige Knöpfe im Kopf (Drucken, Etikett drucken, Ansicht, Verfügbarkeit prüfen, Fertigung starten, Stornieren) + ‚Übernehmen‘ – der nächste Schritt (Fertigung starten) ist nicht hervorgehoben, ‚Stornieren‘ rot daneben.",
      "vorschlag": "Primär ‚Fertigung starten‘, Drucken als Gruppe, Stornieren ins Mehr-Menü.",
      "id": "301-mo-bestaetigt#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     },
     {
      "schwere": "mittel",
@@ -5008,7 +5016,8 @@
      "befund": "Das Prozessdiagramm (≈ 600 px, Schrift unlesbar) steht vor dem Fehlerbild und den Teilen – das Wichtigste beginnt erst unterhalb des Falzes.",
      "vorschlag": "Kompakter Stepper oben, Diagramm einklappbar unten.",
      "id": "601-reparatur-neu#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     },
     {
      "schwere": "mittel",
@@ -5814,7 +5823,8 @@
      "befund": "Untertitel ‚miete · 2.400,00 € monatlich‘ kleingeschrieben; Diagramm zeigt nur 2 Schritte, nimmt aber 420 px ein.",
      "vorschlag": "Stepper statt Diagramm.",
      "id": "853-vertrag#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "6da1c2e"
     }
    ],
    "messwerte": {
@@ -8411,7 +8421,8 @@
      "befund": "Das schwebende Befehlsfeld ‚Was möchtest du tun?‘ liegt mitten über den Kacheln und verdeckt beim Scrollen jeweils eine Kachel vollständig (hier ‚Wareneingänge heute erwartet‘).",
      "vorschlag": "Am Handy unten fixiert mit Abstand zum Inhalt (padding-bottom) oder als Knopf, der das Feld öffnet.",
      "id": "m01-uebersicht#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "4b2005b"
     },
     {
      "schwere": "mittel",

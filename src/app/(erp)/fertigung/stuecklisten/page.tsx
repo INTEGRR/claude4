@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { qty } from '@/modules/shared/format'
 import { createBom } from '../actions'
 import { Auswahl } from '@/components/auswahl'
@@ -52,30 +53,32 @@ export default async function BomListPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="Stücklisten"
         subtitle="Eine Stückliste je Produkt — einzelne Positionen lassen sich auf Varianten einschränken"
-      />
+      actions={
+            <Schublade id="neu-stueckliste" knopf="+ Neue Stückliste" titel="Neue Stückliste">
+            <ActionForm action={createBom}>
+              <div className="row">
+                <label className="field" style={{ flex: 3 }}>
+                  <span>Produkt</span>
+                  <Auswahl name="template_id" required defaultValue="">
+                    <option value="" disabled>— auswählen —</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field">
+                  <span>Referenzmenge</span>
+                  <input type="number" name="qty" step="0.001" min="0.001" defaultValue={1} required />
+                </label>
+                <div className="shrink field">
+                  <button className="primary" type="submit">Anlegen</button>
+                </div>
+              </div>
+            </ActionForm>
 
-      <Card title="Neue Stückliste">
-        <ActionForm action={createBom}>
-          <div className="row">
-            <label className="field" style={{ flex: 3 }}>
-              <span>Produkt</span>
-              <Auswahl name="template_id" required defaultValue="">
-                <option value="" disabled>— auswählen —</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </Auswahl>
-            </label>
-            <label className="field">
-              <span>Referenzmenge</span>
-              <input type="number" name="qty" step="0.001" min="0.001" defaultValue={1} required />
-            </label>
-            <div className="shrink field">
-              <button className="primary" type="submit">Anlegen</button>
-            </div>
-          </div>
-        </ActionForm>
-      </Card>
+          </Schublade>
+        }
+      />
 
       <Card tight>
         {inaktiv > 0 && (

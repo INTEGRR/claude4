@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap, Ueberfaellig } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { LABELS, date } from '@/modules/shared/format'
 import { createRepair } from './actions'
 import { Auswahl } from '@/components/auswahl'
@@ -80,52 +81,50 @@ export default async function ReparaturPage({
       <PageHeader
         title="Reparaturen"
         subtitle="Reparaturaufträge mit Teileverbrauch — Ersatzteile verlassen das Lager, ausgebaute Teile werden entsorgt oder wiederverwendet"
-        actions={
-          <>
+        actions={<>
             <Link className="btn" href="/vorgaenge/prozess/reparatur_anfrage">Reparaturanfragen</Link>
             <Link className="btn" href="/lager/zulauf">Zulauf</Link>
-          </>
-        }
+            <Schublade id="neu-reparatur" knopf="+ Neuer Reparaturauftrag" titel="Neuer Reparaturauftrag">
+              <ActionForm action={createRepair}>
+                <div className="row">
+                  <label className="field" style={{ flex: 2 }}>
+                    <span>Kunde</span>
+                    <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
+                      <option value="" disabled>— auswählen —</option>
+                      {partners.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </Auswahl>
+                  </label>
+                  <label className="field" style={{ flex: 2 }}>
+                    <span>Produkt</span>
+                    <Auswahl name="variant_id" required defaultValue="">
+                      <option value="" disabled>— auswählen —</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </Auswahl>
+                  </label>
+                  <label className="field">
+                    <span>Menge</span>
+                    <input type="number" name="qty" step="1" min="1" defaultValue={1} />
+                  </label>
+                  <div className="shrink field">
+                    <label className="shrink" style={{ display: 'block', marginBottom: 8 }}>
+                      <input type="checkbox" name="under_warranty" /> <span className="mono-label">Garantie</span>
+                    </label>
+                    <button className="primary" type="submit">Anlegen</button>
+                  </div>
+                </div>
+                <label className="field">
+                  <span>Fehlerbeschreibung</span>
+                  <textarea name="note" rows={2} placeholder="z. B. Taste klemmt, Switch defekt" />
+                </label>
+              </ActionForm>
+  
+            </Schublade>
+          </>}
       />
-
-      <Card title="Neuer Reparaturauftrag">
-        <ActionForm action={createRepair}>
-          <div className="row">
-            <label className="field" style={{ flex: 2 }}>
-              <span>Kunde</span>
-              <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
-                <option value="" disabled>— auswählen —</option>
-                {partners.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </Auswahl>
-            </label>
-            <label className="field" style={{ flex: 2 }}>
-              <span>Produkt</span>
-              <Auswahl name="variant_id" required defaultValue="">
-                <option value="" disabled>— auswählen —</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </Auswahl>
-            </label>
-            <label className="field">
-              <span>Menge</span>
-              <input type="number" name="qty" step="1" min="1" defaultValue={1} />
-            </label>
-            <div className="shrink field">
-              <label className="shrink" style={{ display: 'block', marginBottom: 8 }}>
-                <input type="checkbox" name="under_warranty" /> <span className="mono-label">Garantie</span>
-              </label>
-              <button className="primary" type="submit">Anlegen</button>
-            </div>
-          </div>
-          <label className="field">
-            <span>Fehlerbeschreibung</span>
-            <textarea name="note" rows={2} placeholder="z. B. Taste klemmt, Switch defekt" />
-          </label>
-        </ActionForm>
-      </Card>
 
       <Card tight>
         {/* Filter als Links: die Adresszeile ist der Filterzustand. */}
@@ -134,7 +133,8 @@ export default async function ReparaturPage({
           {ZUSTAENDE.map((z) => (
             <Link
               key={z}
-              className={`btn small${filter === z ? ' primary' : ''}`}
+              className="btn small"
+              aria-current={filter === z ? 'page' : undefined}
               href={`/reparatur?zustand=${z}`}
             >
               {LABELS.repair[z]}

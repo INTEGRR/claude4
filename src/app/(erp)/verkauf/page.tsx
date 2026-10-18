@@ -79,6 +79,11 @@ export default async function VerkaufPage({
     limit ${seite.limit} offset ${seite.offset}`
   const gesamt = gesamtAus(rows)
 
+  // Zähler je Filter (2026-10-18, M11): wie viele Belege dahinter stehen.
+  const zaehler = new Map(
+    (await sql<{ state: string; n: number }[]>`
+      select state::text as state, count(*)::int as n from sales_orders group by state`).map((r) => [r.state, r.n]),
+  )
   const filters = [
     { key: undefined, label: 'Alle' },
     { key: 'draft', label: 'Angebote' },
@@ -95,7 +100,7 @@ export default async function VerkaufPage({
           <>
             <Link className="btn" href="/verkauf/rechnungen">Rechnungen</Link>
             <Link className="btn primary" href="/verkauf/neu">
-              Neuer Auftrag
+              + Neuer Auftrag
             </Link>
           </>
         }
@@ -104,25 +109,18 @@ export default async function VerkaufPage({
       <Card tight>
         <div className="actions" style={{ padding: 12 }}>
           {filters.map((f) => (
-            // Der aktive Ansichtsfilter wird wie die Navigation markiert (Rille + Akzentkante),
-            // nicht als gefüllte Primärtaste — Orange bleibt der echten Primäraktion vorbehalten.
+            // Aktiver Filter: einheitliches Filter-Schild (aria-current, 2026-10-18, M11) —
+            // nicht als gefüllte Primärtaste, Orange bleibt der echten Primäraktion vorbehalten.
             <Link
               key={f.label}
               href={f.key ? `/verkauf?status=${f.key}` : '/verkauf'}
               className="btn small"
               aria-current={status === f.key ? 'page' : undefined}
-              style={
-                status === f.key
-                  ? {
-                      background: 'var(--surface-2)',
-                      borderLeft: '2px solid var(--accent)',
-                      fontWeight: 600,
-                    }
-                  : // gleiche Kantenbreite im Ruhezustand, damit nichts springt
-                    { borderLeft: '2px solid transparent' }
-              }
             >
-              {f.label}
+              {f.label}{' '}
+              <span className="filter-zahl">
+                {f.key ? (zaehler.get(f.key) ?? 0) : [...zaehler.values()].reduce((a, b) => a + b, 0)}
+              </span>
             </Link>
           ))}
           <form className="actions" style={{ marginLeft: 'auto', gap: 6 }}>

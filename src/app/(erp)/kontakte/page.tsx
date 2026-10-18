@@ -3,6 +3,7 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { createPartner } from './actions'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { Seiten } from '@/components/seiten'
@@ -46,72 +47,74 @@ export default async function KontaktePage({
 
   return (
     <>
-      <PageHeader title="Kontakte" subtitle="Kunden und Lieferanten" />
+      <PageHeader title="Kontakte" subtitle="Kunden und Lieferanten" actions={
+            <Schublade id="neu-kontakt" knopf="+ Neuer Kontakt" titel="Neuer Kontakt">
+            <ActionForm action={createPartner}>
+              {/* BUG/00013: Personen brauchen Vor- UND Nachname — daraus entsteht
+                  der Anzeigename. Firmen tragen genau einen Namen. Welche Felder
+                  zählen, entscheidet der Haken „Firma"; geprüft wird das in der
+                  Registry-Aktion, nicht nur hier. */}
+              <div className="row">
+                <label className="field" style={{ flex: 2 }}>
+                  <span>Firmenname</span>
+                  <input name="name" placeholder="nur bei Firmen" />
+                </label>
+                <label className="field">
+                  <span>Vorname</span>
+                  <input name="vorname" placeholder="bei Personen" />
+                </label>
+                <label className="field">
+                  <span>Nachname</span>
+                  <input name="nachname" placeholder="bei Personen" />
+                </label>
+              </div>
+              <div className="row">
+                <label className="field">
+                  <span>E-Mail</span>
+                  <input type="email" name="email" placeholder="für Bestellungen nötig" />
+                </label>
+                <label className="field">
+                  <span>Telefon</span>
+                  <input name="phone" />
+                </label>
+                <label className="field">
+                  <span>USt-ID</span>
+                  <input className="mono" name="vat" />
+                </label>
+              </div>
+              <div className="row">
+                <label className="field" style={{ flex: 2 }}>
+                  <span>Straße</span>
+                  <input name="street" />
+                </label>
+                <label className="field">
+                  <span>Hausnummer</span>
+                  <input name="house_number" placeholder="für DHL nötig" />
+                </label>
+                <label className="field">
+                  <span>PLZ</span>
+                  <input className="mono" name="zip" />
+                </label>
+                <label className="field">
+                  <span>Ort</span>
+                  <input name="city" />
+                </label>
+                <label className="field">
+                  <span>Land</span>
+                  <input className="mono" name="country_code" defaultValue="DE" maxLength={2} />
+                </label>
+              </div>
+              <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
+                <label className="shrink field"><input type="checkbox" name="is_company" defaultChecked /> Firma</label>
+                <label className="shrink field"><input type="checkbox" name="is_customer" defaultChecked /> Kunde</label>
+                <label className="shrink field"><input type="checkbox" name="is_vendor" /> Lieferant</label>
+              </div>
+              <button className="primary" type="submit">Kontakt anlegen</button>
+            </ActionForm>
 
-      <Card title="Neuer Kontakt">
-        <ActionForm action={createPartner}>
-          {/* BUG/00013: Personen brauchen Vor- UND Nachname — daraus entsteht
-              der Anzeigename. Firmen tragen genau einen Namen. Welche Felder
-              zählen, entscheidet der Haken „Firma"; geprüft wird das in der
-              Registry-Aktion, nicht nur hier. */}
-          <div className="row">
-            <label className="field" style={{ flex: 2 }}>
-              <span>Firmenname</span>
-              <input name="name" placeholder="nur bei Firmen" />
-            </label>
-            <label className="field">
-              <span>Vorname</span>
-              <input name="vorname" placeholder="bei Personen" />
-            </label>
-            <label className="field">
-              <span>Nachname</span>
-              <input name="nachname" placeholder="bei Personen" />
-            </label>
-          </div>
-          <div className="row">
-            <label className="field">
-              <span>E-Mail</span>
-              <input type="email" name="email" placeholder="für Bestellungen nötig" />
-            </label>
-            <label className="field">
-              <span>Telefon</span>
-              <input name="phone" />
-            </label>
-            <label className="field">
-              <span>USt-ID</span>
-              <input className="mono" name="vat" />
-            </label>
-          </div>
-          <div className="row">
-            <label className="field" style={{ flex: 2 }}>
-              <span>Straße</span>
-              <input name="street" />
-            </label>
-            <label className="field">
-              <span>Hausnummer</span>
-              <input name="house_number" placeholder="für DHL nötig" />
-            </label>
-            <label className="field">
-              <span>PLZ</span>
-              <input className="mono" name="zip" />
-            </label>
-            <label className="field">
-              <span>Ort</span>
-              <input name="city" />
-            </label>
-            <label className="field">
-              <span>Land</span>
-              <input className="mono" name="country_code" defaultValue="DE" maxLength={2} />
-            </label>
-          </div>
-          <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
-            <label className="shrink field"><input type="checkbox" name="is_company" defaultChecked /> Firma</label>
-            <label className="shrink field"><input type="checkbox" name="is_customer" defaultChecked /> Kunde</label>
-            <label className="shrink field"><input type="checkbox" name="is_vendor" /> Lieferant</label>
-          </div>
-          <button className="primary" type="submit">Kontakt anlegen</button>
-        </ActionForm>
-      </Card>
+          </Schublade>
+        }
+      />
 
       <Card tight>
         <div className="actions" style={{ padding: 12, alignItems: 'flex-end' }}>
@@ -128,15 +131,6 @@ export default async function KontaktePage({
                 href={f.key ? `/kontakte?art=${f.key}` : '/kontakte'}
                 className="btn small"
                 aria-current={aktiv ? 'page' : undefined}
-                style={
-                  aktiv
-                    ? {
-                        background: 'var(--surface-2)',
-                        borderLeft: '2px solid var(--accent)',
-                        fontWeight: 600,
-                      }
-                    : undefined
-                }
               >
                 {f.label}
               </Link>

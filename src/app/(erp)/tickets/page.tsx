@@ -63,7 +63,8 @@ export default async function TicketsPage({
           ].map(([wert, text]) => (
             <div className="shrink" key={wert}>
               <Link
-                className={`btn small${filter === wert ? ' primary' : ''}`}
+                className="btn small"
+                aria-current={filter === wert ? 'page' : undefined}
                 href={wert === 'alle' ? '/tickets' : `/tickets?status=${wert}`}
               >
                 {text}

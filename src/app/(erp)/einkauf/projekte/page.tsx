@@ -4,6 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { PROJEKT_ARTEN } from '@/modules/einkauf/einkaufsprojekt'
 import { date } from '@/modules/shared/format'
 import { projektAnlegen } from './actions'
@@ -76,7 +77,77 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Einkaufsprojekte" subtitle="Bedarf → Anfragen → Angebote vergleichen → bestellen → geliefert" />
+      <PageHeader title="Einkaufsprojekte" subtitle="Bedarf → Anfragen → Angebote vergleichen → bestellen → geliefert" actions={
+            darf && (
+          <Schublade id="neu-projekt" knopf="+ Neues Projekt" titel="Neues Projekt">
+            <ActionForm action={projektAnlegen}>
+              <div className="row">
+                <label className="field">
+                  <span>Titel</span>
+                  <input name="titel" required placeholder="z. B. Keycap-Set PBT Nachproduktion" />
+                </label>
+                <label className="field">
+                  <span>Art</span>
+                  <Auswahl name="art" defaultValue="nachproduktion">
+                    {Object.entries(PROJEKT_ARTEN).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field">
+                  <span>Zieltermin</span>
+                  <input type="date" name="zieltermin" />
+                </label>
+                <label className="field">
+                  <span>Verantwortlich</span>
+                  <Auswahl name="verantwortlich_id" defaultValue={user.id}>
+                    {nutzer.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.name}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+              </div>
+              <div className="row">
+                <label className="field">
+                  <span>Erste Position</span>
+                  <input name="pos_bezeichnung" placeholder="Bezeichnung, z. B. Foam-Einlage 60 %" />
+                </label>
+                <label className="field">
+                  <span>oder Artikel (SKU)</span>
+                  <input name="pos_produkt" className="mono" placeholder="SKU oder Barcode" />
+                </label>
+                <label className="field">
+                  <span>Menge</span>
+                  <input name="pos_menge" inputMode="decimal" placeholder="500" />
+                </label>
+                <label className="field">
+                  <span>Zielpreis je Stück (€)</span>
+                  <input name="pos_zielpreis" inputMode="decimal" placeholder="0,85" />
+                </label>
+                <div className="shrink field">
+                  <button className="primary" type="submit">
+                    Projekt anlegen
+                  </button>
+                </div>
+              </div>
+              <label className="small" style={{ display: 'block', marginTop: 6 }}>
+                <input type="checkbox" name="muster_pflicht" /> <strong>Musterpflicht</strong> — bestellt wird erst, wenn ein
+                Golden Sample des gewählten Lieferanten freigegeben ist (Neuteile, Formen)
+              </label>
+              <p className="small muted" style={{ margin: '8px 0 0' }}>
+                Weitere Positionen, Dateien (Zeichnungen, Stücklisten) und die Lieferanten für die Anfrage kommen im Projekt dazu.
+                Der Zielpreis ist der Einstand je Stück in Euro (inkl. Fracht und Zoll) — er geht nie an den Lieferanten.
+              </p>
+            </ActionForm>
+
+          </Schublade>
+          )
+        }
+      />
       <Card tight>
         <div className="actions" style={{ padding: 12 }}>
           {ANSICHTEN.map((a) => (
@@ -158,73 +229,6 @@ export default async function ProjektePage({ searchParams }: { searchParams: Pro
         <Seiten pfad="/einkauf/projekte" params={params} seite={seite} gesamt={gesamt} />
       </Card>
 
-      {darf && (
-        <Card title="Neues Projekt">
-          <ActionForm action={projektAnlegen}>
-            <div className="row">
-              <label className="field">
-                <span>Titel</span>
-                <input name="titel" required placeholder="z. B. Keycap-Set PBT Nachproduktion" />
-              </label>
-              <label className="field">
-                <span>Art</span>
-                <Auswahl name="art" defaultValue="nachproduktion">
-                  {Object.entries(PROJEKT_ARTEN).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field">
-                <span>Zieltermin</span>
-                <input type="date" name="zieltermin" />
-              </label>
-              <label className="field">
-                <span>Verantwortlich</span>
-                <Auswahl name="verantwortlich_id" defaultValue={user.id}>
-                  {nutzer.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.name}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-            </div>
-            <div className="row">
-              <label className="field">
-                <span>Erste Position</span>
-                <input name="pos_bezeichnung" placeholder="Bezeichnung, z. B. Foam-Einlage 60 %" />
-              </label>
-              <label className="field">
-                <span>oder Artikel (SKU)</span>
-                <input name="pos_produkt" className="mono" placeholder="SKU oder Barcode" />
-              </label>
-              <label className="field">
-                <span>Menge</span>
-                <input name="pos_menge" inputMode="decimal" placeholder="500" />
-              </label>
-              <label className="field">
-                <span>Zielpreis je Stück (€)</span>
-                <input name="pos_zielpreis" inputMode="decimal" placeholder="0,85" />
-              </label>
-              <div className="shrink field">
-                <button className="primary" type="submit">
-                  Projekt anlegen
-                </button>
-              </div>
-            </div>
-            <label className="small" style={{ display: 'block', marginTop: 6 }}>
-              <input type="checkbox" name="muster_pflicht" /> <strong>Musterpflicht</strong> — bestellt wird erst, wenn ein
-              Golden Sample des gewählten Lieferanten freigegeben ist (Neuteile, Formen)
-            </label>
-            <p className="small muted" style={{ margin: '8px 0 0' }}>
-              Weitere Positionen, Dateien (Zeichnungen, Stücklisten) und die Lieferanten für die Anfrage kommen im Projekt dazu.
-              Der Zielpreis ist der Einstand je Stück in Euro (inkl. Fracht und Zoll) — er geht nie an den Lieferanten.
-            </p>
-          </ActionForm>
-        </Card>
-      )}
     </>
   )
 }

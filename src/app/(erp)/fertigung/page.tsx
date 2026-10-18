@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { cancelMo, createMo, produceMoDirekt } from './actions'
 import { FertigungBulk } from './bulk'
 import { Auswahl } from '@/components/auswahl'
@@ -149,7 +150,38 @@ export default async function FertigungPage({
       <PageHeader
         title="Fertigungsaufträge"
         subtitle="Aufträge aus dem Verkauf (MTO) und manuell angelegte Aufträge"
-        actions={<Link className="btn" href="/fertigung/demontage">Demontage</Link>}
+        actions={<>
+            <Link className="btn" href="/fertigung/demontage">Demontage</Link>
+            <Schublade id="neu-fertigungsauftrag" knopf="+ Neuer Fertigungsauftrag" titel="Neuer Fertigungsauftrag">
+              <ActionForm action={createMo}>
+                <div className="row">
+                  <label className="field" style={{ flex: 3 }}>
+                    <span>Produkt (nur Produkte mit Stückliste)</span>
+                    <Auswahl name="variant_id" required defaultValue="">
+                      <option value="" disabled>— auswählen —</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </Auswahl>
+                  </label>
+                  <label className="field">
+                    <span>Menge</span>
+                    <input type="number" name="qty" step="0.001" min="0.001" defaultValue={1} required />
+                  </label>
+                  <div className="shrink field">
+                    <button className="primary" type="submit">Anlegen</button>
+                  </div>
+                </div>
+              </ActionForm>
+              {products.length === 0 && (
+                <div className="notice warn" style={{ marginBottom: 0 }}>
+                  Es gibt noch kein Produkt mit Stückliste. Lege zuerst eine unter{' '}
+                  <Link href="/fertigung/stuecklisten">Stücklisten</Link> an.
+                </div>
+              )}
+  
+            </Schublade>
+          </>}
       />
 
       {nachfragen.length > 0 && (
@@ -234,35 +266,6 @@ export default async function FertigungPage({
           </TableWrap>
         </Card>
       )}
-
-      <Card title="Neuer Fertigungsauftrag">
-        <ActionForm action={createMo}>
-          <div className="row">
-            <label className="field" style={{ flex: 3 }}>
-              <span>Produkt (nur Produkte mit Stückliste)</span>
-              <Auswahl name="variant_id" required defaultValue="">
-                <option value="" disabled>— auswählen —</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </Auswahl>
-            </label>
-            <label className="field">
-              <span>Menge</span>
-              <input type="number" name="qty" step="0.001" min="0.001" defaultValue={1} required />
-            </label>
-            <div className="shrink field">
-              <button className="primary" type="submit">Anlegen</button>
-            </div>
-          </div>
-        </ActionForm>
-        {products.length === 0 && (
-          <div className="notice warn" style={{ marginBottom: 0 }}>
-            Es gibt noch kein Produkt mit Stückliste. Lege zuerst eine unter{' '}
-            <Link href="/fertigung/stuecklisten">Stücklisten</Link> an.
-          </div>
-        )}
-      </Card>
 
       {auftrag && (
         <div className="notice info">

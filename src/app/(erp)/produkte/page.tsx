@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { money, qty } from '@/modules/shared/format'
 import { createProduct } from './actions'
 import { Auswahl } from '@/components/auswahl'
@@ -58,56 +59,54 @@ export default async function ProduktePage({
       <PageHeader
         title="Produkte"
         subtitle="Produktvorlagen mit Attributen und Varianten"
-        actions={
-          <>
+        actions={<>
             <Link className="btn" href="/p/artikel_anlegen">Anlage-Assistent</Link>
             <Link className="btn" href="/produkte/attribute">Attribute</Link>
             {/* Kategorien, Steuern, Zahlungsbedingungen: Einstellungen → Stammdaten (nur Admin). */}
             {canAccess(user.rollen, 'einstellungen', user.befugnisse) && (
               <Link className="btn" href="/einstellungen/stammdaten">Kategorien &amp; Steuern</Link>
             )}
-          </>
-        }
+            <Schublade id="neu-produkt" knopf="+ Neues Produkt" titel="Neues Produkt">
+              <ActionForm action={createProduct}>
+                <div className="row">
+                  <label className="field" style={{ flex: 3 }}>
+                    <span>Name</span>
+                    <input name="name" required placeholder="z. B. Tastatur" />
+                  </label>
+                  <label className="field">
+                    <span>Artikelnummer</span>
+                    <input name="sku" className="mono" placeholder="optional" />
+                  </label>
+                  <label className="field">
+                    <span>Einheit</span>
+                    <Auswahl name="uom_id" required defaultValue={uoms.find((u) => u.name === 'Stück')?.id}>
+                      {uoms.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.category})</option>
+                      ))}
+                    </Auswahl>
+                  </label>
+                  <label className="field">
+                    <span>Verkaufspreis</span>
+                    <input type="number" name="list_price" step="0.01" defaultValue={0} />
+                  </label>
+                  <label className="field">
+                    <span>Gewicht (g)</span>
+                    <input type="number" name="weight_g" step="1" defaultValue={0} />
+                  </label>
+                </div>
+                <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
+                  <label className="shrink"><input type="checkbox" name="can_be_sold" defaultChecked /> Verkaufbar</label>
+                  <label className="shrink"><input type="checkbox" name="can_be_purchased" /> Einkaufbar</label>
+                  <label className="shrink"><input type="checkbox" name="route_buy" /> Route: Einkaufen</label>
+                  <label className="shrink"><input type="checkbox" name="route_manufacture" /> Route: Fertigen</label>
+                  <label className="shrink"><input type="checkbox" name="route_mto" /> Route: Auf Bestellung (MTO)</label>
+                </div>
+                <button className="primary" type="submit">Produkt anlegen</button>
+              </ActionForm>
+  
+            </Schublade>
+          </>}
       />
-
-      <Card title="Neues Produkt">
-        <ActionForm action={createProduct}>
-          <div className="row">
-            <label className="field" style={{ flex: 3 }}>
-              <span>Name</span>
-              <input name="name" required placeholder="z. B. Tastatur" />
-            </label>
-            <label className="field">
-              <span>Artikelnummer</span>
-              <input name="sku" className="mono" placeholder="optional" />
-            </label>
-            <label className="field">
-              <span>Einheit</span>
-              <Auswahl name="uom_id" required defaultValue={uoms.find((u) => u.name === 'Stück')?.id}>
-                {uoms.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name} ({u.category})</option>
-                ))}
-              </Auswahl>
-            </label>
-            <label className="field">
-              <span>Verkaufspreis</span>
-              <input type="number" name="list_price" step="0.01" defaultValue={0} />
-            </label>
-            <label className="field">
-              <span>Gewicht (g)</span>
-              <input type="number" name="weight_g" step="1" defaultValue={0} />
-            </label>
-          </div>
-          <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
-            <label className="shrink"><input type="checkbox" name="can_be_sold" defaultChecked /> Verkaufbar</label>
-            <label className="shrink"><input type="checkbox" name="can_be_purchased" /> Einkaufbar</label>
-            <label className="shrink"><input type="checkbox" name="route_buy" /> Route: Einkaufen</label>
-            <label className="shrink"><input type="checkbox" name="route_manufacture" /> Route: Fertigen</label>
-            <label className="shrink"><input type="checkbox" name="route_mto" /> Route: Auf Bestellung (MTO)</label>
-          </div>
-          <button className="primary" type="submit">Produkt anlegen</button>
-        </ActionForm>
-      </Card>
 
       <Card tight>
         <div style={{ padding: 12 }}>

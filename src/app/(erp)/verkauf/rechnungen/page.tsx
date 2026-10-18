@@ -172,7 +172,7 @@ export default async function KundenrechnungenPage({
       <Card tight>
         <div className="actions" style={{ padding: 12, flexWrap: 'wrap' }}>
           {(Object.keys(FILTER) as Filter[]).map((f) => (
-            <Link key={f} className={`btn small${f === filter ? ' primary' : ''}`} href={`/verkauf/rechnungen?filter=${f}`}>
+            <Link key={f} className="btn small" aria-current={f === filter ? 'page' : undefined} href={`/verkauf/rechnungen?filter=${f}`}>
               {FILTER[f]}
             </Link>
           ))}

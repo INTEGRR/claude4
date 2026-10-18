@@ -4,6 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { ActionForm } from '@/components/action-button'
 import { AufgabenListe } from '@/components/aufgaben-liste'
 import { Card, Empty, PageHeader } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { type AufgabenFilter, aufgabenListe } from '@/modules/aufgaben/liste'
 import { TEAMS, heuteInBerlin } from '@/modules/aufgaben/termin'
 import { aufgabeAnlegen } from './actions'
@@ -36,63 +37,65 @@ export default async function AufgabenPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Aufgaben" subtitle="Wer was bis wann erledigt — erscheint beim Zuständigen in der Übersicht" />
+      <PageHeader title="Aufgaben" subtitle="Wer was bis wann erledigt — erscheint beim Zuständigen in der Übersicht" actions={
+            <Schublade id="neu-aufgabe" knopf="+ Neue Aufgabe" titel="Neue Aufgabe">
+            <ActionForm action={aufgabeAnlegen}>
+              <div className="row">
+                <label className="field" style={{ flex: 3 }}>
+                  <span>Was ist zu tun?</span>
+                  <input name="titel" required maxLength={200} placeholder="z. B. Lager hinten durchfegen" />
+                </label>
+                <label className="field" style={{ flex: 1.4 }}>
+                  <span>Für</span>
+                  <Auswahl name="zustaendig" defaultValue="">
+                    <option value="">mich</option>
+                    <optgroup label="Team">
+                      {Object.entries(TEAMS).map(([rolle, name]) => (
+                        <option key={rolle} value={`rolle:${rolle}`}>
+                          {name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Person">
+                      {nutzer
+                        .filter((u) => u.id !== user.id)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  </Auswahl>
+                </label>
+              </div>
+              <div className="row">
+                <label className="field shrink">
+                  <span>Fällig am</span>
+                  <input name="faellig_am" type="date" required defaultValue={heuteInBerlin()} min={heuteInBerlin()} />
+                </label>
+                <label className="field shrink">
+                  <span>Uhrzeit</span>
+                  <input name="uhrzeit" type="time" />
+                </label>
+                <label className="field shrink">
+                  <span>Dauer (min)</span>
+                  <input name="dauer_min" type="number" min={5} max={1440} step={5} placeholder="30" style={{ width: 90 }} />
+                </label>
+                <label className="field" style={{ flex: 2 }}>
+                  <span>Details</span>
+                  <input name="beschreibung" maxLength={2000} placeholder="optional" />
+                </label>
+                <div className="field shrink">
+                  <button className="primary" type="submit">
+                    Anlegen
+                  </button>
+                </div>
+              </div>
+            </ActionForm>
 
-      <Card title="Neue Aufgabe">
-        <ActionForm action={aufgabeAnlegen}>
-          <div className="row">
-            <label className="field" style={{ flex: 3 }}>
-              <span>Was ist zu tun?</span>
-              <input name="titel" required maxLength={200} placeholder="z. B. Lager hinten durchfegen" />
-            </label>
-            <label className="field" style={{ flex: 1.4 }}>
-              <span>Für</span>
-              <Auswahl name="zustaendig" defaultValue="">
-                <option value="">mich</option>
-                <optgroup label="Team">
-                  {Object.entries(TEAMS).map(([rolle, name]) => (
-                    <option key={rolle} value={`rolle:${rolle}`}>
-                      {name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Person">
-                  {nutzer
-                    .filter((u) => u.id !== user.id)
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                </optgroup>
-              </Auswahl>
-            </label>
-          </div>
-          <div className="row">
-            <label className="field shrink">
-              <span>Fällig am</span>
-              <input name="faellig_am" type="date" required defaultValue={heuteInBerlin()} min={heuteInBerlin()} />
-            </label>
-            <label className="field shrink">
-              <span>Uhrzeit</span>
-              <input name="uhrzeit" type="time" />
-            </label>
-            <label className="field shrink">
-              <span>Dauer (min)</span>
-              <input name="dauer_min" type="number" min={5} max={1440} step={5} placeholder="30" style={{ width: 90 }} />
-            </label>
-            <label className="field" style={{ flex: 2 }}>
-              <span>Details</span>
-              <input name="beschreibung" maxLength={2000} placeholder="optional" />
-            </label>
-            <div className="field shrink">
-              <button className="primary" type="submit">
-                Anlegen
-              </button>
-            </div>
-          </div>
-        </ActionForm>
-      </Card>
+          </Schublade>
+        }
+      />
 
       <Card tight>
         <div className="actions" style={{ padding: 12 }}>

@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Paket U4: Anlegen in der Schublade, einheitliche Filter
+
+**Anlass:** UX-Audit M4/M11 (300#5, 310#1, 401#3, 410#1, 480#2, 600#3,
+900#2, 910#2, m05#1): Anlegeformulare standen über (oder dauerhaft unter)
+der Liste und nahmen die prominenteste Fläche ein; am Handy begann die
+Liste erst nach ~700 px. Aktive Filter sahen auf drei Arten aus (Leuchte,
+Akzentkante, Primärtaste).
+
+**Entschieden:**
+- `Schublade` (`src/components/schublade.tsx`): „+ Neu …" im Seitenkopf,
+  das Formular fährt von rechts heraus (natives popover wie das
+  Fehler-Panel, öffnet vor der Hydration, Auswahlfelder darin
+  funktionieren). Eingebaut in Fertigung, Stücklisten, Einkauf,
+  Einkaufsprojekte, Lieferantenverträge, Werkzeuge, Reparatur, Produkte,
+  Kontakte und Aufgaben. Die Rechte-Bedingungen (`darf`) bleiben am Knopf.
+- Aktiver Filter = dunkles Schild (`a.btn[aria-current]`, eine CSS-Regel
+  für alle Listen); die Inline-Akzentkanten und Primär-Umschalter sind
+  weg. Verkauf zeigt Zähler je Filter.
+
 ## 2026-10-18 — Paket U3: Statusleiste, empfohlener Schritt, ⋯-Menü, Ablauf unten
 
 **Anlass:** UX-Audit M1–M3, M5 (102#1/#7, 103#2, 213#1/#2, 301#2, 601#1,

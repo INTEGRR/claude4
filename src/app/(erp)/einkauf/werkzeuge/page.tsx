@@ -4,6 +4,7 @@ import { requireArea } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { ActionForm } from '@/components/action-button'
 import { Badge, Card, Empty, PageHeader, TableWrap } from '@/components/ui'
+import { Schublade } from '@/components/schublade'
 import { WerkzeugSchuesse } from '@/components/werkzeug-schuesse'
 import { EIGENTUEMER, WERKZEUG_ARTEN, WERKZEUG_STATUS } from '@/modules/einkauf/werkzeuge'
 import { money } from '@/modules/shared/format'
@@ -95,7 +96,127 @@ export default async function WerkzeugePage({
 
   return (
     <>
-      <PageHeader title="Werkzeuge & Formen" subtitle="Was beim Lieferanten steht, wem es gehört, wie viele Schuss es noch hat" />
+      <PageHeader title="Werkzeuge & Formen" subtitle="Was beim Lieferanten steht, wem es gehört, wie viele Schuss es noch hat" actions={
+            darf && (
+          <Schublade id="neu-werkzeug" knopf="+ Neues Werkzeug" titel="Neues Werkzeug">
+            <ActionForm action={werkzeugAnlegen}>
+              <div className="row">
+                <label className="field" style={{ flex: 2 }}>
+                  <span>Bezeichnung</span>
+                  <input name="bezeichnung" required placeholder="z. B. Form Keycap-Set 2K, 4-fach" />
+                </label>
+                <label className="field">
+                  <span>Art</span>
+                  <Auswahl name="art" defaultValue="form">
+                    {Object.entries(WERKZEUG_ARTEN).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field">
+                  <span>Standort (Lieferant)</span>
+                  <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" defaultValue={vorLieferant}>
+                    <option value="">— aus der Bestellzeile —</option>
+                    {lieferanten.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field shrink">
+                  <span>Eigentümer</span>
+                  <Auswahl name="eigentuemer" defaultValue="wir">
+                    {Object.entries(EIGENTUEMER).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+              </div>
+              <div className="row">
+                <label className="field shrink">
+                  <span>Kosten</span>
+                  <input name="kosten" inputMode="decimal" placeholder="18.000" />
+                </label>
+                <label className="field shrink">
+                  <span>Währung</span>
+                  <Auswahl name="waehrung" defaultValue="" className="mono">
+                    <option value="">—</option>
+                    {waehrungen.map((w) => (
+                      <option key={w.code} value={w.code}>
+                        {w.code}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field shrink">
+                  <span>Lebensdauer (Schuss)</span>
+                  <input name="lebensdauer_schuss" inputMode="numeric" placeholder="300.000" />
+                </label>
+                <label className="field shrink">
+                  <span>Zählerstand</span>
+                  <input name="schuss_zaehler" inputMode="numeric" placeholder="0" />
+                </label>
+                <label className="field shrink">
+                  <span>Status</span>
+                  <Auswahl name="status" defaultValue="in_auftrag">
+                    {Object.entries(WERKZEUG_STATUS).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+              </div>
+              <div className="row">
+                <label className="field">
+                  <span>Einkaufsprojekt</span>
+                  <Auswahl name="einkaufsprojekt_id" defaultValue={vorProjekt}>
+                    <option value="">—</option>
+                    {projekte.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+                <label className="field">
+                  <span>Artikel (SKU)</span>
+                  <input name="produkt" className="mono" placeholder="SKU, Barcode oder Name" />
+                </label>
+                <label className="field" style={{ flex: 2 }}>
+                  <span>Werkzeugkosten-Zeile einer Bestellung</span>
+                  <Auswahl name="purchase_order_line_id" defaultValue="">
+                    <option value="">—</option>
+                    {zeilen.map((z) => (
+                      <option key={z.id} value={z.id}>
+                        {z.label}
+                      </option>
+                    ))}
+                  </Auswahl>
+                </label>
+              </div>
+              <label className="field">
+                <span>Notiz</span>
+                <textarea name="notiz" rows={2} placeholder="z. B. Werkzeugnummer des Lieferanten, Kavitäten, Material" />
+              </label>
+              <button className="primary" type="submit">
+                Werkzeug anlegen
+              </button>
+              <p className="small muted" style={{ margin: '8px 0 0' }}>
+                Mit einer Bestellzeile kommen Lieferant, Kosten, Währung und Projekt von dort. Zeichnungen und Fotos hängen
+                danach als Dokumente am Werkzeug.
+              </p>
+            </ActionForm>
+
+          </Schublade>
+          )
+        }
+      />
       <Card tight>
         <div className="actions" style={{ padding: 12 }}>
           {ANSICHTEN.map((a) => (
@@ -172,123 +293,6 @@ export default async function WerkzeugePage({
         )}
       </Card>
 
-      {darf && (
-        <Card title="Neues Werkzeug">
-          <ActionForm action={werkzeugAnlegen}>
-            <div className="row">
-              <label className="field" style={{ flex: 2 }}>
-                <span>Bezeichnung</span>
-                <input name="bezeichnung" required placeholder="z. B. Form Keycap-Set 2K, 4-fach" />
-              </label>
-              <label className="field">
-                <span>Art</span>
-                <Auswahl name="art" defaultValue="form">
-                  {Object.entries(WERKZEUG_ARTEN).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field">
-                <span>Standort (Lieferant)</span>
-                <Auswahl kurzanlage={kurzLieferant(user)} name="partner_id" defaultValue={vorLieferant}>
-                  <option value="">— aus der Bestellzeile —</option>
-                  {lieferanten.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field shrink">
-                <span>Eigentümer</span>
-                <Auswahl name="eigentuemer" defaultValue="wir">
-                  {Object.entries(EIGENTUEMER).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-            </div>
-            <div className="row">
-              <label className="field shrink">
-                <span>Kosten</span>
-                <input name="kosten" inputMode="decimal" placeholder="18.000" />
-              </label>
-              <label className="field shrink">
-                <span>Währung</span>
-                <Auswahl name="waehrung" defaultValue="" className="mono">
-                  <option value="">—</option>
-                  {waehrungen.map((w) => (
-                    <option key={w.code} value={w.code}>
-                      {w.code}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field shrink">
-                <span>Lebensdauer (Schuss)</span>
-                <input name="lebensdauer_schuss" inputMode="numeric" placeholder="300.000" />
-              </label>
-              <label className="field shrink">
-                <span>Zählerstand</span>
-                <input name="schuss_zaehler" inputMode="numeric" placeholder="0" />
-              </label>
-              <label className="field shrink">
-                <span>Status</span>
-                <Auswahl name="status" defaultValue="in_auftrag">
-                  {Object.entries(WERKZEUG_STATUS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-            </div>
-            <div className="row">
-              <label className="field">
-                <span>Einkaufsprojekt</span>
-                <Auswahl name="einkaufsprojekt_id" defaultValue={vorProjekt}>
-                  <option value="">—</option>
-                  {projekte.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-              <label className="field">
-                <span>Artikel (SKU)</span>
-                <input name="produkt" className="mono" placeholder="SKU, Barcode oder Name" />
-              </label>
-              <label className="field" style={{ flex: 2 }}>
-                <span>Werkzeugkosten-Zeile einer Bestellung</span>
-                <Auswahl name="purchase_order_line_id" defaultValue="">
-                  <option value="">—</option>
-                  {zeilen.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.label}
-                    </option>
-                  ))}
-                </Auswahl>
-              </label>
-            </div>
-            <label className="field">
-              <span>Notiz</span>
-              <textarea name="notiz" rows={2} placeholder="z. B. Werkzeugnummer des Lieferanten, Kavitäten, Material" />
-            </label>
-            <button className="primary" type="submit">
-              Werkzeug anlegen
-            </button>
-            <p className="small muted" style={{ margin: '8px 0 0' }}>
-              Mit einer Bestellzeile kommen Lieferant, Kosten, Währung und Projekt von dort. Zeichnungen und Fotos hängen
-              danach als Dokumente am Werkzeug.
-            </p>
-          </ActionForm>
-        </Card>
-      )}
     </>
   )
 }

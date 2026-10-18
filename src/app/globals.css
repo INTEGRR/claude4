@@ -573,6 +573,17 @@ button, .btn {
 button:hover, .btn:hover { background: var(--surface-2); border-color: var(--text-muted); text-decoration: none; }
 button:active, .btn:active { transform: translateY(1px); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Filter-Schilder über Listen (2026-10-18, UX-Audit M11): der aktive Filter
+   ist dunkel gefüllt — ein Stil für alle Listen, statt drei nebeneinander
+   (Leuchte, Akzentkante, Primärtaste). */
+a.btn[aria-current='page'], a.btn[aria-current='true'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+  font-weight: 550;
+}
+a.btn[aria-current='page']:hover, a.btn[aria-current='true']:hover { background: var(--text-2); border-color: var(--text-2); }
+.filter-zahl { font-variant-numeric: tabular-nums; opacity: 0.75; font-weight: 450; }
 button:disabled:active { transform: none; }
 button.primary, .btn.primary {
   background: var(--accent-fill);
@@ -1373,6 +1384,11 @@ label.field > span, .field > .feld-titel {
   margin-bottom: 12px;
 }
 .ticket-panel .field { margin-bottom: 8px; }
+
+/* Schublade fürs Anlegen aus der Liste (2026-10-18, M4): breiter als das
+   Fehler-Panel, Formularzeilen untereinander. */
+.schublade { width: min(96vw, 560px); }
+.schublade .row > * { min-width: 200px; }
 
 /* --- KI-Chat als Slide-out (Reiter unter dem Fehler-Reiter) ---------------- */
 
