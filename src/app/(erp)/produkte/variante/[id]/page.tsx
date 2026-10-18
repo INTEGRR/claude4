@@ -138,7 +138,7 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
 
         <Card title="Etikett" actions={codeValue && <span className="mono-label">zum Drucken scannen</span>}>
           {codeValue ? (
-            <div className="display-panel">
+            <div className="info-panel">
               <div className="display-head">
                 <span>Etikett</span>
                 <span>{codeValue}</span>

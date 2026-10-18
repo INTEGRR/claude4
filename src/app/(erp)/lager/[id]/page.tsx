@@ -288,7 +288,7 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
 
       {zulauf &&
         (zulauf.eta_confirmed || zulauf.expected_arrival || zulauf.carrier || zulauf.tracking_number) && (
-        <div className="display-panel" style={{ marginBottom: 12 }}>
+        <div className="info-panel" style={{ marginBottom: 12 }}>
           <div className="display-head">
             <span>Zulauf</span>
             <span>{zulauf.eta_confirmed ? 'Termin vom Lieferanten bestätigt' : 'Termin geschätzt'}</span>

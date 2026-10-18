@@ -191,7 +191,7 @@ export default async function RetourenPage({ searchParams }: { searchParams: Pro
 
       {/* Der QR-Link des zuletzt erzeugten Labels ist Scanner-Datum — dunkle Datenfläche. */}
       {labels[0]?.qr_link && (
-        <div className="display-panel" style={{ marginBottom: 16 }}>
+        <div className="info-panel" style={{ marginBottom: 16 }}>
           <div className="display-head">
             <span>Retoure · QR</span>
             <span className="mono">{labels[0].shipment_number}</span>
@@ -201,7 +201,7 @@ export default async function RetourenPage({ searchParams }: { searchParams: Pro
             href={labels[0].qr_link}
             target="_blank"
             rel="noreferrer"
-            style={{ color: 'var(--display-bright)', wordBreak: 'break-all' }}
+            style={{ color: 'var(--text)', wordBreak: 'break-all' }}
           >
             {labels[0].qr_link}
           </a>

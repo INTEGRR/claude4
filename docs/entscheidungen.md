@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Paket U5: Farbe nach Handlungsbedarf, Display nur für Live
+
+**Anlass:** UX-Audit M7/M15 (010#1, 105#2, 110#1, 112#1, 113#3, 602#1,
+902#2): Jede Zahl der Übersicht stand in Orange (geerbte Linkfarbe), egal
+ob Störung oder Routine; schwarze Display-Flächen trugen Anschriften,
+Kennzahlen, Shopify-IDs und Fehlerbilder — der stärkste Kontrast für oft
+unwichtigen Inhalt.
+
+**Entschieden:**
+- Übersicht: Kachelzahlen in Tinte; überfällig/Störung als gelbe Fläche
+  mit gelber Zahl, Entscheidungen (Freigaben, Unterdeckung) mit violetter
+  Zahl (`.kachel`, `.kachel-warn`, `.kachel-wichtig`).
+- `.info-panel`: helle Karte für Kopfdaten, Anschriften, Kennzahlen, IDs,
+  Verläufe und Etikettenvorschau (Rechnungsliste, Rechnung, Verkauf-Detail,
+  Reparatur-Fehlerbild, Lager-Zulauf, Retouren-QR, Variante,
+  Sendungsverfolgung). Das schwarze Display bleibt Live-Zuständen
+  (Scanner, Packtisch, Werkstattanzeige) und Maschinenausgabe (SQL, JSON).
+- Nebenbei: Reparatur-Filter „Alle" groß und im einheitlichen
+  Filter-Schild (600#3).
+
 ## 2026-10-18 — Paket U4: Anlegen in der Schublade, einheitliche Filter
 
 **Anlass:** UX-Audit M4/M11 (300#5, 310#1, 401#3, 410#1, 480#2, 600#3,

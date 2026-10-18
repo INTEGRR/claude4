@@ -164,12 +164,12 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
       <Statusleiste prozessCode="kundenrechnung" art="kundenrechnung" zustand={k.status} />
 
       <div className="tiles" style={{ marginBottom: 12 }}>
-        <div className="display-panel">
+        <div className="info-panel">
           <div className="display-head"><span>Anschrift</span></div>
           {anschrift.map((z) => <div key={z}>{z}</div>)}
           {k.kundennummer && <div className="small muted">Kundennummer {k.kundennummer}</div>}
         </div>
-        <div className="display-panel">
+        <div className="info-panel">
           <div className="display-head"><span>Beleg</span></div>
           <div>Datum <span className="mono">{date(k.rechnungsdatum)}</span></div>
           <div>Lieferdatum <span className="mono">{date(k.leistungsdatum)}</span></div>
@@ -180,7 +180,7 @@ export default async function KundenrechnungPage({ params }: { params: Promise<{
           {k.ansprechpartner && <div className="small muted">Ansprechpartner {k.ansprechpartner}</div>}
           {k.grund && <div className="small muted">Grund: {k.grund}</div>}
         </div>
-        <div className="display-panel">
+        <div className="info-panel">
           <div className="display-head"><span>Beträge</span></div>
           <div>Netto <span className="mono">{money(k.netto, k.waehrung)}</span></div>
           <div>Steuer <span className="mono">{money(k.steuer, k.waehrung)}</span></div>

@@ -2636,7 +2636,8 @@
      "befund": "‚Neuer Fertigungsauftrag‘ (manuell) steht prominent über der Liste, obwohl Aufträge im Normalfall aus dem Verkauf (MTO) entstehen.",
      "vorschlag": "Als Sekundärknopf im Kopf.",
      "id": "300-fertigung#5",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "niedrig",
@@ -2926,7 +2927,8 @@
      "befund": "Formular ‚Neue Stückliste‘ steht über der Liste und nimmt die prominenteste Fläche ein.",
      "vorschlag": "Knopf ‚Neue Stückliste‘ im Kopf, Formular als Dialog.",
      "id": "310-stuecklisten#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "niedrig",
@@ -3155,7 +3157,8 @@
      "befund": "Keine Suche, keine Seitenaufteilung; ‚Neue Bestellung‘-Formular dominiert den Seitenkopf.",
      "vorschlag": "Suche (Lieferant, Nummer, Artikel), Seitenaufteilung, ‚Neue Bestellung‘ als Knopf.",
      "id": "401-bestellungen#3",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "niedrig",
@@ -3309,7 +3312,8 @@
      "befund": "Formular ‚Neues Projekt‘ mit 9 Feldern dauerhaft unter der Liste.",
      "vorschlag": "Knopf ‚Neues Projekt‘ → Dialog.",
      "id": "410-projekte#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "niedrig",
@@ -4080,7 +4084,8 @@
      "befund": "Formular dominiert die (leere) Seite.",
      "vorschlag": "Knopf ‚Neuer Vertrag‘ + Dialog.",
      "id": "480-vertraege#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     }
    ],
    "messwerte": {
@@ -5970,7 +5975,8 @@
      "befund": "Formular ‚Neues Produkt‘ mit Routen-Checkboxen dominiert den Kopf, obwohl es einen Anlage-Assistenten gibt (zwei Wege zum Anlegen).",
      "vorschlag": "Nur Assistent bzw. Knopf ‚Neues Produkt‘.",
      "id": "900-produkte#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "mittel",
@@ -6182,7 +6188,8 @@
      "befund": "Formular ‚Neuer Kontakt‘ (11 Felder) über der Liste.",
      "vorschlag": "Knopf + Dialog.",
      "id": "910-kontakte#2",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "niedrig",
@@ -8568,7 +8575,8 @@
      "befund": "Formular ‚Neue Aufgabe‘ steht vor der Liste – auf dem Handy erst nach ~700 px Scrollen die eigentlichen Aufgaben.",
      "vorschlag": "Liste zuerst, ‚+ Aufgabe‘ als schwebender Knopf.",
      "id": "m05-aufgaben#1",
-     "status": "offen"
+     "status": "erledigt",
+     "commit": "629a440"
     },
     {
      "schwere": "mittel",

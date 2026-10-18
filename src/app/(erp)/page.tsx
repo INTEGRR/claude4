@@ -146,8 +146,9 @@ export default async function Dashboard({
   const aufgabenFaellig = meineAufgaben.filter((a) => a.ueberfaellig || a.heute).length
   const aufgabenUeberfaellig = meineAufgaben.some((a) => a.ueberfaellig)
 
-  // wichtig = Entscheidungssignal (Violett): hier wartet eine Freigabe auf
-  // einen Menschen; warn = Betriebsstörung (Gelb); sonst Orange.
+  // Farbe nach Handlungsbedarf (2026-10-18, UX-Audit M15/010#1): warn =
+  // überfällig/Störung (gelbe Fläche), wichtig = Entscheidung (violette
+  // Zahl), sonst neutrale Tinte — vorher stand jede Zahl in Orange.
   const aufgaben: { label: string; wert: number; anzeige?: string; href: string; warn?: boolean; wichtig?: boolean }[] = [
     ...(meineAufgaben.length > 0
       ? [
@@ -300,7 +301,7 @@ export default async function Dashboard({
                 <Link
                   key={a.label}
                   href={a.href}
-                  className="card"
+                  className={`card kachel${a.warn ? ' kachel-warn' : a.wichtig ? ' kachel-wichtig' : ''}`}
                   style={{ marginBottom: 0, textDecoration: 'none' }}
                 >
                   <div className="stat">

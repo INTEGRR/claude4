@@ -153,17 +153,17 @@ export default async function KundenrechnungenPage({
       )}
 
       <div className="tiles" style={{ marginBottom: 12 }}>
-        <div className="display-panel">
+        <div className="info-panel">
           <div className="display-head"><span>Offene Forderungen</span></div>
           <div className="mono" style={{ fontSize: 18 }}>{money(summen.offen)}</div>
         </div>
-        <div className="display-panel">
+        <div className="info-panel">
           <div className="display-head"><span>Überfällig</span></div>
           <div className="mono" style={{ fontSize: 18, color: Number(summen.ueberfaellig) > 0 ? 'var(--danger)' : undefined }}>
             {summen.ueberfaellig}
           </div>
         </div>
-        <div className="display-panel">
+        <div className="info-panel">
           <div className="display-head"><span>Umsatz brutto dieser Monat</span><span>{summen.anzahl_monat} Belege</span></div>
           <div className="mono" style={{ fontSize: 18 }}>{money(summen.monat)}</div>
         </div>

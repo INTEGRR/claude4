@@ -434,12 +434,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
         {order.source === 'shopify' && order.shopify_order_id && (
-          <div className="display-panel">
+          <div className="info-panel">
             <div className="display-head">
               <span>Shopify-Verknüpfung</span>
               <span>ID</span>
             </div>
-            <div className="mono" style={{ fontSize: 15, color: 'var(--display-bright)' }}>
+            <div className="mono" style={{ fontSize: 15, color: 'var(--text)' }}>
               {shopUrl ? (
                 <a href={shopUrl} target="_blank" rel="noopener" style={{ color: 'inherit' }} title="Im Shopify-Admin öffnen">
                   {order.shopify_order_name ?? 'Shopify'} ↗

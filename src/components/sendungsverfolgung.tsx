@@ -88,7 +88,7 @@ export async function Sendungsverfolgung({
   }
 
   return (
-    <div className="display-panel" style={{ marginTop: 10 }}>
+    <div className="info-panel" style={{ marginTop: 10 }}>
       <div className="display-head">
         <span>Sendungsverfolgung</span>
         <span>{zeilen[0] ? abgefragtText(zeilen[0]) : 'noch nie abgefragt'}</span>

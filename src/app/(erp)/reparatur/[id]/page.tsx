@@ -312,12 +312,12 @@ export default async function RepairPage({
 
       {/* Der Rohtext des Kunden — am Arbeitsplatz gelesen, darum als Geräteanzeige. */}
       {repair.note && (
-        <div className="display-panel" style={{ marginBottom: 16 }}>
+        <div className="info-panel" style={{ marginBottom: 16 }}>
           <div className="display-head">
             <span>Fehlerbild</span>
             <span>{repair.number}</span>
           </div>
-          <div style={{ padding: '0 6px 2px', color: 'var(--display-bright)', whiteSpace: 'pre-wrap' }}>
+          <div style={{ padding: '0 6px 2px', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
             {repair.note}
           </div>
         </div>

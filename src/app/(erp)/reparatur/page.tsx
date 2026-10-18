@@ -129,7 +129,9 @@ export default async function ReparaturPage({
       <Card tight>
         {/* Filter als Links: die Adresszeile ist der Filterzustand. */}
         <div className="actions" style={{ padding: '10px 12px 0', flexWrap: 'wrap', gap: 6 }}>
-          <Link className={`btn small${filter || nurUeberfaellig ? '' : ' primary'}`} href="/reparatur">alle</Link>
+          <Link className="btn small" aria-current={filter || nurUeberfaellig ? undefined : 'page'} href="/reparatur">
+            Alle
+          </Link>
           {ZUSTAENDE.map((z) => (
             <Link
               key={z}
@@ -140,7 +142,7 @@ export default async function ReparaturPage({
               {LABELS.repair[z]}
             </Link>
           ))}
-          <Link className={`btn small${nurUeberfaellig ? ' primary' : ''}`} href="/reparatur?zustand=ueberfaellig">
+          <Link className="btn small" aria-current={nurUeberfaellig ? 'page' : undefined} href="/reparatur?zustand=ueberfaellig">
             Überfällig
           </Link>
         </div>

@@ -46,7 +46,7 @@ function EingangsKarte({ e, heute }: { e: Eingang; heute: string }) {
   const bestaetigt = e.eta_bestaetigt != null && e.eta_bestaetigt === e.termin
   return (
     <div
-      className="display-panel"
+      className="info-panel"
       style={{ marginBottom: 6, ...(ueberfaellig ? { borderColor: 'var(--danger)' } : {}) }}
     >
       <div className="small">
@@ -276,7 +276,7 @@ export default async function ZulaufPage({
           </p>
           <div className="grid-3">
             {ruecksendungen.map((r) => (
-              <div key={r.id} className="display-panel" style={{ marginBottom: 6 }}>
+              <div key={r.id} className="info-panel" style={{ marginBottom: 6 }}>
                 <div className="small">
                   <span className={`led ${r.emailed_at ? 'ok' : 'warn'}`} />{' '}
                   <Link className="mono" href={`/reparatur/${r.id}?schritt=eingang`}>{r.number}</Link>
@@ -308,7 +308,7 @@ export default async function ZulaufPage({
           </p>
           <div className="grid-3">
             {retourenUnterwegs.map((r) => (
-              <div key={r.id} className="display-panel" style={{ marginBottom: 6 }}>
+              <div key={r.id} className="info-panel" style={{ marginBottom: 6 }}>
                 <div className="small">
                   <span className={`led ${r.emailed_at ? 'ok' : 'warn'}`} />{' '}
                   <Link className="mono" href={`/versand/retouren/${r.id}?schritt=eingang`}>{r.nummer}</Link>

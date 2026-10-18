@@ -751,6 +751,37 @@ label.field > span, .field > .feld-titel {
 .theme-toggle button[aria-pressed='true'] { background: var(--surface); color: var(--text); font-weight: 600; }
 .theme-toggle button:active { transform: none; }
 
+/* --- Kacheln der Übersicht: Farbe nach Handlungsbedarf (2026-10-18, M15) --- */
+.kachel .stat .value { color: var(--text); }
+.kachel:hover { border-color: var(--border-strong); }
+.kachel.kachel-warn { background: var(--warn-soft); border-color: var(--warn); }
+.kachel.kachel-warn .stat .value { color: var(--warn); }
+.kachel.kachel-wichtig .stat .value { color: var(--wichtig); }
+
+/* --- Helle Infofläche (2026-10-18, UX-Audit M7) ----------------------------
+   Kopfdaten, Anschriften, Kennzahlen, IDs und Verläufe: helle Karte statt
+   schwarzem Display. Das Display bleibt Live-Zuständen vorbehalten
+   (Scanner, Packtisch, Werkstattanzeige) und Maschinenausgabe (SQL, JSON). */
+.info-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  color: var(--text);
+}
+.info-panel .display-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+/* Kennzahlen- und Infokarten nebeneinander (Rechnungsliste, Rechnung). */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+
 /* --- Dunkle Datenfläche ("Display") mit Eckwinkeln ------------------------- */
 .display-panel {
   position: relative;
