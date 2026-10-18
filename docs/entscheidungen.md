@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Paket U1: Beschriftungen und Schilder in Satzschreibung
+
+**Anlass:** UX-Audit M8 (000-login#4, A00-rahmen#6, d01#1): Labels,
+Tabellenköpfe, Kennzahl-Titel und Statusschilder standen in 10–10,5 px
+gesperrten Mono-Versalien — schwer lesbar, besonders im Lager. Der
+Betreiber hat die Entwürfe mit Schildern in Satzschreibung freigegeben.
+
+**Entschieden:**
+- `.mono-label`, `th`, Feldbeschriftungen, `.stat .label`, Theme-Schalter
+  und die Auswahl-Beschriftungen: Geist in Satzschreibung, 12–13 px.
+  Mono bleibt für Nummern und Codes (`.mono`), Versalien bleiben Marke
+  und Instrumenten-Display (geschlossene Liste im Wächter).
+- Statusschilder (`.badge`): 12 px, Satzschreibung, farbige Fläche ohne
+  Rahmen (neutral behält den Rahmen). Handgeschriebene Schildtexte, die
+  klein beginnen, bekommen per `::first-letter` einen großen Anfang.
+- Wächter: tests/theme-tokens.test.ts „Versalien nur für Marke und
+  Display".
+- Nebenbei: `badge ok` (keine Variante) → `badge success` in der
+  Rechnungsliste.
+
 ## 2026-10-18 — Layout-Umbau nach freigegebenen Entwürfen; Paket U2 Rahmen
 
 **Anlass:** Der Betreiber hat die Layout-Entwürfe (Design-Canvas „KRNL

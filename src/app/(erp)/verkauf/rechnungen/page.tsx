@@ -212,7 +212,7 @@ export default async function KundenrechnungenPage({
                             {d === null ? (
                               <span className="muted">kein Shop-Betrag</span>
                             ) : Math.abs(d) < 0.005 ? (
-                              <span className="badge ok">gleich</span>
+                              <span className="badge success">gleich</span>
                             ) : (
                               <span className="badge warn">{d > 0 ? '+' : ''}{money(d)}</span>
                             )}

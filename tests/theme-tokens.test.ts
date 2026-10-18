@@ -82,4 +82,28 @@ describe('Theme-Tokens', () => {
     }
     assert.deepEqual(zuSchwach, [], `unter 4,5:1:\n${zuSchwach.join('\n')}`)
   })
+
+  /**
+   * Satzschreibung (Entscheidungslog 2026-10-18, UX-Audit M8): Beschriftungen,
+   * Tabellenköpfe und Statusschilder stehen nicht mehr in gesperrten
+   * Mono-Versalien. Versalien bleiben der Marke und dem Instrumenten-Display
+   * vorbehalten — geschlossene Liste.
+   */
+  test('Versalien nur für Marke und Display', () => {
+    const ERLAUBT = new Set([
+      '.sidebar .brand-sub',
+      '.display-panel .display-head',
+      '.splash-untertitel',
+      '.splash-post-label',
+      // Nur der erste Buchstabe — das ist Satzschreibung, keine Versalien.
+      '.badge::first-letter',
+    ])
+    const treffer: string[] = []
+    for (const m of CSS.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      if (!/text-transform:\s*uppercase/.test(m[2])) continue
+      const selektor = m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim()
+      if (!ERLAUBT.has(selektor)) treffer.push(selektor)
+    }
+    assert.deepEqual(treffer, [], `Versalien außerhalb von Marke/Display:\n${treffer.join('\n')}`)
+  })
 })
