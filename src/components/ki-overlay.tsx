@@ -2,8 +2,8 @@
 import { KiChat } from '@/app/(erp)/ki/chat'
 
 /**
- * Der KI-Chat als Slide-out von jeder Seite: ein Reiter unter dem
- * Fehler-Reiter fährt den Chat aus, ohne die Arbeit zu verlassen — das
+ * Der KI-Chat als Slide-out von jeder Seite: ein Knopf in der Kopfleiste
+ * (seit 2026-10-18, vorher ein Reiter am rechten Rand) fährt den Chat aus, ohne die Arbeit zu verlassen — das
  * Fenster darf offen bleiben, der Gesprächsstand überlebt das Schließen
  * (die Komponente bleibt gemountet, das Popover blendet nur aus).
  *
@@ -13,7 +13,7 @@ import { KiChat } from '@/app/(erp)/ki/chat'
 export function KiOverlay({ sprechen }: { sprechen?: boolean }) {
   return (
     <>
-      <button type="button" className="ticket-tab ki-tab" popoverTarget="ki-panel">
+      <button type="button" className="small ticket-tab ki-knopf" popoverTarget="ki-panel" aria-label="KI-Assistent öffnen">
         KI
       </button>
 

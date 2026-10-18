@@ -62,8 +62,9 @@ async function badges() {
     select
       (select count(*) from sales_orders
         where state = 'sale' and delivery_status <> 'full')::int as offene_auftraege,
+      -- Entwürfe zählen nicht (wie auf der Übersicht, UX-Audit 010#2).
       (select count(*) from manufacturing_orders
-        where state not in ('done','cancel'))::int as offene_mos,
+        where state not in ('draft','done','cancel'))::int as offene_mos,
       (select count(*) from stock_pickings p
          join operation_types ot on ot.id = p.operation_type_id
         where ot.kind = 'receipt' and p.state not in ('done','cancel'))::int as offene_eingaenge,
@@ -199,13 +200,14 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       label: null,
       items: [
         { href: '/', label: 'Übersicht' },
-        // Die zwei Kernfunktionen ganz oben, farbig markiert (2026-10-01):
-        // Sprechen orange, Scannen violett — EIN Scanfeld für Packzettel,
+        // Die Kernfunktionen ganz oben (2026-10-01): Sprechen orange markiert;
+        // Scannen seit 2026-10-18 ohne Violett — Violett bleibt Entscheidungen
+        // vorbehalten (UX-Audit A00#1, M15). EIN Scanfeld für Packzettel,
         // Wareneingang und Fertigung (der Packtisch ist darin aufgegangen).
         ...(sees('ki') && sprechenKonfiguriert()
           ? [{ href: '/sprechen', label: 'Sprechen', kern: 'orange' as const }]
           : []),
-        ...(sees('scanner') ? [{ href: '/scanner', label: 'Scannen', kern: 'lila' as const }] : []),
+        ...(sees('scanner') ? [{ href: '/scanner', label: 'Scannen' }] : []),
         // Aufgaben (0104): Zähler = meine offenen, heute oder früher fälligen.
         ...(sees('aufgaben') ? [{ href: '/aufgaben', label: 'Aufgaben', count: aufgabenFaellig }] : []),
       ],
@@ -439,17 +441,16 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               gewichte={gewichte}
             />
             <ScanBox />
+            {/* Fehler melden und KI-Chat als Knöpfe in der Kopfleiste (2026-10-18,
+                UX-Audit M18) statt als Reiter, die rechts Inhalt verdeckten. */}
+            {sees('fehler') && <TicketOverlay />}
+            {sees('ki') && kiConfigured() && <KiOverlay sprechen={sprechenKonfiguriert()} />}
             <ThemeToggle />
           </div>
         </>
       }
     >
       {children}
-      {/* Fehler melden von jeder Seite aus — der Reiter am rechten Rand. */}
-      {sees('fehler') && <TicketOverlay />}
-      {/* Der KI-Chat als zweiter Reiter: offen lassen und weiterarbeiten —
-          mit Buddy-Modus (Sprachsitzung), wenn der Sprachdienst da ist. */}
-      {sees('ki') && kiConfigured() && <KiOverlay sprechen={sprechenKonfiguriert()} />}
       {probeBox && <ShopifyProbeBox />}
     </AppShell>
     </>

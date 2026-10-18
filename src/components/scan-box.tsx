@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 
 /**
  * Scan-Feld für Handscanner (Keyboard-Wedge): Beleg- oder Produktbarcode
- * scannen, Enter kommt vom Gerät. F2 oder Strg+K springt ins Feld.
+ * scannen, Enter kommt vom Gerät. F2 springt ins Feld (Strg+K gehört seit
+ * 2026-10-18 allein dem Befehlsfeld — vorher lösten beide aus).
  */
 export function ScanBox() {
   const router = useRouter()
@@ -14,7 +15,7 @@ export function ScanBox() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'F2' || ((e.ctrlKey || e.metaKey) && e.key === 'k')) {
+      if (e.key === 'F2') {
         e.preventDefault()
         inputRef.current?.focus()
       }

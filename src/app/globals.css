@@ -240,13 +240,11 @@ a:hover { text-decoration: underline; }
   background: none;
   box-shadow: none;
   text-align: left;
-  font-family: var(--font-mono), monospace;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--text-muted);
-  padding: 5px 8px 3px;
-  font-weight: 500;
+  /* Satzschreibung statt Mono-Versalien (2026-10-18, UX-Audit M8/A00#6). */
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 6px 8px 4px;
+  font-weight: 600;
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
@@ -260,7 +258,7 @@ a:hover { text-decoration: underline; }
   width: 10px;
 }
 .sidebar .chevron.open { transform: rotate(90deg); }
-.sidebar .nav-group-sum { margin-left: auto; font-weight: 500; opacity: 0.8; }
+.sidebar .nav-group-sum { margin-left: auto; font-weight: 500; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 .sidebar a.nav {
   display: flex;
@@ -284,13 +282,11 @@ a:hover { text-decoration: underline; }
 }
 .sidebar .badge { font-size: 10px; padding: 0 6px; }
 
-/* Kernfunktionen (2026-10-01): dauerhaft markiert, nicht erst wenn aktiv —
-   Scannen violett, Sprechen orange. Leuchte vor dem Wort, Farbe am Rand. */
-.sidebar a.nav.kern-lila { color: var(--wichtig); font-weight: 550; border-left-color: var(--wichtig); }
+/* Kernfunktion (2026-10-01): dauerhaft markiert, nicht erst wenn aktiv —
+   Sprechen orange. Leuchte vor dem Wort, Farbe am Rand. Scannen ist seit
+   2026-10-18 ein normaler Eintrag: Violett gehört Entscheidungen (M15). */
 .sidebar a.nav.kern-orange { color: var(--accent-text); font-weight: 550; border-left-color: var(--accent); }
-.sidebar a.nav.kern-lila[aria-current='page'] { background: var(--wichtig-soft); }
 .sidebar a.nav.kern-orange[aria-current='page'] { background: var(--accent-soft); }
-.sidebar a.nav.kern-lila > span:first-child::before,
 .sidebar a.nav.kern-orange > span:first-child::before {
   content: '';
   display: inline-block;
@@ -1226,7 +1222,7 @@ label.field > span, .field > .feld-titel {
     grid-template-columns: auto auto 1fr auto auto;
     grid-template-areas:
       'schalter zustand platz befehle thema'
-      'scan     scan    scan  scan    scan';
+      'scan     scan    scan  fehler  ki';
     align-items: center;
     gap: 10px;
   }
@@ -1236,6 +1232,8 @@ label.field > span, .field > .feld-titel {
   .befehls-knopf { grid-area: befehle; }
   .theme-toggle { grid-area: thema; }
   .scan-form { grid-area: scan; }
+  .fehler-knopf { grid-area: fehler; }
+  .ki-knopf { grid-area: ki; }
   .arbeitsplatz-waehler { grid-area: platz; }
   .arbeitsplatz-waehler { min-width: 0; }
   .arbeitsplatz-waehler .auswahl { flex: 1; min-width: 0; max-width: none; }
@@ -1262,24 +1260,12 @@ label.field > span, .field > .feld-titel {
 
 /* --- Ticket-Overlay (Fehler melden, ohne die Seite zu verlassen) ---------- */
 
+/* Seit 2026-10-18 (UX-Audit M18) ein Knopf in der Kopfleiste statt eines
+   Reiters am rechten Rand, der Tabellenspalten und Knöpfe verdeckte. */
 .ticket-tab {
-  position: fixed;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  writing-mode: vertical-rl;
-  padding: 10px 4px;
-  border-radius: 6px 0 0 6px;
-  border: 1px solid var(--border);
-  border-right: none;
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  z-index: 60;
+  white-space: nowrap;
+  font-size: 13px;
 }
-.ticket-tab:hover { color: var(--text); background: var(--surface); }
 
 .ticket-panel {
   position: fixed;
@@ -1314,8 +1300,6 @@ label.field > span, .field > .feld-titel {
 .ticket-panel .field { margin-bottom: 8px; }
 
 /* --- KI-Chat als Slide-out (Reiter unter dem Fehler-Reiter) ---------------- */
-
-.ki-tab { top: calc(50% + 74px); }
 
 .ki-overlay {
   width: min(96vw, 560px);
@@ -1517,35 +1501,11 @@ label.field > span, .field > .feld-titel {
 }
 .befehls-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 
-/* Handy/PWA: das Dashboard-Befehlsfeld sitzt wie in der Claude-App unten am
-   Daumen (Safe-Area beachtet), die Treffer klappen nach OBEN auf. */
+/* Handy/PWA: das Dashboard-Befehlsfeld bleibt seit 2026-10-18 oben im
+   Fluss (UX-Audit m01#1, M17) — schwebend unten verdeckte es beim Scrollen
+   die Kacheln. Die Treffer begrenzen sich auf die halbe Höhe. */
 @media (max-width: 720px) {
-  .content:has(> div .befehlsfeld.gross) { padding-bottom: 96px; }
-  .befehlsfeld.gross {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    z-index: 60;
-  }
-  .befehlsfeld.gross .composer { box-shadow: var(--shadow-lift); }
-  .befehlsfeld.gross .befehls-liste {
-    top: auto;
-    bottom: calc(100% + 8px);
-    max-height: 55dvh;
-    overflow-y: auto;
-  }
-  /* Im Overlay-Dialog bleibt das Feld oben — dort gilt die Fixierung nicht. */
-  .befehls-dialog .befehlsfeld.gross {
-    position: relative;
-    left: auto;
-    right: auto;
-    bottom: auto;
-  }
-  .befehls-dialog .befehlsfeld.gross .befehls-liste {
-    top: calc(100% + 6px);
-    bottom: auto;
-  }
+  .befehlsfeld.gross .befehls-liste { max-height: 55dvh; overflow-y: auto; }
 }
 
 /* Großansicht der KI-Diagramme (BUG/00008): natives <dialog>, Karte in groß. */

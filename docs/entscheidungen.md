@@ -9,6 +9,29 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-10-18 — Layout-Umbau nach freigegebenen Entwürfen; Paket U2 Rahmen
+
+**Anlass:** Der Betreiber hat die Layout-Entwürfe (Design-Canvas „KRNL
+Layout-Entwürfe": Beleg-Detail, Liste, Übersicht, Handy, Seitenleiste)
+freigegeben, inklusive Statusschilder in Satzschreibung. Umsetzung in
+Paketen U1–U6, je Paket ein Eintrag; Grundlage sind die Muster M1–M18 des
+UX-Audits (design/ux-audit/README.md).
+
+**Entschieden (U2, Rahmen):**
+- Die Gruppe der aktuellen Seite steht in der Seitenleiste immer offen
+  (A00#2); bewusst zugeklappt bleibt sie in der Sitzung zu. Gruppenköpfe
+  in Satzschreibung statt Mono-Versalien.
+- „Scannen" ist ein normaler Eintrag — Violett bleibt Entscheidungen
+  vorbehalten (A00#1, M15). Sprechen bleibt orange markiert.
+- Der Fertigungszähler zählt keine Entwürfe mehr — wie die Übersicht
+  (010#2: 271 statt 308 war keine handlungsrelevante Zahl).
+- „Fehler melden" und „KI" sind Knöpfe in der Kopfleiste statt Reiter am
+  rechten Rand, die Inhalt verdeckten (M18). Strg+K gehört allein dem
+  Befehlsfeld (vorher fokussierte es zugleich das Scanfeld; F2 bleibt
+  fürs Scanfeld).
+- Am Handy schwebt das Befehlsfeld der Übersicht nicht mehr über den
+  Kacheln (m01#1, M17).
+
 ## 2026-10-17 — Go-live über den API-Weg; Produktivgang-Seite prüft sich selbst
 
 **Anlass:** Der Go-live-Plan (go-live.md §7) verlangte noch die Dump-

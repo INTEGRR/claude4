@@ -6,8 +6,9 @@ import { isActionError, isActionInfo } from '@/modules/shared/action'
 import { Auswahl } from '@/components/auswahl'
 
 /**
- * Fehler melden, ohne die Arbeit zu verlassen: ein Reiter am rechten
- * Bildschirmrand fährt ein Panel aus, die Seite ist aus dem aktuellen Pfad
+ * Fehler melden, ohne die Arbeit zu verlassen: ein Knopf in der Kopfleiste
+ * (seit 2026-10-18, vorher ein Reiter am rechten Rand) fährt ein Panel aus,
+ * die Seite ist aus dem aktuellen Pfad
  * vorbelegt. Nach dem Absenden bleibt man, wo man war — das Ticket bestätigt
  * sich mit Nummer und Link im Panel.
  *
@@ -47,8 +48,8 @@ export function TicketOverlay() {
 
   return (
     <>
-      <button type="button" className="ticket-tab" popoverTarget="fehler-panel">
-        Fehler?
+      <button type="button" className="small ticket-tab fehler-knopf" popoverTarget="fehler-panel">
+        Fehler melden
       </button>
 
       <div

@@ -9,16 +9,18 @@ import { navigationMerken } from '@/app/(erp)/nav-action'
  * bereits rollengefiltert aus dem Server-Layout. Standard: alles
  * eingeklappt; welche Gruppen jemand öffnet, merkt sich KRNL am Benutzer
  * (users.nav_offen, 0095) — derselbe Zustand an jedem Gerät, und Server
- * und Client rendern von Anfang an gleich. Die Gruppe der aktuellen Seite
- * klappt NICHT von selbst auf; ist sie zu, trägt ihr Kopf die Markierung.
+ * und Client rendern von Anfang an gleich. Seit 2026-10-18 (UX-Audit A00#2)
+ * steht die Gruppe der aktuellen Seite immer offen — wer sie in dieser
+ * Sitzung bewusst zuklappt, behält sie zu; gespeichert wird nur die eigene
+ * Auswahl.
  */
 
 export interface NavItem {
   href: string
   label: string
   count?: number
-  /** Kernfunktion, dauerhaft farbig markiert: Scannen violett, Sprechen orange. */
-  kern?: 'lila' | 'orange'
+  /** Kernfunktion, dauerhaft farbig markiert (Sprechen orange). */
+  kern?: 'orange'
 }
 
 export interface NavGroup {
@@ -43,6 +45,8 @@ function NavEntry({ item, active }: { item: NavItem; active: boolean }) {
 export function SidebarNav({ groups, offen: gespeichert }: { groups: NavGroup[]; offen: string[] }) {
   const pathname = usePathname()
   const [offen, setOffen] = useState<string[]>(gespeichert)
+  /** In dieser Sitzung bewusst zugeklappt — gilt auch für die Gruppe der aktuellen Seite. */
+  const [zu, setZu] = useState<string[]>([])
   const [, startTransition] = useTransition()
 
   // Genau ein Eintrag ist aktiv: der mit dem längsten passenden Pfad. Sonst
@@ -55,8 +59,14 @@ export function SidebarNav({ groups, offen: gespeichert }: { groups: NavGroup[];
     .sort((a, b) => b.length - a.length)[0]
   const isActive = (href: string) => href === aktiv
 
+  const gruppeAktiv = groups.find((g) => g.label && g.items.some((i) => isActive(i.href)))?.label ?? null
+  const istOffen = (label: string) =>
+    !zu.includes(label) && (offen.includes(label) || label === gruppeAktiv)
+
   const toggle = (label: string) => {
-    const next = offen.includes(label) ? offen.filter((g) => g !== label) : [...offen, label]
+    const warOffen = istOffen(label)
+    setZu(warOffen ? [...zu, label] : zu.filter((g) => g !== label))
+    const next = warOffen ? offen.filter((g) => g !== label) : [...offen.filter((g) => g !== label), label]
     setOffen(next)
     startTransition(() => {
       void navigationMerken(next)
@@ -71,7 +81,7 @@ export function SidebarNav({ groups, offen: gespeichert }: { groups: NavGroup[];
             <NavEntry key={item.href} item={item} active={isActive(item.href)} />
           ))
         }
-        const isClosed = !offen.includes(g.label)
+        const isClosed = !istOffen(g.label)
         const enthaeltAktiv = g.items.some((item) => isActive(item.href))
         return (
           <div key={g.label ?? i} className="nav-group">
