@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-13 — Täglicher Sicherheits-Check in KRNL, Telegram nur bei Befunden
+
+**Anlass (Betreiber):** „Eine tägliche Aufgabe für npm audit und ein kurzer
+Sicherheits-Check jeden Tag, kurz, nicht teuer — bei Problemen per Telegram
+an mich." Der erste Versuch war eine geplante Claude-Aufgabe; sie kostet je
+Lauf (Testlauf 0,38 $), sieht die Produktion nicht und kann kein Telegram
+senden. Die wöchentliche CI-Prüfung meldet sich nur als roter Lauf auf
+GitHub.
+
+**Entschieden:**
+- Der Check läuft **in KRNL** (Cron `sicherheit` täglich 5:40 UTC, Job
+  `sicherheits_check`): kein laufender Preis, Telegram ist schon da.
+- Geprüft wird die **ausgelieferte Lockfile** (reist im Bundle mit) gegen
+  die Advisory-Datenbank der npm-Registry — dieselbe Quelle wie
+  `npm audit`, gemeldet ab „hoch". Dazu: fehlende Betriebs-Geheimnisse,
+  aktives Startkonto, Admins ohne zweiten Faktor, ab 30 Fehlanmeldungen
+  oder 60 Fehlsuchen im Retourenportal in 24 Stunden.
+- **Nachricht nur bei Befunden**, Art `sicherheit` (0132), Schlüssel je Tag:
+  solange ein Punkt offen ist, kommt die Erinnerung jeden Morgen einmal.
+  Schalter unter Einstellungen → Benachrichtigungen, Standard an.
+- **Revidiert** den Satz aus dem Eintrag 2026-10-18 („KRNL ruft zur
+  Laufzeit keine Registry an"): einmal täglich geht jetzt eine Anfrage mit
+  Paketnamen und Versionen an `registry.npmjs.org`. Der Produktivgang-Punkt
+  zeigt weiter den Stand aus dem Build; CI-Wächter und Dependabot bleiben.
+- Gestörte Dienste meldet weiter der Dienste-Wächter, kaputte Buchungen
+  der Daten-TÜV — der Check wiederholt beides nicht.
+- Die geplante Claude-Aufgabe ist wieder gelöscht.
+
+**Umgesetzt:** `modules/einstellungen/sicherheits-check.ts` (pur) und
+`sicherheits-lauf.ts`, Migration 0132, Cron-Route, `vercel.json`,
+Job-Katalog, Schalter in `integrationen/benachrichtigungen.ts` und der
+Registry; `tests/sicherheits-check.test.ts`; docs/betrieb.md,
+docs/module/integrationen.md.
+
 ## 2026-11-13 — Stichtag ohne Rechnungen und Gutschriften
 
 **Anlass (Betreiber):** „Rechnungen und Gutschriften lassen wir erstmal

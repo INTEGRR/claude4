@@ -120,6 +120,13 @@ export const JOB_KATALOG = {
       'von Hand erfasste Kurse bleiben stehen. Grundlage des Angebotsvergleichs in EUR.',
     faehigkeit: 'finanzen:wechselkurse',
   },
+  sicherheits_check: {
+    label: 'Sicherheits-Check',
+    beschreibung:
+      'Prüft morgens die ausgelieferten Abhängigkeiten gegen die Advisory-Datenbank (ab „hoch"), Konten ohne zweiten ' +
+      'Faktor, das Startkonto und auffällige Fehlversuche; nur bei Befunden geht eine Nachricht in den Telegram-Kanal.',
+    faehigkeit: 'sicherheit:tagescheck',
+  },
   einkauf_digest: {
     label: 'Einkaufs-Zusammenfassung',
     beschreibung:

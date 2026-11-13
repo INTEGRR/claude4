@@ -11,7 +11,7 @@ import { telegramSicher } from './telegram.ts'
 
 type Db = Sql | TransactionSql
 
-export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf'
+export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf' | 'sicherheit'
 
 export interface Schalter {
   logins: boolean
@@ -22,8 +22,10 @@ export interface Schalter {
   einkauf: boolean
   /** Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen, Problem (0114). */
   zulauf: boolean
+  /** Täglicher Sicherheits-Check: nur bei Befunden (0132). */
+  sicherheit: boolean
 }
-export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true }
+export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true }
 export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   logins: 'Jede erfolgreiche Anmeldung (wer, wann, IP, Gerät, Methode)',
   fehlversuche: 'Fehlversuche und Kontosperren (gebündelt je Konto und Viertelstunde)',
@@ -31,6 +33,7 @@ export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   dienste: 'Störungen und Entstörungen externer Dienste (Dienste-Wächter)',
   einkauf: 'Tägliche Einkaufs-Zusammenfassung je Einkäufer (Überfälliges, fehlende Dokumente und Rechnungen, Raten, ETA)',
   zulauf: 'Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen oder Problem (17TRACK)',
+  sicherheit: 'Täglicher Sicherheits-Check, nur bei Befunden (Lücken in Abhängigkeiten, Konten ohne zweiten Faktor, auffällige Fehlversuche)',
 }
 
 /** Fehlversuche desselben Kontos werden je Viertelstunde zu einer Nachricht. */
@@ -55,6 +58,7 @@ export async function schalter(db: Db): Promise<Schalter> {
     dienste: v.dienste !== false,
     einkauf: v.einkauf !== false,
     zulauf: v.zulauf !== false,
+    sicherheit: v.sicherheit !== false,
   }
 }
 
@@ -73,6 +77,8 @@ export function artErlaubt(art: BenachrichtigungsArt, s: Schalter): boolean {
       return s.einkauf
     case 'zulauf':
       return s.zulauf
+    case 'sicherheit':
+      return s.sicherheit
     default:
       return true
   }

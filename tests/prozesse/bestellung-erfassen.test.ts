@@ -28,8 +28,11 @@ after(async () => {
 describe('Bestellung aus Beleg erfassen', () => {
   test('neuer Lieferant, vorhandener und neuer Artikel, Fracht, bestätigt, Vorkasse bezahlt, Beleg abgelegt', async () => {
     const sql = h.sql
+    // Festes Datum vor Bestell- und Zahltag des Belegs (21./22.09.2026) — mit
+    // „heute − 30" fehlte der Kurs, sobald der Test später als einen Monat
+    // nach dem Belegdatum lief (strikte Kurse, 0122).
     await sql`
-      insert into exchange_rates (currency, valid_from, rate) values ('USD', current_date - 30, 0.9)
+      insert into exchange_rates (currency, valid_from, rate) values ('USD', date '2026-09-01', 0.9)
       on conflict (currency, valid_from) do update set rate = excluded.rate`
     const [stueck] = await sql<{ id: string }[]>`select id from uoms where name = 'Stück'`
     const [tpl] = await sql<{ id: string }[]>`

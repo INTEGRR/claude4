@@ -127,6 +127,7 @@ des `db`-Dienstes.
 | Aufräumen (Sitzungen, Geräte, Trackingdaten, Benachrichtigungen) | täglich | `/api/cron?task=housekeeping` |
 | Finanz-Tageslauf (Verträge, USt-Vorschlag) | täglich | `/api/cron?task=finanzen` |
 | Einkaufs-Zusammenfassung (Cockpit je Einkäufer → Telegram) | täglich | `/api/cron?task=einkauf` |
+| Sicherheits-Check (Abhängigkeiten, zweiter Faktor, Fehlversuche → Telegram nur bei Befunden) | täglich | `/api/cron?task=sicherheit` |
 
 Weitere Punkte:
 - **Bekannte Lücken in Abhängigkeiten:** die CI prüft `npm audit` bei
@@ -134,6 +135,15 @@ Weitere Punkte:
   Prüfung oder ein roter Punkt „Abhängigkeiten" auf
   `/einstellungen/produktivgang` heißt: PR mergen, Deployment abwarten
   (Entscheidungslog 2026-10-18).
+- **Täglicher Sicherheits-Check** (5:40 UTC, seit 2026-11-13): KRNL prüft
+  die ausgelieferte Lockfile gegen die Advisory-Datenbank der npm-Registry
+  und ein paar Betriebszustände (zweiter Faktor, Startkonto, Fehlversuche,
+  Betriebs-Geheimnisse). Nur bei Befunden kommt eine Telegram-Nachricht,
+  dann jeden Morgen einmal, bis der Punkt erledigt ist. Abschaltbar unter
+  Einstellungen → Benachrichtigungen. Braucht ausgehend
+  `registry.npmjs.org`; ist die Registry nicht erreichbar, versucht der Job
+  es erneut und meldet sich erst nach dem letzten Fehlversuch als
+  fehlgeschlagener Job.
 - **Label-Dateien** liegen unter `STORAGE_DIR` (Standard: `./storage`). Bei
   mehreren Instanzen ein gemeinsames Volume mounten oder auf Objektspeicher
   umstellen — DHL hält Labels nur rund drei Tage vor.

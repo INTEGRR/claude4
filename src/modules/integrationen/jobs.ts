@@ -311,6 +311,12 @@ const handlers = {
     return einkaufDigestEinreihen(typeof payload.datum === 'string' ? payload.datum : undefined)
   },
 
+  /** Täglicher Sicherheits-Check: bei Befunden Telegram (einstellungen/sicherheits-lauf.ts, 0132). */
+  async sicherheits_check(payload) {
+    const { sicherheitsCheckEinreihen } = await import('@/modules/einstellungen/sicherheits-lauf')
+    return sicherheitsCheckEinreihen(typeof payload.datum === 'string' ? payload.datum : undefined)
+  },
+
   /** Einkaufs-Agent sichtet eine eingehende Nachricht (ki/einkauf-agent.ts, 0109, Spur „ki"). */
   async ki_mail_triage(payload) {
     const { mailTriage } = await import('@/modules/ki/einkauf-agent')

@@ -33,6 +33,7 @@ export const maxDuration = 60
  *   /api/cron?task=tracking      stündlich     - DHL-Sendungsstatus + Zulauf über 17TRACK (0112)
  *   /api/cron?task=housekeeping  täglich       - Aufräumen
  *   /api/cron?task=einkauf       täglich       - Einkaufs-Zusammenfassung (Telegram)
+ *   /api/cron?task=sicherheit    täglich       - Sicherheits-Check, Telegram nur bei Befunden (0132)
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -155,6 +156,13 @@ export async function GET(request: Request) {
         const tag = new Date().toISOString().slice(0, 10)
         await sql`select enqueue_job('einkauf_digest', ${sql.json({ datum: tag })}, ${`einkauf-digest:${tag}`})`
         return NextResponse.json({ task, digest: 'eingereiht' })
+      }
+      case 'sicherheit': {
+        // Täglicher Sicherheits-Check (0132) als Job — Dedupe je Tag, Retry
+        // bei Netzfehlern; gemeldet wird nur bei Befunden.
+        const tag = new Date().toISOString().slice(0, 10)
+        await sql`select enqueue_job('sicherheits_check', ${sql.json({ datum: tag })}, ${`sicherheits-check:${tag}`})`
+        return NextResponse.json({ task, check: 'eingereiht' })
       }
       default:
         return NextResponse.json({ error: `Unbekannte Aufgabe: ${task}` }, { status: 400 })
