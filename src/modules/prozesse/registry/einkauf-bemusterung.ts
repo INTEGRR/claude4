@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { typFehler } from './zod-hilfen.ts'
 import { MUSTER_ERGEBNIS_NAMEN } from '../../einkauf/bemusterung.ts'
 import { zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import type { RegistrierteAktion } from './typen.ts'
@@ -16,7 +17,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * (Kosten, Tracking) ist Arbeit an der Runde und prozessfrei.
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format JJJJ-MM-TT')
 const leer = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
 const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
@@ -28,8 +29,8 @@ const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
 const musterFelder = {
   bezeichnung: z.string().trim().max(200).optional().describe('Was bemustert wird, z. B. „Farbmuster Pantone 7621C"'),
   revision: z.string().trim().max(40).optional().describe('Revision/Stand des Musters (A, B, 2 …)'),
-  menge: z.number({ invalid_type_error: 'Bitte eine Menge angeben' }).positive('Die Menge muss größer als 0 sein').optional(),
-  kosten: z.number({ invalid_type_error: 'Bitte einen Betrag angeben' }).nonnegative('Nicht negativ').optional()
+  menge: z.number({ error: typFehler('Bitte eine Menge angeben') }).positive('Die Menge muss größer als 0 sein').optional(),
+  kosten: z.number({ error: typFehler('Bitte einen Betrag angeben') }).nonnegative('Nicht negativ').optional()
     .describe('Musterkosten in der Währung der Runde'),
   waehrung: z.string().trim().toUpperCase().length(3, 'Währung als ISO-Code, z. B. USD').optional(),
   bestellt_am: datum.optional().describe('Angefordert am (ohne Angabe: heute)'),

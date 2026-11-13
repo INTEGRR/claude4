@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { typFehler } from './zod-hilfen.ts'
 import { zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import { VERTRAG_ART_NAMEN, VERTRAG_STATUS_NAMEN } from '../../einkauf/lieferantenvertraege.ts'
 import type { RegistrierteAktion } from './typen.ts'
@@ -15,7 +16,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * (`vertraege`, finanzen.vertrag_*).
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format JJJJ-MM-TT')
 const leer = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
 const optionalLeer = (fd: FormData, feld: string) => (fd.has(feld) ? String(fd.get(feld) ?? '').trim() : undefined)
@@ -25,8 +26,8 @@ const zahl = (fd: FormData, feld: string) => {
   return zahlLesen(roh, 'menge') ?? Number.NaN
 }
 
-const monate = z.number({ invalid_type_error: 'Bitte eine Zahl angeben' }).int('Monate als ganze Zahl')
-const tage = z.number({ invalid_type_error: 'Bitte eine Zahl angeben' }).int('Tage als ganze Zahl')
+const monate = z.number({ error: typFehler('Bitte eine Zahl angeben') }).int('Monate als ganze Zahl')
+const tage = z.number({ error: typFehler('Bitte eine Zahl angeben') }).int('Tage als ganze Zahl')
 
 const preisZeile = z.object({
   produkt: z.string().trim().min(1).describe('SKU, Barcode, Name oder ID des Artikels'),

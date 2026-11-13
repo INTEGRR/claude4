@@ -26,7 +26,7 @@ export const VERKAUF_SHOP = {
     bindung: 'frei',
     schema: z
       .object({
-        template_id: z.string().uuid(),
+        template_id: z.string().guid(),
         modus: MODUS.optional(),
         projekt: z.string().trim().max(100).nullable().optional().describe('leer = kein Projekt'),
       })
@@ -59,7 +59,7 @@ export const VERKAUF_SHOP = {
     bindung: 'frei',
     schema: z
       .object({
-        variant_id: z.string().uuid(),
+        variant_id: z.string().guid(),
         modus: z.enum(['auto', 'immer', 'aus', 'erben']).optional(),
         oos_unter: z.number().int().min(1).max(100000).nullable().optional(),
         zurueckhalten: z.boolean().optional(),
@@ -100,8 +100,8 @@ export const VERKAUF_SHOP = {
       'und Wertnamen.',
     bindung: 'frei',
     schema: z.object({
-      template_id: z.string().uuid(),
-      ptav_id: z.string().uuid(),
+      template_id: z.string().guid(),
+      ptav_id: z.string().guid(),
       gesperrt: z.boolean(),
       alle_farben: z.boolean().default(false),
     }),
@@ -126,7 +126,7 @@ export const VERKAUF_SHOP = {
       'immer = Deckel melden, aus = 0 (ausverkauft) — unabhängig vom Artikel selbst.',
     bindung: 'frei',
     schema: z.object({
-      angebot_id: z.string().uuid(),
+      angebot_id: z.string().guid(),
       modus: MODUS,
     }),
     zusammenfassung: (p) => `Zweitangebot an Shopify: ${p.modus}`,

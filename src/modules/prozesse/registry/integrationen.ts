@@ -196,8 +196,8 @@ export const INTEGRATIONEN = {
       'Odoo-Kopie wird archiviert. Nur ohne Belege und ohne fremde Lagerbuchungen.',
     bindung: 'frei',
     schema: z.object({
-      aufloesen_id: z.string().uuid(),
-      behalten_id: z.string({ required_error: 'Bitte einen Shop-Artikel wählen' }).uuid('Bitte einen Shop-Artikel wählen'),
+      aufloesen_id: z.string().guid(),
+      behalten_id: z.string({ error: 'Bitte einen Shop-Artikel wählen' }).guid('Bitte einen Shop-Artikel wählen'),
     }),
     formdata: (fd) => ({
       aufloesen_id: String(fd.get('aufloesen_id') ?? ''),

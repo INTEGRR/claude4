@@ -11,7 +11,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * Ändern und Übersetzen sind prozessfrei (Arbeit am Entwurf, kein Schritt).
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const email = z.string().trim().toLowerCase().email('Ungültige Mailadresse')
 const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format JJJJ-MM-TT')
 

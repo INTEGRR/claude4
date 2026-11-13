@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { typFehler } from './zod-hilfen.ts'
 import { zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import { PFLICHT_MODELLE } from '../../einkauf/pflichtdokumente.ts'
 import { KOSTEN_ART_NAMEN, SENDUNG_MODUS_NAMEN, bestellnummernLesen, zollzeilenLesen } from '../../einkauf/sendungen.ts'
@@ -21,7 +22,7 @@ import { money, plural } from '../../shared/format.ts'
  * Menschen.
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format JJJJ-MM-TT')
 const leer = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
 const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
@@ -29,7 +30,7 @@ const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
   if (!roh) return undefined
   return zahlLesen(roh, art) ?? Number.NaN
 }
-const nichtNegativ = z.number({ invalid_type_error: 'Bitte eine Zahl angeben' }).nonnegative('Nicht negativ')
+const nichtNegativ = z.number({ error: typFehler('Bitte eine Zahl angeben') }).nonnegative('Nicht negativ')
 
 const kopfFelder = {
   bezeichnung: z.string().trim().max(200).optional().describe('Kurzbezeichnung, z. B. „LCL Shenzhen KW 41"'),

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ohneVorgaben, typFehler } from './zod-hilfen.ts'
 import { FRACHT_MODUS_NAMEN, PROJEKT_ART_NAMEN, staffelnLesen, zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import type { RegistrierteAktion } from './typen.ts'
 import { plural } from '../../shared/format.ts'
@@ -17,7 +18,7 @@ import { plural } from '../../shared/format.ts'
  * der Agent (Stufe 6) bereitet vor, ein Mensch entscheidet und sendet.
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format JJJJ-MM-TT')
 const leer = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
 const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
@@ -25,12 +26,12 @@ const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
   if (!roh) return undefined
   return zahlLesen(roh, art) ?? Number.NaN
 }
-const betrag = z.number({ invalid_type_error: 'Bitte eine Zahl angeben' }).nonnegative('Nicht negativ')
+const betrag = z.number({ error: typFehler('Bitte eine Zahl angeben') }).nonnegative('Nicht negativ')
 
 const positionFelder = {
   bezeichnung: z.string().trim().max(200).optional(),
   produkt: z.string().trim().min(1).optional().describe('SKU, Barcode, Name oder ID eines bestehenden Artikels'),
-  menge: z.number({ invalid_type_error: 'Bitte eine Menge angeben' }).positive('Die Menge muss größer als 0 sein'),
+  menge: z.number({ error: typFehler('Bitte eine Menge angeben') }).positive('Die Menge muss größer als 0 sein'),
   zielpreis_eur: betrag.optional().describe('Zielpreis je Stück in EUR (Einstand)'),
   gewicht_g: betrag.optional().describe('Gewicht je Stück in Gramm (für die Frachtschätzung)'),
   hs_code: z.string().trim().max(14).optional(),
@@ -41,8 +42,8 @@ const positionSchema = z.object(positionFelder).refine(bezeichnungOderArtikel, '
 
 const staffelSchema = z.object({
   position_id: uuid,
-  ab_menge: z.number({ invalid_type_error: 'Staffel: Menge unlesbar' }).positive('Staffel: Menge muss größer als 0 sein'),
-  preis: z.number({ invalid_type_error: 'Staffel: Preis unlesbar (Format „Menge: Preis")' }).nonnegative(),
+  ab_menge: z.number({ error: typFehler('Staffel: Menge unlesbar') }).positive('Staffel: Menge muss größer als 0 sein'),
+  preis: z.number({ error: typFehler('Staffel: Preis unlesbar (Format „Menge: Preis")') }).nonnegative(),
 })
 
 const angebotsFelder = {
@@ -283,10 +284,11 @@ export const EINKAUF_PROJEKTE = {
       'Angabe behalten ihre Preise. Mit vollstaendig=true (das Formular an der Projektseite) gilt das ' +
       'Angebot als komplett neu angegeben: leere Felder werden geleert, Staffeln ganz ersetzt.',
     bindung: 'frei',
-    // partial(): fehlende Felder bleiben, wie sie sind (keine Standardwerte).
+    // Fehlende Felder bleiben, wie sie sind (keine Standardwerte) — seit
+    // zod 4 leistet das `.partial()` nicht mehr, siehe ohneVorgaben.
     schema: z.object({
       angebot_id: uuid,
-      ...z.object(angebotsFelder).partial().shape,
+      ...ohneVorgaben(angebotsFelder),
       staffeln: z.array(staffelSchema).max(500).default([]),
       vollstaendig: z.boolean().default(false),
     }),
@@ -396,7 +398,7 @@ export const EINKAUF_PROJEKTE = {
     bindung: 'frei',
     schema: z.object({
       modus: z.enum(FRACHT_MODUS_NAMEN),
-      eur_je_kg: z.number({ invalid_type_error: 'Bitte einen Satz angeben' }).positive('Der Satz muss größer als 0 sein'),
+      eur_je_kg: z.number({ error: typFehler('Bitte einen Satz angeben') }).positive('Der Satz muss größer als 0 sein'),
       mindestbetrag_eur: betrag.default(0),
       notiz: z.string().trim().max(300).optional(),
     }),
@@ -424,7 +426,7 @@ export const EINKAUF_PROJEKTE = {
         .string()
         .transform((s) => s.replace(/[^0-9]/g, ''))
         .pipe(z.string().regex(/^[0-9]{2,10}$/, 'HS-Präfix: 2 bis 10 Ziffern')),
-      satz_pct: z.number({ invalid_type_error: 'Bitte einen Satz angeben' }).min(0).max(100).default(0),
+      satz_pct: z.number({ error: typFehler('Bitte einen Satz angeben') }).min(0).max(100).default(0),
       bezeichnung: z.string().trim().max(200).optional(),
       loeschen: z.boolean().default(false),
     }),

@@ -11,7 +11,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * 2026-09-30).
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 
 /** Woran eine Wiedervorlage hängen darf (Teilmenge der Dokument-Belege). */
 export const WIEDERVORLAGE_MODELLE = [

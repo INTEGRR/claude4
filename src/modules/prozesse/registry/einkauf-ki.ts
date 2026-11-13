@@ -92,10 +92,12 @@ export const EINKAUF_KI = {
     modell: 'ki_vorschlag',
     schema: z
       .object({
-        parameter: z.record(z.unknown()),
+        parameter: z.record(z.string(), z.unknown()),
         ungueltig: z.array(z.string()).default([]),
       })
-      .refine((p) => p.ungueltig.length === 0, (p) => ({ message: `Unlesbares JSON in: ${p.ungueltig.join(', ')}` })),
+      .superRefine((p, ctx) => {
+        if (p.ungueltig.length > 0) ctx.addIssue({ code: 'custom', message: `Unlesbares JSON in: ${p.ungueltig.join(', ')}` })
+      }),
     zusammenfassung: () => 'KI-Vorschlag ändern',
     formdata: (fd) => parameterAusFormular(fd),
     revalidate: [],

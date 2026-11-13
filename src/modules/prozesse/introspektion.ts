@@ -17,16 +17,38 @@ export interface FeldInfo {
   beschreibung?: string
 }
 
-/** Innerste Typ-Schale eines zod-Feldes freilegen (Optional/Default/Effects). */
-function kern(schema: z.ZodTypeAny): z.ZodTypeAny {
+/**
+ * Innerste Typ-Schale eines zod-Feldes freilegen (Optional/Default/Nullable
+ * und Pipes). Seit zod 4 hüllt `.refine()` nicht mehr ein; `.transform()`
+ * und `z.preprocess()` sind Pipes, deren fachliche Seite die ist, die kein
+ * reiner Transform ist.
+ */
+function kern(schema: z.ZodType): z.ZodType {
   let s = schema
   for (;;) {
     if (s instanceof z.ZodOptional || s instanceof z.ZodDefault || s instanceof z.ZodNullable) {
-      s = s._def.innerType as z.ZodTypeAny
-    } else if (s instanceof z.ZodEffects) {
-      s = s._def.schema as z.ZodTypeAny
+      s = s.unwrap() as z.ZodType
+    } else if (s instanceof z.ZodPipe) {
+      s = (s.def.in instanceof z.ZodTransform ? s.def.out : s.def.in) as z.ZodType
     } else {
       return s
+    }
+  }
+}
+
+/**
+ * Beschreibung eines Feldes. In zod 4 hängt `.describe()` an genau der
+ * Instanz, auf der es aufgerufen wurde — `.describe('…').optional()` trägt
+ * sie nicht mehr nach außen. Deshalb von außen nach innen suchen.
+ */
+function beschreibungVon(schema: z.ZodType): string | undefined {
+  let s = schema
+  for (;;) {
+    if (s.description) return s.description
+    if (s instanceof z.ZodOptional || s instanceof z.ZodDefault || s instanceof z.ZodNullable) {
+      s = s.unwrap() as z.ZodType
+    } else {
+      return undefined
     }
   }
 }
@@ -34,10 +56,10 @@ function kern(schema: z.ZodTypeAny): z.ZodTypeAny {
 export function aktionsFelder(aktion: RegistrierteAktion): FeldInfo[] {
   const objekt = kern(aktion.schema)
   if (!(objekt instanceof z.ZodObject)) return []
-  return Object.entries(objekt.shape as Record<string, z.ZodTypeAny>).map(([name, feld]) => ({
+  return Object.entries(objekt.shape as Record<string, z.ZodType>).map(([name, feld]) => ({
     name,
     pflicht: !(feld instanceof z.ZodOptional) && !(feld instanceof z.ZodDefault),
-    beschreibung: feld.description,
+    beschreibung: beschreibungVon(feld),
   }))
 }
 

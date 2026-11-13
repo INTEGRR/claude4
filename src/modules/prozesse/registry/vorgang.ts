@@ -22,7 +22,7 @@ export const VORGANG = {
       prozess_code: z.string().min(1),
       titel: z.string().max(200).optional(),
       partner_id: z.string().optional(),
-      zusatz: z.record(z.unknown()).default({}),
+      zusatz: z.record(z.string(), z.unknown()).default({}),
     }),
     zusammenfassung: (p) => `${p.prozess_code}${p.titel ? ` — ${p.titel}` : ''}`,
     formdata: (fd) => ({
@@ -71,7 +71,7 @@ export const VORGANG = {
     schema: z.object({
       titel: z.string().max(200).optional(),
       partner_id: z.string().optional(),
-      zusatz: z.record(z.unknown()).optional(),
+      zusatz: z.record(z.string(), z.unknown()).optional(),
     }),
     zusammenfassung: (p) => {
       const teile = [
@@ -111,7 +111,7 @@ export const VORGANG = {
     schema: z.object({
       state: z.string().min(1).max(60),
       vermerk: z.string().max(1000).optional(),
-      zusatz: z.record(z.unknown()).optional(),
+      zusatz: z.record(z.string(), z.unknown()).optional(),
     }),
     zusammenfassung: (p) => `→ ${p.state}`,
     formdata: (fd) => ({

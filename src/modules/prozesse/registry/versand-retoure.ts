@@ -26,7 +26,7 @@ export const VERSAND_RETOURE = {
       positionen: z
         .array(
           z.object({
-            zeile: z.string().uuid(),
+            zeile: z.string().guid(),
             menge: z.number().positive(),
             grund: z.string().max(300).optional(),
           }),
@@ -132,7 +132,7 @@ export const VERSAND_RETOURE = {
     uebergang: { von: ['eingegangen'], nach: ['geprueft', 'abgeschlossen'] },
     schema: z.object({
       ergebnisse: z
-        .array(z.object({ position: z.string().uuid(), pruefung: PRUEFUNG, notiz: z.string().max(500).optional() }))
+        .array(z.object({ position: z.string().guid(), pruefung: PRUEFUNG, notiz: z.string().max(500).optional() }))
         .min(1, 'Bitte jede Position prüfen'),
     }),
     formdata: (fd) => {

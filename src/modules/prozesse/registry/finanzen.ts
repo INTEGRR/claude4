@@ -36,7 +36,7 @@ export const FINANZEN = {
     prozessfrei: true,
     ki: true,
     schema: z.object({
-      bankkonto_id: z.string().uuid('Bitte ein Konto wählen'),
+      bankkonto_id: z.string().guid('Bitte ein Konto wählen'),
       stichtag: DATUM,
       saldo: z.number(),
       notiz: z.string().max(300).optional(),
@@ -57,7 +57,7 @@ export const FINANZEN = {
       betrag: z.number().positive('Der Betrag muss größer als null sein'),
       waehrung: z.string().length(3).default('EUR'),
       gezahlt_am: DATUM.optional(),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
       verwendungszweck: z.string().max(300).optional(),
     }),
     zusammenfassung: (p) =>
@@ -73,7 +73,7 @@ export const FINANZEN = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      zahlung_id: z.string().uuid('Bitte die Zahlung angeben'),
+      zahlung_id: z.string().guid('Bitte die Zahlung angeben'),
     }),
     revalidate: ['/finanzen'],
   },
@@ -89,7 +89,7 @@ export const FINANZEN = {
     schema: z.object({
       betrag: z.number().positive('Der Betrag muss größer als null sein'),
       gezahlt_am: DATUM.optional(),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
     }),
     formdata: (fd) => ({
       betrag: Number(fd.get('betrag')),
@@ -160,7 +160,7 @@ export const FINANZEN = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      rate_id: z.string().uuid('Bitte die Rate angeben'),
+      rate_id: z.string().guid('Bitte die Rate angeben'),
     }),
     revalidate: ['/finanzen'],
   },
@@ -173,9 +173,9 @@ export const FINANZEN = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      rate_id: z.string().uuid('Bitte die Rate angeben'),
+      rate_id: z.string().guid('Bitte die Rate angeben'),
       gezahlt_am: DATUM.optional(),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
     }),
     revalidate: ['/finanzen'],
   },
@@ -209,7 +209,7 @@ export const FINANZEN = {
     schema: z.object({
       name: z.string().min(1, 'Bitte einen Namen angeben').max(160),
       kategorie: z.string().min(1).max(60).default('sonstiges'),
-      partner_id: z.string().uuid().optional(),
+      partner_id: z.string().guid().optional(),
       betrag: z.number().positive('Der Betrag muss größer als null sein'),
       waehrung: z.string().length(3).default('EUR'),
       intervall: z.enum(['monatlich', 'quartalsweise', 'jaehrlich']).default('monatlich'),
@@ -234,7 +234,7 @@ export const FINANZEN = {
     schema: z.object({
       name: z.string().min(1).max(160),
       kategorie: z.string().min(1).max(60),
-      partner_id: z.string().uuid().optional(),
+      partner_id: z.string().guid().optional(),
       betrag: z.number().positive(),
       waehrung: z.string().length(3).default('EUR'),
       intervall: z.enum(['monatlich', 'quartalsweise', 'jaehrlich']),
@@ -292,7 +292,7 @@ export const FINANZEN = {
     prozessfrei: true,
     schema: z.object({
       gezahlt_am: DATUM.optional(),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
     }),
     formdata: (fd) => ({
       gezahlt_am: String(fd.get('gezahlt_am') ?? '') || undefined,
@@ -313,7 +313,7 @@ export const FINANZEN = {
     nurAdmin: true,
     schema: z.object({
       name: z.string().min(1, 'Bitte einen Namen angeben').max(160),
-      partner_id: z.string().uuid().optional(),
+      partner_id: z.string().guid().optional(),
       betrag: z.number().positive('Der Betrag muss größer als null sein'),
       zinssatz_pct: z.number().min(0).max(30).default(0),
       art: z.enum(['annuitaet', 'rate', 'endfaellig']).default('annuitaet'),
@@ -321,7 +321,7 @@ export const FINANZEN = {
       laufzeit_monate: z.number().int().positive().max(360),
       tilgungsfrei_monate: z.number().int().min(0).default(0),
       zahltag: z.number().int().min(1).max(28).default(1),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
       notiz: z.string().max(500).optional(),
     }),
     zusammenfassung: (p) =>
@@ -338,7 +338,7 @@ export const FINANZEN = {
     prozessfrei: true,
     nurAdmin: true,
     schema: z.object({
-      darlehen_id: z.string().uuid('Bitte das Darlehen angeben'),
+      darlehen_id: z.string().guid('Bitte das Darlehen angeben'),
       datum: DATUM.optional(),
     }),
     revalidate: ['/finanzen/darlehen', '/finanzen'],
@@ -351,9 +351,9 @@ export const FINANZEN = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      rate_id: z.string().uuid('Bitte die Rate angeben'),
+      rate_id: z.string().guid('Bitte die Rate angeben'),
       datum: DATUM.optional(),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
     }),
     revalidate: ['/finanzen/darlehen', '/finanzen'],
   },
@@ -386,9 +386,9 @@ export const FINANZEN = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      steuer_id: z.string().uuid('Bitte den Steuertermin angeben'),
+      steuer_id: z.string().guid('Bitte den Steuertermin angeben'),
       datum: DATUM.optional(),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
     }),
     revalidate: ['/finanzen/steuern', '/finanzen'],
   },

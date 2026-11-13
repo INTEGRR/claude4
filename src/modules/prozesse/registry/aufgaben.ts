@@ -12,7 +12,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * „das Lager", „morgen", „15 Uhr"); aufgelöst wird in der Ausführung.
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const leerAlsUndefined = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
 
 export const AUFGABEN = {

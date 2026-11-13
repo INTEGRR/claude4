@@ -9,6 +9,39 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-13 — Umstieg auf zod 4 (Lücke GHSA-mrhx-c7xc-m3w5)
+
+**Anlass:** `npm audit` und der neue Sicherheits-Check melden eine hohe
+Lücke in zod (< 4.6.6: Speicher läuft voll beim Prüfen übergroßer
+Sammlungen). Für zod 3 gibt es keinen Fix; der Betreiber: „ja, raus".
+
+**Entschieden:** zod 3.25 → 4.6.7. Die Registry prüft jede Eingabe mit zod,
+deshalb sind die stillen Verhaltensänderungen ausdrücklich abgefangen und
+mit Tests festgehalten (`tests/zod-hilfen.test.ts`):
+- **`.partial()` füllt jetzt Standardwerte.** „Angebot ändern" hätte
+  fehlende Werkzeug- und Musterkosten auf 0 gesetzt. Dafür gibt es
+  `ohneVorgaben(felder)` — alle Felder optional, ohne Vorgabe.
+- **`error` am Schema gilt für alle Prüfungen des Feldes.** Das frühere
+  `invalid_type_error` ist jetzt `error: typFehler('…')`, damit „zu klein"
+  nicht die Typ-Meldung bekommt.
+- **`.uuid()` prüft streng nach RFC.** Alle IDs nutzen `.guid()` (jede
+  8-4-4-4-12-Kennung), wie bisher.
+- **`.describe()` wandert nicht mehr durch `.optional()`/`.default()`.**
+  Generierte Masken und der KI-Aktionskatalog suchen die Beschreibung von
+  außen nach innen (`beschreibungVon`).
+- **`.refine()` hüllt nicht mehr ein, `.transform()` ist eine Pipe.** Die
+  Schema-Introspektion (`schema-felder.ts`, `introspektion.ts`) ist darauf
+  umgestellt; Vorgabe und Maximallänge kommen aus der öffentlichen API.
+- **Standardmeldungen auf Deutsch** (`z.config(z.locales.de())`, geladen
+  mit der Registry): statt „Required" steht „Ungültige Eingabe: erwartet
+  string, erhalten undefined" — eigene Meldungen der Felder gehen weiter vor.
+- `z.record(wert)` → `z.record(z.string(), wert)`; `errorMap`,
+  `required_error` → `error`.
+
+**Umgesetzt:** `registry/zod-hilfen.ts`, `registry/typen.ts`
+(`AktionsSchema`), 19 Registry-Dateien, `schema-felder.ts`,
+`introspektion.ts`; Konvention in docs/entwicklung.md.
+
 ## 2026-11-13 — Täglicher Sicherheits-Check in KRNL, Telegram nur bei Befunden
 
 **Anlass (Betreiber):** „Eine tägliche Aufgabe für npm audit und ein kurzer

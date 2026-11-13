@@ -163,6 +163,12 @@ nicht geschlossen. Genau das war der CI-Hänger (Entscheidungslog 2026-08-22).
   in die Abfrage, nicht als `rows.filter` auf die Seite. Der Wächter
   `tests/seiten.test.ts` lässt neue Listen-Seiten mit `limit ≥ 100` ohne
   Helfer nicht zu (Auswahllisten `order by name/label` sind ausgenommen).
+- **Eingabeschemas (zod 4)** → IDs mit `.guid()`, nicht `.uuid()` (prüft
+  streng nach RFC); Typ-Meldung als `error: typFehler('…')`; „ändern"-
+  Aktionen mit `ohneVorgaben(felder)` statt `.partial()` (das füllt
+  Standardwerte); `z.record(z.string(), wert)`. Hilfen und Begründung in
+  `modules/prozesse/registry/zod-hilfen.ts`, festgehalten in
+  `tests/zod-hilfen.test.ts`.
 - **Mengen im Text** → `plural(n, 'Position', 'Positionen')` (SQL:
   `plural_text`, 0128) — nie „Position(en)“ oder „Auftrag/-aufträge“
   (Wächter `tests/plural.test.ts`). Folgt ein Verb, gehört es in beide

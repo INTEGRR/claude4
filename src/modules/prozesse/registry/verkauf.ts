@@ -256,7 +256,7 @@ export const VERKAUF = {
     schema: z.object({
       datum: DATUM.optional(),
       betrag: z.number().positive().optional().describe('Teilbetrag in Euro; leer = offener Betrag'),
-      bankkonto_id: z.string().uuid().optional(),
+      bankkonto_id: z.string().guid().optional(),
       zahlungsart: z.string().max(60).optional().describe('z. B. Überweisung, PayPal, bar'),
     }),
     formdata: (fd) => ({
@@ -296,7 +296,7 @@ export const VERKAUF = {
     prozessfrei: true,
     schema: z.object({
       positionen: z
-        .array(z.object({ position_id: z.string().uuid(), menge: z.number().positive() }))
+        .array(z.object({ position_id: z.string().guid(), menge: z.number().positive() }))
         .min(1, 'Bitte mindestens eine Position mit Menge angeben'),
       grund: z.string().max(300).optional(),
     }),

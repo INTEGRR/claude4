@@ -20,7 +20,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * Datei-ID aus dem Browser wird nie ungeprüft geglaubt.
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 
 export const EINKAUF_DOKUMENTE = {
   'einkauf.ablage_einrichten': {

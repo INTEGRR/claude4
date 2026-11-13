@@ -18,7 +18,14 @@ import type { Area, Role } from '../../auth/permissions.ts'
  * erzwingt zur Compile-Zeit, dass keine Aktion ohne Ausführung bleibt.
  */
 
-export interface RegistrierteAktion<S extends z.ZodTypeAny = z.ZodTypeAny> {
+/**
+ * „Irgendein Schema" mit Ausgabe `any`. Seit zod 4 ist `z.ZodTypeAny` ein
+ * Schema mit Ausgabe `unknown` — damit wäre `zusammenfassung(p)` einer
+ * konkreten Aktion nicht mehr an die allgemeine Form zuweisbar.
+ */
+export type AktionsSchema = z.ZodType<any, any>
+
+export interface RegistrierteAktion<S extends AktionsSchema = AktionsSchema> {
   /** Knopfbeschriftung — adressierbar statt nur JSX-Text. */
   label: string
   bereich: Area

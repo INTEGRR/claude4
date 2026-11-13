@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { typFehler } from './zod-hilfen.ts'
 import { MODELL_KATALOG, type ModellId } from '../../ki/modelle.ts'
 import { KI_REGIONEN, type KiRegion } from '../../ki/region.ts'
 import type { RegistrierteAktion } from './typen.ts'
@@ -199,8 +200,8 @@ export const EINSTELLUNGEN = {
     bindung: 'frei',
     schema: z.object({
       modus: z.enum(['baubar', 'fest']).describe('baubar = echte Menge (gedeckelt), fest = Deckel oder 0'),
-      puffer: z.number({ invalid_type_error: 'Puffer: ganze Zahl' }).int().min(0).max(100),
-      deckel: z.number({ invalid_type_error: 'Deckel: ganze Zahl' }).int().min(1).max(10000),
+      puffer: z.number({ error: typFehler('Puffer: ganze Zahl') }).int().min(0).max(100),
+      deckel: z.number({ error: typFehler('Deckel: ganze Zahl') }).int().min(1).max(10000),
     }),
     zusammenfassung: (p) =>
       p.modus === 'fest'
@@ -337,7 +338,7 @@ export const EINSTELLUNGEN = {
     bindung: 'frei',
     schema: z.object({
       einkauf_limit: z
-        .number({ invalid_type_error: 'Das Limit muss eine Zahl sein — oder leer für „keine Freigabepflicht"' })
+        .number({ error: typFehler('Das Limit muss eine Zahl sein — oder leer für „keine Freigabepflicht"') })
         .nonnegative('Das Limit muss ≥ 0 sein')
         .nullable(),
     }),
@@ -364,7 +365,7 @@ export const EINSTELLUNGEN = {
         FINANZ_FELDER.map((f) => [
           f.name,
           z
-            .number({ invalid_type_error: `„${f.label}" muss eine Zahl sein` })
+            .number({ error: typFehler(`„${f.label}" muss eine Zahl sein`) })
             .min(f.min ?? Number.NEGATIVE_INFINITY, `„${f.label}" muss mindestens ${f.min} sein`)
             .max(f.max ?? Number.POSITIVE_INFINITY, `„${f.label}" darf höchstens ${f.max} sein`),
         ]),
@@ -387,7 +388,7 @@ export const EINSTELLUNGEN = {
     bindung: 'frei',
     schema: z.object({
       name: z.string().trim().min(1, 'Bitte einen Namen angeben').max(100),
-      parent_id: z.string().uuid().optional(),
+      parent_id: z.string().guid().optional(),
     }),
     zusammenfassung: (p) => `Kategorie ${p.name}`,
     formdata: (fd) => ({
@@ -407,7 +408,7 @@ export const EINSTELLUNGEN = {
     schema: z.object({
       name: z.string().trim().min(1, 'Bitte einen Namen angeben').max(100),
       amount: z
-        .number({ invalid_type_error: 'Der Satz muss eine Zahl sein' })
+        .number({ error: typFehler('Der Satz muss eine Zahl sein') })
         .min(0, 'Der Satz muss ≥ 0 sein')
         .max(100, 'Der Satz darf höchstens 100 % sein'),
       type_tax_use: z.enum(['sale', 'purchase']),
@@ -437,19 +438,19 @@ export const EINSTELLUNGEN = {
       .object({
         name: z.string().trim().min(1, 'Bitte einen Namen angeben').max(100),
         nb_days: z
-          .number({ invalid_type_error: 'Tage müssen eine Zahl sein' })
+          .number({ error: typFehler('Tage müssen eine Zahl sein') })
           .int('Tage bitte ganzzahlig')
           .min(0)
           .max(365),
         delay_type: z.enum(['days_after', 'days_after_end_of_month']),
         early_discount: z.boolean(),
         discount_percentage: z
-          .number({ invalid_type_error: 'Skonto-Prozent müssen eine Zahl sein' })
+          .number({ error: typFehler('Skonto-Prozent müssen eine Zahl sein') })
           .min(0)
           .max(100, 'Skonto höchstens 100 %')
           .optional(),
         discount_days: z
-          .number({ invalid_type_error: 'Skonto-Tage müssen eine Zahl sein' })
+          .number({ error: typFehler('Skonto-Tage müssen eine Zahl sein') })
           .int('Skonto-Tage bitte ganzzahlig')
           .min(0)
           .max(365)
@@ -553,7 +554,7 @@ export const EINSTELLUNGEN = {
     schema: z.object({
       aktiv: z.boolean(),
       monats_tokens: z
-        .number({ invalid_type_error: 'Bitte eine ganze Zahl angeben' })
+        .number({ error: typFehler('Bitte eine ganze Zahl angeben') })
         .int('Bitte eine ganze Zahl angeben')
         .positive('Die Obergrenze muss größer als 0 sein')
         .nullable()
@@ -618,7 +619,7 @@ export const EINSTELLUNGEN = {
     bindung: 'frei',
     schema: z.object({
       bestaetigung: z.literal('ALLES LÖSCHEN', {
-        errorMap: () => ({ message: 'Zur Bestätigung muss im Feld exakt „ALLES LÖSCHEN" stehen.' }),
+        error: 'Zur Bestätigung muss im Feld exakt „ALLES LÖSCHEN" stehen.',
       }),
     }),
     zusammenfassung: () => 'Betriebsdaten gelöscht',
@@ -639,7 +640,7 @@ export const EINSTELLUNGEN = {
     bindung: 'frei',
     schema: z.object({
       bestaetigung: z.literal('WERKSZUSTAND', {
-        errorMap: () => ({ message: 'Zur Bestätigung muss im Feld exakt „WERKSZUSTAND" stehen.' }),
+        error: 'Zur Bestätigung muss im Feld exakt „WERKSZUSTAND" stehen.',
       }),
     }),
     zusammenfassung: () => 'Werkszustand hergestellt',
@@ -727,7 +728,7 @@ export const EINSTELLUNGEN = {
               .optional()
               .describe('Kindprozess-Code, Pflicht bei art=prozess (Teilprozess/Call Activity)'),
             teilprozess_link: z
-              .record(z.unknown())
+              .record(z.string(), z.unknown())
               .optional()
               .describe(
                 'Kindbeleg-Verknüpfung: leer = origin zeigt auf den Elternbeleg, ' +
@@ -745,7 +746,7 @@ export const EINSTELLUNGEN = {
               .optional()
               .describe('Verlangte Benutzer-Befugnis, z. B. einkauf:freigabe (Torwächter prüft hart)'),
             params: z
-              .record(z.unknown())
+              .record(z.string(), z.unknown())
               .optional()
               .describe('Vorbelegte Aktionsfelder, z. B. {"state": "geprueft"}'),
             optional: z.boolean().default(false),
@@ -1222,9 +1223,9 @@ export const EINSTELLUNGEN = {
       'die auf ihm gedruckt werden.',
     bindung: 'frei',
     schema: z.object({
-      id: z.string().uuid().optional().describe('leer = neu anlegen'),
+      id: z.string().guid().optional().describe('leer = neu anlegen'),
       name: z.string().min(1, 'Der Drucker braucht einen Namen.').max(100),
-      work_center_id: z.string().uuid().optional().describe('Standort (Arbeitsplatz)'),
+      work_center_id: z.string().guid().optional().describe('Standort (Arbeitsplatz)'),
       druckername: z.string().max(200).optional().describe('Name unter Windows; leer = Standarddrucker'),
       typ: z.enum(['label', 'a4']),
       breite_mm: z.number().positive().max(1000).optional(),
@@ -1286,9 +1287,9 @@ export const EINSTELLUNGEN = {
       'wird der Weg entfernt.',
     bindung: 'frei',
     schema: z.object({
-      work_center_id: z.string().uuid().optional().describe('leer = Ersatz für alle Plätze'),
+      work_center_id: z.string().guid().optional().describe('leer = Ersatz für alle Plätze'),
       druckart: z.enum(DRUCKARTEN),
-      drucker_id: z.string().uuid().optional().describe('leer = Weg entfernen'),
+      drucker_id: z.string().guid().optional().describe('leer = Weg entfernen'),
     }),
     zusammenfassung: (p) =>
       `${DRUCKART_LABELS[p.druckart as Druckart]}: ${p.drucker_id ? 'Drucker gesetzt' : 'Weg entfernt'}` +
@@ -1314,7 +1315,7 @@ export const EINSTELLUNGEN = {
     bindung: 'frei',
     schema: z.object({
       automatisch: z.boolean().default(false),
-      reserve: z.number({ invalid_type_error: 'Reserve: ganze Zahl' }).int().min(0).max(100000).default(20),
+      reserve: z.number({ error: typFehler('Reserve: ganze Zahl') }).int().min(0).max(100000).default(20),
     }),
     zusammenfassung: (p) =>
       p.automatisch ? `17TRACK: automatisch anmelden, Reserve ${p.reserve}` : '17TRACK: Anmeldung nur von Hand',

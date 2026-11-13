@@ -1,4 +1,6 @@
 import type { RegistrierteAktion } from './typen.ts'
+// Zuerst: stellt die Meldungen der Eingabeprüfung auf Deutsch (Seiteneffekt).
+import './zod-hilfen.ts'
 import { AUFGABEN } from './aufgaben.ts'
 import { AUSWERTUNGEN } from './auswertungen.ts'
 import { EINKAUF } from './einkauf.ts'

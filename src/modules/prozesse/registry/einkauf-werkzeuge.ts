@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { typFehler } from './zod-hilfen.ts'
 import { zahlLesen } from '../../einkauf/einkaufsprojekt.ts'
 import { EIGENTUEMER_NAMEN, WERKZEUG_ART_NAMEN, WERKZEUG_STATUS_NAMEN } from '../../einkauf/werkzeuge.ts'
 import type { RegistrierteAktion } from './typen.ts'
@@ -11,7 +12,7 @@ import type { RegistrierteAktion } from './typen.ts'
  * Werkzeugkosten, entsteht der Datensatz beim Bestellen von selbst.
  */
 
-const uuid = z.string().uuid()
+const uuid = z.string().guid()
 const leer = (fd: FormData, feld: string) => String(fd.get(feld) ?? '').trim() || undefined
 /** Feld vorhanden → Text (auch leer, zum Löschen); fehlt → unverändert. */
 const optionalLeer = (fd: FormData, feld: string) => (fd.has(feld) ? String(fd.get(feld) ?? '').trim() : undefined)
@@ -21,8 +22,8 @@ const zahl = (fd: FormData, feld: string, art: 'menge' | 'preis' = 'preis') => {
   return zahlLesen(roh, art) ?? Number.NaN
 }
 
-const betrag = z.number({ invalid_type_error: 'Bitte einen Betrag angeben' }).nonnegative('Nicht negativ')
-const schuss = z.number({ invalid_type_error: 'Bitte eine ganze Zahl angeben' }).int('Schüsse als ganze Zahl')
+const betrag = z.number({ error: typFehler('Bitte einen Betrag angeben') }).nonnegative('Nicht negativ')
+const schuss = z.number({ error: typFehler('Bitte eine ganze Zahl angeben') }).int('Schüsse als ganze Zahl')
 
 export const EINKAUF_WERKZEUGE = {
   'einkauf.werkzeug_anlegen': {

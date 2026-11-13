@@ -48,7 +48,7 @@ export const ARGUMENTE = {
     aktion: z.string().min(1),
     parameter: z.record(z.string(), z.unknown()),
     zusammenfassung: z.string().min(3).max(300),
-    record_id: z.string().uuid().optional(),
+    record_id: z.string().guid().optional(),
   }),
   aktionen_suchen: z.object({
     begriff: z.string().min(2),

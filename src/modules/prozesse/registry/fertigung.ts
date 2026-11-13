@@ -68,7 +68,7 @@ export const FERTIGUNG = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      ids: z.array(z.string().uuid()).min(1).describe('Fertigungsauftrags-IDs'),
+      ids: z.array(z.string().guid()).min(1).describe('Fertigungsauftrags-IDs'),
     }),
     formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
     revalidate: ['/fertigung', '/integrationen'],
@@ -87,7 +87,7 @@ export const FERTIGUNG = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      ids: z.array(z.string().uuid()).min(1).max(100).describe('Fertigungsauftrags-IDs'),
+      ids: z.array(z.string().guid()).min(1).max(100).describe('Fertigungsauftrags-IDs'),
     }),
     formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
     revalidate: ['/integrationen'],
@@ -103,7 +103,7 @@ export const FERTIGUNG = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      ids: z.array(z.string().uuid()).min(1).describe('Fertigungsauftrags-IDs'),
+      ids: z.array(z.string().guid()).min(1).describe('Fertigungsauftrags-IDs'),
     }),
     formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
     revalidate: ['/fertigung'],
@@ -132,7 +132,7 @@ export const FERTIGUNG = {
     uebergang: { von: ['confirmed', 'progress'], nach: ['done', 'progress'] },
     schema: z.object({
       qty: z.number().positive().optional().describe('Ist-Menge; leer = offene Sollmenge'),
-      mengen: z.record(z.number()).default({}).describe('Ist-Verbrauch je Bewegung'),
+      mengen: z.record(z.string(), z.number()).default({}).describe('Ist-Verbrauch je Bewegung'),
       backorder: z.boolean().default(true),
       lot: z.string().max(60).optional().describe('Los/Serie des Erzeugnisses'),
     }),

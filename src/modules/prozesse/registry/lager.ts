@@ -118,7 +118,7 @@ export const LAGER = {
     modell: 'stock_picking',
     schema: z.object({
       gesammelt: z
-        .record(z.string().uuid(), z.number().nonnegative())
+        .record(z.string().guid(), z.number().nonnegative())
         .default({})
         .describe('Gesammelte Menge je Variante'),
       unvollstaendig: z.boolean().default(false),

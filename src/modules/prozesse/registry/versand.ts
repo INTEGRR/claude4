@@ -72,7 +72,7 @@ export const VERSAND = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      ids: z.array(z.string().uuid()).min(1, 'Bitte mindestens eine Lieferung auswählen').max(100),
+      ids: z.array(z.string().guid()).min(1, 'Bitte mindestens eine Lieferung auswählen').max(100),
     }),
     zusammenfassung: (p) => `${p.ids.length} Packzettel`,
     formdata: (fd) => ({ ids: fd.getAll('ids').map(String).filter(Boolean) }),
@@ -176,7 +176,7 @@ export const VERSAND = {
     prozessfrei: true,
     ki: true,
     schema: z.object({
-      variant_id: z.string().uuid(),
+      variant_id: z.string().guid(),
       weight_g: z.number().int().min(1, 'Gewicht in Gramm, mindestens 1').max(100000),
     }),
     zusammenfassung: (p) => `Artikelgewicht ${p.weight_g} g`,
@@ -211,7 +211,7 @@ export const VERSAND = {
     bindung: 'frei',
     prozessfrei: true,
     schema: z.object({
-      ids: z.array(z.string().uuid()).min(1).max(500).optional().describe('Lieferungen; leer = alle'),
+      ids: z.array(z.string().guid()).min(1).max(500).optional().describe('Lieferungen; leer = alle'),
     }),
     zusammenfassung: (p) =>
       p.ids ? `${plural(p.ids.length, 'gelabelte Lieferung', 'gelabelte Lieferungen')} ausbuchen` : 'alle gelabelten Lieferungen ausbuchen',

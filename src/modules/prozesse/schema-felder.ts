@@ -33,16 +33,38 @@ export interface FormularFeld {
   hinweis?: string
 }
 
-/** Innerste Typ-Schale freilegen (Optional/Default/Nullable/Effects). */
-function kern(schema: z.ZodTypeAny): z.ZodTypeAny {
+/**
+ * Innerste Typ-Schale eines zod-Feldes freilegen (Optional/Default/Nullable
+ * und Pipes). Seit zod 4 hüllt `.refine()` nicht mehr ein; `.transform()`
+ * und `z.preprocess()` sind Pipes, deren fachliche Seite die ist, die kein
+ * reiner Transform ist.
+ */
+function kern(schema: z.ZodType): z.ZodType {
   let s = schema
   for (;;) {
     if (s instanceof z.ZodOptional || s instanceof z.ZodDefault || s instanceof z.ZodNullable) {
-      s = s._def.innerType as z.ZodTypeAny
-    } else if (s instanceof z.ZodEffects) {
-      s = s._def.schema as z.ZodTypeAny
+      s = s.unwrap() as z.ZodType
+    } else if (s instanceof z.ZodPipe) {
+      s = (s.def.in instanceof z.ZodTransform ? s.def.out : s.def.in) as z.ZodType
     } else {
       return s
+    }
+  }
+}
+
+/**
+ * Beschreibung eines Feldes. In zod 4 hängt `.describe()` an genau der
+ * Instanz, auf der es aufgerufen wurde — `.describe('…').optional()` trägt
+ * sie nicht mehr nach außen. Deshalb von außen nach innen suchen.
+ */
+function beschreibungVon(schema: z.ZodType): string | undefined {
+  let s = schema
+  for (;;) {
+    if (s.description) return s.description
+    if (s instanceof z.ZodOptional || s instanceof z.ZodDefault || s instanceof z.ZodNullable) {
+      s = s.unwrap() as z.ZodType
+    } else {
+      return undefined
     }
   }
 }
@@ -316,16 +338,14 @@ function beschriftung(name: string): string {
   return roh.charAt(0).toUpperCase() + roh.slice(1)
 }
 
-function feldTyp(name: string, s: z.ZodTypeAny): Pick<FormularFeld, 'typ' | 'auswahl' | 'quelle'> {
+function feldTyp(name: string, s: z.ZodType): Pick<FormularFeld, 'typ' | 'auswahl' | 'quelle'> {
   if (VERWEIS_QUELLEN[name]) return { typ: 'verweis', quelle: VERWEIS_QUELLEN[name] }
   if (s instanceof z.ZodEnum) return { typ: 'auswahl', auswahl: [...(s.options as string[])] }
   if (s instanceof z.ZodBoolean) return { typ: 'schalter' }
   if (s instanceof z.ZodNumber) return { typ: 'nummer' }
   if (s instanceof z.ZodString) {
-    const max = (s._def.checks as { kind: string; value?: number }[]).find(
-      (c) => c.kind === 'max',
-    )?.value
-    return { typ: max !== undefined && max >= 1000 ? 'mehrzeilig' : 'text' }
+    const max = s.maxLength
+    return { typ: max !== null && max >= 1000 ? 'mehrzeilig' : 'text' }
   }
   // Records/Objekte/Arrays: generisch nur als JSON erfassbar (z. B. die
   // Ist-Mengen beim Reparaturabschluss — dafür bleibt die Fachmaske da).
@@ -336,7 +356,7 @@ export function formularFelder(aktion: RegistrierteAktion): FormularFeld[] {
   const objekt = kern(aktion.schema)
   if (!(objekt instanceof z.ZodObject)) return []
 
-  return Object.entries(objekt.shape as Record<string, z.ZodTypeAny>)
+  return Object.entries(objekt.shape as Record<string, z.ZodType>)
     .filter(([name]) => {
       /**
        * Der rohe `zusatz`-Sack gehört NIE in eine generierte Maske. Er ist
@@ -352,14 +372,15 @@ export function formularFelder(aktion: RegistrierteAktion): FormularFeld[] {
     })
     .map(([name, roh]) => {
       const innen = kern(roh)
-      const vorgabe =
-        roh instanceof z.ZodDefault ? (roh._def.defaultValue as () => unknown)() : undefined
+      // zod 4: defaultValue ist der Wert selbst (ein Getter), keine Funktion mehr.
+      const vorgabe = roh instanceof z.ZodDefault ? (roh.def.defaultValue as unknown) : undefined
+      const beschreibung = beschreibungVon(roh)
       return {
         name,
-        label: roh.description ?? beschriftung(name),
+        label: beschreibung ?? beschriftung(name),
         pflicht: !(roh instanceof z.ZodOptional) && !(roh instanceof z.ZodDefault),
         ...(vorgabe !== undefined ? { vorgabe } : {}),
-        hinweis: roh.description,
+        hinweis: beschreibung,
         ...feldTyp(name, innen),
       }
     })
