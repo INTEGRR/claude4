@@ -6,7 +6,12 @@ import { Card, TableWrap, Zustand } from '@/components/ui'
 import { EinstellungenKopf } from '@/components/einstellungen-kopf'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { einstellung } from '@/modules/einstellungen/lesen'
-import { HANDARBEIT, type ProduktivgangStand, produktivgangBewerten } from '@/modules/einstellungen/produktivgang'
+import {
+  HANDARBEIT,
+  type ProduktivgangStand,
+  RECHNUNG_AUFGABEN,
+  produktivgangBewerten,
+} from '@/modules/einstellungen/produktivgang'
 import auditStand from '@/modules/einstellungen/audit-stand.json'
 import { shopifyModus } from '@/modules/integrationen/shopify-modus'
 import { gestoerteDienste } from '@/modules/integrationen/wache'
@@ -40,8 +45,10 @@ async function standLesen(): Promise<ProduktivgangStand> {
       select count(*) filter (where role = 'admin' and totp_aktiviert_at is null)::int as ohne2fa,
              bool_or(lower(email) = 'admin@example.com') as startkonto
       from users where active`,
-    sql<{ offen: number }[]>`
-      select count(*)::int as offen from aufgaben
+    sql<{ offen: number; rechnung: number }[]>`
+      select count(*)::int as offen,
+             count(*) filter (where einrichtung_schluessel = any(${[...RECHNUNG_AUFGABEN]}::text[]))::int as rechnung
+      from aufgaben
       where einrichtung_schluessel is not null and status = 'offen'`,
   ])
   return {
@@ -58,6 +65,7 @@ async function standLesen(): Promise<ProduktivgangStand> {
     adminsOhne2fa: konten.ohne2fa,
     startkontoAktiv: Boolean(konten.startkonto),
     offeneEinrichtung: aufgaben.offen,
+    offeneEinrichtungRechnung: aufgaben.rechnung,
     // Aus dem Build dieser Fassung (scripts/audit-stand.ts), nicht live.
     abhaengigkeiten: auditStand,
   }

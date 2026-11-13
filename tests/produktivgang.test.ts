@@ -37,6 +37,7 @@ const BEREIT: ProduktivgangStand = {
   adminsOhne2fa: 0,
   startkontoAktiv: false,
   offeneEinrichtung: 0,
+  offeneEinrichtungRechnung: 0,
   abhaengigkeiten: { geprueftAm: '2026-10-18T06:00:00Z', kritisch: 0, hoch: 0, mittel: 0, niedrig: 0, pakete: [], fehler: null },
 }
 
@@ -58,9 +59,27 @@ describe('Produktivgang', () => {
       startkontoAktiv: true,
       offeneEinrichtung: 7,
     })
-    for (const k of ['firma', 'nummernkreise', 'rechnungsmodus', 'shopify_modus', 'startkonto', 'einrichtung']) {
+    for (const k of ['firma', 'shopify_modus', 'startkonto', 'einrichtung']) {
       assert.equal(t[k], 'warn', k)
     }
+    // Rechnungen zurückgestellt (2026-11-13): Probelauf und Nummernkreise halten den Stichtag nicht auf.
+    assert.equal(t.rechnungsmodus, 'off')
+    assert.equal(t.nummernkreise, 'off')
+  })
+
+  test('Rechnungen zurückgestellt: grau statt rot, Rechnungs-Aufgaben zählen erst mit „scharf"', () => {
+    const bei1 = [{ code: 'kundenrechnung', next_number: 1 }, { code: 'gutschrift', next_number: 1 }]
+    assert.equal(ton({ ...BEREIT, rechnungModus: 'aus' }).rechnungsmodus, 'off')
+    assert.equal(ton({ ...BEREIT, rechnungModus: 'scharf', nummernkreise: bei1 }).nummernkreise, 'warn', 'scharf braucht die Nummern')
+
+    const nurRechnung = { ...BEREIT, rechnungModus: 'test' as const, offeneEinrichtung: 5, offeneEinrichtungRechnung: 5 }
+    const p = produktivgangBewerten(nurRechnung).find((x) => x.schluessel === 'einrichtung')!
+    assert.equal(p.ton, 'ok')
+    assert.match(p.text, /dazu 5 zur Rechnung, zurückgestellt/)
+    const gemischt = produktivgangBewerten({ ...nurRechnung, offeneEinrichtung: 7 }).find((x) => x.schluessel === 'einrichtung')!
+    assert.equal(gemischt.ton, 'warn')
+    assert.match(gemischt.text, /^2 Aufgaben sind noch offen \(dazu 5 zur Rechnung/)
+    assert.equal(ton({ ...nurRechnung, rechnungModus: 'scharf' }).einrichtung, 'warn', 'scharf: alle Aufgaben zählen')
   })
 
   test('Einzelregeln: Testbelege, Attrappe, Störung, fehlende Pflichtangabe, KI-Region', () => {

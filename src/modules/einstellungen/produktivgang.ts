@@ -35,6 +35,8 @@ export interface ProduktivgangStand {
   startkontoAktiv: boolean
   /** Offene Einrichtungsaufgaben (Stichtag-Todos, 0116). */
   offeneEinrichtung: number
+  /** Davon Aufgaben, die nur zum Scharfschalten der Rechnungen gehören (RECHNUNG_AUFGABEN). */
+  offeneEinrichtungRechnung: number
   /** `npm audit` aus dem Build dieser Fassung (scripts/audit-stand.ts). */
   abhaengigkeiten: AuditStand
 }
@@ -78,6 +80,20 @@ export const FIRMA_PFLICHTFELDER = [
   ['handelsregister', 'Handelsregister'],
   ['geschaeftsfuehrung', 'Geschäftsführung'],
   ['iban', 'IBAN'],
+] as const
+
+/**
+ * Einrichtungsaufgaben, die erst mit eigenen Rechnungen fällig werden.
+ * Solange der Rechnungsmodus nicht „scharf" ist, halten sie den Stichtag
+ * nicht auf (Entscheidungslog 2026-11-13: Rechnungen und Gutschriften
+ * bleiben vorerst außen vor, sevDesk stellt weiter aus).
+ */
+export const RECHNUNG_AUFGABEN = [
+  'rechnung_nummernkreis',
+  'shopify_rechnungsapp',
+  'datev_konten',
+  'rechnung_mailversand',
+  'rechnung_probelauf',
 ] as const
 
 /** Name, den der Werkszustand einträgt — gilt als „noch nicht eingerichtet". */
@@ -150,9 +166,11 @@ export const PRUEFPUNKTE: readonly Pruefpunkt[] = [
       const re = nummernkreis(s, 'kundenrechnung')
       const gu = nummernkreis(s, 'gutschrift')
       const offen = [re === null || re <= 1 ? 'RE-' : null, gu === null || gu <= 1 ? 'GU-' : null].filter(Boolean)
-      return offen.length
+      if (offen.length === 0) return ok(`nächste Nummern: RE-${re}, GU-${gu}`)
+      // Rechnungen zurückgestellt: die Nummern braucht erst das Scharfschalten.
+      return s.rechnungModus === 'scharf'
         ? rot(`${offen.join(' und ')} beginnt noch bei 1 — auf die letzte sevDesk-Nummer + 1 setzen`)
-        : ok(`nächste Nummern: RE-${re}, GU-${gu}`)
+        : grau(`${offen.join(' und ')} beginnt noch bei 1 — erst beim Scharfschalten der Rechnungen setzen`)
     },
   },
   {
@@ -161,8 +179,10 @@ export const PRUEFPUNKTE: readonly Pruefpunkt[] = [
     gruppe: 'Firma & Belege',
     link: '/einstellungen/belege',
     bewerten: (s) => {
-      if (s.rechnungModus === 'aus') return rot('Rechnungen sind aus — KRNL stellt keine Rechnungen')
-      if (s.rechnungModus === 'test') return rot('noch im Probelauf (Testbelege) — am Stichtag auf „scharf" schalten')
+      // Entscheidungslog 2026-11-13: Rechnungen und Gutschriften bleiben beim
+      // Stichtag außen vor — sevDesk stellt weiter aus, scharf wird später.
+      if (s.rechnungModus === 'aus') return grau('zurückgestellt — KRNL stellt keine Rechnungen, sevDesk läuft weiter')
+      if (s.rechnungModus === 'test') return grau('zurückgestellt — Probelauf läuft mit (Testbelege), sevDesk stellt weiter aus; später „scharf"')
       return s.probeRechnungen > 0
         ? rot('scharf, aber es liegen noch Testbelege — im Probelauf löschen')
         : ok('scharf, keine Testbelege mehr')
@@ -253,10 +273,14 @@ export const PRUEFPUNKTE: readonly Pruefpunkt[] = [
     titel: 'Einrichtungsaufgaben erledigt',
     gruppe: 'Konten',
     link: '/aufgaben',
-    bewerten: (s) =>
-      s.offeneEinrichtung > 0
-        ? rot(`${s.offeneEinrichtung === 1 ? 'eine Aufgabe ist' : `${s.offeneEinrichtung} Aufgaben sind`} noch offen`)
-        : ok('alle Stichtag-Aufgaben erledigt'),
+    bewerten: (s) => {
+      // Rechnungs-Aufgaben zählen erst, wenn die Rechnungen scharf sind.
+      const spaeter = s.rechnungModus === 'scharf' ? 0 : s.offeneEinrichtungRechnung
+      const offen = s.offeneEinrichtung - spaeter
+      const zusatz = spaeter > 0 ? ` (dazu ${spaeter} zur Rechnung, zurückgestellt)` : ''
+      if (offen > 0) return rot(`${offen === 1 ? 'eine Aufgabe ist' : `${offen} Aufgaben sind`} noch offen${zusatz}`)
+      return spaeter > 0 ? ok(`alle Stichtag-Aufgaben erledigt${zusatz}`) : ok('alle Stichtag-Aufgaben erledigt')
+    },
   },
 ]
 
@@ -265,7 +289,7 @@ export const HANDARBEIT: readonly { titel: string; text: string }[] = [
   { titel: 'Supabase-Sicherung', text: 'PITR aktiv, AV-Vertrag (DPA) abgeschlossen, Region EU (go-live.md §2)' },
   { titel: 'Vercel', text: 'Eigene Domain, Deployment-Schutz für Vorschauen, Variablen nur in Production (§3)' },
   { titel: 'Odoo', text: 'Selektive Übernahme (Stücklisten, Komponenten, Lieferanten, Bestände) abgeschlossen, danach schreibgeschützt (§5b, §7)' },
-  { titel: 'sevDesk', text: 'Rechnungsausgabe der Shopify-App am Stichtag abschalten (§7c)' },
+  { titel: 'sevDesk', text: 'stellt weiter die Rechnungen aus; Rechnungsausgabe erst abschalten, wenn KRNL scharf ist (§7c)' },
   { titel: 'Sendcloud', text: 'auslaufen lassen, bis keine alten Labels mehr unterwegs sind (§8)' },
 ]
 

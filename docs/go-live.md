@@ -22,6 +22,18 @@ fail-closed, Tracking über Parcel DE Tracking, Shopify-Lesemodus und
 Probelauf, Odoo-Stücklisten, Druckbrücke, Label bucht aus, ein Scanfeld,
 Datenbank-TLS im Code, Konten löschen.
 
+**Kurzlage 2026-11-13** (aus Prod gelesen): DHL, Shopify (Probelauf),
+Mail, 17TRACK, Sprache und Telegram grün; **KI gestört** (Anthropic-
+Schlüssel wird mit 401 abgelehnt), **Druckbrücke gestört** (kein Agent
+seit 10.11.). Offen vor dem Stichtag: Firmendaten (USt-IdNr.,
+Steuernummer, Register, Geschäftsführung, IBAN fehlen), zweiter Faktor
+für den zweiten Admin, zehn Fertigungs-Nachfragen (WH/MO/00054–00063,
+extern versendet), Shop-Verfügbarkeit (120 Varianten weichen ab, 14
+würden beim Umschalten ausverkauft), Versand über KRNL testen (77 von 79
+Lieferungen der letzten 30 Tage liefen über Sendcloud), KI-Region,
+Odoo-Übernahme letzter Lauf, PITR/DPA/Domain (§2, §3). Rechnungen und
+Gutschriften bleiben außen vor (§7).
+
 **Kurzlage 2026-10-01:** DHL, Shopify (Probelauf), KI, Sprache,
 Druckbrücke und Telegram melden grün; Mail und Google sind nicht
 eingerichtet. Offen vor dem Stichtag vor allem: Mail, PITR, Konten/2FA
@@ -301,8 +313,9 @@ Der Stichtag ist eine Reihe von Schaltern an der laufenden Instanz —
 Einstellungen → **Produktivgang** zeigt vorher und nachher, was grün ist.
 
 Vor dem Stichtag:
-- [ ] Produktivgang-Seite: alle automatischen Punkte grün außer den
-      Stichtags-Schaltern (Shopify-Modus, Rechnungsmodus, Nummernkreise).
+- [ ] Produktivgang-Seite: alle automatischen Punkte grün außer dem
+      Stichtags-Schalter Shopify-Modus; Rechnungsmodus und Nummernkreise
+      stehen grau (zurückgestellt, 2026-11-13).
 - [ ] Odoo-Übernahme (Einstellungen → Odoo-Übernahme) ein letztes Mal mit
       Vorschau laufen lassen: Stücklisten, Komponenten, Lieferanten,
       Bestände — ohne Doppel.
@@ -311,21 +324,27 @@ Vor dem Stichtag:
 Am Stichtag, in dieser Reihenfolge:
 - [ ] Odoo schreibgeschützt: keine Buchungen mehr in Odoo, Bestände ab
       jetzt nur in KRNL.
-- [ ] Nummernkreise RE-/GU- auf die nächste freie sevDesk-Nummer
-      (Einstellungen → Belege & Freigaben).
-- [ ] Rechnungsmodus: Probelauf löschen, dann „scharf"; im selben Zug die
-      Rechnungsausgabe in sevDesk abschalten (§7c).
 - [ ] Shopify-Modus „schreiben", Webhooks registrieren, einmal „Mit
       Shopify abgleichen" (§6).
-- [ ] Produktivgang-Seite: alles grün außer der Handarbeit.
+- [ ] Produktivgang-Seite: alles grün außer der Handarbeit und den
+      zurückgestellten Rechnungspunkten (grau).
+
+**Rechnungen und Gutschriften sind nicht Teil des Stichtags**
+(Entscheidungslog 2026-11-13): sevDesk stellt weiter aus, KRNL bleibt im
+Probelauf. Später, als eigener Schritt:
+- [ ] Probelauf auswerten (Verkauf → Rechnungen → Probelauf).
+- [ ] Nummernkreise RE-/GU- auf die nächste freie sevDesk-Nummer
+      (Einstellungen → Belege & Freigaben).
+- [ ] Probelauf löschen, Rechnungsmodus „scharf"; im selben Zug die
+      Rechnungsausgabe in sevDesk abschalten (§7c).
+- [ ] Erste echte Rechnung gegen die Shopify-Bestellung prüfen (Betrag,
+      Zahlstatus — offen nur bei Aufpreis, 0130).
 
 Danach:
 - [ ] Einstellungen → Schnittstellen zeigt alle Anbindungen konfiguriert
       und erreichbar, der Ereignis-Monitor `/integrationen` ist ruhig, die
       Cron-Ergebnisse der ersten Stunde durchsehen (Outbox leer, Tracking
       ohne `fehler`).
-- [ ] Erste echte Rechnung gegen die Shopify-Bestellung prüfen (Betrag,
-      Zahlstatus — offen nur bei Aufpreis, 0130).
 
 ## 7b. Einkaufstool (Betreiber, vor dem echten Postfach-Betrieb)
 

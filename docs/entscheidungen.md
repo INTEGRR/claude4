@@ -9,6 +9,32 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-13 — Stichtag ohne Rechnungen und Gutschriften
+
+**Anlass (Betreiber):** „Rechnungen und Gutschriften lassen wir erstmal
+außen vor, schalten wir später scharf." Der Stand vor dem Stichtag zeigte
+die Rechnungsseite als größten Block offener Punkte (Nummernkreise bei 1,
+Probelauf nicht ausgewertet, Firmendaten für den Rechnungsfuß, sevDesk).
+
+**Entschieden:**
+- Der Stichtag (Odoo schreibgeschützt, Shopify „schreiben", Versand über
+  KRNL) läuft **ohne** eigene Rechnungen. sevDesk stellt weiter aus, der
+  Rechnungsmodus bleibt im Probelauf; „scharf" ist ein eigener, späterer
+  Schritt mit Nummernkreisen, Probelauf löschen und sevDesk abschalten.
+- Die Produktivgang-Seite zeigt das als „zurückgestellt" (grau) statt rot:
+  Rechnungsmodus `test`/`aus`, Nummernkreise bei 1 solange nicht scharf.
+  Die Einrichtungsaufgaben zur Rechnung (`RECHNUNG_AUFGABEN`:
+  Nummernkreis, Rechnungs-App, DATEV-Konten, Mailversand, Probelauf)
+  zählen erst mit „scharf"; sie bleiben als Aufgaben stehen.
+- Unverändert rot bleibt, was auch ohne Rechnungen gilt: Firmendaten,
+  zweiter Faktor, Shopify-Modus, Anbindungen.
+- Revidiert die Stichtags-Reihenfolge aus dem Eintrag 2026-10-17
+  („Go-live über den API-Weg"): die Rechnungsschritte fallen dort heraus.
+
+**Umgesetzt:** `modules/einstellungen/produktivgang.ts`, Seite
+`/einstellungen/produktivgang`, `tests/produktivgang.test.ts`;
+docs/go-live.md §7 und §7c, docs/module/einstellungen.md.
+
 ## 2026-10-18 — Sicherheitsreview der öffentlichen Oberflächen
 
 **Anlass:** Zusammen mit dem Abhängigkeits-Wächter wurden alle ohne
