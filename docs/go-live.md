@@ -22,6 +22,10 @@ fail-closed, Tracking über Parcel DE Tracking, Shopify-Lesemodus und
 Probelauf, Odoo-Stücklisten, Druckbrücke, Label bucht aus, ein Scanfeld,
 Datenbank-TLS im Code, Konten löschen.
 
+**Produkt-Release (2026-11-17):** Der Zuschnitt auf die vier neuen
+Produkte — Anlegen, Stücklisten, Schutz gegen Überverkauf am Release-Tag,
+Arbeitspakete — steht in [release-neue-produkte.md](release-neue-produkte.md).
+
 **Kurzlage 2026-11-13** (aus Prod gelesen): DHL, Shopify (Probelauf),
 Mail, 17TRACK, Sprache und Telegram grün; **KI gestört** (Anthropic-
 Schlüssel wird mit 401 abgelehnt), **Druckbrücke gestört** (kein Agent
