@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-23 — Stückliste kopieren: Zuordnungen über Attribut und Wert
+
+**Anlass:** Vier neue Tastaturen (Native 1800 HE und MX, je als Founders)
+mit vier Stücklisten, die sich fast alles teilen. Bisher: viermal Zeile
+für Zeile.
+
+**Entschieden:**
+- `fertigung.stueckliste_kopieren` kopiert eine Stückliste auf ein anderes
+  Produkt: Positionen, Arbeitsgänge, Kuppelprodukte, Verbrauchsregel.
+- Die „gilt nur für …"-Zuordnungen hängen an den Attributwerten des
+  jeweiligen Produkts. Die Kopie hängt sie über **Attribut + Wert** um —
+  derselbe Wert, sonst gleicher Name ohne Groß-/Kleinschreibung.
+- **Nie stillschweigend „gilt für alle":** Fehlt ein Wert am Zielprodukt,
+  entfällt er; bleibt einer Position keine Zuordnung, wird sie nicht
+  übernommen. Beides steht in der Meldung. Eine Position ohne Filter wäre
+  sonst plötzlich in jeder Variante — Silber-Switches in einem Board ohne
+  Silber.
+- Nur auf Produkte **ohne** aktive Stückliste: eine zweite aktive
+  Stückliste würde still ignoriert (`resolve_bom` nimmt die älteste).
+- Die Meldung warnt, wenn dem Zielprodukt die Routen fehlen — aus Shopify
+  übernommene Produkte haben sie nicht, und ohne sie entsteht kein
+  Fertigungsauftrag.
+
+**Umgesetzt:** Registry `fertigung.ts` + Ausführung, Knopf „Kopieren" auf
+`/fertigung/stuecklisten/[id]`, `tests/prozesse/stueckliste-kopieren.test.ts`;
+docs/module/fertigung.md, release-neue-produkte.md (A1).
+
 ## 2026-11-23 — Klärfälle gesammelt auflösen; Switch-Packungen sind Verkaufsartikel mit Stückliste
 
 **Anlass:** Seit dem 18.11. standen über 200 Shop-Bestellungen als

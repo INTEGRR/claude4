@@ -1,4 +1,4 @@
-import { sql } from '@/db/client'
+import { sql, tx } from '@/db/client'
 import { drucken, zielDrucker } from '@/modules/druck/auftrag'
 import { varianteAufloesen } from './aufloesen.ts'
 import { fertigungsNachfrageAbhaken } from '@/modules/verkauf/extern-versand'
@@ -283,6 +283,133 @@ export async function stuecklisteAnlegen(p: {
     link: `/fertigung/stuecklisten/${bom.id}`,
     recordId: bom.id,
   }
+}
+
+/**
+ * Stückliste auf ein anderes Produkt kopieren (Entscheidungslog 2026-11-23).
+ * Die vier 1800er-Stücklisten teilen sich fast alles — statt viermal Zeile
+ * für Zeile: eine bauen, kopieren, die Unterschiede ändern.
+ *
+ * Die Variantenfilter hängen an den Attributwerten des JEWEILIGEN Produkts
+ * (product_template_attribute_values); sie werden über Attribut + Wert
+ * umgehängt — erst über denselben Wert, sonst über gleiche Namen. Was am
+ * Zielprodukt fehlt, wird nicht stillschweigend zu „gilt für alle": ein
+ * fehlender Wert entfällt, eine Position ohne übrige Zuordnung wird nicht
+ * übernommen und in der Meldung genannt.
+ */
+export async function stuecklisteKopieren(
+  p: { template_id: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const [quelle] = await sql<
+    {
+      id: string; template_id: string; produkt: string; qty: number; uom_id: string; bom_type: string
+      consumption: string; produce_delay: number; days_to_prepare_mo: number
+    }[]
+  >`
+    select b.id, b.template_id, pt.name as produkt, b.qty, b.uom_id, b.bom_type::text as bom_type,
+           b.consumption::text as consumption, b.produce_delay, b.days_to_prepare_mo
+    from boms b join product_templates pt on pt.id = b.template_id
+    where b.id = ${ctx.recordId!}`
+  if (!quelle) throw new Error('Stückliste nicht gefunden')
+
+  const [ziel] = await sql<{ id: string; name: string; route_manufacture: boolean; route_mto: boolean; hat: boolean }[]>`
+    select pt.id, pt.name, pt.route_manufacture, pt.route_mto,
+           exists (select 1 from boms b where b.template_id = pt.id and b.active and b.variant_id is null) as hat
+    from product_templates pt where pt.id = ${p.template_id} and pt.active`
+  if (!ziel) throw new Error('Zielprodukt nicht gefunden oder nicht aktiv')
+  if (ziel.id === quelle.template_id) throw new Error('Quelle und Ziel sind dasselbe Produkt')
+  if (ziel.hat) {
+    throw new Error(`„${ziel.name}" hat schon eine aktive Stückliste — dort weiterarbeiten statt eine zweite anzulegen`)
+  }
+
+  const ergebnis = await tx(async (t) => {
+    // Attributwert der Quelle → Attributwert des Ziels (gleicher Wert, sonst gleicher Name).
+    const zuordnung = await t<{ quelle_ptav: string; ziel_ptav: string | null; bezeichnung: string }[]>`
+      select q.id as quelle_ptav, z.id as ziel_ptav, qa.name || ': ' || qv.name as bezeichnung
+      from product_template_attribute_values q
+      join product_template_attribute_lines ql on ql.id = q.line_id and ql.template_id = ${quelle.template_id}
+      join product_attributes qa on qa.id = ql.attribute_id
+      join product_attribute_values qv on qv.id = q.value_id
+      left join lateral (
+        select zp.id
+        from product_template_attribute_values zp
+        join product_template_attribute_lines zl on zl.id = zp.line_id and zl.template_id = ${ziel.id}
+        join product_attributes za on za.id = zl.attribute_id
+        join product_attribute_values zv on zv.id = zp.value_id
+        where zp.value_id = q.value_id
+           or (lower(za.name) = lower(qa.name) and lower(zv.name) = lower(qv.name))
+        order by (zp.value_id = q.value_id) desc
+        limit 1) z on true`
+    const ptav = new Map(zuordnung.map((z) => [z.quelle_ptav, z]))
+
+    const [neu] = await t<{ id: string }[]>`
+      insert into boms (template_id, qty, uom_id, bom_type, consumption, produce_delay, days_to_prepare_mo, note)
+      values (${ziel.id}, ${quelle.qty}, ${quelle.uom_id}, ${quelle.bom_type}::bom_type,
+              ${quelle.consumption}::consumption_rule, ${quelle.produce_delay}, ${quelle.days_to_prepare_mo},
+              ${`Kopie der Stückliste von ${quelle.produkt}`})
+      returning id`
+
+    const zeilen = await t<
+      { id: string; sequence: number; component_variant_id: string; komponente: string; qty: number; uom_id: string
+        issue_method: string; note: string | null; filter: string[] }[]
+    >`
+      select bl.id, bl.sequence, bl.component_variant_id, variant_display_name(bl.component_variant_id) as komponente,
+             bl.qty, bl.uom_id, bl.issue_method::text as issue_method, bl.note,
+             array(select f.ptav_id from bom_line_variant_filters f where f.bom_line_id = bl.id) as filter
+      from bom_lines bl where bl.bom_id = ${quelle.id}
+      order by bl.sequence, bl.created_at`
+
+    let uebernommen = 0
+    const ausgelassen: string[] = []
+    const gekuerzt: string[] = []
+    for (const z of zeilen) {
+      const ziele = z.filter.map((f) => ptav.get(f)?.ziel_ptav).filter((x): x is string => Boolean(x))
+      const fehlend = z.filter.filter((f) => !ptav.get(f)?.ziel_ptav).map((f) => ptav.get(f)?.bezeichnung ?? '?')
+      if (z.filter.length > 0 && ziele.length === 0) {
+        ausgelassen.push(`${z.komponente} (${fehlend.join(', ')})`)
+        continue
+      }
+      if (fehlend.length > 0) gekuerzt.push(`${z.komponente} (ohne ${fehlend.join(', ')})`)
+      const [zeile] = await t<{ id: string }[]>`
+        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method, manual_consumption, note)
+        values (${neu.id}, ${z.sequence}, ${z.component_variant_id}, ${z.qty}, ${z.uom_id},
+                ${z.issue_method}::component_issue_method, ${z.issue_method === 'manual'}, ${z.note})
+        returning id`
+      for (const f of new Set(ziele)) {
+        await t`insert into bom_line_variant_filters (bom_line_id, ptav_id) values (${zeile.id}, ${f})`
+      }
+      uebernommen++
+    }
+
+    const gaenge = await t`
+      insert into bom_operations (bom_id, sequence, name, work_center_id, duration_minutes, setup_minutes, note)
+      select ${neu.id}, sequence, name, work_center_id, duration_minutes, setup_minutes, note
+      from bom_operations where bom_id = ${quelle.id}
+      returning id`
+    await t`
+      insert into bom_byproducts (bom_id, variant_id, qty, uom_id, cost_share)
+      select ${neu.id}, variant_id, qty, uom_id, cost_share from bom_byproducts where bom_id = ${quelle.id}`
+
+    await t`select log_event('product_template', ${ziel.id}, 'note',
+      ${`Stückliste von ${quelle.produkt} kopiert: ${plural(uebernommen, 'Position', 'Positionen')}` +
+        (ausgelassen.length ? `, ${ausgelassen.length} nicht übernommen` : '')}, ${ctx.actor})`
+    return { id: neu.id, uebernommen, gaenge: gaenge.length, ausgelassen, gekuerzt }
+  })
+
+  const kurz = (liste: string[]) => liste.slice(0, 6).join('; ') + (liste.length > 6 ? ` … und ${liste.length - 6} weitere` : '')
+  const teile = [
+    `Stückliste auf „${ziel.name}" kopiert: ${plural(ergebnis.uebernommen, 'Position', 'Positionen')}` +
+      (ergebnis.gaenge ? `, ${plural(ergebnis.gaenge, 'Arbeitsgang', 'Arbeitsgänge')}` : '') + '.',
+    ergebnis.ausgelassen.length
+      ? `Nicht übernommen, weil die Zuordnung am Zielprodukt fehlt: ${kurz(ergebnis.ausgelassen)}.`
+      : null,
+    ergebnis.gekuerzt.length ? `Zuordnung gekürzt: ${kurz(ergebnis.gekuerzt)}.` : null,
+    !ziel.route_manufacture || !ziel.route_mto
+      ? `Achtung: Am Produkt fehlt ${[!ziel.route_manufacture ? '„Fertigen"' : null, !ziel.route_mto ? '„Auf Bestellung"' : null].filter(Boolean).join(' und ')} — ohne beides entsteht bei einer Bestellung kein Fertigungsauftrag.`
+      : null,
+  ].filter(Boolean)
+  return { text: teile.join(' '), link: `/fertigung/stuecklisten/${ergebnis.id}`, recordId: ergebnis.id }
 }
 
 export async function stuecklistePositionHinzufuegen(

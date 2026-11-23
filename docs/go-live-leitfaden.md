@@ -108,7 +108,9 @@ release-neue-produkte.md).
       FR-4 und PC, Keycap-Sets Standard und Obsidian Frosted, vier
       HE-Switches, Stabilizer groß und klein, Daughterboard, Kabel …).
 - [ ] Je Tastatur: Shop-Entwurf mit Artikelnummern → Übernahme → Routen
-      → Stückliste (erste von Hand, die anderen kopieren — Paket A1).
+      → Stückliste (erste von Hand, die anderen mit „Kopieren" an der
+      Stückliste; Options- und Wertnamen im Shop gleich schreiben, dann
+      wandern die „gilt nur für …"-Zuordnungen mit).
 - [ ] Stückliste für den neuen Switch Tester.
 
 **Fertig, wenn:** jede neue Variante in Verkauf → Shop-Verfügbarkeit einen

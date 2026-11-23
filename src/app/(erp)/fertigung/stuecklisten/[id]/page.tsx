@@ -8,6 +8,7 @@ import { money, qty } from '@/modules/shared/format'
 import {
   addBomLine,
   addBomOperation,
+  copyBom,
   removeBomLine,
   removeBomOperation,
   setBomConsumption,
@@ -15,6 +16,7 @@ import {
 } from '../../actions'
 import { RecordComments } from '@/components/record-comments'
 import { Auswahl } from '@/components/auswahl'
+import { Schublade } from '@/components/schublade'
 import { kurzArtikel } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
@@ -149,6 +151,14 @@ export default async function BomPage({
     where pv.active and pt.active and pt.id <> ${bom.template_id}
     order by label limit 500`
 
+  // Ziele fürs Kopieren: aktive Produkte ohne eigene aktive Stückliste.
+  const kopierZiele = await sql<{ id: string; name: string }[]>`
+    select pt.id, pt.name
+    from product_templates pt
+    where pt.active and pt.type = 'goods' and pt.id <> ${bom.template_id}
+      and not exists (select 1 from boms b where b.template_id = pt.id and b.active and b.variant_id is null)
+    order by pt.name`
+
   return (
     <>
       <PageHeader
@@ -161,7 +171,41 @@ export default async function BomPage({
             {bom.bom_type === 'kit' && <> · Baugruppe (wird beim Verwenden aufgelöst)</>}
           </>
         }
-        actions={<Link className="btn" href="/fertigung/stuecklisten">Zur Übersicht</Link>}
+        actions={
+          <>
+            <Link className="btn" href="/fertigung/stuecklisten">Zur Übersicht</Link>
+            <Schublade id="stueckliste-kopieren" knopf="Kopieren" titel="Stückliste kopieren">
+              <ActionForm action={copyBom.bind(null, bom.id)}>
+                <p className="small muted" style={{ marginTop: 0 }}>
+                  Kopiert alle Positionen, Arbeitsgänge und Kuppelprodukte auf ein anderes Produkt. „Gilt nur
+                  für …" wird über Attribut und Wert umgehängt (z. B. Switches: Linear Yellow). Fehlt ein Wert am
+                  Zielprodukt, entfällt er; Positionen ohne übrige Zuordnung werden nicht übernommen und in der
+                  Meldung genannt. Danach in der Kopie die Unterschiede ändern.
+                </p>
+                <div className="row">
+                  <label className="field" style={{ flex: 3 }}>
+                    <span>Zielprodukt (ohne Stückliste)</span>
+                    <Auswahl name="template_id" required defaultValue="">
+                      <option value="" disabled>— auswählen —</option>
+                      {kopierZiele.map((z) => (
+                        <option key={z.id} value={z.id}>{z.name}</option>
+                      ))}
+                    </Auswahl>
+                  </label>
+                  <div className="shrink field">
+                    <button className="primary" type="submit">Kopieren</button>
+                  </div>
+                </div>
+                {kopierZiele.length === 0 && (
+                  <div className="notice warn" style={{ marginBottom: 0 }}>
+                    Kein Produkt ohne Stückliste vorhanden — das Zielprodukt zuerst anlegen (Produkte) oder aus
+                    Shopify übernehmen.
+                  </div>
+                )}
+              </ActionForm>
+            </Schublade>
+          </>
+        }
       />
 
       {bom.bom_type === 'kit' && (

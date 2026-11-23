@@ -67,7 +67,7 @@ Release ungeeignet.
 | Produkt mit Varianten | geht | Attribute vorher unter Produkte → Attribute; SKU/EAN nur einzeln je Variante |
 | Teil beim Stücklistenbau anlegen | geht | nur Bezeichnung und Artikelnummer; Einheit immer „Stück", Preis 0, immer Kaufteil |
 | Stückliste mit variantenabhängigen Zeilen | geht | Position ändern heißt löschen und neu anlegen |
-| Stückliste kopieren | **fehlt** | vier Stücklisten wären viermal Zeile für Zeile |
+| Stückliste kopieren | geht (seit 23.11.) | Knopf „Kopieren" an der Stückliste; Zuordnungen wandern über Attribut und Wert mit |
 | Unterbaugruppen | teilweise | Baugruppe mit eigener Stückliste wird als Lagerteil verbraucht, kein Unterauftrag; Typ „Baugruppe" in der Maske nicht wählbar |
 | Anfangsbestand | geht | Inventur; vorher Einstandspreis setzen, sonst Herstellkosten zu niedrig |
 | Fertigungsdateien | teilweise | Dokumente am Produkt (Google Drive nötig), nicht an der Stückliste |
@@ -142,7 +142,7 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 
 | Nr. | Paket | Größe |
 |---|---|---|
-| A1 | Stückliste kopieren (auf anderes Produkt, Zuordnung über Attribut- und Wertnamen) | mittel |
+| A1 | Stückliste kopieren (auf anderes Produkt, Zuordnung über Attribut- und Wertnamen) — **gebaut am 23.11.** | mittel |
 | A2 | Auswahlfelder mit Serversuche statt 500er-Grenze | mittel |
 | A3 | Stücklistenposition bearbeiten (Menge, Zuordnung) | klein–mittel |
 | A4 | Teil-Kurzanlage um Einheit, Einstandspreis, Kauf- oder Fertigteil erweitern | klein |

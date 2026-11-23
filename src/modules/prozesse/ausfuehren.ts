@@ -198,6 +198,7 @@ export const AUSFUEHRUNG = {
   'fertigung.demontage_anlegen': fertigung.demontageAnlegen,
   'fertigung.demontage_buchen': fertigung.demontageBuchen,
   'fertigung.stueckliste_anlegen': fertigung.stuecklisteAnlegen,
+  'fertigung.stueckliste_kopieren': fertigung.stuecklisteKopieren,
   'fertigung.stueckliste_position_hinzufuegen': fertigung.stuecklistePositionHinzufuegen,
   'fertigung.stueckliste_position_entfernen': fertigung.stuecklistePositionEntfernen,
   'fertigung.stueckliste_verbrauch': fertigung.stuecklisteVerbrauch,

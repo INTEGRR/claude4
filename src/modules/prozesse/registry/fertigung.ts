@@ -245,6 +245,24 @@ export const FERTIGUNG = {
     revalidate: ['/fertigung/stuecklisten'],
   },
 
+  'fertigung.stueckliste_kopieren': {
+    label: 'Stückliste kopieren',
+    bereich: 'fertigung',
+    beschreibung:
+      'Kopiert eine Stückliste auf ein anderes Produkt: alle Positionen mit Menge und Verbrauchsart, ' +
+      'Arbeitsgänge und Kuppelprodukte. „Gilt nur für …"-Zuordnungen werden über Attribut und Wert auf ' +
+      'das Zielprodukt umgehängt; fehlt dort ein Wert, entfällt er, und eine Position, deren Zuordnung ' +
+      'ganz fehlt, wird nicht übernommen (steht in der Meldung). Das Zielprodukt darf noch keine aktive ' +
+      'Stückliste haben.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      template_id: z.string().guid('Bitte das Zielprodukt auswählen'),
+    }),
+    formdata: (fd) => ({ template_id: String(fd.get('template_id') ?? '') }),
+    revalidate: ['/fertigung/stuecklisten'],
+  },
+
   'fertigung.stueckliste_position_hinzufuegen': {
     label: 'Komponente hinzufügen',
     bereich: 'fertigung',

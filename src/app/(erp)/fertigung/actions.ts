@@ -84,6 +84,11 @@ export async function createBom(formData: FormData): Promise<ActionResult> {
   if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
 }
 
+/** Kopiert die Stückliste auf ein anderes Produkt — die Meldung nennt, was nicht übernommen wurde. */
+export async function copyBom(bomId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.stueckliste_kopieren', { recordId: bomId, formData })
+}
+
 export async function addBomLine(bomId: string, formData: FormData): Promise<ActionResult> {
   return serverAktion('fertigung.stueckliste_position_hinzufuegen', { recordId: bomId, formData })
 }
