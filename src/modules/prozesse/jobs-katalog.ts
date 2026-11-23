@@ -58,6 +58,13 @@ export const JOB_KATALOG = {
     beschreibung: 'Holt historische Bestellungen zur Abfrage q in Häppchen.',
     faehigkeit: 'shop:bestellungen_import',
   },
+  shopify_bestellung_nachziehen: {
+    label: 'Bestellung aus dem Shop nachziehen',
+    beschreibung:
+      'Holt eine Bestellung frisch aus dem Shop und lässt den Import erneut laufen — zieht aufgelöste ' +
+      'Klärfälle in den Auftrag und bestätigt bei Bezahlung.',
+    faehigkeit: 'shop:bestellung_nachziehen',
+  },
   daten_tuev: {
     label: 'Daten-TÜV (Invarianten-Check)',
     beschreibung:

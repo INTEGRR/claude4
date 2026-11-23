@@ -275,6 +275,22 @@ const handlers = {
     return `${plural(r.imported, 'Bestellung', 'Bestellungen')} übernommen — Übernahme abgeschlossen`
   },
 
+  /**
+   * Eine Bestellung frisch aus dem Shop holen und den Import erneut laufen
+   * lassen — zieht gesammelt aufgelöste Klärfälle in den Auftrag und
+   * bestätigt bei Bezahlung (integrationen.klaerfaelle_aufloesen).
+   */
+  async shopify_bestellung_nachziehen(payload) {
+    const { fetchOrder } = await import('./shopify')
+    const { importShopifyOrder } = await import('./import')
+    const id = String(payload.shopify_order_id ?? '')
+    if (!id) throw new Error('shopify_order_id fehlt')
+    const order = await fetchOrder(id)
+    if (!order) return `Bestellung ${id} gibt es im Shop nicht mehr — nichts nachgezogen`
+    const r = await importShopifyOrder(order)
+    return r.message
+  },
+
   /** Freigegebenen Mail-Entwurf über das Einkaufspostfach senden (einkauf/mail-senden.ts). */
   async gmail_senden(payload) {
     const { entwurfSenden } = await import('@/modules/einkauf/mail-senden')

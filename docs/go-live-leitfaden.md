@@ -42,9 +42,19 @@ Alles, was in den hängenden Bestellungen sonst noch steht, ist in KRNL
 weder reserviert noch zur Fertigung eingeplant — der Bestand in KRNL ist
 seit dem 18.11. zu hoch.
 
-Weg heraus (Etappe 1): beiden Shop-Produkten eine Artikelnummer geben, in
-KRNL übernehmen, Klärfälle auflösen. Heute geht das Auflösen nur Zeile für
-Zeile (209 Klicks) — dafür wird eine Sammelaktion gebaut (Paket K1).
+Weg heraus (Etappe 1), seit dem 23.11. gebaut:
+
+1. In KRNL die beiden Artikel anlegen (Produkte → Neues Produkt) oder über
+   Integrationen → „Produkte aus Shopify" übernehmen.
+2. Integrationen → Karte **„Klärfälle je Shop-Artikel"**: je Shop-Artikel
+   die Variante wählen (nach einer Übernahme steht sie schon als „erkannt"
+   da) und **„Alle zuordnen"**.
+3. KRNL zieht die Bestellungen im Hintergrund nach (rund 20 je Minute) und
+   bestätigt die bezahlten — Reservierung und Fertigungsaufträge entstehen.
+
+Der Switch Tester wird gefertigt: er braucht vorher die Routen „Fertigen"
+und „Auf Bestellung" und eine Stückliste, sonst entsteht nur eine wartende
+Lieferung.
 
 ## Die fünf Etappen
 
@@ -52,8 +62,9 @@ Jede Etappe hat ein klares „fertig". Die nächste beginnt erst danach.
 
 ### Etappe 1 — Aufräumen (was schon drin ist)
 
-- [ ] Meinungsmache-Keycaps und Switch Tester: Artikelnummer im Shop,
-      Übernahme in KRNL, Klärfälle auflösen (K1).
+- [ ] Meinungsmache-Keycaps und Switch Tester: Artikel in KRNL anlegen
+      oder übernehmen, dann Integrationen → „Klärfälle je Shop-Artikel" →
+      „Alle zuordnen". Im Shop eine Artikelnummer nachtragen.
 - [ ] 24 Fertigungs-Nachfragen beantworten (WH/MO/00054–00079: gebaut oder
       storniert).
 - [ ] Druckbrücke wieder starten (meldet sich seit 10.11. nicht).
@@ -66,8 +77,10 @@ Shop, keine offene Fertigungs-Nachfrage.
       27 Teile aus Odoo tragen SKU und Bestand, ihre Shop-Zwillinge stehen
       auf 0 — Gehäuse (Yellow = Phoenix Gold, Blue = Glacial Blue, Green =
       Emerald Green, Violet = Cosmic Purple, White = Nexus White, Black =
-      Plague Black), Plates FR-4 und PC, Gateron-Switches (nur wenn der
-      Shop sie einzeln und nicht als Packung verkauft). Regel dazu:
+      Plague Black), Plates FR-4 und PC. **Nicht die Switches:** der Shop
+      verkauft sie als Packung — die Shop-Artikel „GATERON Switches …"
+      bekommen stattdessen die Routen „Fertigen" und „Auf Bestellung" und
+      eine Stückliste (1 Packung = N Switches). Regel dazu:
       Entscheidungslog 2026-11-23.
 - [ ] Für einzeln verkaufte Teile Rückhalt und Höchstmenge setzen
       (Verkauf → Shop-Verfügbarkeit → Lagerware und Ersatzteile).
@@ -131,7 +144,7 @@ An einem ruhigen Tag, **vor** dem Release:
 
 | Du | Ich (Technik) |
 |---|---|
-| Artikelnummern im Shop, Teileliste, Stücklisten | K1 Klärfälle gesammelt auflösen |
+| Artikelnummern im Shop, Teileliste, Stücklisten | K1 Klärfälle gesammelt auflösen (fertig) |
 | Fertigungs-Nachfragen beantworten | A1 Stückliste kopieren, A2 Auswahlfelder |
 | Zählen | S1–S8 Schutz am Release-Tag |
 | Umschalten am Stichtag | Lasttest, Generalprobe begleiten |

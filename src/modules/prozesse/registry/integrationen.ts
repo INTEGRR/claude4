@@ -23,6 +23,40 @@ export const INTEGRATIONEN = {
     revalidate: ['/integrationen'],
   },
 
+  'integrationen.klaerfaelle_aufloesen': {
+    label: 'Klärfälle eines Shop-Artikels auflösen',
+    bereich: 'integrationen',
+    nurAdmin: true,
+    prozessfrei: true,
+    beschreibung:
+      'Ordnet ALLE offenen Klärfälle eines Shop-Artikels (gleiche Shop-Variante, sonst gleiche SKU und ' +
+      'gleicher Titel) in einem Schritt einer Variante zu, speichert die Zuordnung an der Variante und ' +
+      'reiht je betroffener Bestellung das Nachziehen ein (Job shopify_bestellung_nachziehen): die Position ' +
+      'kommt in den Auftrag, bezahlte Aufträge werden bestätigt. Für viele Bestellungen mit demselben ' +
+      'unbekannten Artikel — statt Zeile für Zeile.',
+    bindung: 'frei',
+    schema: z.object({
+      variant_id: z.string().guid('Bitte eine Variante auswählen'),
+      variant_gid: z.string().max(200).nullable().optional(),
+      sku: z.string().max(200).nullable().optional(),
+      titel: z.string().max(500).nullable().optional(),
+    }),
+    zusammenfassung: (p) => `Klärfälle zu „${p.titel ?? p.sku ?? p.variant_gid ?? 'Shop-Artikel'}" zuordnen`,
+    formdata: (fd) => {
+      const text = (k: string) => {
+        const v = String(fd.get(k) ?? '').trim()
+        return v === '' ? null : v
+      }
+      return {
+        variant_id: String(fd.get('variant_id') ?? ''),
+        variant_gid: text('variant_gid'),
+        sku: text('sku'),
+        titel: text('titel'),
+      }
+    },
+    revalidate: ['/integrationen'],
+  },
+
   'integrationen.webhooks_registrieren': {
     label: 'Shopify-Webhooks registrieren',
     bereich: 'integrationen',

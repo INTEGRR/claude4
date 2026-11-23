@@ -305,10 +305,10 @@ export async function importShopifyOrder(
       }
 
       const aufgeloest = await t<
-        { id: string; sku: string | null; variant_gid: string | null; qty: number;
+        { id: string; sku: string | null; variant_gid: string | null; title: string | null; qty: number;
           resolved_variant: string }[]
       >`
-        select id, sku, variant_gid, qty, resolved_variant
+        select id, sku, variant_gid, title, qty, resolved_variant
         from shopify_unmatched_lines
         where shopify_order_id = ${order.id}
           and resolved_at is not null and attached_at is null
@@ -319,7 +319,10 @@ export async function importShopifyOrder(
         const item = order.lineItems.nodes.find(
           (i) =>
             (zeile.variant_gid && i.variant?.id === zeile.variant_gid) ||
-            (zeile.sku && i.sku === zeile.sku),
+            (zeile.sku && i.sku === zeile.sku) ||
+            // Position ganz ohne Shop-Variante und ohne Artikelnummer
+            // (eigene Position im Shop): nur der Titel verbindet sie.
+            (!zeile.variant_gid && !zeile.sku && !i.variant?.id && !i.sku && Boolean(zeile.title) && i.title === zeile.title),
         )
         if (!item) continue // Zeile gehört zu einer älteren Fassung der Bestellung
 

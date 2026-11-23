@@ -4,7 +4,8 @@ import { sql } from '@/db/client'
 import { requireAdmin, requireArea } from '@/modules/auth'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { dateTime, label, plural, qty, tone } from '@/modules/shared/format'
+import { date, dateTime, label, plural, qty, tone } from '@/modules/shared/format'
+import { klaerfallGruppen } from '@/modules/integrationen/klaerfaelle'
 import { shopifyConfigured, shopifyModus } from '@/modules/integrationen/shopify'
 import { dhlConfigured, dhlFehlendeVariablen } from '@/modules/versand/dhl'
 import { druckbrueckeKonfig } from '@/modules/versand/druckbruecke'
@@ -181,6 +182,12 @@ async function retryWebhook(eventId: string) {
   revalidatePath('/integrationen')
 }
 
+/** Ordnet ALLE offenen Klärfälle eines Shop-Artikels zu und zieht die Bestellungen nach (Registry). */
+async function klaerfaelleAufloesen(formData: FormData) {
+  'use server'
+  return serverAktion('integrationen.klaerfaelle_aufloesen', { formData })
+}
+
 /** Ordnet eine unbekannte Shopify-SKU einer Variante zu (Registry: Klärfall). */
 async function resolveUnmatched(lineId: string, formData: FormData) {
   'use server'
@@ -321,6 +328,9 @@ export default async function IntegrationenPage() {
       select s.id from sales_orders s where s.shopify_order_id = u.shopify_order_id limit 1
     ) so on true
     where u.resolved_at is null order by u.created_at desc limit 25`
+
+  // Klärfälle je Shop-Artikel — eine Zuordnung je Artikel (modules/integrationen/klaerfaelle.ts).
+  const klaerGruppen = await klaerfallGruppen(sql)
 
   const variants = await sql<{ id: string; label: string }[]>`
     select pv.id, coalesce(pv.display_name, pt.name) || coalesce(' · ' || pv.sku, '') as label
@@ -523,8 +533,71 @@ export default async function IntegrationenPage() {
         </div>
       )}
 
+      {klaerGruppen.length > 0 && (
+        <Card
+          title={`Klärfälle je Shop-Artikel (${plural(klaerGruppen.reduce((n, g) => n + g.zeilen, 0), 'Position', 'Positionen')})`}
+          tight
+        >
+          <div className="notice warn" style={{ margin: 12 }}>
+            Diese Shop-Artikel kennt KRNL nicht — die Bestellungen damit stehen als Entwurf, ohne Reservierung und
+            ohne Fertigungsauftrag. Eine Zuordnung je Artikel löst alle Positionen auf einmal: die Position kommt in
+            den Auftrag, bezahlte Aufträge werden bestätigt (läuft im Hintergrund, etwa 20 Bestellungen je Minute).
+            Den Artikel vorher anlegen oder über „Produkte aus Shopify" übernehmen — dann steht er unten schon als
+            „erkannt".
+          </div>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Shop-Artikel</th>
+                  <th className="num">Positionen</th>
+                  <th className="num">Stück</th>
+                  <th className="num">Bestellungen</th>
+                  <th>Seit</th>
+                  <th style={{ width: 420 }}>Alle zuordnen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {klaerGruppen.map((g) => (
+                  <tr key={`${g.variant_gid ?? ''}|${g.sku ?? ''}|${g.title ?? ''}`}>
+                    <td>
+                      {g.title ?? '—'}
+                      <div className="small muted mono">{g.sku ? g.sku : 'ohne Artikelnummer im Shop'}</div>
+                    </td>
+                    <td className="num mono">{g.zeilen}</td>
+                    <td className="num mono">{qty(g.stueck)}</td>
+                    <td className="num mono">{g.bestellungen}</td>
+                    <td className="mono small nowrap">{date(g.seit)}</td>
+                    <td>
+                      <ActionForm action={klaerfaelleAufloesen}>
+                        <input type="hidden" name="variant_gid" value={g.variant_gid ?? ''} />
+                        <input type="hidden" name="sku" value={g.sku ?? ''} />
+                        <input type="hidden" name="titel" value={g.title ?? ''} />
+                        <div className="row" style={{ gap: 6 }}>
+                          <Auswahl name="variant_id" required defaultValue={g.erkannt_id ?? ''}>
+                            <option value="" disabled>— Variante wählen —</option>
+                            {variants.map((v) => (
+                              <option key={v.id} value={v.id}>{v.label}</option>
+                            ))}
+                          </Auswahl>
+                          <div className="shrink">
+                            <button className="small" type="submit">
+                              {g.erkannt_id ? 'Erkannt — alle zuordnen' : 'Alle zuordnen'}
+                            </button>
+                          </div>
+                        </div>
+                      </ActionForm>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
+
       {unmatched.length > 0 && (
-        <Card title={`Nicht zugeordnete Shopify-Positionen (${unmatched.length})`} tight>
+        <Card title={`Einzelne Positionen (die neuesten ${unmatched.length})`} tight>
           <div className="notice warn" style={{ margin: 12 }}>
             Diese Positionen konnten keinem Produkt zugeordnet werden und fehlen in den Aufträgen.
             Nach der Zuordnung wird die Shopify-Variante dauerhaft am Produkt gespeichert.

@@ -132,7 +132,7 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 | S7 | Abgleich heilt und meldet Abweichungen, prüft „nicht weiterverkaufen" erneut | klein |
 | S8 | Lasttest: 500 Bestellungen gleichzeitig gegen die Attrappe, Beweis „nie mehr verkauft als Teile da" | mittel |
 
-**Block K — Klärfälle (sofort, Stand 23.11.)**
+**Block K — Klärfälle (gebaut am 23.11.)**
 
 | Nr. | Paket | Größe |
 |---|---|---|

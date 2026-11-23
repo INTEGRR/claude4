@@ -345,6 +345,7 @@ export const AUSFUEHRUNG = {
   'versand.versandregel_verschieben': versand.versandregelVerschieben,
 
   'integrationen.klaerfall_aufloesen': integrationen.klaerfallAufloesen,
+  'integrationen.klaerfaelle_aufloesen': integrationen.klaerfaelleAufloesen,
   'integrationen.webhooks_registrieren': integrationen.webhooksRegistrieren,
   'integrationen.historie_pruefen': integrationen.historiePruefenAktion,
   'integrationen.historie_importieren': integrationen.historieImportierenAktion,

@@ -9,6 +9,36 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-23 — Klärfälle gesammelt auflösen; Switch-Packungen sind Verkaufsartikel mit Stückliste
+
+**Anlass:** Seit dem 18.11. standen über 200 Shop-Bestellungen als
+Entwurf — zwei neue Shop-Produkte ohne Artikelnummer („Meinungsmache"-
+Keycaps, HE/MX Switch Tester), die KRNL nicht kannte. Ohne Bestätigung
+gibt es keine Reservierung und keinen Fertigungsauftrag; auflösen ließ
+sich das nur Zeile für Zeile (215 Zeilen). Der Betreiber: „Bau die
+Sammelaktion."
+
+**Entschieden:**
+- **Eine Zuordnung je Shop-Artikel** (`integrationen.klaerfaelle_aufloesen`):
+  Gruppe ist die Shop-Variante, ohne sie SKU + Titel. Die Zuordnung wird an
+  der Variante gespeichert, alle offenen Zeilen werden aufgelöst.
+- **Nachziehen je Bestellung als Job** (`shopify_bestellung_nachziehen`),
+  nicht in der Anfrage: 200 Abrufe im Shop passen in keinen Klick, ein
+  gedrosselter Abruf wiederholt sich von selbst, jeder Lauf steht im
+  Monitor. Auflösung und Jobs entstehen in einer Transaktion.
+- Der Import erkennt beim Nachziehen jetzt auch Positionen ganz ohne
+  Shop-Variante und ohne Artikelnummer über den Titel.
+- Die Einzelauflösung bleibt für Sonderfälle.
+- **Switches verkauft der Shop als Packung** (Antwort des Betreibers) —
+  sie werden deshalb NICHT mit den einzelnen Switches zusammengeführt,
+  sondern sind Verkaufsartikel mit Stückliste (1 Packung = N Switches);
+  ergänzt den Eintrag „Ein Teil ist ein Artikel" vom selben Tag.
+
+**Umgesetzt:** Registry `integrationen.ts` + Ausführung, Job-Katalog,
+`import.ts`, Karte „Klärfälle je Shop-Artikel" auf `/integrationen`,
+`tests/prozesse/klaerfaelle.test.ts`; docs/module/integrationen.md,
+go-live-leitfaden.md, release-neue-produkte.md.
+
 ## 2026-11-23 — Ein Teil ist ein Artikel; der Einzelverkauf ist eine Regel, kein zweiter Bestand
 
 **Anlass (Betreiber):** In Odoo waren Gehäuse eigene Artikel mit SKU, im

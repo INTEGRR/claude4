@@ -53,6 +53,84 @@ export async function klaerfallAufloesen(
   return { text: 'Klärfall aufgelöst — der nächste Abgleich zieht die Position nach.' }
 }
 
+/**
+ * Sammelauflösung (Entscheidungslog 2026-11-23): alle offenen Klärfälle
+ * eines Shop-Artikels auf einmal. Gruppe = gleiche Shop-Variante (GID),
+ * ohne GID gleiche SKU und gleicher Titel. Die Bestellungen werden nicht
+ * hier, sondern je Bestellung als Job nachgezogen — 200 Abrufe im Shop
+ * passen in keine Anfrage, und ein gedrosselter Abruf wiederholt sich so
+ * von selbst.
+ */
+export async function klaerfaelleAufloesen(
+  p: { variant_id: string; variant_gid?: string | null; sku?: string | null; titel?: string | null },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const gid = p.variant_gid ?? null
+  const sku = p.sku ?? null
+  const titel = p.titel ?? null
+  if (!gid && !sku && !titel) throw new Error('Kein Shop-Artikel angegeben.')
+
+  const [variante] = await sql<{ id: string; name: string; template_id: string }[]>`
+    select pv.id, coalesce(pv.display_name, pt.name) as name, pv.template_id
+    from product_variants pv join product_templates pt on pt.id = pv.template_id
+    where pv.id = ${p.variant_id} and pv.active`
+  if (!variante) throw new Error('Variante nicht gefunden oder nicht aktiv.')
+
+  // Eine Transaktion: Zuordnung, Auflösung und die Nachzieh-Jobs gehören
+  // zusammen — sonst stünden aufgelöste Zeilen ohne Job da.
+  const { zeilen, bestellungen } = await tx(async (t) => {
+    const zeilen = await t<{ id: string; shopify_order_id: string | null }[]>`
+      update shopify_unmatched_lines
+      set resolved_at = now(), resolved_variant = ${variante.id}
+      where resolved_at is null
+        and case
+              when ${gid}::text is not null then variant_gid = ${gid}
+              else variant_gid is null
+                   and coalesce(sku, '') = coalesce(${sku}::text, '')
+                   and coalesce(title, '') = coalesce(${titel}::text, '')
+            end
+      returning id, shopify_order_id`
+    if (zeilen.length === 0) throw new Error('Zu diesem Shop-Artikel gibt es keine offenen Klärfälle mehr.')
+
+    // Zuordnung dauerhaft an der Variante — nur wo sie frei ist (beide Spalten
+    // sind eindeutig): der nächste Import passt dann ohne Klärfall.
+    if (gid) {
+      await t`update product_variants set shopify_variant_id = ${gid}
+              where id = ${variante.id} and shopify_variant_id is null
+                and not exists (select 1 from product_variants x where x.shopify_variant_id = ${gid})`
+    }
+    if (sku) {
+      await t`update product_variants set sku = ${sku}
+              where id = ${variante.id} and sku is null
+                and not exists (select 1 from product_variants x where x.sku = ${sku})`
+    }
+
+    const bestellungen = [...new Set(zeilen.map((z) => z.shopify_order_id).filter((x): x is string => Boolean(x)))]
+    // Eigener Schlüssel je Lauf: dieselbe Bestellung kann später für einen
+    // zweiten Artikel noch einmal nachgezogen werden.
+    const lauf = Date.now()
+    for (const id of bestellungen) {
+      await t`select enqueue_job('shopify_bestellung_nachziehen',
+        ${t.json({ shopify_order_id: id })}, ${`nachziehen:${id}:${lauf}`})`
+    }
+
+    const was = titel ?? sku ?? gid
+    await t`select log_event('product_template', ${variante.template_id}, 'note',
+      ${`${plural(zeilen.length, 'Klärfall', 'Klärfälle')} aus dem Shop („${was}") ${variante.name} zugeordnet — ` +
+        `${plural(bestellungen.length, 'Bestellung wird', 'Bestellungen werden')} nachgezogen`}, ${ctx.actor})`
+    return { zeilen, bestellungen }
+  })
+
+  // Etwa 20 Bestellungen je Minute (Cron „jobs").
+  const minuten = Math.max(1, Math.ceil(bestellungen.length / 20))
+  return {
+    text:
+      `${plural(zeilen.length, 'Klärfall', 'Klärfälle')} zugeordnet. ` +
+      `${plural(bestellungen.length, 'Bestellung wird', 'Bestellungen werden')} im Hintergrund nachgezogen ` +
+      `und bei Bezahlung bestätigt — etwa ${plural(minuten, 'Minute', 'Minuten')}.`,
+  }
+}
+
 export async function webhooksRegistrieren(
   p: { url: string },
   _ctx: AktionsKontext,
