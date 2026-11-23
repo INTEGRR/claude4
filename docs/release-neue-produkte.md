@@ -125,7 +125,7 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 |---|---|---|
 | S1 | Mengen nie blind hochsetzen: Erhöhung nur mit Vergleichswert, nicht solange Bestell-Ereignisse offen sind | klein–mittel |
 | S2 | Reservierung mit Sperre auf dem Bestand (`move_reserve`) | klein |
-| S3 | Kontingent-Modus: knappe Teile auf die Varianten aufteilen, Summe ≤ frei; Zweitangebote eingerechnet | groß |
+| S3 | Kontingent-Modus: knappe Teile auf die Varianten aufteilen, Summe ≤ frei; Zweitangebote und der Einzelverkauf des Teils (Rückhalt/Höchstmenge, 0133) eingerechnet | groß |
 | S4 | Webhook-Verarbeitung härten: Ereignisse exklusiv greifen, Bestellungen vor Bestand-Echos, bei Drosselung kurz warten, hängenden Abgleich nach 2 Minuten zurückholen | mittel |
 | S5 | Überverkaufs-Wächter: Bestellung ohne volle Reservierung → Telegram und Vermerk am Auftrag | klein–mittel |
 | S6 | Not-Aus: eine Aktion setzt alle auftragsgefertigten Varianten auf ausverkauft | klein |

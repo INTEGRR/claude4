@@ -321,6 +321,13 @@ Shopify bekommt — aufgebaut wie die Produktseite im Shop:
     Farben des Projekts (gleicher Options- und Wertname).
   - Lagerware (Zubehör, einzeln verkaufte Switches) unter „Weitere
     Shop-Artikel": dieselben Regeln auf den eigenen Bestand.
+  - **Einzelverkauf eines Teils** (0133, dieselbe Tabelle): **Rückhalt**
+    (`shop_rueckhalt`: so viele Stück bleiben der Fertigung — einzeln
+    verkaufbar ist nur, was darüber liegt) und **Höchstmenge**
+    (`shop_hoechstmenge`: nie mehr gleichzeitig anbieten). Gilt nur für den
+    Shop-Eintrag des Teils selbst; Tastaturen mit diesem Teil rechnen
+    weiter mit dem vollen freien Bestand. Ein Teil bleibt damit EIN Artikel
+    mit EINEM Bestand, auch wenn es einzeln verkauft wird.
   - **Zweitangebote** (0106, Karte „Zweitangebote"): je weiterem
     Shop-Angebot derselben SKU wie der Artikel / immer / aus, mit Soll,
     zuletzt gemeldet, Shop-Stand und einer Ablehnung durch Shopify.
@@ -331,7 +338,8 @@ Shopify bekommt — aufgebaut wie die Produktseite im Shop:
   bevor Shopify scharfgeschaltet wird. Nebenbei findet er Zweitangebote
   (unverknüpfte Shop-Varianten mit der SKU eines Artikels, 0106).
 - Rechnung: `shopify_soll_menge()` prüft in dieser Reihenfolge aus → 0,
-  immer → Deckel, gesperrter Optionswert → 0, Lagerware → `shop_frei`,
+  immer → Deckel, gesperrter Optionswert → 0, Lagerware →
+  `shop_einzelverkauf` (`shop_frei` − Rückhalt, höchstens Höchstmenge),
   Made-to-Order → `baubar(…, 0, true)` (Teile mit Schwelle/zurückhalten) +
   eigener nutzbarer Bestand, minus Puffer, höchstens Deckel.
 

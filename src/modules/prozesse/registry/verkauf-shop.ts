@@ -55,7 +55,9 @@ export const VERKAUF_SHOP = {
       'Für eine Variante: Modus auto/immer/aus oder erben (wie der Artikel). Als Teil bzw. Artikel mit ' +
       'Bestand: Schwelle „ausverkauft unter N Stück" (nur was darüber liegt, zählt; leer = keine) und ' +
       'zurückhalten (zählt für den Shop als 0 — z. B. Yellow Cases). Wirkt auf alle Tastaturen, die das ' +
-      'Teil brauchen.',
+      'Teil brauchen. Nur für den Einzelverkauf eines Lagerartikels (Ersatzteil): rueckhalt = so viele ' +
+      'Stück bleiben der Fertigung, hoechstmenge = nie mehr gleichzeitig im Shop anbieten (leer = ohne); ' +
+      'Tastaturen rechnen weiter mit dem vollen Bestand.',
     bindung: 'frei',
     schema: z
       .object({
@@ -63,9 +65,13 @@ export const VERKAUF_SHOP = {
         modus: z.enum(['auto', 'immer', 'aus', 'erben']).optional(),
         oos_unter: z.number().int().min(1).max(100000).nullable().optional(),
         zurueckhalten: z.boolean().optional(),
+        rueckhalt: z.number().min(0).max(1000000).nullable().optional(),
+        hoechstmenge: z.number().int().min(0).max(100000).nullable().optional(),
       })
       .refine(
-        (p) => p.modus !== undefined || p.oos_unter !== undefined || p.zurueckhalten !== undefined,
+        (p) =>
+          p.modus !== undefined || p.oos_unter !== undefined || p.zurueckhalten !== undefined ||
+          p.rueckhalt !== undefined || p.hoechstmenge !== undefined,
         'Nichts zu ändern',
       ),
     zusammenfassung: (p) =>
@@ -73,17 +79,26 @@ export const VERKAUF_SHOP = {
         p.modus ? `Variante an Shopify: ${p.modus}` : null,
         p.oos_unter !== undefined ? (p.oos_unter ? `ausverkauft unter ${p.oos_unter}` : 'keine Schwelle') : null,
         p.zurueckhalten !== undefined ? (p.zurueckhalten ? 'zurückhalten' : 'nicht zurückhalten') : null,
+        p.rueckhalt !== undefined ? (p.rueckhalt ? `Rückhalt ${p.rueckhalt}` : 'kein Rückhalt') : null,
+        p.hoechstmenge !== undefined ? (p.hoechstmenge !== null ? `höchstens ${p.hoechstmenge}` : 'keine Höchstmenge') : null,
       ]
         .filter(Boolean)
         .join(', '),
     formdata: (fd) => {
       const schwelle = leer(fd, 'oos_unter')
+      // Leeres Feld = Regel aufheben; fehlt das Feld im Formular, bleibt sie.
+      const zahl = (k: string) => {
+        const v = leer(fd, k)
+        return v === undefined ? undefined : v === '' ? null : Number(v.replace(',', '.'))
+      }
       return {
         variant_id: String(fd.get('variant_id') ?? ''),
         modus: leer(fd, 'modus') || undefined,
         oos_unter: schwelle === undefined ? undefined : schwelle === '' ? null : Number(schwelle),
         // Checkbox: nur auswerten, wenn das Formular sie führt (Marker-Feld).
         zurueckhalten: fd.has('zurueckhalten_feld') ? fd.get('zurueckhalten') === 'on' : undefined,
+        rueckhalt: zahl('rueckhalt'),
+        hoechstmenge: zahl('hoechstmenge'),
       }
     },
     revalidate: ['/verkauf/shop-verfuegbarkeit'],

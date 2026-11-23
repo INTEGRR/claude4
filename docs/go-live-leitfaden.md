@@ -62,6 +62,18 @@ Jede Etappe hat ein klares „fertig". Die nächste beginnt erst danach.
 **Fertig, wenn:** keine Klärfälle offen, keine Entwurfs-Aufträge aus dem
 Shop, keine offene Fertigungs-Nachfrage.
 
+- [ ] Doppelte Artikel zusammenführen (Einstellungen → Odoo-Übernahme):
+      27 Teile aus Odoo tragen SKU und Bestand, ihre Shop-Zwillinge stehen
+      auf 0 — Gehäuse (Yellow = Phoenix Gold, Blue = Glacial Blue, Green =
+      Emerald Green, Violet = Cosmic Purple, White = Nexus White, Black =
+      Plague Black), Plates FR-4 und PC, Gateron-Switches (nur wenn der
+      Shop sie einzeln und nicht als Packung verkauft). Regel dazu:
+      Entscheidungslog 2026-11-23.
+- [ ] Für einzeln verkaufte Teile Rückhalt und Höchstmenge setzen
+      (Verkauf → Shop-Verfügbarkeit → Lagerware und Ersatzteile).
+- [ ] „TestTastatur" (24 Varianten ohne SKU) im Shop löschen oder in KRNL
+      deaktivieren.
+
 ### Etappe 2 — Neue Stammdaten
 
 Was neu dazukommt (so verstanden — bitte korrigieren):

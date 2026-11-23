@@ -9,6 +9,43 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-23 — Ein Teil ist ein Artikel; der Einzelverkauf ist eine Regel, kein zweiter Bestand
+
+**Anlass (Betreiber):** In Odoo waren Gehäuse eigene Artikel mit SKU, im
+Shop stehen dieselben Gehäuse als Varianten mit Verkaufsnamen („Case
+Yellow" gegen „Phoenix Gold") — in KRNL liegen sie dadurch doppelt, der
+Bestand auf der Odoo-Kopie, der Shop-Artikel auf 0. Frage: Verkaufsartikel
+und Material trennen? Einwand gegen „ein Artikel": Im Einzelverkauf soll
+weniger angeboten werden als da ist — die Marge am Board ist höher, und
+Gehäuse dürfen den Boards nicht weggekauft werden.
+
+**Entschieden:**
+- **Ein physisches Teil = ein Artikel = ein Bestand.** Getrennt ist nur
+  das Angebot (Name, Preis, Shop-Eintrag). Zwei Artikel für dasselbe Teil
+  heißen: jemand muss umbuchen und abgleichen.
+- **Montierte oder gepackte Ware bleibt Verkaufsartikel über Stückliste**
+  (Tastaturen, Barebones, Sondereditionen, Switch Tester) — wie bisher.
+- **Die Menge am Shop-Eintrag eines Teils ist eine Regel über dem einen
+  Bestand** (0133): Rückhalt für die Fertigung und Höchstmenge im
+  Einzelverkauf. Tastaturen rechnen weiter mit dem vollen freien Bestand.
+  Die bestehende Schwelle „aus unter N" bleibt die Notreserve für alles.
+- Die doppelten Artikel werden über „Doppelte Artikel zusammenführen"
+  (Odoo-Übernahme) zu einem — außer wo der Shop eine andere Einheit
+  verkauft (Switches als Packung): dort bleibt es Verkaufsartikel mit
+  Stückliste.
+- Sonderedition: der Fertigungsauftrag reserviert die Teile, die
+  verkaufbare Menge aller anderen Produkte sinkt von selbst — kein eigener
+  Bestand nötig.
+
+**Offen:** Im Kontingent-Modus (release-neue-produkte.md, S3) ist der
+Einzelverkauf ein weiterer Abnehmer desselben Teils; bis dahin kann die
+Summe aus Einzelverkauf und Tastaturen den Bestand übersteigen.
+
+**Umgesetzt:** Migration 0133 (`shop_rueckhalt`, `shop_hoechstmenge`,
+`shop_einzelverkauf`), `verkauf.shop_variante_setzen`, Verkauf →
+Shop-Verfügbarkeit (Lagerware und Ersatzteile), `tests/fertigung.test.ts`;
+docs/module/integrationen.md, go-live-leitfaden.md.
+
 ## 2026-11-13 — Umstieg auf zod 4 (Lücke GHSA-mrhx-c7xc-m3w5)
 
 **Anlass:** `npm audit` und der neue Sicherheits-Check melden eine hohe

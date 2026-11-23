@@ -297,6 +297,38 @@ describe('Shop-Regeln (0101): Schwelle, zurückhalten, Artikel/Variante/Option',
     })
   })
 
+  test('Einzelverkauf (0133): Rückhalt für die Fertigung und Höchstmenge — Tastaturen unberührt', async () => {
+    await withRollback(async (t) => {
+      const s = await lager(t)
+      // 40 schwarze Gehäuse: einzeln verkaufbar wären alle 40, die Tastatur zeigt 40.
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 40)
+      assert.equal(await soll(t, s.schwarz), 40)
+
+      await t`update product_variants set shop_rueckhalt = 30 where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 10, '30 gehören der Fertigung → 10 einzeln')
+      assert.equal(await soll(t, s.schwarz), 40, 'die Tastatur rechnet weiter mit allen 40')
+      assert.equal(await baubar(t, s.schwarz, true), 40)
+
+      await t`update product_variants set shop_hoechstmenge = 6 where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 6, 'der kleinere Wert gilt')
+      await t`update product_variants set shop_rueckhalt = 37 where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 3)
+      await t`update product_variants set shop_rueckhalt = 45 where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 0, 'Rückhalt über dem Bestand → nichts einzeln, nie negativ')
+
+      // Höchstmenge 0 = nicht einzeln verkaufen; Regeln aufheben = wieder der freie Bestand.
+      await t`update product_variants set shop_rueckhalt = null, shop_hoechstmenge = 0 where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 0)
+      await t`update product_variants set shop_hoechstmenge = null where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 40)
+
+      // Die Notreserve „aus unter N" wirkt weiter VOR dem Rückhalt und auf alles.
+      await t`update product_variants set shop_oos_unter = 11, shop_rueckhalt = 20 where id = ${s.gehaeuseSchwarz}`
+      assert.equal(await soll(t, s.gehaeuseSchwarz), 10, '40 − 10 Notreserve = 30, davon 20 für die Fertigung')
+      assert.equal(await soll(t, s.schwarz), 30, 'die Notreserve trifft auch die Tastatur')
+    })
+  })
+
   test('Teil zurückhalten: zählt für den Shop als 0', async () => {
     await withRollback(async (t) => {
       const s = await lager(t)

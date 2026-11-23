@@ -424,8 +424,15 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
       <Card title={`Weitere Shop-Artikel (${daten.weitere.length})`} tight>
         <details>
           <summary className="small" style={{ cursor: 'pointer', padding: '10px 12px' }}>
-            Lagerware (Zubehör, Switches, Deskmats …): freier Bestand mit denselben Regeln — aufklappen
+            Lagerware und Ersatzteile (Zubehör, Switches, Gehäuse, Plates …): freier Bestand, mit Rückhalt für die
+            Fertigung und Höchstmenge im Einzelverkauf — aufklappen
           </summary>
+          <p className="small muted" style={{ padding: '0 12px 8px', margin: 0 }}>
+            <strong>Rückhalt:</strong> so viele Stück bleiben der Fertigung — einzeln verkaufbar ist nur, was darüber
+            liegt. <strong>Höchstens:</strong> nie mehr gleichzeitig im Shop anbieten. Beides gilt nur für den
+            Einzelverkauf; Tastaturen mit diesem Teil rechnen weiter mit dem vollen Bestand. „Aus unter" dagegen ist
+            eine Notreserve für alles.
+          </p>
           <TableWrap>
             <table>
               <thead>
@@ -466,6 +473,14 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                             <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                               aus unter
                               <input name="oos_unter" type="number" min={1} defaultValue={w.oosUnter ?? ''} style={{ width: 70 }} />
+                            </label>
+                            <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                              Rückhalt
+                              <input name="rueckhalt" type="number" min={0} step="1" defaultValue={w.rueckhalt ?? ''} style={{ width: 70 }} />
+                            </label>
+                            <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                              höchstens
+                              <input name="hoechstmenge" type="number" min={0} step="1" defaultValue={w.hoechstmenge ?? ''} style={{ width: 70 }} />
                             </label>
                             <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                               <input type="checkbox" name="zurueckhalten" defaultChecked={w.zurueck} /> zurück

@@ -35,7 +35,14 @@ export async function shopArtikelSetzen(
 }
 
 export async function shopVarianteSetzen(
-  p: { variant_id: string; modus?: 'auto' | 'immer' | 'aus' | 'erben'; oos_unter?: number | null; zurueckhalten?: boolean },
+  p: {
+    variant_id: string
+    modus?: 'auto' | 'immer' | 'aus' | 'erben'
+    oos_unter?: number | null
+    zurueckhalten?: boolean
+    rueckhalt?: number | null
+    hoechstmenge?: number | null
+  },
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const modus = p.modus === undefined ? undefined : p.modus === 'erben' ? null : p.modus
@@ -43,7 +50,9 @@ export async function shopVarianteSetzen(
     update product_variants set
       shop_modus = case when ${modus !== undefined} then ${modus ?? null} else shop_modus end,
       shop_oos_unter = case when ${p.oos_unter !== undefined} then ${p.oos_unter ?? null}::int else shop_oos_unter end,
-      shop_zurueckhalten = coalesce(${p.zurueckhalten ?? null}::boolean, shop_zurueckhalten)
+      shop_zurueckhalten = coalesce(${p.zurueckhalten ?? null}::boolean, shop_zurueckhalten),
+      shop_rueckhalt = case when ${p.rueckhalt !== undefined} then ${p.rueckhalt || null}::numeric else shop_rueckhalt end,
+      shop_hoechstmenge = case when ${p.hoechstmenge !== undefined} then ${p.hoechstmenge ?? null}::int else shop_hoechstmenge end
     where id = ${p.variant_id}
     returning display_name as name, template_id`
   if (!v) throw new Error('Variante nicht gefunden')
@@ -51,6 +60,10 @@ export async function shopVarianteSetzen(
     p.modus ? `Shop: ${MODUS_TEXT[p.modus]}` : null,
     p.oos_unter !== undefined ? (p.oos_unter ? `ausverkauft unter ${p.oos_unter}` : 'keine Schwelle') : null,
     p.zurueckhalten !== undefined ? (p.zurueckhalten ? 'zurückgehalten' : 'nicht zurückgehalten') : null,
+    p.rueckhalt !== undefined ? (p.rueckhalt ? `Rückhalt für die Fertigung ${p.rueckhalt}` : 'kein Rückhalt') : null,
+    p.hoechstmenge !== undefined
+      ? p.hoechstmenge !== null ? `höchstens ${p.hoechstmenge} im Einzelverkauf` : 'keine Höchstmenge'
+      : null,
   ].filter(Boolean)
   await sql`select log_event('product_template', ${v.template_id}, 'note', ${`${v.name}: ${teile.join(', ')}`}, ${ctx.actor})`
   await anstossen()
