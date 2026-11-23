@@ -69,6 +69,10 @@ der [AGENTS.md](../AGENTS.md).
 - [go-live.md](go-live.md) — **der Go-Live-Plan**: Checkliste aller
   Zugänge, Einstellungen und Prüfungen vor dem Stichtag (DHL-Keys,
   Supabase, Vercel, Konten, Versandtests); verweist aufs Cutover-Runbook.
+- [go-live-leitfaden.md](go-live-leitfaden.md) — **Leitfaden in fünf
+  Etappen** (Stand 23.11.2026): aufräumen, neue Stammdaten, zählen,
+  umschalten, Release — mit „fertig"-Kriterium je Etappe; Empfehlung
+  gegen einen Neuimport aus Odoo.
 - [release-neue-produkte.md](release-neue-produkte.md) — **Plan für den
   Produkt-Release** (Stand 17.11.2026): Reihenfolge beim Anlegen neuer
   Produkte und Stücklisten, was geht und was fehlt, Schutz gegen

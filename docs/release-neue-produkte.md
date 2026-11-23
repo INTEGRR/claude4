@@ -132,6 +132,12 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 | S7 | Abgleich heilt und meldet Abweichungen, prüft „nicht weiterverkaufen" erneut | klein |
 | S8 | Lasttest: 500 Bestellungen gleichzeitig gegen die Attrappe, Beweis „nie mehr verkauft als Teile da" | mittel |
 
+**Block K — Klärfälle (sofort, Stand 23.11.)**
+
+| Nr. | Paket | Größe |
+|---|---|---|
+| K1 | Klärfälle gesammelt auflösen: alle offenen Zeilen eines Shop-Artikels in einem Schritt zuordnen und die Bestellungen neu einlesen (heute 209 Zeilen einzeln) | klein–mittel |
+
 **Block A — Anlegen (soll, spart dir Zeit beim Aufbau)**
 
 | Nr. | Paket | Größe |
