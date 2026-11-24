@@ -266,7 +266,8 @@ export default async function SchnittstellenPage() {
             <span className="mono">write_orders</span>,{' '}
             <span className="mono">read_customers</span>, <span className="mono">read_products</span>,{' '}
             <span className="mono">write_products</span> (Produkte anlegen, Made-to-Order einrichten),{' '}
-            <span className="mono">write_merchant_managed_fulfillment_orders</span>,{' '}
+            <span className="mono">write_merchant_managed_fulfillment_orders</span> (Versand melden; liest auch den
+            Fulfillment-Halt),{' '}
             <span className="mono">read_inventory</span>, <span className="mono">write_inventory</span>,{' '}
             <span className="mono">read_locations</span>) und im eigenen Shop installieren. Client ID und
             Secret stehen unter Settings → Credentials; das Access Token holt das ERP selbst.

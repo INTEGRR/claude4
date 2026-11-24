@@ -468,6 +468,11 @@ export function Packtisch({
               <div className="muted small">
                 {[doc.auftrag, doc.shopify, doc.kunde].filter(Boolean).join(' · ')}
               </div>
+              {doc.packhinweis && (
+                <div className="small" style={{ color: 'var(--display-bright)', marginTop: 4 }}>
+                  <span className="led wichtig" /> Hinweis aus Shopify: {doc.packhinweis}
+                </div>
+              )}
               {doc.kommissioniert && (
                 <div className="small" style={{ color: 'var(--display-text)', marginTop: 4 }}>
                   <span className="led ok" /> kommissioniert

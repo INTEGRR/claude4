@@ -9,6 +9,48 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-24 — Fulfillment-Halt: Shopify führt, KRNL sperrt den Versand
+
+Der Betreiber hält im Shop-Admin ab und zu das Fulfillment einer Bestellung
+an („on hold") — etwas muss noch ins Paket, oder der Kunde möchte bis zu
+einem Tag warten. KRNL kannte den Status nur als Wort in der
+Import-Übersicht: die Bestellung lag versandbereit am Packtisch, und wurde
+sie gepackt, überspringt die Versand-Rückmeldung still, weil Shopify kein
+offenes Fulfillment hat — Paket raus, keine Versandmail.
+
+Entschieden (Betreiber):
+
+- **Der Halt wird nur in Shopify gesetzt und aufgehoben.** KRNL liest mit
+  und schreibt keinen Halt an den Shop — die Regel, was an Shopify gehen
+  darf (Bestand, baubare Menge, Tracking/Fulfillment), bleibt unverändert.
+- **Kein eigenes Datumsfeld** („Versand frühestens ab"): Shopify kennt am
+  Halt kein Datum; der Tag steht in der Notiz, freigegeben wird von Hand.
+- **Sperren statt warnen.** Eine angehaltene Bestellung ist nicht
+  versandbereit; Packtisch und Label verweigern, und ein Trigger in der
+  Datenbank verhindert das Ausbuchen auf jedem Weg. Die Reservierung bleibt.
+
+Umsetzung und Gründe:
+
+- Drei Wege, den Halt zu erfahren (Halt-Webhooks, Bestell-Import, Abfrage
+  vor jedem Label) — ein verlorener Webhook darf weder ein Paket am Halt
+  vorbeilassen noch eine freigegebene Bestellung liegen lassen. Die Abfrage
+  vor dem Label kostet einen Shop-Aufruf je Paket; das ist der Preis dafür,
+  dass ein eben gesetzter Halt sicher greift.
+- Die Halt-Einzelheiten sind eine eigene kleine Abfrage, kein Feld der
+  Bestell-Abfrage: sie braucht das Recht auf Fulfillment-Aufträge, und
+  daran darf der Bestell-Import nie scheitern. Fehlt das Recht, entscheidet
+  der Anzeige-Status der Bestellung (Halt ohne Grund und Notiz).
+- Ein Teil-Halt sperrt die ganze Lieferung — KRNL versendet eine Bestellung
+  nicht in Stücken am Halt vorbei.
+- Grund und Notiz bleiben nach dem Aufheben stehen und erscheinen als
+  „Hinweis aus Shopify" beim Packen: der Anlass des Halts („Kabel
+  beilegen") ist meist genau das, was der Packer wissen muss.
+- Versendet und danach angehalten: die Versand-Rückmeldung meldet per
+  Telegram und wiederholt, statt still zu überspringen.
+
+Doku: [module/integrationen.md](module/integrationen.md) (Fulfillment-Halt);
+Migration 0134.
+
 ## 2026-11-23 — Stückliste kopieren: Zuordnungen über Attribut und Wert
 
 **Anlass:** Vier neue Tastaturen (Native 1800 HE und MX, je als Founders)

@@ -402,6 +402,19 @@ export function Sammeln({
         </div>
       )}
 
+      {doc.halt && (
+        <div className="notice danger" style={{ margin: '10px 12px 0' }}>
+          <span className="mono-label">In Shopify angehalten</span>{' '}
+          {[doc.haltGrund, doc.haltNotiz].filter(Boolean).join(': ') || 'ohne Angabe'} — nicht versenden, bis der Shop
+          freigibt.
+        </div>
+      )}
+      {!doc.halt && doc.haltNotiz && phase !== 'fertig' && (
+        <div className="notice" style={{ margin: '10px 12px 0' }}>
+          <span className="mono-label">Hinweis aus Shopify</span> {doc.haltNotiz}
+        </div>
+      )}
+
       {doc.kundennotiz && phase !== 'fertig' && (
         <div className="notice" style={{ margin: '10px 12px 0' }}>
           <span className="mono-label">Kundennotiz</span> {doc.kundennotiz}

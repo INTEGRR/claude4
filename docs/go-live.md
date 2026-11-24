@@ -297,7 +297,9 @@ Portalen; hier stehen nur die Namen und woher sie kommen.
       und sie dort auf „aus" stellen, solange die Aktion nicht läuft.*
 - [ ] Stichtag: Shopify-Modus von „Probelauf" auf **schreiben** stellen, dann Webhooks
       registrieren, einmal „Mit Shopify abgleichen" (Bestand), Order-
-      Backfill nur ab Stichtag.
+      Backfill nur ab Stichtag. *Seit 0134 gehören zwei Halt-Webhooks dazu
+      (Fulfillment angehalten/freigegeben) — wer schon registriert hat,
+      führt „Webhooks registrieren" einmal erneut aus.*
 
 ## 7. Probelauf und Stichtag
 

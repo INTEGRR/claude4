@@ -387,6 +387,11 @@ export async function createLabelForPicking(
     )
   }
 
+  // Fulfillment-Halt (0134): frisch im Shop nachsehen, bevor ein Label Geld
+  // kostet und ausbucht — angehaltene Bestellungen gehen nicht raus.
+  const { versandHaltPruefen } = await import('@/modules/integrationen/shop-halt')
+  await versandHaltPruefen(pickingId)
+
   const sendung = await sendungFuerPicking(pickingId, opts)
   if (sendung.state === 'done') {
     // Das Label bucht aus (2026-10-01) — ein storniertes Label muss sich

@@ -39,6 +39,8 @@ export interface PacktischDoc {
   weightG: number | null
   dhlProduct: string | null
   labelVorhanden: boolean
+  /** Notiz eines aufgehobenen Shop-Halts (0134), z. B. „Kabel beilegen" — beim Packen beachten. */
+  packhinweis: string | null
   /** Gesammelt beim Kommissionieren (0091) — nur Hinweis, gescannt wird trotzdem. */
   kommissioniert: { am: string; von: string | null } | null
   lines: PacktischZeile[]
@@ -60,6 +62,9 @@ interface PacktischTreffer {
   ship_country_code: string | null
   kommissioniert_am: string | null
   kommissioniert_von: string | null
+  halt: boolean | null
+  halt_grund: string | null
+  halt_notiz: string | null
 }
 
 export type PacktischErgebnis =
@@ -75,7 +80,8 @@ export async function packtischBelegLaden(code: string): Promise<PacktischErgebn
            so.number as auftrag, so.shopify_order_name as shopify,
            part.name as kunde,
            so.ship_name, so.ship_street, so.ship_house_number,
-           so.ship_zip, so.ship_city, so.ship_country_code
+           so.ship_zip, so.ship_city, so.ship_country_code,
+           so.shopify_halt as halt, so.shopify_halt_grund as halt_grund, so.shopify_halt_notiz as halt_notiz
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
     left join sales_orders so on so.id = p.origin_id and p.origin_model = 'sales_order'
@@ -100,6 +106,13 @@ export async function packtischBelegLaden(code: string): Promise<PacktischErgebn
   }
   if (picking.state === 'cancel') {
     return { ok: false, status: 409, error: `${picking.number} ist storniert` }
+  }
+
+  // Fulfillment-Halt (0134): im Shop angehalten — nicht packen, Grund nennen.
+  if (picking.halt) {
+    return { ok: false, status: 409, error: `${picking.shopify ?? picking.number} ist in Shopify angehalten (${
+      [picking.halt_grund, picking.halt_notiz].filter(Boolean).join(': ') || 'ohne Angabe'
+    }) — erst dort freigeben, dann packen` }
   }
 
   // „Versand wartet immer auf MTO": offene Fertigungen des Auftrags mit
@@ -166,6 +179,7 @@ export async function packtischBelegLaden(code: string): Promise<PacktischErgebn
     weightG: vorschlag ? vorschlag.weightG : null,
     dhlProduct: vorschlag?.product ?? null,
     labelVorhanden: Boolean(label),
+    packhinweis: picking.halt_notiz?.trim() || null,
     kommissioniert: picking.kommissioniert_am
       ? { am: picking.kommissioniert_am, von: picking.kommissioniert_von }
       : null,

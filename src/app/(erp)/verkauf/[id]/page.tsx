@@ -57,6 +57,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       gross: number
       historisch: boolean
       versandkosten: number
+      shopify_halt: boolean
+      shopify_halt_grund: string | null
+      shopify_halt_notiz: string | null
+      shopify_halt_seit: string | null
       origin_model: string | null
       origin_id: string | null
       origin_label: string | null
@@ -365,6 +369,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             : undefined
         }
       />
+
+      {/* Fulfillment-Halt (0134): gesetzt und aufgehoben wird nur im Shop. */}
+      {order.shopify_halt && order.state !== 'cancel' && (
+        <div className="notice danger">
+          <span className="led warn" /> <strong>In Shopify angehalten</strong>
+          {order.shopify_halt_seit ? ` seit ${date(order.shopify_halt_seit)}` : ''}:{' '}
+          {[order.shopify_halt_grund, order.shopify_halt_notiz].filter(Boolean).join(': ') || 'ohne Angabe'} — der
+          Versand ist gesperrt, die Reservierung bleibt. Freigeben in Shopify, KRNL zieht nach.
+        </div>
+      )}
+      {!order.shopify_halt && order.shopify_halt_notiz && order.delivery_status !== 'full' && order.state !== 'cancel' && (
+        <div className="notice info">
+          War in Shopify angehalten — Hinweis fürs Packen: {order.shopify_halt_notiz}
+        </div>
+      )}
 
       {order.locked && (
         <div className="notice info">

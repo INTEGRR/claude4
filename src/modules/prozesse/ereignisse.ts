@@ -58,6 +58,16 @@ export const EREIGNISSE = {
       'Lieferung, eine noch offene Fertigung wird zur Nachfrage ans Team Fertigung.',
     quelle: 'shopify webhook orders/updated (displayFulfillmentStatus FULFILLED) + Abgleich',
   },
+  'shop:bestellung_angehalten': {
+    label: 'Fulfillment im Shop angehalten/freigegeben',
+    beschreibung:
+      'Im Shop-Admin wurde das Fulfillment einer Bestellung angehalten (etwas muss noch ins Paket, der Kunde ' +
+      'möchte warten) oder wieder freigegeben: der Auftrag trägt den Halt mit Grund und Notiz, die Lieferung ' +
+      'ist so lange nicht versandbereit und lässt sich nicht ausbuchen. Gesetzt und aufgehoben wird nur im Shop.',
+    quelle:
+      'shopify webhook fulfillment_orders/placed_on_hold + fulfillment_orders/hold_released, ' +
+      'orders/updated (displayFulfillmentStatus ON_HOLD), Abfrage vor jedem Label',
+  },
   'sendung:zugestellt': {
     label: 'Sendung zugestellt',
     beschreibung: 'Der Paketdienst meldet die Zustellung; die Sendung ist damit abgeschlossen.',

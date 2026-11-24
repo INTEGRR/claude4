@@ -7,6 +7,7 @@ import { dateTime, money, plural, qty } from '@/modules/shared/format'
 import { dhlConfigured, productForCountry } from '@/modules/versand/dhl'
 import { sammelMarken } from '@/modules/versand/kommissionieren'
 import { gelabeltNichtAusgebucht } from '@/modules/versand/gelabelt'
+import { angehalteneLieferungen } from '@/modules/versand/angehalten'
 import { versandbereitMitVorschlag } from '@/modules/versand/regeln'
 import {
   adressePruefen,
@@ -68,6 +69,8 @@ export default async function VersandPage({
     where ot.kind = 'delivery' and p.state in ('waiting', 'confirmed')`
   // Label da, Ware nicht ausgebucht (Entscheidungslog 2026-10-01): aus der
   // Zeit, als Ausbuchen ein Haken war, oder bewusst „nur Label".
+  // Im Shop angehalten (0134): fehlen in „Versandbereit", stehen hier mit Grund.
+  const angehalten = await angehalteneLieferungen()
   const gelabelt = await gelabeltNichtAusgebucht()
   const gelabeltIds = new Set(gelabelt.map((g) => g.picking_id))
   // Artikel ohne Gewicht in versandbereiten Lieferungen (2026-10-01): aus
@@ -237,6 +240,42 @@ export default async function VersandPage({
                         </div>
                       </ActionForm>
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
+
+      {angehalten.length > 0 && (
+        <Card title={`In Shopify angehalten (${angehalten.length})`} tight>
+          <p className="muted small" style={{ margin: '8px 12px' }}>
+            Diese Bestellungen sind im Shop angehalten und deshalb nicht versandbereit. Die Ware bleibt reserviert.
+            Freigegeben wird in Shopify — danach erscheinen sie von selbst unter „Versandbereit".
+          </p>
+          <TableWrap>
+            <table>
+              <thead>
+                <tr>
+                  <th>Lieferung</th>
+                  <th>Auftrag</th>
+                  <th>Kunde</th>
+                  <th>Grund</th>
+                  <th>Seit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {angehalten.map((a) => (
+                  <tr key={a.picking_id}>
+                    <td><Link href={`/lager/${a.picking_id}`} className="mono">{a.picking_number}</Link></td>
+                    <td>
+                      <Link href={`/verkauf/${a.sales_order_id}`} className="mono">{a.auftrag}</Link>
+                      {a.shopify ? <span className="muted small"> {a.shopify}</span> : null}
+                    </td>
+                    <td>{a.partner_id ? <Link href={`/kontakte/${a.partner_id}`}>{a.kunde ?? '—'}</Link> : '—'}</td>
+                    <td>{[a.grund, a.notiz].filter(Boolean).join(': ') || 'ohne Angabe'}</td>
+                    <td className="nowrap">{a.seit ? dateTime(a.seit) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

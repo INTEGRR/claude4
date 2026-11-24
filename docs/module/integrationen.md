@@ -90,6 +90,63 @@ Die Rückmeldung, die bei Sendcloud die Integration übernommen hätte, machen w
 - Fehlerbilder (Out-of-Stock `nonFulfillableQuantity`, fehlende Location, Rate-Limits) ⇒ Retry mit Backoff, nach 10 Versuchen Fehler-Aktivität am Auftrag.
 - Der frühere `ready-to-ship`-Tag entfällt als Trigger (war nur für Sendcloud nötig); optional konfigurierbarer Info-Tag, Default aus.
 
+## Shopify — Fulfillment-Halt („on hold", 0134)
+
+Im Shop-Admin wird das Fulfillment einer Bestellung ab und zu angehalten —
+etwas muss noch ins Paket („Kabel beilegen"), oder der Kunde möchte warten.
+KRNL **spiegelt** den Halt und sperrt so lange den Versand; gesetzt und
+aufgehoben wird **nur in Shopify** (Entscheidungslog 2026-11-24).
+
+**Wie der Halt ankommt** — drei Wege, jeder fängt den Ausfall der anderen:
+
+1. Webhooks `fulfillment_orders/placed_on_hold` und
+   `fulfillment_orders/hold_released`. Sie nennen nur den
+   Fulfillment-Auftrag; KRNL holt die Bestellung dazu frisch.
+2. Jeder Bestell-Import (`orders/updated`, Abgleich): meldet die Bestellung
+   `ON_HOLD` oder kennt KRNL einen Halt, werden die Einzelheiten gelesen.
+   Der Normalfall kostet keinen zusätzlichen Shop-Aufruf.
+3. **Unmittelbar vor jedem Label** fragt KRNL den Shop frisch
+   (`versandHaltPruefen`). Ein eben gesetzter Halt hält das Paket auf, ein
+   eben aufgehobener gibt es frei — auch wenn ein Webhook verloren ging.
+   Ist der Shop nicht erreichbar, gilt der gespeicherte Stand.
+
+**Was am Auftrag steht:** `shopify_halt`, Grund (Shopifys Grund in
+Betriebsdeutsch: Sonstiges, Adresse falsch, Betrugsverdacht …), Notiz (der
+Freitext aus dem Shop) und Beginn. Setzen, Ändern und Aufheben stehen im
+Verlauf. Angehalten ist die Bestellung, sobald **ein** Fulfillment-Auftrag
+auf `ON_HOLD` steht — auch ein Teil-Halt sperrt die ganze Lieferung.
+
+**Was die Sperre bewirkt:**
+
+- Die Lieferung fehlt in `shipping_ready` — also in der Sammelliste, unter
+  „Versandbereit", im Massendruck und in den Zählern. Versand zeigt sie in
+  der Karte **„In Shopify angehalten"** mit Grund, Notiz und Beginn.
+- Packtisch und Label verweigern mit Grund und Notiz.
+- Letzte Sicherung in der Datenbank: ein Trigger an `stock_pickings` lässt
+  das Ausbuchen der Lieferung auf keinem Weg zu.
+- Reservierung und Fertigung laufen weiter — die Ware bleibt der
+  Bestellung vorbehalten.
+
+**Nach dem Aufheben** ist die Lieferung wieder versandbereit. Grund und
+Notiz bleiben stehen: Packtisch, Sammelansicht, Lieferung und Auftrag
+zeigen die Notiz als „Hinweis aus Shopify" — wer packt, sieht „Kabel
+beilegen" auch dann noch.
+
+**Versendet und trotzdem angehalten** (Halt entstand nach dem Label): die
+Versand-Rückmeldung wird nicht mehr still übersprungen. Der Job meldet per
+Telegram und wiederholt mit Backoff; nach dem Aufheben geht die
+Versandmeldung an den Shop.
+
+**Recht:** Grund und Notiz brauchen das Leserecht auf Fulfillment-Aufträge
+(in `write_merchant_managed_fulfillment_orders` enthalten). Fehlt es,
+entscheidet der Anzeige-Status der Bestellung — der Halt sperrt trotzdem,
+nur ohne Grund und Notiz. Die beiden Webhooks legt „Webhooks registrieren"
+mit an; nach dem Update einmal erneut ausführen.
+
+Umsetzung: `integrationen/shop-halt.ts` (+ `shop-halt-logik.ts`),
+`versand/angehalten.ts`, Migration 0134; Tests
+`tests/prozesse/shop-halt.test.ts`, `tests/shop-halt.test.ts`.
+
 ## 17TRACK — Zulauf-Sendungsverfolgung (seit 2026-10-15)
 
 Eingehende Sendungen des Einkaufs (Tracking-Nummer der Bestellung, HBL/AWB

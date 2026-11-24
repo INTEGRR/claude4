@@ -36,6 +36,21 @@ export function fakeBestellungenLeeren(): void {
 }
 
 /**
+ * Fulfillment-Halt je Bestellung (0134) — ohne Eintrag ist nichts
+ * angehalten. `null` als Wert stellt das fehlende Recht nach: die Abfrage
+ * wirft wie der echte Shop bei ACCESS_DENIED.
+ */
+const FAKE_HALT = new Map<string, { reason: string; reasonNotes: string | null }[] | null>()
+
+export function fakeHaltSetzen(
+  orderGid: string,
+  holds: { reason: string; reasonNotes: string | null }[] | null | undefined,
+): void {
+  if (holds === undefined) FAKE_HALT.delete(orderGid)
+  else FAKE_HALT.set(orderGid, holds)
+}
+
+/**
  * Produkte, die der Fake auf die Seitenabfrage des Produktimports liefert —
  * in der Reihenfolge der Hinterlegung, eine einzige Seite.
  */
@@ -69,17 +84,44 @@ export async function fakeShopifyGraphQL<T>(
   const antwort = (() => {
     // Beide Order-Anfragen beginnen mit `order(id:)` — unterschieden wird
     // am angefragten Feld, nicht am Operationsnamen.
+    if (op === 'fulfillmentOrder') {
+      // fetchOrderGidZuFulfillmentOrder: die Kennung trägt die Bestellnummer
+      // („…/FulfillmentOrder/<Order-Nr>") — so findet der Halt-Webhook heim.
+      const nr = String(variables.id).split('/').pop()
+      return { fulfillmentOrder: { order: { id: `gid://shopify/Order/${nr}` } } }
+    }
+    if (query.includes('fulfillmentHolds')) {
+      // fetchOrderHalt: der hinterlegte Halt der Bestellung.
+      const id = String(variables.id)
+      const holds = FAKE_HALT.get(id)
+      if (holds === null) throw new Error('Access denied for fulfillmentOrders field.')
+      const bestellung = FAKE_BESTELLUNGEN.get(id) as { displayFulfillmentStatus?: string } | undefined
+      return {
+        order: {
+          displayFulfillmentStatus: holds?.length ? 'ON_HOLD' : (bestellung?.displayFulfillmentStatus ?? 'UNFULFILLED'),
+          fulfillmentOrders: {
+            nodes: [{
+              id: 'gid://shopify/FulfillmentOrder/1',
+              status: holds?.length ? 'ON_HOLD' : 'OPEN',
+              fulfillmentHolds: holds ?? [],
+            }],
+          },
+        },
+      }
+    }
     if (query.includes('fulfillmentOrders(')) {
       // fetchFulfillmentOrders: ein offenes Fulfillment ohne Positionsliste —
       // die Jobs werten das als Voll-Fulfillment (every() über leer = true).
+      // Angehalten (0134): wie im echten Shop ohne CREATE_FULFILLMENT.
+      const gehalten = Boolean(FAKE_HALT.get(String(variables.id))?.length)
       return {
         order: {
           fulfillmentOrders: {
             nodes: [
               {
                 id: 'gid://shopify/FulfillmentOrder/1',
-                status: 'OPEN',
-                supportedActions: [{ action: 'CREATE_FULFILLMENT' }],
+                status: gehalten ? 'ON_HOLD' : 'OPEN',
+                supportedActions: [{ action: gehalten ? 'RELEASE_HOLD' : 'CREATE_FULFILLMENT' }],
                 lineItems: { nodes: [] },
               },
             ],

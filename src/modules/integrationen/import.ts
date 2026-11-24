@@ -5,6 +5,7 @@ import { splitStreet } from '@/modules/shared/address'
 import { externVersandNachziehen } from '@/modules/verkauf/extern-versand'
 import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
 import { fetchOrder, type ShopifyOrder } from './shopify'
+import { haltNachziehen, shopHaltLesen } from './shop-halt'
 import { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText } from './bestellung-felder'
 import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
 import { plural } from '@/modules/shared/format'
@@ -212,7 +213,11 @@ export interface ImportResult {
 export async function importShopifyOrder(
   order: ShopifyOrder,
   eventId: string | null = null,
+  opts: { haltFrisch?: boolean } = {},
 ): Promise<ImportResult> {
+  // Fulfillment-Halt (0134): vor der Transaktion lesen — ein Shop-Aufruf
+  // gehört nicht in eine offene Transaktion. undefined = nichts zu prüfen.
+  const halt = await shopHaltLesen(order, opts.haltFrisch)
   // Storno führt Shopify (2026-10-02): storniert der Shop einen bestehenden
   // Auftrag, zieht KRNL nach der Transaktion noch die DHL-Labels nach.
   let storniert: string | null = null
@@ -281,6 +286,9 @@ export async function importShopifyOrder(
                  set shopify_zahlstatus = ${order.displayFinancialStatus ?? null},
                      shopify_offen = coalesce(${shopOffen(order)}, shopify_offen)
                where id = ${existing.id}`
+      // Fulfillment-Halt (0134) VOR allem, was ausbucht: ein aufgehobener
+      // Halt muss weg sein, bevor ein Versand im Shop nachgezogen wird.
+      const haltMeldung = await haltNachziehen(t, existing.id, halt)
       // Nachzügler-Heilung für noch unbestätigte Shop-Aufträge: inzwischen
       // aufgelöste Klärzeilen als Positionen nachziehen (echter Preis aus
       // der Bestellung) und — wenn nichts mehr offen ist und bezahlt wurde —
@@ -300,7 +308,7 @@ export async function importShopifyOrder(
           salesOrderId: existing.id,
           created: false,
           unmatched: 0,
-          message: [geaendert, extern, retoure, zahlung].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
+          message: [haltMeldung && `${order.name} ${haltMeldung}`, geaendert, extern, retoure, zahlung].filter(Boolean).join(' · ') || `${order.name} war bereits importiert`,
         }
       }
 
@@ -367,7 +375,9 @@ export async function importShopifyOrder(
         message:
           nachgezogen > 0 || bestaetigt
             ? `${order.name}: ${plural(nachgezogen, 'Position', 'Positionen')} nachgezogen${bestaetigt ? ', Auftrag bestätigt' : ''}`
-            : `${order.name} war bereits importiert`,
+            : haltMeldung
+              ? `${order.name} ${haltMeldung}`
+              : `${order.name} war bereits importiert`,
       }
     }
 
@@ -467,6 +477,9 @@ export async function importShopifyOrder(
       }
     }
 
+    // Fulfillment-Halt (0134): schon beim Anlegen angehalten (z. B. Betrugsprüfung).
+    const haltNeu = await haltNachziehen(t, created.id, halt)
+
     // Bezahlte Orders sofort bestätigen: erzeugt Lieferung + Fertigungsaufträge.
     const paid = order.displayFinancialStatus === 'PAID'
     if (paid && unmatched === 0) {
@@ -480,7 +493,8 @@ export async function importShopifyOrder(
       message:
         `${order.name} importiert` +
         (paid && unmatched === 0 ? ' und bestätigt' : '') +
-        (unmatched > 0 ? ` (${plural(unmatched, 'Position', 'Positionen')} offen)` : ''),
+        (unmatched > 0 ? ` (${plural(unmatched, 'Position', 'Positionen')} offen)` : '') +
+        (haltNeu ? ` — ${haltNeu}` : ''),
     }
   })
   if (storniert) await stornoNachlauf(storniert, 'shopify')
@@ -746,6 +760,31 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
         const meldung = await verarbeiteInventarWebhook(event.payload)
         await sql`update shopify_webhook_events
                   set status = 'done', processed_at = now(), error = ${meldung}
+                  where id = ${event.id}`
+        processed++
+        continue
+      }
+
+      // Fulfillment-Halt (0134): der Webhook nennt nur den Fulfillment-Auftrag —
+      // die Bestellung dazu frisch holen und den Halt nachziehen.
+      if (event.topic.startsWith('fulfillment_orders/')) {
+        const roh = (event.payload as { fulfillment_order?: { id?: string | number } }).fulfillment_order?.id
+        const foGid = roh == null ? null
+          : String(roh).startsWith('gid://') ? String(roh) : `gid://shopify/FulfillmentOrder/${String(roh)}`
+        const { fetchOrderGidZuFulfillmentOrder } = await import('./shopify')
+        const orderGid = foGid ? await fetchOrderGidZuFulfillmentOrder(foGid) : null
+        const bestellung = orderGid ? await fetchOrder(orderGid) : null
+        if (!bestellung) {
+          await sql`update shopify_webhook_events
+                    set status = 'skipped', processed_at = now(),
+                        error = 'Keine Bestellung zum Fulfillment-Auftrag gefunden'
+                    where id = ${event.id}`
+          continue
+        }
+        const r = await importShopifyOrder(bestellung, event.id, { haltFrisch: true })
+        await sql`update shopify_webhook_events
+                  set status = 'done', processed_at = now(), error = ${r.message},
+                      shopify_order_id = ${bestellung.id}
                   where id = ${event.id}`
         processed++
         continue

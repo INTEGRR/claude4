@@ -525,6 +525,53 @@ export async function fetchFulfillmentOrders(orderGid: string): Promise<Fulfillm
   return data.order?.fulfillmentOrders.nodes ?? []
 }
 
+/**
+ * Fulfillment-Halt einer Bestellung (0134): Anzeige-Status und je
+ * Fulfillment-Auftrag Status samt Gründen. Bewusst eine eigene, kleine
+ * Abfrage statt eines Feldes in ORDER_FIELDS — sie braucht das Recht auf
+ * Fulfillment-Aufträge, und daran darf der Bestell-Import nie hängen.
+ */
+export async function fetchOrderHalt(orderGid: string): Promise<{
+  displayFulfillmentStatus: string | null
+  auftraege: { status: string; fulfillmentHolds: { reason: string; reasonNotes: string | null }[] }[]
+} | null> {
+  const data = await shopifyGraphQL<{
+    order: {
+      displayFulfillmentStatus: string | null
+      fulfillmentOrders: {
+        nodes: { status: string; fulfillmentHolds: { reason: string; reasonNotes: string | null }[] | null }[]
+      }
+    } | null
+  }>(
+    `query($id: ID!) {
+       order(id: $id) {
+         displayFulfillmentStatus
+         fulfillmentOrders(first: 20) {
+           nodes { id status fulfillmentHolds { reason reasonNotes } }
+         }
+       }
+     }`,
+    { id: orderGid },
+  )
+  if (!data.order) return null
+  return {
+    displayFulfillmentStatus: data.order.displayFulfillmentStatus,
+    auftraege: data.order.fulfillmentOrders.nodes.map((n) => ({
+      status: n.status,
+      fulfillmentHolds: n.fulfillmentHolds ?? [],
+    })),
+  }
+}
+
+/** Zu welcher Bestellung gehört ein Fulfillment-Auftrag? (Halt-Webhooks nennen nur ihn.) */
+export async function fetchOrderGidZuFulfillmentOrder(fulfillmentOrderGid: string): Promise<string | null> {
+  const data = await shopifyGraphQL<{ fulfillmentOrder: { order: { id: string } | null } | null }>(
+    `query($id: ID!) { fulfillmentOrder(id: $id) { order { id } } }`,
+    { id: fulfillmentOrderGid },
+  )
+  return data.fulfillmentOrder?.order?.id ?? null
+}
+
 export interface TrackingInfo {
   company: string
   number: string
@@ -640,6 +687,9 @@ const WEBHOOK_TOPICS = [
   'INVENTORY_LEVELS_UPDATE',
   'PRODUCTS_CREATE',
   'PRODUCTS_UPDATE',
+  // Fulfillment-Halt (0134): im Shop angehalten bzw. wieder freigegeben.
+  'FULFILLMENT_ORDERS_PLACED_ON_HOLD',
+  'FULFILLMENT_ORDERS_HOLD_RELEASED',
 ] as const
 
 export interface WebhookEintrag {

@@ -96,6 +96,11 @@ export interface SammelDoc {
   shopify: string | null
   kunde: string | null
   kundennotiz: string | null
+  /** Im Shop angehalten (0134) — nicht sammeln. */
+  halt: boolean
+  /** Grund und Notiz des (letzten) Halts; die Notiz bleibt nach dem Aufheben als Packhinweis. */
+  haltGrund: string | null
+  haltNotiz: string | null
   sammler: string | null
   kommissioniertAm: string | null
   kommissioniertVon: string | null
@@ -109,6 +114,8 @@ export async function sammelDoc(pickingId: string): Promise<SammelDoc | null> {
     select p.id as "pickingId", p.number, p.state::text as state,
            so.number as auftrag, so.shopify_order_name as shopify, pa.name as kunde,
            nullif(trim(so.note), '') as kundennotiz,
+           coalesce(so.shopify_halt, false) as halt,
+           so.shopify_halt_grund as "haltGrund", nullif(trim(so.shopify_halt_notiz), '') as "haltNotiz",
            case when p.kommissionierung_seit > now() - make_interval(mins => ${SPERRE_MINUTEN})
                 then p.kommissionierung_von end as sammler,
            p.kommissioniert_am::text as "kommissioniertAm",

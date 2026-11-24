@@ -74,7 +74,19 @@ const handlers = {
     const open = fulfillmentOrders.filter((fo) =>
       fo.supportedActions.some((a) => a.action === 'CREATE_FULFILLMENT'),
     )
-    if (open.length === 0) return 'Shopify hat keine offenen Fulfillments - übersprungen'
+    if (open.length === 0) {
+      // Angehalten (0134): das Paket ist raus, der Shop hält das Fulfillment
+      // noch. Nicht still überspringen — melden und wiederholen; sobald der
+      // Halt im Shop aufgehoben ist, geht die Versandmeldung durch.
+      if (fulfillmentOrders.some((fo) => fo.status === 'ON_HOLD')) {
+        const { einreihen } = await import('./benachrichtigungen')
+        await einreihen(sql, 'job', `halt-versand:${shipmentId}`,
+          `📦 Sendung ${shipment.shipment_number} ist versendet, aber die Bestellung ist in Shopify noch angehalten — ` +
+          'der Kunde bekommt keine Versandmail. Bitte den Halt in Shopify aufheben; KRNL meldet den Versand dann nach.')
+        throw new Error('In Shopify angehalten — Versandmeldung folgt, sobald der Halt aufgehoben ist')
+      }
+      return 'Shopify hat keine offenen Fulfillments - übersprungen'
+    }
 
     // Welche Mengen wurden tatsächlich geliefert? Danach richtet sich, ob es
     // ein Voll- oder Teil-Fulfillment wird.

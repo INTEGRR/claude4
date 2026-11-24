@@ -32,6 +32,13 @@ erfuhr nichts. Die Shopify-Rückmeldung hängt weiterhin am **Warenausgang**,
 der jetzt mit dem Label zusammenfällt (wie Sendclouds „Rückmeldung bei
 Label-Erstellung").
 
+**Im Shop angehalten (0134):** Hält der Shop das Fulfillment einer
+Bestellung an, ist ihre Lieferung nicht versandbereit — sie steht in der
+Karte „In Shopify angehalten" mit Grund und Notiz, Packtisch und Label
+verweigern, die Datenbank lässt das Ausbuchen nicht zu. Freigegeben wird in
+Shopify. Einzelheiten: [Integrationen](integrationen.md), Abschnitt
+Fulfillment-Halt.
+
 - **Ausnahme „nur Label"** (Haken am Einzel-Label bzw. „nicht ausbuchen" im
   Massendruck): die Lieferung bleibt reserviert, der Buchen-Schritt bleibt
   angeboten.

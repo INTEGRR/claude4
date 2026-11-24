@@ -64,17 +64,22 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
       user_id: string | null
       priority: string
       extern_versand: { carrier: string | null; nummer: string | null; url: string | null; am: string } | null
+      halt: boolean | null
+      halt_grund: string | null
+      halt_notiz: string | null
     }[]
   >`
     select p.id, p.number, ot.kind, ot.name as type_name, p.state, part.name as partner,
            p.partner_id, p.origin_model, p.origin_id, p.origin_label, p.scheduled_date, p.date_done,
            bo.number as backorder_of, p.backorder_of_id, ro.number as return_of, p.return_of_id, p.note,
-           p.user_id, p.priority, p.extern_versand
+           p.user_id, p.priority, p.extern_versand,
+           so.shopify_halt as halt, so.shopify_halt_grund as halt_grund, so.shopify_halt_notiz as halt_notiz
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
     left join partners part on part.id = p.partner_id
     left join stock_pickings bo on bo.id = p.backorder_of_id
     left join stock_pickings ro on ro.id = p.return_of_id
+    left join sales_orders so on so.id = p.origin_id and p.origin_model = 'sales_order' and ot.kind = 'delivery'
     where p.id = ${id}`
 
   if (!picking) notFound()
@@ -329,6 +334,17 @@ export default async function PickingPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      {/* Fulfillment-Halt (0134): die Datenbank lässt das Ausbuchen ohnehin nicht zu. */}
+      {picking.halt && !['done', 'cancel'].includes(picking.state) && (
+        <div className="notice danger">
+          <span className="led warn" /> <strong>In Shopify angehalten:</strong>{' '}
+          {[picking.halt_grund, picking.halt_notiz].filter(Boolean).join(': ') || 'ohne Angabe'} — nicht versenden. Erst in
+          Shopify freigeben, KRNL zieht nach.
+        </div>
+      )}
+      {!picking.halt && picking.halt_notiz && !['done', 'cancel'].includes(picking.state) && (
+        <div className="notice info">Hinweis aus Shopify fürs Packen: {picking.halt_notiz}</div>
+      )}
       {picking.state === 'done' && (
         <div className="notice success">
           <span className="led ok" />{' '}
