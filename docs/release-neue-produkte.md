@@ -259,4 +259,11 @@ Alle drei am 27.11. entschieden:
 - Generalprobe an einem Testprodukt im echten Shop: ein Kauf, eine
   Bestandsänderung in KRNL, ein Storno — und prüfen, dass die
   Differenz-Meldung (`inventoryAdjustQuantities`) vom Shop angenommen wird.
+- **Verkaufsstart per Knopfdruck** (seit 27.11.): den sechs neuen
+  Tastaturen in der Produktliste dasselbe Shop-Projekt geben (anhaken →
+  „Shop-Projekt setzen"), in der Shop-Verfügbarkeit an ihrer Karte
+  **„Verkauf stoppen"** drücken (Shopify bekommt 0, passend zu den schon
+  angelegten Shop-Seiten) — und am 29.11. um 16:30 **„Verkauf starten"**:
+  alle Artikel der Karte gehen auf „berechnet", die Regeln greifen.
+- Webhooks lassen sich schon im Probelauf registrieren (seit 27.11.).
 - Not-Aus kennen: Verkauf → Shop-Verfügbarkeit → „Not-Aus".

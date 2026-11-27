@@ -14,6 +14,24 @@ const leer = (fd: FormData, k: string) => {
 }
 
 export const VERKAUF_SHOP = {
+  'verkauf.shop_verkauf_schalten': {
+    label: 'Shop: Verkauf starten oder stoppen',
+    bereich: 'verkauf',
+    prozessfrei: true,
+    beschreibung:
+      'Stellt mehrere Shop-Artikel (z. B. alle Tastaturen eines Shop-Projekts) in einem Schritt um: ' +
+      'start = „berechnet" (die Regeln greifen, die verteilten Mengen gehen an Shopify), ' +
+      'stopp = „aus" (0 = ausverkauft). Ein Abgleich für alle — der Knopf für den Release.',
+    bindung: 'frei',
+    schema: z.object({
+      template_ids: z.array(z.string().guid()).min(1, 'Keine Artikel gewählt').max(100),
+      start: z.boolean(),
+    }),
+    zusammenfassung: (p) => `${p.template_ids.length} Shop-Artikel: Verkauf ${p.start ? 'starten' : 'stoppen'}`,
+    revalidate: ['/verkauf/shop-verfuegbarkeit'],
+  },
+
+
   'verkauf.shop_artikel_setzen': {
     label: 'Shop: Artikel steuern',
     bereich: 'verkauf',

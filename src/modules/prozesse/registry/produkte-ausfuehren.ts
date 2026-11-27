@@ -244,6 +244,25 @@ export async function variantenCodes(
   }
 }
 
+/** Shop-Projekt für mehrere Produkte auf einmal (Produktliste, 2026-11-27) — reine Anzeige-Gruppierung. */
+export async function shopProjektSetzen(
+  p: { template_ids: string[]; projekt: string | null },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const geaendert = await sql<{ id: string }[]>`
+    update product_templates set projekt = ${p.projekt}
+    where id = any(${p.template_ids}::uuid[]) and projekt is distinct from ${p.projekt}
+    returning id`
+  for (const g of geaendert) {
+    await sql`select log_event('product_template', ${g.id}, 'note', ${`Shop-Projekt: ${p.projekt ?? '—'}`}, ${ctx.actor})`
+  }
+  return {
+    text: p.projekt
+      ? `${plural(p.template_ids.length, 'Produkt', 'Produkte')} im Shop-Projekt „${p.projekt}" (${geaendert.length} geändert).`
+      : `Shop-Projekt bei ${plural(geaendert.length, 'Produkt', 'Produkten')} entfernt.`,
+  }
+}
+
 export async function attributAnlegen(p: {
   name: string
   werte: string[]

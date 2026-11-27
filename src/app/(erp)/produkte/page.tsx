@@ -1,12 +1,12 @@
 import { requireArea } from '@/modules/auth'
-import { canAccess } from '@/modules/auth/permissions'
+import { canAccess, canWrite } from '@/modules/auth/permissions'
 import Link from 'next/link'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { Schublade } from '@/components/schublade'
 import { money, qty } from '@/modules/shared/format'
-import { createProduct } from './actions'
+import { createProduct, setShopProjekt } from './actions'
 import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { GroesseBehalten, Seiten } from '@/components/seiten'
@@ -22,6 +22,7 @@ export default async function ProduktePage({
   const params = await searchParams
   const { q } = params
   const seite = seitenParameter(params)
+  const darf = canWrite(user.rollen, 'produkte', user.befugnisse)
 
   const rows = await sql<
     {
@@ -34,6 +35,7 @@ export default async function ProduktePage({
       has_bom: boolean
       route_manufacture: boolean
       route_buy: boolean
+      projekt: string | null
     }[]
   >`
     select count(*) over () as gesamt, pt.id, pt.name, u.name as uom, pt.list_price,
@@ -41,11 +43,12 @@ export default async function ProduktePage({
            coalesce((select sum(on_hand_qty(pv.id)) from product_variants pv
                       where pv.template_id = pt.id and pv.active), 0) as on_hand,
            exists (select 1 from boms b where b.template_id = pt.id and b.active) as has_bom,
-           pt.route_manufacture, pt.route_buy
+           pt.route_manufacture, pt.route_buy, pt.projekt
     from product_templates pt
     join uoms u on u.id = pt.uom_id
     where pt.active
-      and (${q ?? null}::text is null or pt.name ilike ${'%' + (q ?? '') + '%'})
+      and (${q ?? null}::text is null or pt.name ilike ${'%' + (q ?? '') + '%'}
+           or pt.projekt ilike ${'%' + (q ?? '') + '%'})
     order by pt.name limit ${seite.limit} offset ${seite.offset}`
   const gesamt = gesamtAus(rows)
 
@@ -114,7 +117,7 @@ export default async function ProduktePage({
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Suche</span>
               <GroesseBehalten params={params} />
-              <input type="search" name="q" placeholder="Produkt suchen" defaultValue={q ?? ''} />
+              <input type="search" name="q" placeholder="Produkt oder Shop-Projekt" defaultValue={q ?? ''} />
             </label>
             <div className="shrink field">
               <button type="submit">Suchen</button>
@@ -125,41 +128,61 @@ export default async function ProduktePage({
         {rows.length === 0 ? (
           <Empty>Keine Produkte gefunden.</Empty>
         ) : (
-          <TableWrap karten>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th className="num">Varianten</th>
-                  <th className="num">Bestand</th>
-                  <th>Einheit</th>
-                  <th className="num">Preis</th>
-                  <th>Beschaffung</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td><Link href={`/produkte/${r.id}`}>{r.name}</Link></td>
-                    <td className="num">{r.variants}</td>
-                    <td className="num">{qty(r.on_hand)}</td>
-                    <td className="mono small">{r.uom}</td>
-                    <td className="num">{money(r.list_price)}</td>
-                    <td>
-                      <span className="actions">
-                        {r.route_manufacture && (
-                          <span className={`badge ${r.has_bom ? 'info' : 'warn'}`}>
-                            {r.has_bom ? 'Fertigung' : 'Fertigung ohne Stückliste'}
-                          </span>
-                        )}
-                        {r.route_buy && <span className="badge neutral">Einkauf</span>}
-                      </span>
-                    </td>
+          // Eine Form um die Tabelle: Produkte anhaken und allen auf einmal
+          // dasselbe Shop-Projekt geben (2026-11-27) — statt einzeln in der Shop-Verfügbarkeit.
+          <ActionForm action={setShopProjekt}>
+            {darf && (
+              <div className="actions" style={{ padding: '0 12px 12px' }}>
+                <span className="mono-label">Für angehakte</span>
+                <input name="projekt" placeholder="Shop-Projekt, z. B. NATIVE 1800" aria-label="Shop-Projekt" style={{ width: 260 }} />
+                <button type="submit" className="small">Shop-Projekt setzen</button>
+                <span className="small muted">Leer lassen entfernt das Projekt.</span>
+              </div>
+            )}
+            <TableWrap karten>
+              <table>
+                <thead>
+                  <tr>
+                    {darf && <th style={{ width: 32 }} aria-label="Auswahl" />}
+                    <th>Name</th>
+                    <th>Shop-Projekt</th>
+                    <th className="num">Varianten</th>
+                    <th className="num">Bestand</th>
+                    <th>Einheit</th>
+                    <th className="num">Preis</th>
+                    <th>Beschaffung</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id}>
+                      {darf && (
+                        <td>
+                          <input type="checkbox" name="template_id" value={r.id} aria-label={`${r.name} auswählen`} />
+                        </td>
+                      )}
+                      <td><Link href={`/produkte/${r.id}`}>{r.name}</Link></td>
+                      <td className="small">{r.projekt ?? <span className="muted">—</span>}</td>
+                      <td className="num">{r.variants}</td>
+                      <td className="num">{qty(r.on_hand)}</td>
+                      <td className="mono small">{r.uom}</td>
+                      <td className="num">{money(r.list_price)}</td>
+                      <td>
+                        <span className="actions">
+                          {r.route_manufacture && (
+                            <span className={`badge ${r.has_bom ? 'info' : 'warn'}`}>
+                              {r.has_bom ? 'Fertigung' : 'Fertigung ohne Stückliste'}
+                            </span>
+                          )}
+                          {r.route_buy && <span className="badge neutral">Einkauf</span>}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </ActionForm>
         )}
         <Seiten pfad="/produkte" params={params} seite={seite} gesamt={gesamt} />
       </Card>

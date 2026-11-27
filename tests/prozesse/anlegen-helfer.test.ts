@@ -152,6 +152,32 @@ describe('Produkt speichern mit langer Shop-Beschreibung', () => {
   })
 })
 
+describe('Release per Knopfdruck: Shop-Projekt und Verkauf starten/stoppen', () => {
+  const stand = () =>
+    h.sql<{ name: string; projekt: string | null; shop_modus: string }[]>`
+      select name, projekt, shop_modus from product_templates where id in (${v.a}, ${v.b}) order by name`
+
+  test('Shop-Projekt für mehrere Produkte auf einmal — und wieder entfernen', async () => {
+    const r = await aktion('produkte.shop_projekt_setzen', undefined, { template_ids: [v.a, v.b], projekt: 'NATIVE 1800' })
+    assert.match(r.text ?? '', /2 Produkte im Shop-Projekt „NATIVE 1800" \(2 geändert\)/)
+    assert.deepEqual((await stand()).map((s) => s.projekt), ['NATIVE 1800', 'NATIVE 1800'])
+    await aktion('produkte.shop_projekt_setzen', undefined, { template_ids: [v.b], projekt: null })
+    assert.deepEqual((await stand()).map((s) => s.projekt), ['NATIVE 1800', null])
+    await assert.rejects(aktion('produkte.shop_projekt_setzen', undefined, { template_ids: [], projekt: 'X' }), /anhaken/)
+  })
+
+  test('Verkauf stoppen stellt alle auf „aus", starten alle auf „berechnet" — mit Hinweis auf den Shopify-Modus', async () => {
+    const stopp = await aktion('verkauf.shop_verkauf_schalten', undefined, { template_ids: [v.a, v.b], start: false })
+    assert.deepEqual((await stand()).map((s) => s.shop_modus), ['aus', 'aus'])
+    assert.match(stopp.text ?? '', /Verkauf gestoppt: 2 Artikel auf „aus \(ausverkauft\)"/)
+    const start = await aktion('verkauf.shop_verkauf_schalten', undefined, { template_ids: [v.a, v.b], start: true })
+    assert.deepEqual((await stand()).map((s) => s.shop_modus), ['auto', 'auto'])
+    assert.match(start.text ?? '', /Verkauf gestartet: 2 Artikel auf „berechnet"/)
+    // Die Testdatenbank steht auf „nur lesen" — der Knopf sagt es, statt still nichts zu senden.
+    assert.match(start.text ?? '', /an den Shop geht nichts hinaus/)
+  })
+})
+
 describe('Artikelnummern und Barcodes in einer Tabelle (A5)', () => {
   const varianten = () =>
     h.sql<{ id: string; sku: string | null; barcode: string | null }[]>`

@@ -525,6 +525,13 @@ Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`
   - **Artikel / Variante**: `shop_modus` auto (berechnet), **immer**
     (Deckel — Switch-Tester; der 3D-Druck ist schnell nachgebaut), **aus**
     (0 — Black Week Editions); die Variante überstimmt den Artikel.
+  - **Verkauf starten / stoppen** (seit 2026-11-27, Knöpfe an jeder Karte
+    der Ansicht „Tastaturen", `verkauf.shop_verkauf_schalten`): stellt alle
+    Artikel der Karte — also des Shop-Projekts — in einem Schritt auf
+    „berechnet" bzw. „aus" und stößt einen Abgleich an. So gehen neue
+    Tastaturen, deren Shop-Seiten schon mit Bestand 0 stehen, per Knopfdruck
+    in den Verkauf. Das Shop-Projekt lässt sich für mehrere Produkte auf
+    einmal in der Produktliste setzen (`produkte.shop_projekt_setzen`).
   - **Optionswert** deaktivieren (`shop_option_sperren`), wahlweise in allen
     Farben des Projekts (gleicher Options- und Wertname).
   - Lagerware (Zubehör, einzeln verkaufte Switches) in „Teile und

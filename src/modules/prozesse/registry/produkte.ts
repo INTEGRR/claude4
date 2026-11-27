@@ -250,6 +250,26 @@ export const PRODUKTE = {
     revalidate: ['/produkte/:id'],
   },
 
+  'produkte.shop_projekt_setzen': {
+    label: 'Shop-Projekt für mehrere Produkte setzen',
+    bereich: 'produkte',
+    beschreibung:
+      'Gibt mehreren Produkten auf einmal dasselbe Shop-Projekt (der gemeinsame Name, unter dem z. B. die ' +
+      'Farben einer Tastatur in der Shop-Verfügbarkeit als eine Karte stehen). Leer = Projekt entfernen. ' +
+      'Ändert nichts an Bestand oder Regeln.',
+    bindung: 'frei',
+    schema: z.object({
+      template_ids: z.array(z.string().guid()).min(1, 'Bitte erst Produkte anhaken').max(200),
+      projekt: z.string().trim().max(100).nullable().describe('leer = kein Projekt'),
+    }),
+    zusammenfassung: (p) => `${p.template_ids.length} Produkte: Shop-Projekt ${p.projekt ?? '—'}`,
+    formdata: (fd) => ({
+      template_ids: fd.getAll('template_id').map(String),
+      projekt: String(fd.get('projekt') ?? '').trim() || null,
+    }),
+    revalidate: ['/produkte', '/verkauf/shop-verfuegbarkeit'],
+  },
+
   'produkte.attribut_anlegen': {
     label: 'Attribut anlegen',
     bereich: 'produkte',

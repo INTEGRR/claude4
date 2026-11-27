@@ -277,6 +277,7 @@ export const AUSFUEHRUNG = {
   'produkte.attribut_zuweisen': produkte.attributZuweisen,
   'produkte.variante_codes': produkte.varianteCodes,
   'produkte.varianten_codes': produkte.variantenCodes,
+  'produkte.shop_projekt_setzen': produkte.shopProjektSetzen,
   'produkte.attribut_anlegen': produkte.attributAnlegen,
   'produkte.lieferantenpreis_anlegen': produkte.lieferantenpreisAnlegen,
   'produkte.lieferantenpreis_loeschen': produkte.lieferantenpreisLoeschen,
@@ -364,6 +365,7 @@ export const AUSFUEHRUNG = {
   'verkauf.shop_zweitangebot_setzen': verkaufShop.shopZweitangebotSetzen,
   'verkauf.shop_stand_holen': verkaufShop.shopStandHolen,
   'verkauf.shop_not_aus': verkaufShop.shopNotAus,
+  'verkauf.shop_verkauf_schalten': verkaufShop.shopVerkaufSchalten,
   'verkauf.shop_gewicht_setzen': verkaufShop.shopGewichtSetzen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

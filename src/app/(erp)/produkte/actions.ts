@@ -46,6 +46,10 @@ export async function setVariantenCodes(templateId: string, formData: FormData):
   return ergebnis
 }
 
+export async function setShopProjekt(formData: FormData): Promise<ActionResult> {
+  return serverAktion('produkte.shop_projekt_setzen', { formData })
+}
+
 export async function createAttribute(formData: FormData): Promise<ActionResult> {
   return serverAktion('produkte.attribut_anlegen', { formData })
 }

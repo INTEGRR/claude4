@@ -34,6 +34,40 @@ export async function shopArtikelSetzen(
   return { recordId: p.template_id, text: `${t.name}: ${teile.join(', ')}.` }
 }
 
+/**
+ * Verkauf starten oder stoppen — mehrere Artikel auf einmal (2026-11-27):
+ * vor dem Release stehen die neuen Tastaturen auf „aus" (Shopify bekommt 0),
+ * zum Start stellt EIN Knopf alle auf „berechnet"; ein Abgleich für alle.
+ */
+export async function shopVerkaufSchalten(
+  p: { template_ids: string[]; start: boolean },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const modus = p.start ? 'auto' : 'aus'
+  const artikel = await sql<{ id: string; name: string }[]>`
+    update product_templates set shop_modus = ${modus}
+    where id = any(${p.template_ids}::uuid[]) and active
+    returning id, name`
+  if (artikel.length === 0) throw new Error('Keine Artikel gefunden')
+  for (const a of artikel) {
+    await sql`select log_event('product_template', ${a.id}, 'note',
+      ${p.start ? 'Shop: Verkauf gestartet (berechnet)' : 'Shop: Verkauf gestoppt (aus)'}, ${ctx.actor})`
+  }
+  await anstossen()
+  const { shopifyModus } = await import('../../integrationen/shopify-modus.ts')
+  const shop = await shopifyModus(sql)
+  const hinweis =
+    shop === 'schreiben'
+      ? p.start ? ' Die verteilten Mengen gehen jetzt an Shopify.' : ' Shopify bekommt jetzt 0.'
+      : ` Achtung: Shopify steht auf „${shop === 'probe' ? 'Probelauf' : 'nur lesen'}" — an den Shop geht nichts hinaus.`
+  return {
+    text:
+      `Verkauf ${p.start ? 'gestartet' : 'gestoppt'}: ${plural(artikel.length, 'Artikel', 'Artikel')} ` +
+      `auf „${MODUS_TEXT[modus]}".${hinweis}`,
+    daten: { artikel: artikel.length, modus, shopify: shop },
+  }
+}
+
 export async function shopVarianteSetzen(
   p: {
     variant_id: string

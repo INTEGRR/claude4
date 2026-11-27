@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Release per Knopfdruck: Verkauf starten/stoppen je Karte, Shop-Projekt in der Produktliste
+
+Auslöser (Betreiber): Die Produktseiten der neuen Tastaturen stehen schon
+im Shop, mit Bestand 0. Zum Release sollen alle sechs Tastaturen mit allen
+Varianten per Knopfdruck in den Verkauf — „bzw. die Regel greifen lassen".
+
+Entschieden:
+- **Kein neuer Zustand.** Der Verkaufsstart ist die vorhandene
+  Artikel-Steuerung: vorher „aus" (Shopify bekommt 0), zum Start
+  „berechnet" (Kontingent und Regeln greifen). Neu ist nur, dass EIN Knopf
+  alle Artikel einer Karte der Shop-Verfügbarkeit umstellt und EINEN
+  Abgleich anstößt: `verkauf.shop_verkauf_schalten` („Verkauf starten" /
+  „Verkauf stoppen", mit Rückfrage). Die Meldung sagt ausdrücklich, wenn
+  Shopify nicht auf „schreiben" steht und nichts hinausgeht.
+- **Die Karte ist das Shop-Projekt** — der gemeinsame Name mehrerer
+  Shop-Produkte (reine Anzeige-Gruppierung, `product_templates.projekt`).
+  Damit sechs Tastaturen schnell unter einen Namen kommen, lässt sich das
+  Shop-Projekt in der **Produktliste** für mehrere angehakte Produkte auf
+  einmal setzen (`produkte.shop_projekt_setzen`, Spalte „Shop-Projekt", die
+  Suche findet auch den Projektnamen). Die Einzelpflege in der
+  Shop-Verfügbarkeit bleibt.
+- Kein Zeitschalter: der Start bleibt ein bewusster Klick des Betreibers.
+
+Test: `tests/prozesse/anlegen-helfer.test.ts`. Doku:
+[module/integrationen.md](module/integrationen.md) „Shop-Verfügbarkeit:
+Regeln und Ansicht", [release-neue-produkte.md](release-neue-produkte.md).
+
 ## 2026-11-27 — Keine Wand aus Listen: eine Liste mit Filtern, Suche und Seiten
 
 Auslöser (Betreiber): In der Shop-Verfügbarkeit standen „Teile-Regeln",

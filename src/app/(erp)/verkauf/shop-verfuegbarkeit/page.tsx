@@ -48,6 +48,10 @@ async function gewichtSetzen(formData: FormData) {
   'use server'
   return serverAktion('verkauf.shop_gewicht_setzen', { formData })
 }
+async function verkaufSchalten(templateIds: string[], start: boolean) {
+  'use server'
+  return serverAktion('verkauf.shop_verkauf_schalten', { parameter: { template_ids: templateIds, start } })
+}
 async function notAusAn() {
   'use server'
   return serverAktion('verkauf.shop_not_aus', { parameter: { aktiv: true } })
@@ -426,6 +430,28 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                 </Link>
               ))}
             </div>
+            {darf && (
+              // Verkauf starten/stoppen für ALLE Artikel der Karte (Release per Knopfdruck).
+              <div className="actions" style={{ margin: '4px 0 14px' }}>
+                <span className="small muted">
+                  {p.artikel.filter((a) => a.modus !== 'aus').length} von {p.artikel.length} im Verkauf
+                </span>
+                <ActionButton
+                  action={verkaufSchalten.bind(null, p.artikel.map((a) => a.id), true)}
+                  className="small primary"
+                  confirm={`Verkauf starten: ${p.artikel.length === 1 ? 'den Artikel' : `alle ${p.artikel.length} Artikel`} von „${p.name}" auf „berechnet" stellen? Die Regeln greifen, die Mengen gehen an Shopify.`}
+                >
+                  Verkauf starten
+                </ActionButton>
+                <ActionButton
+                  action={verkaufSchalten.bind(null, p.artikel.map((a) => a.id), false)}
+                  className="small danger"
+                  confirm={`Verkauf stoppen: ${p.artikel.length === 1 ? 'den Artikel' : `alle ${p.artikel.length} Artikel`} von „${p.name}" auf „aus" stellen? Shopify bekommt 0.`}
+                >
+                  Verkauf stoppen
+                </ActionButton>
+              </div>
+            )}
             <ArtikelAnsicht a={auswahl} projekt={p} darf={darf} />
           </Card>
         )
