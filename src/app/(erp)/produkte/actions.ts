@@ -46,7 +46,9 @@ export async function setVariantenCodes(templateId: string, formData: FormData):
   return ergebnis
 }
 
+/** Sammel-Formular der Produktliste: der geklickte Knopf (was) entscheidet, was die angehakten Produkte bekommen. */
 export async function setShopProjekt(formData: FormData): Promise<ActionResult> {
+  if (formData.get('was') === 'auflage') return serverAktion('produkte.auflage_setzen', { formData })
   return serverAktion('produkte.shop_projekt_setzen', { formData })
 }
 

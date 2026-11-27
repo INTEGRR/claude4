@@ -46,6 +46,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       date_done: string | null
       sales_order_id: string | null
       sales_order_number: string | null
+      auflage: string | null
       backorder_of_number: string | null
       backorder_of_id: string | null
       uom: string
@@ -67,6 +68,7 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
            mo.material_cost, mo.labor_cost, mo.unit_cost,
            product_tracking(mo.variant_id) as tracking,
            mo.sales_order_id, so.number as sales_order_number,
+           auflage_nummern_fertigung(mo.id) as auflage,
            bo.number as backorder_of_number, mo.backorder_of_id, u.name as uom, b.consumption,
            exists(select 1 from odoo_verweise v
                   where v.krnl_tabelle = 'manufacturing_orders' and v.krnl_id = mo.id) as aus_odoo
@@ -182,6 +184,11 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
             {mo.bom_id && (
               <>
                 {' '}· <Link href={`/fertigung/stuecklisten/${mo.bom_id}`}>Stückliste</Link>
+              </>
+            )}
+            {mo.auflage && (
+              <>
+                {' '}· <span className="badge info">{mo.auflage}</span>
               </>
             )}
             {mo.sales_order_id && (

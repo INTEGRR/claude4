@@ -432,6 +432,57 @@ export async function shopProjektSetzen(
   }
 }
 
+/**
+ * Nummerierte Auflage (0144): Auflage nach Namen anlegen oder anpassen und
+ * die Produkte daran hängen. Die Nummern selbst vergibt die Datenbank
+ * (auflage_nummern_vergeben) in Bestellreihenfolge.
+ */
+export async function auflageSetzen(
+  p: { template_ids: string[]; name: string | null; von?: number; bis?: number },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  return tx(async (t) => {
+    if (!p.name) {
+      const raus = await t<{ id: string }[]>`
+        update product_templates set auflage_id = null
+        where id = any(${p.template_ids}::uuid[]) and auflage_id is not null returning id`
+      for (const r of raus) {
+        await t`select log_event('product_template', ${r.id}, 'note', 'Nummerierte Auflage entfernt', ${ctx.actor})`
+      }
+      await t`select auflage_nummern_vergeben()`
+      return { text: `Auflage bei ${plural(raus.length, 'Produkt', 'Produkten')} entfernt.` }
+    }
+    const von = p.von ?? 1
+    const bis = p.bis as number
+    const [vorher] = await t<{ id: string; hoechste: number | null; kleinste: number | null }[]>`
+      select a.id, max(n.nummer) as hoechste, min(n.nummer) as kleinste
+      from auflagen a left join auflage_nummern n on n.auflage_id = a.id
+      where a.name = ${p.name} group by a.id`
+    if (vorher?.hoechste != null && (vorher.hoechste > bis || (vorher.kleinste ?? von) < von)) {
+      throw new Error(
+        `„${p.name}" hat schon die Nummern ${vorher.kleinste}–${vorher.hoechste} vergeben — der Bereich muss sie enthalten.`,
+      )
+    }
+    const [a] = await t<{ id: string }[]>`
+      insert into auflagen (name, von, bis) values (${p.name}, ${von}, ${bis})
+      on conflict (name) do update set von = excluded.von, bis = excluded.bis
+      returning id`
+    const geaendert = await t<{ id: string }[]>`
+      update product_templates set auflage_id = ${a.id}
+      where id = any(${p.template_ids}::uuid[]) and auflage_id is distinct from ${a.id} returning id`
+    const text = `Nummerierte Auflage „${p.name}" (Nr. ${von}–${bis})`
+    for (const g of geaendert) {
+      await t`select log_event('product_template', ${g.id}, 'note', ${text}, ${ctx.actor})`
+    }
+    const [{ n }] = await t<{ n: number }[]>`
+      select count(*)::int as n from product_templates where auflage_id = ${a.id}`
+    return {
+      recordId: a.id,
+      text: `${text}: ${plural(n, 'Produkt', 'Produkte')} — jedes verkaufte Stück bekommt die nächste Nummer in Bestellreihenfolge.`,
+    }
+  })
+}
+
 export async function attributAnlegen(p: {
   name: string
   werte: string[]

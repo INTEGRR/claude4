@@ -186,6 +186,56 @@ Nachweis: `tests/prozesse/kundenrechnungen.test.ts` („Rechnungs-Probelauf
 wie im Ernstfall, nicht in Fälligkeiten und DATEV, PDF mit Probe, Sperre
 beim Scharfschalten, Löschen mit Rückrechnung, danach nahtlose RE-Nummer.
 
+## Abverkauf — Command Center (seit 2026-11-27, Migration 0144)
+
+**Verkauf → Abverkauf** (`/verkauf/abverkauf`) ist der Bildschirm für den
+Release-Tag. Er fragt alle vier Sekunden nach (`GET /api/abverkauf`).
+
+- **Oben:** verkaufte Tastaturen und Bestellungen im Zeitfenster, Tempo
+  (Tastaturen je Stunde, aus den letzten 15 Minuten) mit Verlauf der
+  letzten Stunde, und das Teil, das als Nächstes ausgeht.
+- **Was zuerst ausgeht:** eine Zeile je Teil aus den Stücklisten der
+  verkaufbaren, gefertigten Produkte. „Reicht für" ist der für den Shop
+  nutzbare Bestand in Tastaturen (`shop_frei()` ÷ Stück je Tastatur), der
+  Balken zeigt den Rest gegen das im Zeitfenster Verkaufte, „leer in …"
+  rechnet mit dem Tempo der letzten 15 Minuten (sonst der letzten Stunde).
+  Reihenfolge: überverkauft, dann Minuten bis leer, dann Reichweite.
+- **„Ausverkauft setzen"** an jeder Zeile: das Teil zählt für den Shop als
+  0 — und damit jede Variante jedes Produkts, das es in der Stückliste hat
+  (`verkauf.shop_variante_setzen` mit `zurueckhalten`, dieselbe Regel wie
+  „Für den Shop sperren" in der Shop-Verfügbarkeit). „Freigeben" nimmt es
+  zurück. Steht Shopify nicht auf „schreiben", sagt die Seite das.
+- **Rechts:** Stand der nummerierten Auflagen, die meistverkauften
+  Produkte und Optionen.
+- Zeitfenster (15 Min, 1 Std, 3 Std, heute) und Shop-Projekt stehen in der
+  Adresse; „Vollbild" für den Wandbildschirm.
+
+Rechenlogik: `src/modules/verkauf/abverkauf-logik.ts`, Daten:
+`src/modules/verkauf/abverkauf.ts`.
+
+## Nummerierte Auflage (seit 2026-11-27, Migration 0144)
+
+Für limitierte Stücke wie die Founders Edition (Nr. 1–96).
+
+1. **Anlegen:** Stammdaten → Produkte, die Produkte anhaken, „Nummerierte
+   Auflage" aufklappen, Name und Nummernbereich setzen
+   (`produkte.auflage_setzen`). Produkte mit demselben Auflagennamen
+   teilen sich die Nummern. Name leer = aus der Auflage nehmen.
+2. **Vergeben:** automatisch, je verkauftem Stück eine Nummer, in der
+   Reihenfolge der Bestellzeit; die Nummer kommt ein bis zwei Minuten nach
+   der Bestellung (60 Sekunden Ruhezeit, damit sich gleichzeitige
+   Bestellungen sortieren, dann der Minutentakt).
+3. **Storno** gibt die Nummer frei; das nächste Stück ohne Nummer bekommt
+   sie. Ist die Auflage voll, bleibt ein weiteres Stück ohne Nummer und
+   wird gemeldet.
+4. **Sehen:** an der Auftragsposition, am Fertigungsauftrag und auf dem
+   Montagezettel („Nummer: Founders Edition Nr. 17"), als Liste unter
+   `/verkauf/auflagen` (Nummer → Bestellung, Kunde, Artikel, Fertigung).
+
+Tabellen: `auflagen`, `auflage_nummern`; Funktionen
+`auflage_nummern_vergeben()`, `auflage_nummern_text()`,
+`auflage_nummern_fertigung()`, `auflage_ohne_nummer()`.
+
 ## UI
 
 - **Liste**: Nummer, Shopify-Name, Kunde, Datum, Status-Badges (Status/Liefer-/Abrechnungsstatus), Summe; Filter nach Status/Quelle; Volltextsuche.

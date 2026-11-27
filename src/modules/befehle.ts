@@ -31,6 +31,8 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/verkauf/neu', label: 'Neuer Verkaufsauftrag', area: 'verkauf' },
   { href: '/vorgaenge', label: 'Vorgänge', area: 'verkauf' },
   { href: '/verkauf/shop-verfuegbarkeit', label: 'Shop-Verfügbarkeit (was Shopify bekommt, Regeln je Teil)', area: 'verkauf' },
+  { href: '/verkauf/abverkauf', label: 'Abverkauf (live: was verkauft sich, welches Teil geht als Nächstes aus)', area: 'verkauf' },
+  { href: '/verkauf/auflagen', label: 'Nummerierte Auflagen (z. B. Founders Edition: welche Nummer zu welcher Bestellung)', area: 'verkauf' },
   { href: '/verkauf/rechnungen', label: 'Kundenrechnungen (Rechnungen, Gutschriften, Mahnungen, DATEV)', area: 'verkauf' },
   { href: '/versand', label: 'Versand', area: 'versand', prozess: ['versand'] },
   { href: '/kommissionieren', label: 'Kommissionieren (Ware sammeln)', area: 'versand', prozess: ['versand'] },

@@ -2356,3 +2356,90 @@ label.field > span.auswahl {
   .puls-mehr, .puls-weniger, .montage-punkt { animation: none; }
   .montage-balken > span { transition: none; }
 }
+
+/* --- Abverkauf (0144): Command Center für den Release-Tag ------------------- */
+.abv-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.abv-wahl { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.abv-wahl button[aria-pressed='true'] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.abv-hinweis { margin: 0; padding: 8px 12px; border: 1px solid var(--warn); border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.abv-klein { font-size: 12px; color: var(--text-muted); }
+.abv-klein.warn { color: var(--danger); font-weight: 600; }
+.abv-brett .montage-gesamt { flex: 1 1 220px; position: relative; }
+.abv-verlauf { position: absolute; right: 16px; bottom: 14px; display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+.abv-verlauf > span { width: 7px; border-radius: 2px; background: var(--display-line); transition: height 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.abv-verlauf > span.an { background: var(--accent); }
+.abv-naechster { flex: 2 1 320px; align-content: start; }
+.abv-naechster-name { font-size: clamp(20px, 2.1vw, 30px); font-weight: 650; line-height: 1.15; letter-spacing: -0.01em; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.abv-naechster-name.ruhig { color: var(--display-text); }
+.abv-naechster.kritisch, .abv-naechster.ueberverkauft { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+.abv-naechster.kritisch .montage-kopf-neben, .abv-naechster.ueberverkauft .montage-kopf-neben { color: var(--display-bright); font-weight: 600; }
+.abv-naechster.knapp { border-color: var(--warn); }
+.abv-raster { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+.abv-seite { display: grid; gap: 16px; min-width: 0; }
+.abv-karte { display: grid; gap: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; min-width: 0; }
+.abv-karte > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.abv-karte h2 { margin: 0; font-size: 17px; font-weight: 650; }
+.abv-karte h3 { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.abv-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.abv-zeile {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) 78px 104px 142px auto; align-items: center; gap: 4px 14px;
+  padding: 10px 12px; border: 1px solid var(--border); border-left: 5px solid var(--success); border-radius: 10px; background: var(--bg);
+}
+.abv-zeile.knapp { border-left-color: var(--warn); }
+.abv-zeile.kritisch, .abv-zeile.ueberverkauft { border-left-color: var(--danger); }
+.abv-zeile.ueberverkauft { background: var(--danger-soft); }
+.abv-zeile.leer, .abv-zeile.gesperrt { border-left-color: var(--border-strong); }
+.abv-zeile.gesperrt { border-left-style: dashed; }
+.abv-rang { font-size: 20px; font-weight: 650; color: var(--text-muted); text-align: center; font-variant-numeric: tabular-nums; }
+.abv-zeile.kritisch .abv-rang, .abv-zeile.ueberverkauft .abv-rang { color: var(--danger); }
+.abv-teil { display: grid; gap: 3px; min-width: 0; }
+.abv-name { font-size: 15px; font-weight: 600; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
+.abv-neben { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abv-balken { display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--border) 60%, transparent); overflow: hidden; }
+.abv-balken.gross { height: 14px; border-radius: 7px; }
+.abv-balken > span { display: block; height: 100%; border-radius: inherit; background: var(--success); transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.4s; }
+.abv-zeile.knapp .abv-balken > span { background: var(--warn); }
+.abv-zeile.kritisch .abv-balken > span, .abv-zeile.ueberverkauft .abv-balken > span { background: var(--danger); }
+.abv-renner .abv-balken > span, .abv-balken.gross > span { background: var(--accent); }
+.abv-reicht { display: grid; justify-items: end; line-height: 1; }
+.abv-reicht .montage-zahl { font-size: 30px; font-weight: 650; }
+.abv-zeile.leer .abv-reicht .montage-zahl, .abv-zeile.gesperrt .abv-reicht .montage-zahl { color: var(--text-muted); }
+.abv-tempo { display: grid; gap: 2px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.abv-tempo strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.abv-prognose { font-size: 13.5px; font-weight: 600; }
+.abv-zeile.ok .abv-prognose, .abv-zeile.leer .abv-prognose, .abv-zeile.gesperrt .abv-prognose { color: var(--text-muted); font-weight: 500; }
+.abv-zeile.knapp .abv-prognose { color: var(--warn); }
+.abv-zeile.kritisch .abv-prognose, .abv-zeile.ueberverkauft .abv-prognose { color: var(--danger); }
+.abv-knopf { display: inline-flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.abv-frage { grid-column: 2 / -1; margin: 2px 0 0; font-size: 13px; color: var(--text); }
+.abv-frage.fehler { color: var(--danger); font-weight: 600; }
+.abv-mehr { justify-self: start; }
+.abv-leer > summary { cursor: pointer; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.abv-auflage { margin: 0; display: flex; align-items: baseline; gap: 8px; color: var(--text-muted); font-size: 13px; }
+.abv-auflage .montage-zahl { font-size: 40px; font-weight: 650; line-height: 1; color: var(--text); }
+.abv-renner { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.abv-renner li { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(40px, 1fr) auto; align-items: center; gap: 10px; font-size: 13.5px; }
+.abv-renner-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abv-renner strong { font-variant-numeric: tabular-nums; min-width: 2.4ch; text-align: right; }
+/* Sinkende Reichweite ist hier die Nachricht — sie blitzt in der Akzentfarbe, nicht grün. */
+.abv-zeile.puls-weniger { animation: abv-sinkt 1.5s ease-out; }
+@keyframes abv-sinkt {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); background-color: var(--accent-soft); }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+.sammel-mehr { flex-basis: 100%; }
+.sammel-mehr > summary { cursor: pointer; color: var(--text-muted); }
+@media (max-width: 1100px) {
+  .abv-raster { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .abv-zeile { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .abv-tempo { grid-column: 2; grid-auto-flow: column; justify-content: start; gap: 12px; }
+  .abv-prognose { grid-column: 2; }
+  .abv-knopf { grid-column: 2 / -1; justify-content: flex-start; }
+  .abv-verlauf { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .abv-zeile.puls-weniger { animation: none; }
+  .abv-balken > span, .abv-verlauf > span { transition: none; }
+}

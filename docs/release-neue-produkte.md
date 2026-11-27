@@ -267,3 +267,10 @@ Alle drei am 27.11. entschieden:
   alle Artikel der Karte gehen auf „berechnet", die Regeln greifen.
 - Webhooks lassen sich schon im Probelauf registrieren (seit 27.11.).
 - Not-Aus kennen: Verkauf → Shop-Verfügbarkeit → „Not-Aus".
+- **Founders-Nummern** (seit 27.11.): in der Produktliste die beiden
+  Founders-Editionen anhaken → „Nummerierte Auflage" → Name
+  „Founders Edition", Nr. 1 bis 96. Danach vergibt KRNL die Nummern von
+  selbst, in Bestellreihenfolge.
+- **Am Release-Tag offen haben:** Verkauf → Abverkauf (Command Center) —
+  dort steht, welches Teil als Nächstes ausgeht, und der Knopf
+  „Ausverkauft setzen".

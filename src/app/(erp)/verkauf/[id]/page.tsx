@@ -119,11 +119,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       subtotal: number
       variant_id: string | null
       sperrgrund: string | null
+      auflage: string | null
     }[]
   >`
     select l.id, l.name, l.qty, u.name as uom, l.price_unit, l.discount, l.tax_rate,
            l.qty_delivered, sale_line_subtotal(l) as subtotal, l.variant_id,
-           sales_order_line_entfernbar(l.id) as sperrgrund
+           sales_order_line_entfernbar(l.id) as sperrgrund,
+           auflage_nummern_text(l.id) as auflage
     from sales_order_lines l
     left join uoms u on u.id = l.uom_id
     where l.order_id = ${id} and l.display_type is null
@@ -574,6 +576,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       ) : (
                         l.name
                       )}
+                      {/* Nummerierte Auflage (0144): welche Nummer dieses Stück trägt. */}
+                      {l.auflage && <div><span className="badge info">{l.auflage}</span></div>}
                     </td>
                     <td className="num">{qty(l.qty)}</td>
                     <td>{l.uom}</td>

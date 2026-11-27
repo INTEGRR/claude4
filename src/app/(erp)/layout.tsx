@@ -221,6 +221,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               { href: '/verkauf/rechnungen', label: 'Rechnungen', count: counts.rechnungen_ueberfaellig },
               { href: '/vorgaenge', label: 'Vorgänge', count: offenGesamt },
               { href: '/verkauf/shop-verfuegbarkeit', label: 'Shop-Verfügbarkeit' },
+              { href: '/verkauf/abverkauf', label: 'Abverkauf (live)' },
             ]
           : []),
         ...(sees('versand') && prozessAktiv('versand')

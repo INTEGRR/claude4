@@ -88,6 +88,12 @@ export function ZettelAnsicht({ daten }: { daten: ZettelDaten }) {
               </td>
             </tr>
           )}
+          {mo.auflage && (
+            <tr>
+              <th>Nummer</th>
+              <td style={{ fontSize: 18, fontWeight: 700 }}>{mo.auflage}</td>
+            </tr>
+          )}
         </tbody>
       </table>
 

@@ -22,6 +22,8 @@ export interface ZettelKopf {
   shopify_order_name: string | null
   customer: string | null
   note: string | null
+  /** Nummerierte Auflage (0144): „Founders Edition Nr. 17" — null ohne Auflage. */
+  auflage: string | null
 }
 
 export interface ZettelKomponente {
@@ -45,7 +47,7 @@ export async function moZettelDaten(id: string): Promise<ZettelDaten | null> {
     select mo.number, variant_display_name(mo.variant_id) as product, pv.sku, pv.barcode,
            mo.qty_to_produce, u.name as uom, mo.scheduled_date, mo.state,
            mo.sales_order_id, so.number as sales_order_number, so.shopify_order_name,
-           p.name as customer, mo.note
+           p.name as customer, mo.note, auflage_nummern_fertigung(mo.id) as auflage
     from manufacturing_orders mo
     join product_variants pv on pv.id = mo.variant_id
     join uoms u on u.id = mo.uom_id

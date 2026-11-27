@@ -300,6 +300,7 @@ export const PRODUKTE = {
   'produkte.shop_projekt_setzen': {
     label: 'Shop-Projekt für mehrere Produkte setzen',
     bereich: 'produkte',
+    prozessfrei: true,
     beschreibung:
       'Gibt mehreren Produkten auf einmal dasselbe Shop-Projekt (der gemeinsame Name, unter dem z. B. die ' +
       'Farben einer Tastatur in der Shop-Verfügbarkeit als eine Karte stehen). Leer = Projekt entfernen. ' +
@@ -315,6 +316,46 @@ export const PRODUKTE = {
       projekt: String(fd.get('projekt') ?? '').trim() || null,
     }),
     revalidate: ['/produkte', '/verkauf/shop-verfuegbarkeit'],
+  },
+
+  'produkte.auflage_setzen': {
+    label: 'Nummerierte Auflage für Produkte setzen',
+    bereich: 'produkte',
+    prozessfrei: true,
+    ki: true,
+    beschreibung:
+      'Legt eine nummerierte Auflage fest (z. B. „Founders Edition", Nr. 1 bis 96) und hängt die gewählten ' +
+      'Produkte daran. Jedes verkaufte Stück dieser Produkte — egal in welcher Variante — bekommt die nächste ' +
+      'Nummer in der Reihenfolge der Bestellungen; mehrere Produkte teilen sich eine Auflage über den ' +
+      'gleichen Namen. name leer = die Produkte aus ihrer Auflage nehmen. Vergebene Nummern bleiben, die ' +
+      'Auflage lässt sich nicht unter eine schon vergebene Nummer kürzen.',
+    bindung: 'frei',
+    schema: z
+      .object({
+        template_ids: z.array(z.string().guid()).min(1, 'Bitte erst Produkte anhaken').max(200),
+        name: z.string().trim().max(60).nullable().describe('leer = keine Auflage'),
+        von: z.number().int().min(1).max(100000).optional().describe('erste Nummer, Standard 1'),
+        bis: z.number().int().min(1).max(100000).optional().describe('letzte Nummer'),
+      })
+      .refine((p) => !p.name || p.bis !== undefined, 'Bitte die letzte Nummer angeben (z. B. 96)')
+      .refine((p) => !p.name || (p.bis ?? 0) >= (p.von ?? 1), 'Die letzte Nummer liegt vor der ersten'),
+    zusammenfassung: (p) =>
+      p.name
+        ? `${p.template_ids.length} Produkte: Auflage „${p.name}" Nr. ${p.von ?? 1}–${p.bis}`
+        : `${p.template_ids.length} Produkte: keine Auflage`,
+    formdata: (fd) => {
+      const zahl = (k: string) => {
+        const v = String(fd.get(k) ?? '').trim()
+        return v === '' ? undefined : Number(v)
+      }
+      return {
+        template_ids: fd.getAll('template_id').map(String),
+        name: String(fd.get('auflage') ?? '').trim() || null,
+        von: zahl('von'),
+        bis: zahl('bis'),
+      }
+    },
+    revalidate: ['/produkte', '/verkauf/abverkauf'],
   },
 
   'produkte.attribut_anlegen': {

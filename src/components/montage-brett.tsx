@@ -13,7 +13,7 @@ import type { MontageStand } from '@/modules/fertigung/montage'
 const TAKT_MS = 4000
 
 /** Zahl, die auf ihren neuen Wert läuft. */
-function Zahl({ wert }: { wert: number }) {
+export function Zahl({ wert }: { wert: number }) {
   const [anzeige, setAnzeige] = useState(wert)
   const von = useRef(wert)
   useEffect(() => {
@@ -42,7 +42,7 @@ function Zahl({ wert }: { wert: number }) {
 }
 
 /** Merkt sich den vorigen Wert je Schlüssel — für „mehr geworden" / „weniger geworden". */
-function useAenderungen(werte: Map<string, number>): Map<string, 'mehr' | 'weniger'> {
+export function useAenderungen(werte: Map<string, number>): Map<string, 'mehr' | 'weniger'> {
   const vorher = useRef<Map<string, number> | null>(null)
   const [aenderungen, setAenderungen] = useState<Map<string, 'mehr' | 'weniger'>>(new Map())
   const signatur = [...werte].map(([k, v]) => `${k}=${v}`).join('|')

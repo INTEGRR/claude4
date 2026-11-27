@@ -9,6 +9,75 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Abverkauf (Command Center) und nummerierte Auflage
+
+Wunsch des Betreibers für den Release-Tag: eine Übersicht, die in Echtzeit
+zeigt, was sich am schnellsten verkauft und was als Nächstes auf 0 läuft —
+mit einem Knopf, der es sofort ausverkauft setzt, „und dann muss alles, was
+diese Komponente in irgendwelchen Stücklisten hat, out of stock gesetzt
+werden". Dazu: jede verkaufte Founders Edition bekommt, egal in welcher
+Konstellation, eine Nummer von 1 bis 96 — in Bestellreihenfolge.
+
+**Abverkauf** (Verkauf → Abverkauf, `/verkauf/abverkauf`):
+
+- **Das Ranking steht auf den Teilen, nicht auf den Varianten.** Was
+  ausgeht, ist ein Gehäuse, eine Plate, ein Switch — und genau daran hängt
+  der Knopf. Eine Zeile je Teil aus den Stücklisten der verkaufbaren,
+  gefertigten Produkte.
+- **Gerechnet wird in Tastaturen.** Von einem Switch stecken 99 in einer
+  Tastatur; Stückzahlen wären nicht vergleichbar. „Reicht für" =
+  `shop_frei()` ÷ Stück je Tastatur — dieselbe Zahl, mit der die
+  Shop-Verfügbarkeit rechnet, also inklusive Schwellen und Sperren.
+- **Nachfrage sind die Komponentenbuchungen der Fertigungsaufträge** zu den
+  Bestellungen (plus Lieferungen direkt verkaufter Lagerartikel). Das ist,
+  was die Stückliste je bestellter Variante wirklich zieht — keine zweite
+  Auflösung, die abweichen könnte.
+- **Reihenfolge:** überverkauft (größte Lücke oben), dann Minuten bis leer
+  beim Tempo der letzten 15 Minuten (ist dort Ruhe: der letzten Stunde),
+  dann Reichweite. Leeres und von Hand Gesperrtes steht dahinter.
+  „Kritisch" unter 15 Minuten, „knapp" unter einer Stunde.
+- **„Ausverkauft setzen" ist keine neue Aktion**, sondern
+  `verkauf.shop_variante_setzen` mit `zurueckhalten` — „für den Shop
+  sperren": das Teil zählt als 0, jede Variante jedes Produkts, das es
+  braucht, geht auf ausverkauft; der Bestandsabgleich wird angestoßen.
+  Immer mit Rückfrage, die sagt, wie viele Produkte es trifft; „Freigeben"
+  ist derselbe Weg zurück.
+- Daneben: was läuft (Produkte, Optionen), Verkäufe je fünf Minuten, Stand
+  der Auflagen. Zeitfenster 15 Min / 1 Std / 3 Std / heute, Filter nach
+  Shop-Projekt, Vollbild. Abfrage alle vier Sekunden, serverseitig 2,5 s
+  gepuffert — mehrere Bildschirme kosten eine Rechnung.
+
+**Nummerierte Auflage** (Migration 0144):
+
+- Eine Auflage (`auflagen`: Name, von, bis) hängt an Produkten
+  (`product_templates.auflage_id`); mehrere Produkte teilen sich eine
+  Auflage über den Namen — HE und MX der Founders Edition zählen gemeinsam
+  bis 96. Gesetzt wird sie in der Produktliste für angehakte Produkte
+  (`produkte.auflage_setzen`, auch für die KI).
+- Die Nummer hängt an der Auftragsposition (`auflage_nummern`), je Stück
+  eine. Vergeben wird im Minutentakt (`auflage_nummern_vergeben()`, Cron
+  `jobs`) nach **Bestellzeit im Shop**, nicht nach Eingang in KRNL: eine
+  Bestellung bekommt ihre Nummer erst, wenn sie 60 Sekunden alt ist —
+  Bestellungen derselben Sekunden treffen nicht immer in ihrer Reihenfolge
+  ein. Einmal vergeben, ändert sich eine Nummer nie.
+- **Storno gibt die Nummer frei**; sie geht an das nächste Stück ohne
+  Nummer. Begründung: es gibt 96 nummerierte Stück — das stornierte geht
+  zurück in den Verkauf und sein nächster Käufer bekommt es. Lücken würden
+  bedeuten, dass ein nummeriertes Stück nie verkauft wird.
+- Ist die Auflage voll, bleibt ein weiteres verkauftes Stück ohne Nummer
+  und wird gemeldet (Abverkauf, Liste) — KRNL erfindet keine Nr. 97.
+- Sichtbar: an der Auftragsposition, am Fertigungsauftrag, auf dem
+  Montagezettel (Bildschirm und PDF), in der Liste
+  `/verkauf/auflagen` und in der Chronik der Bestellung.
+- An Shopify geht davon nichts — KRNL meldet dem Shop weiter nur Bestand
+  und Versand.
+
+Nachweis: `tests/abverkauf.test.ts` (Rechenlogik),
+`tests/prozesse/abverkauf.test.ts` (Ranking aus Bestellungen, Sperre über
+alle Stücklisten, Überverkauf, Nummern nach Bestellzeit, Storno, Ruhezeit,
+volle Auflage). Doku: [module/verkauf.md](module/verkauf.md) „Abverkauf"
+und „Nummerierte Auflage".
+
 ## 2026-11-27 — Zuordnungen sichtbar machen: eine Mapping-Tabelle
 
 Auslöser (Betreiber): „Bisher war die SKU das Einzige. Ich brauche eine

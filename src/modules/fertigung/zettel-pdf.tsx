@@ -115,6 +115,12 @@ export async function moZettelPdf(moIds: string[]): Promise<Buffer> {
                 </Text>
               </View>
             )}
+            {daten.mo.auflage && (
+              <View style={s.zeile}>
+                <Text style={s.th}>Nummer</Text>
+                <Text style={s.gross}>{daten.mo.auflage}</Text>
+              </View>
+            )}
           </View>
 
           <Text style={s.h2}>Komponenten</Text>

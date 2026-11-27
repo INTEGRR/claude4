@@ -43,6 +43,7 @@ export default async function ProduktePage({
       route_manufacture: boolean
       route_buy: boolean
       projekt: string | null
+      auflage: string | null
     }[]
   >`
     select count(*) over () as gesamt, pt.id, pt.name, u.name as uom, pt.list_price,
@@ -50,7 +51,8 @@ export default async function ProduktePage({
            coalesce((select sum(on_hand_qty(pv.id)) from product_variants pv
                       where pv.template_id = pt.id and (pv.active or ${archiv})), 0) as on_hand,
            exists (select 1 from boms b where b.template_id = pt.id and b.active) as has_bom,
-           pt.route_manufacture, pt.route_buy, pt.projekt
+           pt.route_manufacture, pt.route_buy, pt.projekt,
+           (select a.name || ' ' || a.von || '–' || a.bis from auflagen a where a.id = pt.auflage_id) as auflage
     from product_templates pt
     join uoms u on u.id = pt.uom_id
     where pt.active = ${!archiv}
@@ -152,8 +154,24 @@ export default async function ProduktePage({
               <div className="actions" style={{ padding: '0 12px 12px' }}>
                 <span className="mono-label">Für angehakte</span>
                 <input name="projekt" placeholder="Shop-Projekt, z. B. NATIVE 1800" aria-label="Shop-Projekt" style={{ width: 260 }} />
-                <button type="submit" className="small">Shop-Projekt setzen</button>
+                <button type="submit" name="was" value="projekt" className="small">Shop-Projekt setzen</button>
                 <span className="small muted">Leer lassen entfernt das Projekt.</span>
+                <details className="sammel-mehr">
+                  <summary className="small">Nummerierte Auflage</summary>
+                  <span className="actions" style={{ marginTop: 8 }}>
+                    <input name="auflage" placeholder="Name, z. B. Founders Edition" aria-label="Name der Auflage" style={{ width: 230 }} />
+                    <label className="small">Nr.{' '}
+                      <input name="von" inputMode="numeric" defaultValue="1" aria-label="erste Nummer" style={{ width: 64 }} />
+                    </label>
+                    <label className="small">bis{' '}
+                      <input name="bis" inputMode="numeric" placeholder="96" aria-label="letzte Nummer" style={{ width: 72 }} />
+                    </label>
+                    <button type="submit" name="was" value="auflage" className="small">Auflage setzen</button>
+                    <span className="small muted">
+                      Jedes verkaufte Stück der angehakten Produkte bekommt die nächste Nummer, in Bestellreihenfolge. Name leer = Auflage entfernen.
+                    </span>
+                  </span>
+                </details>
               </div>
             )}
             <TableWrap karten>
@@ -180,7 +198,10 @@ export default async function ProduktePage({
                         </td>
                       )}
                       <td><Link href={`/produkte/${r.id}`}>{r.name}</Link></td>
-                      <td className="small">{r.projekt ?? <span className="muted">—</span>}</td>
+                      <td className="small">
+                        {r.projekt ?? <span className="muted">—</span>}
+                        {r.auflage && <span className="badge info" style={{ marginLeft: 6 }}>{r.auflage}</span>}
+                      </td>
                       <td className="num">{r.variants}</td>
                       <td className="num">{qty(r.on_hand)}</td>
                       <td className="mono small">{r.uom}</td>

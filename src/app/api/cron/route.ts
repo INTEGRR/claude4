@@ -67,6 +67,10 @@ export async function GET(request: Request) {
         if (shopifyConfigured() && ausloeserAktiv(await shopifyModus(sql))) {
           await sql`select inventar_abgleich_anstossen()`
         }
+        // Nummerierte Auflagen (0144): verkaufte Stück bekommen ihre Nummer in
+        // Bestellreihenfolge, frei gewordene Nummern gehen an das nächste Stück.
+        const [auflage] = await sql<{ vergeben: number; frei_geworden: number }[]>`
+          select * from auflage_nummern_vergeben()`.catch(() => [])
         const jobs = await runDueJobs()
         // Telegram: endgültig gescheiterte Jobs melden, dann die Outbox der
         // Benachrichtigungen senden (Anmeldungen, Fehlversuche, Dienste).
@@ -78,7 +82,7 @@ export async function GET(request: Request) {
             (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null),
         ).catch(() => 0)
         const benachrichtigungen = await benachrichtigungenVersenden()
-        return NextResponse.json({ task, ...jobs, jobs_gemeldet: gemeldet, aufgaben_gemeldet: aufgaben, benachrichtigungen })
+        return NextResponse.json({ task, ...jobs, auflage_nummern: auflage?.vergeben ?? 0, jobs_gemeldet: gemeldet, aufgaben_gemeldet: aufgaben, benachrichtigungen })
       }
 
       case 'mail': {
