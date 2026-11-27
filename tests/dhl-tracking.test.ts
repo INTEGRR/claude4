@@ -10,8 +10,17 @@ import {
   parseZtAntwort,
   trackingStatusAus,
   ztAnfrageXml,
+  ztKopfzeilen,
   ztZeitstempel,
 } from '../src/modules/versand/dhl-tracking-xml.ts'
+
+describe('Parcel DE Tracking: Anmeldung am Gateway', () => {
+  test('API-Key im Header UND Key + Secret als Basic Auth — nur der Key gibt 401', () => {
+    const k = ztKopfzeilen('mein-key', 'mein-secret')
+    assert.equal(k['DHL-API-Key'], 'mein-key')
+    assert.equal(k.Authorization, `Basic ${Buffer.from('mein-key:mein-secret').toString('base64')}`)
+  })
+})
 
 const ANTWORT = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <data name="piece-shipment-list" code="0" request-id="abc">

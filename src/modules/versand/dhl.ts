@@ -13,6 +13,7 @@ import {
   parseZtAntwort,
   trackingStatusAus,
   ztAnfrageXml,
+  ztKopfzeilen,
 } from './dhl-tracking-xml'
 
 export { productForCountry, toAlpha3, trackingUrl }
@@ -546,7 +547,7 @@ async function parcelDeTracking(
   const xml = ztAnfrageXml({ benutzer, passwort, sendungsnummern: stapel })
   const res = await fetch(
     `${c.base}/parcel/de/tracking/v0/shipments?xml=${encodeURIComponent(xml)}`,
-    { headers: { 'DHL-API-Key': c.apiKey } },
+    { headers: ztKopfzeilen(c.apiKey, c.apiSecret) },
   )
   const text = await res.text()
   const log = (ok: boolean, error?: string) =>
@@ -562,8 +563,16 @@ async function parcelDeTracking(
     throw new DhlError('DHL-Tracking-Limit erreicht (1.000 Aufrufe/Tag, 3 je Sekunde)', 429)
   }
   if (!res.ok) {
-    await log(false, `Tracking fehlgeschlagen (${res.status})`)
-    throw new DhlError(`Tracking fehlgeschlagen (${res.status})`, res.status, text.slice(0, 500))
+    // 401/403 kommen vom Gateway, vor der Fachprüfung: Key/Secret falsch
+    // oder die App ist für „Parcel DE Tracking" nicht freigeschaltet. Die
+    // Antwort des Gateways (ohne Zugangsdaten) gehört ins Protokoll.
+    const grund = text.replace(/\s+/g, ' ').trim().slice(0, 200)
+    const hinweis =
+      res.status === 401 || res.status === 403
+        ? ' — DHL lehnt die Anmeldung ab: DHL_API_KEY/DHL_API_SECRET prüfen und ob die App im DHL Developer Portal für „Parcel DE Tracking" freigeschaltet ist'
+        : ''
+    await log(false, `Tracking fehlgeschlagen (${res.status})${hinweis}${grund ? ` · DHL: ${grund}` : ''}`)
+    throw new DhlError(`Tracking fehlgeschlagen (${res.status})${hinweis}`, res.status, text.slice(0, 500))
   }
 
   const antwort = parseZtAntwort(text)

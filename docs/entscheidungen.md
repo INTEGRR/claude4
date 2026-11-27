@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — DHL-Tracking: Anmeldung am Gateway mit Key und Secret
+
+Auslöser: Das erste echte Label in Produktion kam, die Sendungsverfolgung
+dazu antwortete mit 401 nach 33 ms — abgewiesen am DHL-Gateway, noch vor
+der Prüfung des Geschäftskunden-Benutzers.
+
+Ursache: `trackShipments()` schickte an die Parcel DE Tracking API nur den
+Header `DHL-API-Key`. DHL verlangt dort laut Doku („Get Access") den Key
+im Header **und** Key + Secret als Basic Auth. Beim Labeldruck gilt das
+Gegenteil (nur Bearer-Token, die Kombination wird abgelehnt) — deshalb
+fiel es bis zum ersten echten Tracking-Lauf nicht auf; die Sandbox war mit
+dieser API nie gegen das echte Gateway getestet.
+
+Entschieden: Die Tracking-Abfrage meldet sich mit beidem an
+(`ztKopfzeilen` in `dhl-tracking-xml.ts`, unter Test). Bei 401/403 nennt
+die Meldung jetzt, was zu prüfen ist (Key/Secret, Freischaltung der App
+für „Parcel DE Tracking"), und das Protokoll enthält die Antwort des
+Gateways. Bleibt es nach diesem Fix bei 401, fehlt die Freischaltung im
+DHL Developer Portal — Rückfall dann `DHL_TRACKING_API=unified`.
+Doku: [api-referenz/dhl.md](api-referenz/dhl.md) §3.
+
 ## 2026-11-27 — Anlegen-Helfer: Serversuche, Position ändern, Teil-Kurzanlage, Code-Tabelle, Lücken-Hinweis
 
 Für den Release am 29.11. müssen vier Tastaturen mit Stücklisten, Teilen

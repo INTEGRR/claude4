@@ -63,6 +63,20 @@ function xmlEntitaeten(wert: string): string {
 }
 
 /** Die Anfrage: Anmeldung (GKP-Benutzer) und Sendungsnummern stecken IM XML. */
+/**
+ * Anmeldung am DHL-Gateway für die Tracking-API: der API-Key im Header UND
+ * Key + Secret als Basic Auth (DHL-Doku „Get Access": „API key and API
+ * secret as basic authorization"). Nur mit dem Key-Header antwortet das
+ * Gateway 401 — Befund am ersten echten Label, 2026-11-27. Anders als beim
+ * Labeldruck, wo der Bearer-Token allein gilt.
+ */
+export function ztKopfzeilen(apiKey: string, apiSecret: string): Record<string, string> {
+  return {
+    'DHL-API-Key': apiKey,
+    Authorization: `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}`,
+  }
+}
+
 export function ztAnfrageXml(p: {
   benutzer: string
   passwort: string
