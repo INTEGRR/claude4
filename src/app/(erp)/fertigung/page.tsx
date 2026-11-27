@@ -56,9 +56,11 @@ export default async function FertigungPage({
       lieferung_id: string | null
       lieferung_number: string | null
       missing: number
+      auflage: string | null
     }[]
   >`
     select count(*) over () as gesamt, mo.id, mo.number, variant_display_name(mo.variant_id) as product,
+           auflage_nummern_fertigung(mo.id) as auflage,
            mo.qty_to_produce, mo.qty_produced, mo.state, mo.scheduled_date,
            so.number as sales_order_number, so.id as sales_order_id,
            pv.template_id, lf.id as lieferung_id, lf.number as lieferung_number,

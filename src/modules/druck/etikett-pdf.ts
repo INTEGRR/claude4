@@ -38,6 +38,8 @@ export interface FertigungsetikettDaten {
   shopifyName: string | null
   kunde: string | null
   komponenten: number
+  /** Nummerierte Auflage (0144): „Founders Edition Nr. 17" — steht vorn in der Detailzeile. */
+  auflage?: string | null
 }
 
 export interface ArtikeletikettDaten {
@@ -115,6 +117,7 @@ function seite(format: EtikettFormat, randPt: number, luftPt: number, kinder: Re
 
 function detailText(d: FertigungsetikettDaten): string {
   return [
+    d.auflage || null,
     d.sku ? `SKU ${d.sku}` : null,
     d.termin ? `Termin ${date(d.termin)}` : null,
     d.komponenten > 0 ? `${d.komponenten} Komponente${d.komponenten === 1 ? '' : 'n'}` : null,

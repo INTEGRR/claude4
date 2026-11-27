@@ -228,9 +228,11 @@ Für limitierte Stücke wie die Founders Edition (Nr. 1–96).
 3. **Storno** gibt die Nummer frei; das nächste Stück ohne Nummer bekommt
    sie. Ist die Auflage voll, bleibt ein weiteres Stück ohne Nummer und
    wird gemeldet.
-4. **Sehen:** an der Auftragsposition, am Fertigungsauftrag und auf dem
-   Montagezettel („Nummer: Founders Edition Nr. 17"), als Liste unter
-   `/verkauf/auflagen` (Nummer → Bestellung, Kunde, Artikel, Fertigung).
+4. **Sehen:** an der Auftragsposition; am Fertigungsauftrag groß in der
+   Werkstattanzeige, in der Fertigungsliste, auf dem Montagezettel
+   („Nummer: Founders Edition Nr. 17") und vorn in der Detailzeile des
+   Fertigungsetiketts; als Liste unter `/verkauf/auflagen`
+   (Nummer → Bestellung, Kunde, Artikel, Fertigung).
 
 Tabellen: `auflagen`, `auflage_nummern`; Funktionen
 `auflage_nummern_vergeben()`, `auflage_nummern_text()`,

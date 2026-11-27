@@ -268,7 +268,13 @@ export default async function MoPage({ params }: { params: Promise<{ id: string 
       {/* Werkstattanzeige: die drei Zahlen des Auftrags auf einen Blick. */}
       <div className="display-panel" style={{ marginBottom: 16 }}>
         <div className="display-head">
-          <span>{mo.number}</span>
+          <span>
+            {mo.number}
+            {/* Nummerierte Auflage (0144): die Nummer des Stücks, das hier gebaut wird — groß, damit sie niemand übersieht. */}
+            {mo.auflage && (
+              <strong style={{ marginLeft: 12, fontSize: 18, color: 'var(--display-bright)' }}>{mo.auflage}</strong>
+            )}
+          </span>
           <span>
             <span className={`led ${moLed}`} /> {LABELS.mo[mo.state as keyof typeof LABELS.mo] ?? mo.state}
           </span>

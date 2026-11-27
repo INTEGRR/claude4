@@ -22,6 +22,7 @@ export async function fertigungsetikettDaten(moIds: readonly string[]): Promise<
     select mo.id, mo.number, variant_display_name(mo.variant_id) as produkt, pv.sku,
            mo.qty_to_produce::float8 as menge, u.name as einheit, mo.scheduled_date as termin,
            so.number as auftrag, so.shopify_order_name as "shopifyName", p.name as kunde,
+           auflage_nummern_fertigung(mo.id) as auflage,
            (select count(*) from stock_moves m
              where m.production_id = mo.id and m.reference = 'Komponentenverbrauch'
                and m.state <> 'cancel')::int as komponenten

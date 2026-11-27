@@ -31,6 +31,8 @@ export interface BulkZeile {
   lieferung_id: string | null
   lieferung_number: string | null
   missing: number
+  /** Nummerierte Auflage (0144): „Founders Edition Nr. 17" — null ohne Auflage. */
+  auflage?: string | null
 }
 
 type Stufe = 'auswahl' | 'gedruckt' | 'startet'
@@ -255,7 +257,10 @@ export function FertigungBulk({ rows }: { rows: BulkZeile[] }) {
                 </td>
               )}
               <td className="mono"><Link href={`/fertigung/${r.id}`}>{r.number}</Link></td>
-              <td><Link href={`/produkte/${r.template_id}`}>{r.product}</Link></td>
+              <td>
+                <Link href={`/produkte/${r.template_id}`}>{r.product}</Link>
+                {r.auflage && <> <span className="badge info">{r.auflage}</span></>}
+              </td>
               <td className="num mono">
                 {qty(r.qty_produced)} / {qty(r.qty_to_produce)}
               </td>

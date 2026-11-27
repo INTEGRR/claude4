@@ -192,6 +192,12 @@ describe('Nummerierte Auflage: Nummern in Bestellreihenfolge', () => {
              (select auflage_nummern_fertigung(mo.id) from manufacturing_orders mo where mo.sales_order_id = sol.order_id limit 1) as mo
       from sales_order_lines sol where sol.order_id = ${o.a}`
     assert.deepEqual(text, { zeile: 'Founders Edition Nr. 2, 3', mo: 'Founders Edition Nr. 2, 3' })
+    // Die Nummer steht auch auf dem Fertigungsetikett und dem Montagezettel.
+    const [mo] = await h.sql<{ id: string }[]>`select id from manufacturing_orders where sales_order_id = ${o.b}`
+    const { fertigungsetikettDaten } = await import('../../src/modules/druck/etiketten.ts')
+    const { moZettelDaten } = await import('../../src/modules/fertigung/zettel-daten.ts')
+    assert.equal((await fertigungsetikettDaten([mo.id]))[0].auflage, 'Founders Edition Nr. 1')
+    assert.equal((await moZettelDaten(mo.id))!.mo.auflage, 'Founders Edition Nr. 1')
     // Die Auflage ist voll: das vierte Stück bleibt ohne Nummer und wird gemeldet.
     const s = await abverkaufStand('heute', 'TEST 1800')
     assert.deepEqual(
