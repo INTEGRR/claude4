@@ -9,6 +9,34 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Montage-Übersicht: live, gruppiert nach HE/MX → Plate → Switch
+
+Auslöser (Betreiber): Für den Release-Tag eine Übersicht für die Montage —
+sehen, was sich am Stück bauen lässt (Switches in Plates, HE oder MX).
+„Am Ende muss ich wissen, wie viele HE oder MX, dann jeweils welche Plate,
+dann jeweils welcher Switch." Echtzeit, animiert.
+
+Entschieden:
+- **Quelle sind die offenen Fertigungsaufträge** (bestätigt/laufend, Soll −
+  gebaut) — der Belegstatus bleibt die einzige Wahrheit, kein eigener
+  Zähler. Bestellungen ohne Auftrag (Produkt ohne Route oder Stückliste)
+  erscheinen nicht; dafür gibt es den Hinweis „Anlage unvollständig".
+- **Die Gruppierung ist Daten** (`settings.montage`, Migration 0141):
+  Stichwörter im Produktnamen als oberste Ebene (HE, MX — der Typ steckt im
+  Produktnamen, nicht in einem Attribut), dann Attribute in Reihenfolge
+  (Mounting Plate, Switches). Änderbar auf der Seite über
+  `fertigung.montage_ebenen_setzen`; kein hartkodierter Sonderweg.
+- **Echtzeit durch Abfragen alle vier Sekunden** (`GET /api/montage`), kein
+  neuer Kanal: eine Sammelabfrage über die offenen Aufträge, pausiert bei
+  verdecktem Tab. Bewegung nur als Hilfe (Zahlenlauf, Balken, kurzes
+  Aufleuchten), abschaltbar über die Systemeinstellung „weniger Bewegung".
+- Menüpunkt Fertigung → Montage-Übersicht, Vollbild für die Werkbank.
+
+Umsetzung: `fertigung/montage-logik.ts`, `fertigung/montage.ts`,
+`components/montage-brett.tsx`, Seite `/fertigung/montage`. Tests:
+`tests/montage.test.ts`, `tests/prozesse/montage.test.ts`. Doku:
+[module/fertigung.md](module/fertigung.md) „Montage-Übersicht".
+
 ## 2026-11-27 — Release per Knopfdruck: Verkauf starten/stoppen je Karte, Shop-Projekt in der Produktliste
 
 Auslöser (Betreiber): Die Produktseiten der neuen Tastaturen stehen schon

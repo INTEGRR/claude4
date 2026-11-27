@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { parseQtyMap } from '../../shared/form.ts'
 import { geld, type RegistrierteAktion } from './typen.ts'
 import { ARBEITSPLATZ_ARTEN } from '../../druck/routing.ts'
+import { listeAusText } from '../../fertigung/montage-logik.ts'
 
 /**
  * Aktionen der Fertigung: Fertigungsaufträge, Demontage, Stücklisten,
@@ -243,6 +244,26 @@ export const FERTIGUNG = {
       qty: Number(fd.get('qty') ?? 1) || 1,
     }),
     revalidate: ['/fertigung/stuecklisten'],
+  },
+
+  'fertigung.montage_ebenen_setzen': {
+    label: 'Montage-Übersicht: Gruppierung festlegen',
+    bereich: 'fertigung',
+    beschreibung:
+      'Legt fest, wonach die Montage-Übersicht die offenen Fertigungsmengen gruppiert: zuerst nach ' +
+      'Stichwörtern im Produktnamen (z. B. HE, MX), dann nach Attributen in dieser Reihenfolge ' +
+      '(z. B. Mounting Plate, Switches). Ändert keine Aufträge.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      name_teile: z.array(z.string().trim().min(1).max(40)).max(12).default([]),
+      attribute: z.array(z.string().trim().min(1).max(60)).max(6).default([]),
+    }),
+    formdata: (fd) => ({
+      name_teile: listeAusText(String(fd.get('name_teile') ?? '')),
+      attribute: listeAusText(String(fd.get('attribute') ?? '')),
+    }),
+    revalidate: ['/fertigung/montage'],
   },
 
   'fertigung.stueckliste_kopieren': {

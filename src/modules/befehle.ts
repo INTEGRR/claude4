@@ -36,6 +36,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/kommissionieren', label: 'Kommissionieren (Ware sammeln)', area: 'versand', prozess: ['versand'] },
   { href: '/versand/retouren', label: 'Retouren (Rücksendungen prüfen, Retourenlabel)', area: 'versand', prozess: ['versand'] },
   { href: '/fertigung', label: 'Fertigungsaufträge', area: 'fertigung', prozess: ['fertigung'] },
+  { href: '/fertigung/montage', label: 'Montage-Übersicht (live: was noch zu bauen ist, gruppiert)', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/fertigung/stuecklisten', label: 'Stücklisten', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/fertigung/arbeitsplaetze', label: 'Arbeitsplätze', area: 'fertigung', prozess: ['fertigung'] },
   { href: '/einkauf/cockpit', label: 'Einkaufs-Cockpit (was heute ansteht, je Einkäufer)', area: 'einkauf', prozess: ['einkauf'] },

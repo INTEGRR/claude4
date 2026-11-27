@@ -449,6 +449,20 @@ export async function stuecklistePositionHinzufuegen(
  * die Komponente — in einer Transaktion, damit nie eine Position ohne ihre
  * Zuordnung dasteht (sie gälte dann für alle Varianten).
  */
+/** Gruppierung der Montage-Übersicht (0141) — eine Einstellung, keine Aufträge. */
+export async function montageEbenenSetzen(
+  p: { name_teile: string[]; attribute: string[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  await sql`
+    insert into settings (key, value) values ('montage', ${sql.json({ name_teile: p.name_teile, attribute: p.attribute })})
+    on conflict (key) do update set value = excluded.value`
+  const ebenen = [p.name_teile.length ? `Name (${p.name_teile.join(' / ')})` : null, ...p.attribute].filter(Boolean)
+  await sql`select log_event('settings', gen_random_uuid(), 'note',
+    ${`Montage-Übersicht gruppiert nach: ${ebenen.join(' → ') || 'Produkt'}`}, ${ctx.actor})`
+  return { text: `Gruppierung: ${ebenen.join(' → ') || 'nach Produkt'}.` }
+}
+
 export async function stuecklistePositionAendern(
   p: { line_id: string; qty: number; ptav_ids: string[]; component_variant_id?: string },
   ctx: AktionsKontext,

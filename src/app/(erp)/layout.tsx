@@ -238,6 +238,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items: sees('fertigung') && prozessAktiv('fertigung')
         ? [
             { href: '/fertigung', label: 'Fertigungsaufträge', count: counts.offene_mos },
+            { href: '/fertigung/montage', label: 'Montage-Übersicht' },
             { href: '/fertigung/stuecklisten', label: 'Stücklisten' },
             { href: '/fertigung/arbeitsplaetze', label: 'Arbeitsplätze' },
           ]

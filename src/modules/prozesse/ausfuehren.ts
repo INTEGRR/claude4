@@ -200,6 +200,7 @@ export const AUSFUEHRUNG = {
   'fertigung.stueckliste_anlegen': fertigung.stuecklisteAnlegen,
   'fertigung.stueckliste_kopieren': fertigung.stuecklisteKopieren,
   'fertigung.stueckliste_position_hinzufuegen': fertigung.stuecklistePositionHinzufuegen,
+  'fertigung.montage_ebenen_setzen': fertigung.montageEbenenSetzen,
   'fertigung.stueckliste_position_aendern': fertigung.stuecklistePositionAendern,
   'fertigung.stueckliste_position_entfernen': fertigung.stuecklistePositionEntfernen,
   'fertigung.stueckliste_verbrauch': fertigung.stuecklisteVerbrauch,

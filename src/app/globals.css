@@ -2284,3 +2284,61 @@ label.field > span.auswahl {
 .ki-msg .ki-anhang.gross img { width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
 .ki-input.ziehen .composer { border-color: var(--accent); box-shadow: var(--shadow-lift); }
 .ki-input.ziehen .composer input::placeholder { color: var(--accent-text); }
+
+/* --- Montage-Übersicht (0141): das Brett für die Werkbank ------------------- */
+.montage-brett { display: grid; gap: 16px; background: var(--bg); }
+.montage-brett:fullscreen { padding: 28px; overflow: auto; align-content: start; }
+.montage-zahl { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.montage-kopf { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; }
+.montage-gesamt {
+  display: grid; gap: 2px; padding: 14px 20px; min-width: 190px;
+  background: var(--display); color: var(--display-bright);
+  border: 1px solid var(--display-line); border-radius: 10px;
+}
+.montage-gesamt .montage-zahl { font-size: clamp(44px, 6vw, 84px); font-weight: 650; line-height: 1; letter-spacing: -0.02em; }
+.montage-gesamt.fertig .montage-zahl { color: var(--success); }
+.montage-kopf-titel { font-size: 13px; font-weight: 500; color: var(--display-text); }
+.montage-kopf-neben { font-size: 12.5px; color: var(--display-text); }
+.montage-live { margin-left: auto; display: flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 12.5px; color: var(--text-muted); }
+.montage-punkt { width: 9px; height: 9px; border-radius: 50%; background: var(--success); animation: montage-atmen 1.8s ease-in-out infinite; }
+.montage-punkt.aus { background: var(--warn); animation: none; }
+.montage-leer { padding: 40px 0; text-align: center; color: var(--text-muted); font-size: 16px; }
+.montage-buendel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.montage-chip {
+  padding: 6px 12px; border-radius: 999px; font-size: 13.5px;
+  background: var(--surface); border: 1px solid var(--border);
+  transition: border-color 0.4s, background 0.4s;
+}
+.montage-chip strong { color: var(--accent-text); }
+.montage-spalten { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+.montage-spalte { display: grid; gap: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.montage-spalte-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
+.montage-spalte-name { font-size: clamp(22px, 2.6vw, 34px); font-weight: 650; letter-spacing: -0.01em; }
+.montage-spalte-kopf .montage-zahl { font-size: clamp(34px, 4vw, 56px); font-weight: 650; line-height: 1; }
+.montage-gruppe { display: grid; gap: 8px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; transition: border-color 0.4s; }
+.montage-gruppe > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.montage-gruppe-name { font-size: 17px; font-weight: 600; }
+.montage-gruppe > header .montage-zahl { font-size: 24px; font-weight: 650; }
+.montage-blaetter { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.montage-blatt { display: grid; grid-template-columns: minmax(120px, 1.2fr) 2fr auto; align-items: center; gap: 10px; padding: 3px 6px; border-radius: 6px; }
+.montage-blatt-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.montage-blatt .montage-zahl { font-size: 18px; font-weight: 600; min-width: 2.4ch; text-align: right; }
+.montage-balken { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--border) 55%, transparent); overflow: hidden; }
+.montage-balken > span { display: block; height: 100%; border-radius: 6px; background: var(--accent); transition: width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.montage-einstellung { margin-top: 18px; }
+.montage-einstellung > summary { cursor: pointer; color: var(--text-muted); margin-bottom: 10px; }
+.puls-mehr { animation: montage-mehr 1.5s ease-out; }
+.puls-weniger { animation: montage-weniger 1.5s ease-out; }
+@keyframes montage-mehr {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); background-color: var(--accent-soft); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+@keyframes montage-weniger {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 70%, transparent); background-color: var(--success-soft); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+@keyframes montage-atmen { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+@media (prefers-reduced-motion: reduce) {
+  .puls-mehr, .puls-weniger, .montage-punkt { animation: none; }
+  .montage-balken > span { transition: none; }
+}

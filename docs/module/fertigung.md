@@ -148,6 +148,35 @@ Beides sind prozessfreie Registry-Werkzeuge durch den Torwächter (wie der
 Label-Massendruck im Versand): Bulk ist Bedienkomfort über den
 bestehenden Einzelaktionen, kein zweiter Statusweg.
 
+## Montage-Übersicht (seit 2026-11-27, Migration 0141)
+
+**Fertigung → Montage-Übersicht** (`/fertigung/montage`) ist das Brett für
+die Werkbank am Release-Tag: was noch zu bauen ist, live und gruppiert,
+damit die Montage Gleiches am Stück vorbereitet („10 × HE · FR4 · Jade
+Max" — Switches in die Plate).
+
+- **Quelle ist der Belegstatus:** bestätigte und laufende
+  Fertigungsaufträge, je Variante Soll − gebaut. Entwürfe, erledigte und
+  stornierte Aufträge zählen nicht. Dazu „Heute fertig" (heute fertig
+  gemeldete Stück). Ohne Routen „Fertigen"/„Auf Bestellung" und ohne
+  Stückliste entsteht aus einer Bestellung kein Auftrag — dann bleibt das
+  Brett leer (Hinweis „Anlage unvollständig" am Produkt).
+- **Gruppierung als Einstellung** (`settings.montage`, Aktion
+  `fertigung.montage_ebenen_setzen`, auf der Seite unter „Gruppierung
+  ändern"): zuerst Stichwörter im Produktnamen (Standard `HE`, `MX` — als
+  eigenes Wort, sonst „Sonstige"), dann Attribute in dieser Reihenfolge
+  (Standard `Mounting Plate`, `Switches`). Farben und Keycaps zählen
+  zusammen, solange sie keine Ebene sind.
+- **Darstellung:** je Stichwort eine Spalte mit Summe, darin je Plate ein
+  Kasten, darin je Switch ein Balken; darüber die größten Bündel. Alle vier
+  Sekunden fragt die Seite `GET /api/montage` ab (nur lesend, Zugriff
+  Fertigung): Zahlen laufen auf den neuen Wert, Balken wachsen, Geändertes
+  leuchtet kurz (mehr = orange, weniger = grün). „Live" wird zur Warnung,
+  wenn der Stand älter als 20 Sekunden ist. Vollbild-Knopf für den
+  Bildschirm an der Werkbank.
+- Rein und getestet: `fertigung/montage-logik.ts` (`tests/montage.test.ts`),
+  Abfrage `fertigung/montage.ts` (`tests/prozesse/montage.test.ts`).
+
 ## Abnahmekriterien
 
 1. BoM „Tastatur" mit 20 Positionen, davon Gehäuse-Zeilen je Farbe gefiltert: MO für „Weiß" enthält genau die weiße Gehäuse-Zeile + alle ungefilterten Zeilen; MO für „Schwarz" entsprechend.
