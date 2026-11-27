@@ -461,6 +461,13 @@ Schnittstellen → Shopify): **Probelauf**. KRNL arbeitet, als wäre es scharf
 — Bestandsabgleich, Versandmeldungen, Made-to-Order-Einrichtung,
 Produkt-Push —, sendet aber **nichts**:
 
+- **Einzige Ausnahme (seit 2026-11-27): Webhook-Abos.** „Webhooks
+  registrieren" geht auch im Probelauf wirklich an den Shop
+  (`imProbelaufErlaubt` in `shopify-modus.ts`): ein Abo ändert im Shop
+  nichts, richtet aber den Eingang ein — Bestellungen, Stornos,
+  Bestands- und Produktänderungen und der Fulfillment-Halt kommen dann in
+  Sekunden statt über den viertelstündlichen Abgleich. In „nur lesen"
+  bleibt die Registrierung gesperrt.
 - **Eine Naht**: `shopifyGraphQL()` sendet im Probelauf keine Mutation,
   sondern protokolliert sie als „würde senden" (`api_transactions`, kind
   `probe:<operation>`, mit allen Variablen) und wirft `ShopifyProbelauf`;

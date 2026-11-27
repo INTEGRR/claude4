@@ -65,7 +65,7 @@ export const INTEGRATIONEN = {
     beschreibung:
       'Legt die Webhook-Abos (Bestellungen, Stornos, Bestände) im Shop an bzw. zieht sie auf die ' +
       'angegebene öffentliche Adresse um — danach kommen Änderungen sekundenschnell statt über ' +
-      'den viertelstündlichen Abgleich. Im Lesemodus gesperrt (Shopify-Mutation).',
+      'den viertelstündlichen Abgleich. Im Modus „nur lesen" gesperrt; im Probelauf erlaubt (ändert im Shop nichts).',
     bindung: 'frei',
     schema: z.object({
       url: z

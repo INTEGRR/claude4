@@ -119,7 +119,12 @@ export async function produktAendern(
       country_of_origin = ${p.country_of_origin ?? null},
       sale_tax_id = ${p.sale_tax_id ?? null},
       purchase_tax_id = ${p.purchase_tax_id ?? null},
-      description_sale = ${p.description_sale ?? null},
+      -- Unverändert lassen, wenn sich nur Leerraum unterscheidet: das Formular
+      -- gibt die Shop-Beschreibung (HTML) ohne ihre Zeilenumbrüche zurück.
+      description_sale = case
+        when regexp_replace(btrim(coalesce(description_sale, '')), '[[:space:]]+', ' ', 'g')
+           = regexp_replace(btrim(coalesce(${p.description_sale ?? null}, '')), '[[:space:]]+', ' ', 'g')
+        then description_sale else ${p.description_sale ?? null} end,
       description_purchase = ${p.description_purchase ?? null},
       description_picking = ${p.description_picking ?? null},
       responsible_id = ${p.responsible_id ?? null},

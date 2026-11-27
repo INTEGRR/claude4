@@ -323,8 +323,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               />
             </label>
             <label className="field" style={{ flex: 2 }}>
-              <span>Belegtext Verkauf</span>
-              <input name="description_sale" defaultValue={tpl.description_sale ?? ''} />
+              <span>Belegtext Verkauf{imShop ? ' (= Beschreibung im Shop)' : ''}</span>
+              <textarea name="description_sale" rows={2} defaultValue={tpl.description_sale ?? ''} />
             </label>
           </div>
           <div className="row" style={{ alignItems: 'flex-end' }}>

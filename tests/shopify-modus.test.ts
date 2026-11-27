@@ -7,7 +7,31 @@
 import test, { after, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { closeDb, withRollback } from './helpers.ts'
-import { istMutation, shopifyModus } from '../src/modules/integrationen/shopify-modus.ts'
+import { imProbelaufErlaubt, istMutation, shopifyModus } from '../src/modules/integrationen/shopify-modus.ts'
+
+describe('Shopify-Modus: Ausnahme im Probelauf', () => {
+  const anlegen = `mutation anlegen($topic: WebhookSubscriptionTopic!, $sub: WebhookSubscriptionInput!) {
+    webhookSubscriptionCreate(topic: $topic, webhookSubscription: $sub) { userErrors { message } } }`
+  const umziehen = `mutation aktualisieren($id: ID!, $sub: WebhookSubscriptionInput!) {
+    webhookSubscriptionUpdate(id: $id, webhookSubscription: $sub) { userErrors { message } } }`
+
+  test('Webhook-Abos anlegen und umziehen gehen im Probelauf hinaus', () => {
+    assert.equal(imProbelaufErlaubt(anlegen), true)
+    assert.equal(imProbelaufErlaubt(umziehen), true)
+  })
+
+  test('alles andere bleibt gesperrt — auch im Windschatten eines Webhook-Abos', () => {
+    assert.equal(imProbelaufErlaubt('mutation m($i: [InventorySetQuantityInput!]!) { inventorySetQuantities(input: $i) { userErrors { message } } }'), false)
+    assert.equal(imProbelaufErlaubt('mutation l($id: ID!) { webhookSubscriptionDelete(id: $id) { userErrors { message } } }'), false)
+    assert.equal(imProbelaufErlaubt('query { webhookSubscriptions(first: 5) { nodes { id } } }'), false)
+    assert.equal(
+      imProbelaufErlaubt(`mutation m($t: WebhookSubscriptionTopic!, $s: WebhookSubscriptionInput!, $p: ProductInput!) {
+        webhookSubscriptionCreate(topic: $t, webhookSubscription: $s) { userErrors { message } }
+        productUpdate(input: $p) { userErrors { message } } }`),
+      false,
+    )
+  })
+})
 
 describe('Shopify-Modus: Einstellung', () => {
   test('ohne Eintrag gilt „lesen" — Zugangsdaten allein schalten nichts scharf', async () => {

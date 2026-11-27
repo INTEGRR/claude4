@@ -143,7 +143,9 @@ export const PRODUKTE = {
       country_of_origin: z.string().max(2).optional(),
       sale_tax_id: z.string().optional(),
       purchase_tax_id: z.string().optional(),
-      description_sale: z.string().max(2000).optional(),
+      // Bei Shop-Produkten steht hier die Shop-Beschreibung (HTML, oft viele
+      // tausend Zeichen) — die Grenze darf das Speichern von Routen nicht verhindern.
+      description_sale: z.string().max(100_000).optional(),
       description_purchase: z.string().max(2000).optional(),
       description_picking: z.string().max(2000).optional(),
       responsible_id: z.string().optional(),

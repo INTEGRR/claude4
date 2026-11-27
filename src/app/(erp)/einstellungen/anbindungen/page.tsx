@@ -198,7 +198,9 @@ export default async function SchnittstellenPage() {
               <span>
                 <strong>Probelauf (Staging)</strong> — KRNL arbeitet, als wäre es scharf (Bestandsabgleich,
                 Versandmeldungen, Made-to-Order-Einrichtung), sendet aber <strong>nichts</strong>: unten rechts zeigt
-                eine Debug-Box live, was an Shopify gegangen wäre. Zum Testen vor dem Scharfschalten.
+                eine Debug-Box live, was an Shopify gegangen wäre. Zum Testen vor dem Scharfschalten. Einzige
+                Ausnahme: die Webhooks unten lassen sich schon registrieren — sie ändern im Shop nichts, Bestellungen
+                kommen damit in Sekunden statt alle 15 Minuten.
               </span>
             </label>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -253,7 +255,7 @@ export default async function SchnittstellenPage() {
         <p className="small muted" style={{ margin: '8px 0 0' }}>
           Mit Webhooks landen Bestellungen, Stornos/Erstattungen und Bestandsänderungen sekundenschnell
           im ERP (Ziel <span className="mono">/api/webhooks/shopify</span>); der Abgleich bleibt Sicherheitsnetz.
-          Braucht eine öffentliche https-Adresse und den Modus „schreiben". Produkte werden über die SKU
+          Braucht eine öffentliche https-Adresse und den Modus „Probelauf" oder „schreiben". Produkte werden über die SKU
           zugeordnet — die SKU der Variante muss der Shopify-SKU entsprechen.
         </p>
         <Variablen stand={stand.shopify} />

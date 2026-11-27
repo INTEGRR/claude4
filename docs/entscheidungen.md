@@ -9,6 +9,43 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Webhooks lassen sich schon im Probelauf registrieren
+
+Auslöser: Zwei Tage vor dem Release ist in Produktion kein Webhook
+registriert (kein einziges Ereignis je angekommen) — Bestellungen kommen
+nur über den viertelstündlichen Abgleich. Die Registrierung war an den
+Modus „schreiben" gebunden; der Shop steht bis zum Stichtag im Probelauf.
+Der Release-Schutz (Buch je Angebot, Überverkaufs-Wächter) braucht die
+Bestellung aber in Sekunden, und der Eingang soll vor dem Scharfschalten
+echt getestet sein.
+
+Entschieden: Im Probelauf gehen genau zwei Mutationen wirklich hinaus —
+`webhookSubscriptionCreate` und `webhookSubscriptionUpdate`. Ein Abo
+ändert im Shop weder Produkte noch Bestände noch Bestellungen; es richtet
+nur den Eingang ein, den KRNL im Probelauf ohnehin liest. Alles andere
+bleibt „würde senden". Erkannt wird streng (einzige Operation im
+Dokument, `imProbelaufErlaubt` in `shopify-modus.ts`, unter Test); „nur
+lesen" bleibt vollständig zu. Revidiert insoweit den Eintrag 2026-09-18
+(„Probelauf sendet nichts"). Doku: [module/integrationen.md](module/integrationen.md)
+„Probelauf vor dem Scharfschalten".
+
+## 2026-11-27 — Produkt speichern: Shop-Beschreibung darf lang sein und bleibt unangetastet
+
+Auslöser: Beim NATIVE 1800 ließen sich die Routen nicht speichern —
+„description_sale: Zu groß: erwartet ≤ 2000 Zeichen". Das Feld
+„Belegtext Verkauf" trägt bei Shop-Produkten die Shop-Beschreibung (HTML
+aus dem Produktimport, geht beim Produkt-Push wieder an den Shop) und ist
+dort oft viele tausend Zeichen lang. Das Produktformular schickt es bei
+jedem Speichern mit.
+
+Entschieden: Die Grenze für `description_sale` liegt bei 100.000 Zeichen.
+Unterscheidet sich der abgeschickte Text nur im Leerraum vom gespeicherten
+(das Formular gibt HTML ohne die ursprünglichen Zeilenumbrüche zurück),
+bleibt der gespeicherte Text Zeichen für Zeichen stehen — wer Routen
+speichert, ändert nicht nebenbei die Shop-Beschreibung. Das Feld ist ein
+mehrzeiliges Textfeld und heißt bei Shop-Produkten „(= Beschreibung im
+Shop)". Test: `tests/prozesse/anlegen-helfer.test.ts`.
+
 ## 2026-11-27 — DHL-Tracking: Anmeldung am Gateway mit Key und Secret
 
 Auslöser: Das erste echte Label in Produktion kam, die Sendungsverfolgung

@@ -1,6 +1,6 @@
 import 'server-only'
 import { sql } from '@/db/client'
-import { istMutation, shopifyModus } from './shopify-modus'
+import { imProbelaufErlaubt, istMutation, shopifyModus } from './shopify-modus'
 
 export { verifyWebhookHmac } from './shopify-hmac'
 export { type ShopifyModus, shopifyModus } from './shopify-modus'
@@ -193,7 +193,7 @@ export async function shopifyGraphQL<T>(
   // damit der Wächter ohne Zugangsdaten und ohne Netz testbar ist; hinter
   // dem Fake, weil der Fake keinen Shop hat, den es zu schützen gäbe.
   const modus = istMutation(query) ? await shopifyModus(sql) : null
-  if (modus === 'probe') {
+  if (modus === 'probe' && !imProbelaufErlaubt(query)) {
     const operation = operationName(query)
     const { logTransaction } = await import('./transaktionen')
     await logTransaction({
@@ -202,7 +202,7 @@ export async function shopifyGraphQL<T>(
     })
     throw new ShopifyProbelauf(operation)
   }
-  if (modus !== null && modus !== 'schreiben') {
+  if (modus !== null && modus !== 'schreiben' && modus !== 'probe') {
     const operation = operationName(query)
     const { logTransaction } = await import('./transaktionen')
     await logTransaction({

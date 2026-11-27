@@ -130,6 +130,28 @@ describe('Teil mit Einheit, Preis und Route anlegen (A4)', () => {
   })
 })
 
+describe('Produkt speichern mit langer Shop-Beschreibung', () => {
+  const basis = { name: 'Board B', list_price: 199, can_be_sold: true, route_manufacture: true, route_mto: true }
+
+  test('Routen lassen sich speichern; die Beschreibung bleibt Zeichen für Zeichen', async () => {
+    const html = `<p>${'Lange Beschreibung aus dem Shop. '.repeat(300)}</p>\n<ul>\n  <li>Punkt</li>\n</ul>`
+    assert.ok(html.length > 2000)
+    await h.sql`update product_templates set description_sale = ${html} where id = ${v.b}`
+    // Das Formular liefert den Text ohne Zeilenumbrüche zurück.
+    await aktion('produkte.produkt_aendern', v.b, { ...basis, description_sale: html.replace(/\s+/g, ' ') })
+    const [t] = await h.sql<{ description_sale: string; route_mto: boolean }[]>`
+      select description_sale, route_mto from product_templates where id = ${v.b}`
+    assert.equal(t.route_mto, true)
+    assert.equal(t.description_sale, html, 'nur Leerraum anders → gespeicherter Text bleibt')
+  })
+
+  test('ein wirklich geänderter Text wird übernommen', async () => {
+    await aktion('produkte.produkt_aendern', v.b, { ...basis, description_sale: 'Neuer Text' })
+    const [t] = await h.sql<{ description_sale: string }[]>`select description_sale from product_templates where id = ${v.b}`
+    assert.equal(t.description_sale, 'Neuer Text')
+  })
+})
+
 describe('Artikelnummern und Barcodes in einer Tabelle (A5)', () => {
   const varianten = () =>
     h.sql<{ id: string; sku: string | null; barcode: string | null }[]>`
