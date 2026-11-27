@@ -9,6 +9,21 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — KI-Chat läuft der Antwort wieder nach
+
+Auslöser (Betreiber): „Der KI-Chat scrollt nicht automatisch runter."
+Ursache: Seit BUG/00009 wurde bei jedem Textstück neu gemessen, ob man
+„noch am Ende" steht (140 px Toleranz) — und zwar vor dem Zeichnen. Kam
+ein hohes Stück auf einmal (Tabelle, Diagramm, Vorschlagskarte), lag das
+Ende danach weiter weg als die Toleranz, und der Chat blieb stehen.
+
+Entschieden: Mitlaufen ist ein Zustand, kein Messwert. Der Chat folgt der
+Antwort, bis der Benutzer selbst nach oben scrollt (Scroll-Ereignis), und
+wieder, sobald er ans Ende zurückkehrt oder eine neue Frage stellt.
+Gescrollt wird nach dem Zeichnen (Effekt auf Verlauf und Status), wenn die
+neue Höhe feststeht. BUG/00009 bleibt gewahrt: wer oben liest, wird nicht
+weggerissen. Umsetzung: `src/app/(erp)/ki/chat.tsx`.
+
 ## 2026-11-27 — Variante als eigenes Produkt herauslösen (Shop-Struktur ≠ Lager-Struktur)
 
 Auslöser: Der Cherry „Silent Red" steht in Shopify als Variante des

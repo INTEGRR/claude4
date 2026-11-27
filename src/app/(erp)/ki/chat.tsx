@@ -955,9 +955,8 @@ export function KiChat({
   }
 
   /**
-   * Liest man gerade weiter oben, darf die laufende Antwort die Position
-   * nicht klauen (BUG/00009) — gescrollt wird nur, wenn man ohnehin (fast)
-   * am Ende steht. Im Slide-out scrollt .ki-messages, auf /ki die Seite.
+   * Steht man (fast) am Ende des Verlaufs? Im Slide-out scrollt
+   * .ki-messages, auf /ki die Seite.
    */
   function amEnde(): boolean {
     const el = verlauf.current
@@ -967,6 +966,34 @@ export function KiChat({
     const doc = document.documentElement
     return window.innerHeight + window.scrollY >= doc.scrollHeight - 140
   }
+
+  /**
+   * Mitlaufen (2026-11-27): der Chat folgt der Antwort, bis man selbst nach
+   * oben scrollt — und wieder, sobald man ans Ende zurückkehrt oder eine
+   * neue Frage stellt. Vorher wurde bei jedem Textstück neu gemessen, ob man
+   * „noch am Ende" steht: ein hohes Stück (Tabelle, Diagramm, Vorschlag)
+   * schob das Ende weiter als die Toleranz weg, und der Chat blieb stehen.
+   * Jetzt entscheidet nur noch eine echte Scroll-Bewegung des Benutzers
+   * (BUG/00009 bleibt gewahrt: wer oben liest, wird nicht weggerissen).
+   */
+  const folgen = useRef(true)
+  useEffect(() => {
+    const beiScroll = () => {
+      folgen.current = amEnde()
+    }
+    const el = verlauf.current
+    el?.addEventListener('scroll', beiScroll, { passive: true })
+    window.addEventListener('scroll', beiScroll, { passive: true })
+    return () => {
+      el?.removeEventListener('scroll', beiScroll)
+      window.removeEventListener('scroll', beiScroll)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // Nach jedem Zeichnen mit neuem Inhalt ans Ende — erst jetzt steht die neue Höhe fest.
+  useEffect(() => {
+    if (folgen.current) bottomRef.current?.scrollIntoView({ block: 'end' })
+  }, [msgs, status])
 
   // Solange die Antwort läuft, den Bildschirm wachhalten: das Display, das
   // sich abschaltet, ist der häufigste Grund für den Abriss (BUG/00010).
@@ -1014,7 +1041,8 @@ export function KiChat({
       { role: 'user' as const, text, ...leer, ...(dateien.length ? { anhaenge: dateien } : {}) },
     ]
     setMsgs([...history, { role: 'assistant', text: '', ...leer }])
-    // Zur eigenen Frage springen — ab da entscheidet amEnde().
+    // Zur eigenen Frage springen und der Antwort folgen, bis der Benutzer selbst hochscrollt.
+    folgen.current = true
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }))
 
     const patchLast = (fn: (m: Msg) => Msg) =>
@@ -1045,7 +1073,6 @@ export function KiChat({
       for (;;) {
         const { done, value } = await reader.read()
         if (done) break
-        const warAmEnde = amEnde()
         buffer += decoder.decode(value, { stream: true })
         const zeilen = buffer.split('\n')
         buffer = zeilen.pop() ?? ''
@@ -1072,7 +1099,6 @@ export function KiChat({
           if (ev.type === 'error') patchLast((m) => ({ ...m, text: m.text + '\n\n' + ev.text }))
           if (ev.type === 'done') setStatus(null)
         }
-        if (warAmEnde) bottomRef.current?.scrollIntoView({ block: 'end' })
       }
     } catch {
       // Stream abgerissen (Netz weg, PWA im Hintergrund eingefroren): die
