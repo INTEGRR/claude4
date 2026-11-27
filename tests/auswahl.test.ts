@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { type AuswahlOption, filtern, normalisieren, startwert } from '../src/components/auswahl-logik.ts'
+import { NACHLADE_ARTEN, suchWoerter } from '../src/modules/shared/auswahl-suche.ts'
 
 /**
  * Auswahlbox statt <select> (Betreiber 2026-10-02: „Dropdowns müssen eine
@@ -174,5 +175,25 @@ describe('Kurzanlage: Kontakt aus einem Namensfeld', async () => {
   test('Kunde als Firma und ohne Namen', () => {
     assert.equal((kontaktAusKurzanlage('kunde', { name: 'ACME GmbH', art: 'firma' }) as { is_company: boolean }).is_company, true)
     assert.deepEqual(kontaktAusKurzanlage('kunde', { name: '   ' }), { fehler: 'Bitte einen Namen angeben' })
+  })
+})
+
+// --- Serversuche (A2) ----------------------------------------------------------
+
+
+describe('Serversuche der Auswahlfelder (A2)', () => {
+  test('Suchwörter: ab zwei Zeichen, höchstens sechs Wörter, Kleinbuchstaben', () => {
+    assert.deepEqual(suchWoerter('a'), [], 'ein Zeichen sucht nicht')
+    assert.deepEqual(suchWoerter('  PCB   Native '), ['pcb', 'native'])
+    assert.equal(suchWoerter('a b c d e f g h').length, 6)
+  })
+
+  test('jedes Auswahlfeld mit nachladen nennt eine bekannte Art', () => {
+    const verwendet = new Set<string>()
+    for (const datei of dateien(join(SRC, 'app'))) {
+      for (const m of readFileSync(datei, 'utf8').matchAll(/nachladen="([^"]+)"/g)) verwendet.add(m[1])
+    }
+    assert.ok(verwendet.size > 0, 'die Serversuche ist eingebaut')
+    for (const art of verwendet) assert.ok((NACHLADE_ARTEN as readonly string[]).includes(art), `Art „${art}" unbekannt`)
   })
 })

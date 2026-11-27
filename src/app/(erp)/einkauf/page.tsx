@@ -106,7 +106,7 @@ export default async function EinkaufPage({
                 <div className="row">
                   <label className="field" style={{ flex: 3 }}>
                     <span>Lieferant</span>
-                    <Auswahl kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
+                    <Auswahl nachladen="lieferant" kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
                       <option value="" disabled>— auswählen —</option>
                       {vendors.map((v) => (
                         <option key={v.id} value={v.id}>{v.name}</option>

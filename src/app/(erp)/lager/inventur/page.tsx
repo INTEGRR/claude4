@@ -52,7 +52,7 @@ export default async function InventurPage() {
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Produkt</span>
-              <Auswahl name="variant_id" required defaultValue="">
+              <Auswahl nachladen="variante-ware" name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>

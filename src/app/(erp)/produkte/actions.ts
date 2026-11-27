@@ -40,6 +40,12 @@ export async function setVariantCodes(variantId: string, formData: FormData): Pr
   return ergebnis
 }
 
+export async function setVariantenCodes(templateId: string, formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('produkte.varianten_codes', { recordId: templateId, formData })
+  outboxAnstossen()
+  return ergebnis
+}
+
 export async function createAttribute(formData: FormData): Promise<ActionResult> {
   return serverAktion('produkte.attribut_anlegen', { formData })
 }

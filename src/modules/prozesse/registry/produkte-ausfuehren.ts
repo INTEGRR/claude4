@@ -1,4 +1,4 @@
-import { sql } from '@/db/client'
+import { sql, tx } from '@/db/client'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { type ProduktEingabe, produktAnlegen } from '../../ki/produkt-anlegen.ts'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
@@ -178,6 +178,65 @@ export async function varianteCodes(
     select template_id from product_variants where id = ${variantId}`
   await shopifyNachziehen(variant.template_id)
   return { recordId: variant.template_id }
+}
+
+/**
+ * SKU und EAN aller Varianten in einer Tabelle (A5). Geändert wird nur, was
+ * sich unterscheidet; in zwei Schritten (erst leeren, dann setzen), damit
+ * auch ein Tausch zweier Nummern an der Eindeutigkeit vorbeikommt.
+ */
+export async function variantenCodes(
+  p: { zeilen: { variant_id: string; sku?: string; barcode?: string }[] },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const templateId = ctx.recordId!
+  for (const feld of ['sku', 'barcode'] as const) {
+    const gesehen = new Set<string>()
+    for (const z of p.zeilen) {
+      const wert = z[feld]
+      if (!wert) continue
+      if (gesehen.has(wert)) {
+        throw new Error(`${feld === 'sku' ? 'Artikelnummer' : 'Barcode'} „${wert}" steht zweimal in der Tabelle`)
+      }
+      gesehen.add(wert)
+    }
+  }
+
+  const geaendert = await tx(async (t) => {
+    const stand = await t<{ id: string; sku: string | null; barcode: string | null }[]>`
+      select id, sku, barcode from product_variants where template_id = ${templateId} for update`
+    const jetzt = new Map(stand.map((v) => [v.id, v]))
+    const neu = p.zeilen.filter((z) => {
+      const v = jetzt.get(z.variant_id)
+      if (!v) throw new Error('Eine Variante gehört nicht zu diesem Produkt')
+      return (v.sku ?? '') !== (z.sku ?? '') || (v.barcode ?? '') !== (z.barcode ?? '')
+    })
+    if (neu.length === 0) return 0
+
+    const ids = neu.map((z) => z.variant_id)
+    for (const [feld, name] of [['sku', 'Artikelnummer'], ['barcode', 'Barcode']] as const) {
+      const werte = neu.map((z) => z[feld]).filter((w): w is string => !!w)
+      if (werte.length === 0) continue
+      const [fremd] = await t<{ wert: string; name: string }[]>`
+        select ${t(feld)} as wert, variant_display_name(id) as name from product_variants
+        where ${t(feld)} = any(${werte}) and id <> all(${ids}::uuid[]) limit 1`
+      if (fremd) throw new Error(`${name} „${fremd.wert}" ist bereits vergeben (${fremd.name})`)
+    }
+    await t`update product_variants set sku = null, barcode = null where id = any(${ids}::uuid[])`
+    for (const z of neu) {
+      await t`update product_variants set sku = ${z.sku ?? null}, barcode = ${z.barcode ?? null}
+              where id = ${z.variant_id}`
+    }
+    await t`select log_event('product_template', ${templateId}, 'note',
+      ${`Artikelnummern/Barcodes von ${plural(neu.length, 'Variante', 'Varianten')} geändert`}, ${ctx.actor})`
+    return neu.length
+  })
+
+  if (geaendert > 0) await shopifyNachziehen(templateId)
+  return {
+    recordId: templateId,
+    text: geaendert === 0 ? 'Keine Änderung.' : `${plural(geaendert, 'Variante', 'Varianten')} gespeichert.`,
+  }
 }
 
 export async function attributAnlegen(p: {

@@ -9,6 +9,59 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Anlegen-Helfer: Serversuche, Position ändern, Teil-Kurzanlage, Code-Tabelle, Lücken-Hinweis
+
+Für den Release am 29.11. müssen vier Tastaturen mit Stücklisten, Teilen
+und Artikelnummern angelegt werden (Plan:
+[release-neue-produkte.md](release-neue-produkte.md), Pakete A2–A6). Fünf
+Stellen haben das Anlegen gebremst oder still Fehler erzeugt.
+
+**Entschieden:**
+
+- **A2 — Auswahlfelder suchen auf dem Server.** Die Listen für Varianten,
+  Kunden und Lieferanten laden weiter höchstens 500 Einträge vor; wer
+  tippt, sucht ab zwei Zeichen zusätzlich in **allen** Einträgen
+  (`GET /api/auswahl`, nur angemeldet, höchstens 40 Treffer, jedes Wort
+  muss in Name, Artikelnummer oder Barcode bzw. Name, Ort oder E-Mail
+  vorkommen). Kein neues Bauteil: `<Auswahl nachladen="variante">`. Warum
+  nicht „alles laden": 413 Varianten heute, mit dem Release deutlich mehr —
+  die Seite würde mit jeder Variante schwerer, und über der Grenze entstehen
+  Dubletten, weil das Teil „nicht da" ist. Die Suche ist eine Lese-Route,
+  keine Aktion. Wächter: jede `nachladen`-Art muss bekannt sein
+  (`tests/auswahl.test.ts`).
+- **A3 — Stücklistenposition ändern statt löschen und neu anlegen.** Aktion
+  `fertigung.stueckliste_position_aendern`: Menge, „gilt nur für …" und
+  wahlweise die Komponente, in einer Transaktion — eine Position steht nie
+  ohne ihre Zuordnung da (sie gälte sonst kurz für alle Varianten).
+  Zuordnungen eines fremden Produkts werden abgelehnt. Laufende
+  Fertigungsaufträge behalten ihren Stand.
+- **A4 — Teil-Kurzanlage mit Einheit, Einstandspreis, Kaufen/Fertigen.**
+  Bisher entstand jedes Teil als „Stück, 0 €, Kaufteil" — Meterware und
+  Baugruppen waren danach falsch, die Herstellkosten zu niedrig.
+  `produkte.produkt_anlegen` nimmt dafür `einheit` (über den Namen;
+  unbekannt = Fehler mit Klartext). „Selbst fertigen" ist nicht einkaufbar.
+- **A5 — Artikelnummern und Barcodes in einer Tabelle.** Aktion
+  `produkte.varianten_codes` an der Produktseite: alle Varianten, ein
+  Speichern. Nur Geändertes wird geschrieben; ein Tausch zweier Nummern
+  geht in einem Schritt; doppelte Codes werden mit Namen abgelehnt, nichts
+  wird halb gespeichert. Die Einzelseite je Variante bleibt.
+- **A6 — Hinweis bei unvollständiger Anlage.** Ein Verkaufsprodukt ohne
+  Route, mit Route „Fertigen" ohne Stückliste, mit leerer Stückliste oder
+  mit Varianten ohne Artikelnummer bekommt einen Hinweis auf der
+  Produktseite; die Shop-Verfügbarkeit listet alle betroffenen
+  **Shop-Produkte** über allem. Nur Hinweis, keine Sperre: ein Artikel, der
+  einmal gebaut und von Hand gebucht wird (Switch-Tester), braucht keine
+  Route.
+
+**Wo:** `src/app/api/auswahl/route.ts`, `src/modules/shared/auswahl-suche.ts`,
+`src/components/auswahl.tsx`; Registry `fertigung.ts`/`produkte.ts` mit
+Ausführung; `src/modules/shared/teil-kurzanlage.ts`,
+`src/modules/shared/anlage-luecken.ts`,
+`src/modules/integrationen/shop-anlage.ts`. Tests:
+`tests/prozesse/anlegen-helfer.test.ts`, `tests/anlage.test.ts`,
+`tests/auswahl.test.ts`. Doku: [module/fertigung.md](module/fertigung.md),
+[module/stammdaten.md](module/stammdaten.md).
+
 ## 2026-11-27 — Release-Schutz: Kontingent je Teil, Buch je Angebot, Reservieren beim Eingang
 
 Am 29.11. um 16:30 gehen vier neue Tastaturen in den Verkauf; Bestellungen

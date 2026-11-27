@@ -32,6 +32,7 @@ export const PRODUKTE = {
       verkaufbar: z.boolean().default(true),
       einkaufbar: z.boolean().default(false),
       route: z.enum(['kaufen', 'fertigen']).optional(),
+      einheit: z.string().max(20).optional().describe('Mengeneinheit über den Namen, z. B. Stück, m, g (Standard: Stück)'),
       sku: z
         .string()
         .max(40)
@@ -215,6 +216,36 @@ export const PRODUKTE = {
       shopify_variant_id: String(fd.get('shopify_variant_id') ?? '').trim() || undefined,
     }),
     revalidate: ['/produkte/variante/:id', '/produkte/:ergebnis'],
+  },
+
+  'produkte.varianten_codes': {
+    label: 'Artikelnummern und Barcodes pflegen',
+    bereich: 'produkte',
+    beschreibung:
+      'Setzt Artikelnummer (SKU) und Barcode (EAN) mehrerer Varianten eines Produkts in einem Schritt — ' +
+      'die Tabelle auf der Produktseite. Leer = kein Code. Doppelte Codes werden mit Namen abgelehnt.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      zeilen: z
+        .array(
+          z.object({
+            variant_id: z.string().guid(),
+            sku: z.string().max(60).optional(),
+            barcode: z.string().max(60).optional(),
+          }),
+        )
+        .min(1)
+        .max(500),
+    }),
+    formdata: (fd) => ({
+      zeilen: fd.getAll('variant_id').map((id) => ({
+        variant_id: String(id),
+        sku: String(fd.get(`sku:${id}`) ?? '').trim() || undefined,
+        barcode: String(fd.get(`barcode:${id}`) ?? '').trim() || undefined,
+      })),
+    }),
+    revalidate: ['/produkte/:id'],
   },
 
   'produkte.attribut_anlegen': {

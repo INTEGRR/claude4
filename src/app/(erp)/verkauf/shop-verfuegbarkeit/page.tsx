@@ -8,6 +8,7 @@ import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { shopifyModus } from '@/modules/integrationen/shopify-modus'
 import { madeToOrderEinstellung } from '@/modules/integrationen/made-to-order'
 import { notAusAktiv } from '@/modules/integrationen/inventar'
+import { shopProdukteMitLuecken } from '@/modules/integrationen/shop-anlage'
 import {
   type ArtikelInfo,
   type Modus,
@@ -273,8 +274,8 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
   const user = await requireArea('verkauf')
   const darf = canWrite(user.rollen, 'verkauf', user.befugnisse)
   const { a: gewaehlt } = await searchParams
-  const [daten, mto, modus, notAus] = await Promise.all([
-    shopVerfuegbarkeit(), madeToOrderEinstellung(), shopifyModus(sql), notAusAktiv(),
+  const [daten, mto, modus, notAus, unvollstaendig] = await Promise.all([
+    shopVerfuegbarkeit(), madeToOrderEinstellung(), shopifyModus(sql), notAusAktiv(), shopProdukteMitLuecken(),
   ])
 
   return (
@@ -306,6 +307,26 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
           <span className="led warn" /> <strong>Not-Aus aktiv:</strong> alle Angebote stehen im Shop auf ausverkauft.
           Bestellungen, die schon eingegangen sind, laufen normal weiter. Aufheben verteilt die Kontingente neu.
         </div>
+      )}
+      {unvollstaendig.length > 0 && (
+        <details className="notice warn">
+          <summary style={{ cursor: 'pointer' }}>
+            <span className="led warn" />{' '}
+            <strong>
+              {unvollstaendig.length === 1
+                ? '1 Shop-Produkt ist unvollständig angelegt'
+                : `${unvollstaendig.length} Shop-Produkte sind unvollständig angelegt`}
+            </strong>{' '}
+            — ohne Route oder Stückliste wird aus der Bestellung kein Auftrag.
+          </summary>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+            {unvollstaendig.map((p) => (
+              <li key={p.id}>
+                <Link href={`/produkte/${p.id}`}>{p.name}</Link>: {p.luecken.map((l) => l.text).join(' ')}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       <div className={modus === 'schreiben' ? 'notice info' : 'notice warn'}>
         Geteilte Teile werden als Kontingent auf die Angebote verteilt — die Summe übersteigt nie den freien

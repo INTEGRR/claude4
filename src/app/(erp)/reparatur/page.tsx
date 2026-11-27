@@ -89,7 +89,7 @@ export default async function ReparaturPage({
                 <div className="row">
                   <label className="field" style={{ flex: 2 }}>
                     <span>Kunde</span>
-                    <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
+                    <Auswahl nachladen="kunde" kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
                       <option value="" disabled>— auswählen —</option>
                       {partners.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
@@ -98,7 +98,7 @@ export default async function ReparaturPage({
                   </label>
                   <label className="field" style={{ flex: 2 }}>
                     <span>Produkt</span>
-                    <Auswahl name="variant_id" required defaultValue="">
+                    <Auswahl nachladen="variante" name="variant_id" required defaultValue="">
                       <option value="" disabled>— auswählen —</option>
                       {products.map((p) => (
                         <option key={p.id} value={p.id}>{p.label}</option>

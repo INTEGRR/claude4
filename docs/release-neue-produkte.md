@@ -64,14 +64,14 @@ Release ungeeignet.
 
 | Punkt | Stand | Bemerkung |
 |---|---|---|
-| Produkt mit Varianten | geht | Attribute vorher unter Produkte → Attribute; SKU/EAN nur einzeln je Variante |
-| Teil beim Stücklistenbau anlegen | geht | nur Bezeichnung und Artikelnummer; Einheit immer „Stück", Preis 0, immer Kaufteil |
-| Stückliste mit variantenabhängigen Zeilen | geht | Position ändern heißt löschen und neu anlegen |
+| Produkt mit Varianten | geht | Attribute vorher unter Produkte → Attribute; SKU/EAN aller Varianten in einer Tabelle auf der Produktseite (seit 27.11.) |
+| Teil beim Stücklistenbau anlegen | geht | mit Einheit, Einstandspreis und Kaufen/Fertigen (seit 27.11.) |
+| Stückliste mit variantenabhängigen Zeilen | geht | Position ändern: Knopf „Ändern" in der Zeile (seit 27.11.) |
 | Stückliste kopieren | geht (seit 23.11.) | Knopf „Kopieren" an der Stückliste; Zuordnungen wandern über Attribut und Wert mit |
 | Unterbaugruppen | teilweise | Baugruppe mit eigener Stückliste wird als Lagerteil verbraucht, kein Unterauftrag; Typ „Baugruppe" in der Maske nicht wählbar |
 | Anfangsbestand | geht | Inventur; vorher Einstandspreis setzen, sonst Herstellkosten zu niedrig |
 | Fertigungsdateien | teilweise | Dokumente am Produkt (Google Drive nötig), nicht an der Stückliste |
-| Auswahlfelder | Risiko | laden höchstens 500 Varianten (heute 300 aktiv) — darüber fehlen Teile in der Liste und es entstehen Dubletten |
+| Auswahlfelder | geht (seit 27.11.) | laden 500 Einträge vor, Tippen sucht in allen |
 | Reservierung bei Bestellung | geht | nur bei bezahlten Bestellungen, in derselben Transaktion wie der Import |
 | Shop-Menge nach Reservierung | geht | Sekunden nach dem Webhook; im Probelauf wird nichts gesendet |
 | SKU/EAN-Abgleich | teilweise | der letzte Schreiber gewinnt, kein Abweichungsbericht; unbekannte SKU → Auftrag bleibt unbestätigt (Klärfall) |
@@ -119,7 +119,7 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 
 ## Arbeitspakete
 
-**Stand 27.11. abends:** ✅ gebaut · ⬜ offen. Gebaut sind K1, A1, die
+**Stand 27.11. abends:** ✅ gebaut · ⬜ offen. Gebaut sind K1, **A1–A6**, die
 Schutz-Pakete **S1–S8** und zwei Pakete, die im Plan nicht standen: Rückhalt
 und Höchstmenge für den Einzelverkauf (0133) und der Fulfillment-Halt aus
 Shopify (0134). Wie der Schutz arbeitet, steht in
@@ -151,11 +151,11 @@ erwarteter Nachfrage, Release am 29.11. um 16:30.
 | Nr. | Paket | Größe |
 |---|---|---|
 | ✅ A1 | Stückliste kopieren (auf anderes Produkt, Zuordnung über Attribut- und Wertnamen) — **gebaut am 23.11.** | mittel |
-| ⬜ A2 | Auswahlfelder mit Serversuche statt 500er-Grenze | mittel |
-| ⬜ A3 | Stücklistenposition bearbeiten (Menge, Zuordnung) | klein–mittel |
-| ⬜ A4 | Teil-Kurzanlage um Einheit, Einstandspreis, Kauf- oder Fertigteil erweitern | klein |
-| ⬜ A5 | SKU und EAN aller Varianten in einer Tabelle pflegen | klein–mittel |
-| ⬜ A6 | Hinweis, wenn ein Shop-Produkt keine Routen oder keine Stückliste hat | klein |
+| ✅ A2 | Auswahlfelder mit Serversuche statt 500er-Grenze — **gebaut am 27.11.** | mittel |
+| ✅ A3 | Stücklistenposition bearbeiten (Menge, Zuordnung, Komponente) — **gebaut am 27.11.** | klein–mittel |
+| ✅ A4 | Teil-Kurzanlage um Einheit, Einstandspreis, Kauf- oder Fertigteil erweitert — **gebaut am 27.11.** | klein |
+| ✅ A5 | SKU und EAN aller Varianten in einer Tabelle pflegen — **gebaut am 27.11.** | klein–mittel |
+| ✅ A6 | Hinweis, wenn ein Shop-Produkt keine Routen, keine Stückliste oder keine Artikelnummern hat — **gebaut am 27.11.** | klein |
 
 **Vorschlag für die fünf Tage**
 

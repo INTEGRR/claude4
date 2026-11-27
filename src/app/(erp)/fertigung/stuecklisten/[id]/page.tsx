@@ -10,6 +10,7 @@ import {
   addBomOperation,
   copyBom,
   removeBomLine,
+  updateBomLine,
   removeBomOperation,
   setBomConsumption,
   setBomLineIssueMethod,
@@ -17,7 +18,7 @@ import {
 import { RecordComments } from '@/components/record-comments'
 import { Auswahl } from '@/components/auswahl'
 import { Schublade } from '@/components/schublade'
-import { kurzArtikel } from '@/app/(erp)/kurzanlage'
+import { kurzArtikel, kurzEinheiten } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +64,7 @@ export default async function BomPage({
       qty: number
       uom: string
       filters: string[]
+      ptav_ids: string[]
       issue_method: string
       is_phantom: boolean
     }[]
@@ -71,7 +73,8 @@ export default async function BomPage({
            u.name as uom, l.issue_method,
            resolve_kit(l.component_variant_id) is not null as is_phantom,
            coalesce(array_agg(a.name || ': ' || av.name order by a.name)
-                    filter (where av.id is not null), '{}') as filters
+                    filter (where av.id is not null), '{}') as filters,
+           coalesce(array_agg(f.ptav_id::text) filter (where f.ptav_id is not null), '{}') as ptav_ids
     from bom_lines l
     join product_variants pv on pv.id = l.component_variant_id
     join uoms u on u.id = l.uom_id
@@ -306,10 +309,43 @@ export default async function BomPage({
                         </span>
                       )}
                     </td>
-                    <td className="num">
-                      <ActionButton className="small danger" action={removeBomLine.bind(null, id, l.id)}>
-                        Entfernen
-                      </ActionButton>
+                    <td className="nowrap">
+                      <span className="actions" style={{ justifyContent: 'flex-end' }}>
+                        <Schublade id={`position-${l.id}`} knopf="Ändern" knopfKlasse="small" titel={`${l.component} ändern`}>
+                          <ActionForm action={updateBomLine.bind(null, id)}>
+                            <input type="hidden" name="line_id" value={l.id} />
+                            <label className="field">
+                              <span>Menge ({l.uom})</span>
+                              <input type="number" name="qty" step="0.001" min="0.001" defaultValue={Number(l.qty)} required />
+                            </label>
+                            {ptavs.length > 0 && (
+                              <label className="field">
+                                <span>Auf Varianten anwenden (leer = alle)</span>
+                                <Auswahl name="ptav_ids" multiple placeholder="alle Varianten" defaultValue={l.ptav_ids}>
+                                  {ptavs.map((p) => (
+                                    <option key={p.id} value={p.id}>{p.label}</option>
+                                  ))}
+                                </Auswahl>
+                              </label>
+                            )}
+                            <label className="field">
+                              <span>Andere Komponente (leer = bleibt)</span>
+                              <Auswahl nachladen="variante" name="component_variant_id" defaultValue="">
+                                <option value="">— bleibt: {l.component} —</option>
+                                {components.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.label}</option>
+                                ))}
+                              </Auswahl>
+                            </label>
+                            <div className="actions">
+                              <button className="primary" type="submit">Speichern</button>
+                            </div>
+                          </ActionForm>
+                        </Schublade>
+                        <ActionButton className="small danger" action={removeBomLine.bind(null, id, l.id)}>
+                          Entfernen
+                        </ActionButton>
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -323,7 +359,7 @@ export default async function BomPage({
             <div className="row">
               <label className="field" style={{ flex: 3 }}>
                 <span>Komponente</span>
-                <Auswahl kurzanlage={kurzArtikel(user, 'einkauf')} name="component_variant_id" required defaultValue="">
+                <Auswahl nachladen="variante" kurzanlage={kurzArtikel(user, 'einkauf', await kurzEinheiten())} name="component_variant_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {components.map((c) => (
                     <option key={c.id} value={c.id}>{c.label}</option>

@@ -663,7 +663,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div className="row">
                 <label className="field" style={{ flex: 3 }}>
                   <span>Produkt</span>
-                  <Auswahl kurzanlage={kurzArtikel(user, 'verkauf')} name="variant_id" required>
+                  <Auswahl nachladen="variante-verkauf" kurzanlage={kurzArtikel(user, 'verkauf')} name="variant_id" required>
                     <option value="">— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>

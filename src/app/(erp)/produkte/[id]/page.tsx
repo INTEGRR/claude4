@@ -5,7 +5,16 @@ import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { money, plural, qty } from '@/modules/shared/format'
-import { addAttribute, addVendorPrice, deleteVendorPrice, produktZuShopify, updateProduct } from '../actions'
+import {
+  addAttribute,
+  addVendorPrice,
+  deleteVendorPrice,
+  produktZuShopify,
+  setVariantenCodes,
+  updateProduct,
+} from '../actions'
+import { canWrite } from '@/modules/auth/permissions'
+import { anlageLuecken } from '@/modules/shared/anlage-luecken'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
 import { RecordComments } from '@/components/record-comments'
@@ -131,6 +140,22 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const lieferanten = await sql<{ id: string; name: string }[]>`
     select id, name from partners where is_vendor and active order by name limit 500`
 
+  const darfSchreiben = canWrite(user.rollen, 'produkte', user.befugnisse)
+  // Anlage-Lücken (A6): nur bei Produkten, die verkauft werden — ein
+  // Kaufteil ohne Artikelnummer ist kein Hinweis wert.
+  const imShop = variants.some((v) => v.shopify_variant_id)
+  const luecken =
+    tpl.can_be_sold || imShop
+      ? anlageLuecken({
+          route_buy: tpl.route_buy,
+          route_manufacture: tpl.route_manufacture,
+          stuecklisten: boms.length,
+          positionen: boms.reduce((n, b) => n + b.lines, 0),
+          ohne_sku: variants.filter((v) => !v.sku).length,
+          varianten: variants.length,
+        })
+      : []
+
   return (
     <>
       <PageHeader
@@ -167,10 +192,28 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         }
       />
 
+      {luecken.length > 0 && (
+        <div className="notice warn">
+          <span className="led warn" /> <strong>Anlage unvollständig{imShop ? ' (Produkt ist im Shop)' : ''}:</strong>
+          <ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>
+            {luecken.map((l) => (
+              <li key={l.art}>
+                {l.text}{' '}
+                {l.art === 'route' && <a href="#stammdaten">Route setzen</a>}
+                {l.art === 'stueckliste' && <Link href="/fertigung/stuecklisten">Stückliste anlegen oder kopieren</Link>}
+                {l.art === 'positionen' && <Link href={`/fertigung/stuecklisten/${boms[0]?.id}`}>Positionen ergänzen</Link>}
+                {l.art === 'sku' && <a href="#varianten">in der Tabelle unten eintragen</a>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div style={{ marginBottom: 12 }}>
         <TagEditor model="product_template" recordId={id} path={`/produkte/${id}`} />
       </div>
 
+      <div id="stammdaten" />
       <Card title="Eigenschaften">
         <ActionForm action={updateProduct.bind(null, id)}>
           <div className="row">
@@ -350,11 +393,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <button className="primary" type="submit">Speichern</button>
         </ActionForm>
 
-        {tpl.route_manufacture && tpl.route_mto && boms.length === 0 && (
+        {luecken.length === 0 && tpl.route_manufacture && boms.length === 0 && (
           <div className="notice warn" style={{ marginTop: 12, marginBottom: 0 }}>
             <span className="led warn" />{' '}
-            Route „Fertigen auf Bestellung" ist aktiv, aber es existiert keine Stückliste. Ohne
-            Stückliste entsteht bei der Auftragsbestätigung kein Fertigungsauftrag.
+            Route „Fertigen" ist aktiv, aber es existiert keine Stückliste. Ohne Stückliste entsteht kein
+            Fertigungsauftrag.
           </div>
         )}
       </Card>
@@ -412,7 +455,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="row" style={{ alignItems: 'flex-end' }}>
               <label className="field" style={{ flex: 2 }}>
                 <span>Lieferant</span>
-                <Auswahl kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
+                <Auswahl nachladen="lieferant" kurzanlage={kurzLieferant(user)} name="vendor_id" required defaultValue="">
                   <option value="" disabled>— auswählen —</option>
                   {lieferanten.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
@@ -519,9 +562,63 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         )}
       </Card>
 
+      <div id="varianten" />
       <Card title={`Varianten (${variants.length})`} tight>
         {variants.length === 0 ? (
           <Empty>Keine Varianten.</Empty>
+        ) : darfSchreiben ? (
+          // Eine Tabelle für alle Artikelnummern und Barcodes (A5) — ein
+          // Speichern statt je Variante eine eigene Seite.
+          <ActionForm action={setVariantenCodes.bind(null, id)}>
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Variante</th>
+                    <th>Artikelnummer (SKU)</th>
+                    <th>Barcode (EAN)</th>
+                    <th className="num">Bestand</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map((v) => (
+                    <tr key={v.id}>
+                      <td>
+                        <input type="hidden" name="variant_id" value={v.id} />
+                        <Link href={`/produkte/variante/${v.id}`}>{v.display_name ?? tpl.name}</Link>
+                      </td>
+                      <td>
+                        <input
+                          className="mono small"
+                          name={`sku:${v.id}`}
+                          defaultValue={v.sku ?? ''}
+                          maxLength={60}
+                          autoComplete="off"
+                          aria-label={`Artikelnummer ${v.display_name ?? tpl.name}`}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="mono small"
+                          name={`barcode:${v.id}`}
+                          defaultValue={v.barcode ?? ''}
+                          maxLength={60}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          aria-label={`Barcode ${v.display_name ?? tpl.name}`}
+                        />
+                      </td>
+                      <td className="num">{qty(v.on_hand)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+            <div className="actions" style={{ padding: '10px 14px' }}>
+              <button className="primary" type="submit">Artikelnummern und Barcodes speichern</button>
+              <span className="muted small">Leer = kein Code. Gespeichert wird nur, was sich geändert hat.</span>
+            </div>
+          </ActionForm>
         ) : (
           <TableWrap>
             <table>

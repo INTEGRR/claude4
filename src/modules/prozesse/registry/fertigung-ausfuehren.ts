@@ -444,6 +444,57 @@ export async function stuecklistePositionHinzufuegen(
   return { recordId: bomId }
 }
 
+/**
+ * Position ändern (A3): Menge, Zuordnung („gilt nur für …") und wahlweise
+ * die Komponente — in einer Transaktion, damit nie eine Position ohne ihre
+ * Zuordnung dasteht (sie gälte dann für alle Varianten).
+ */
+export async function stuecklistePositionAendern(
+  p: { line_id: string; qty: number; ptav_ids: string[]; component_variant_id?: string },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const bomId = ctx.recordId!
+  const text = await tx(async (t) => {
+    const [zeile] = await t<{ id: string; component_variant_id: string; template_id: string; name: string }[]>`
+      select l.id, l.component_variant_id, b.template_id, variant_display_name(l.component_variant_id) as name
+      from bom_lines l join boms b on b.id = l.bom_id
+      where l.id = ${p.line_id} and l.bom_id = ${bomId} for update of l`
+    if (!zeile) throw new Error('Position nicht gefunden')
+
+    // Zuordnungen müssen zu DIESEM Produkt gehören — sonst träfe der Filter nie.
+    if (p.ptav_ids.length > 0) {
+      const [{ n }] = await t<{ n: number }[]>`
+        select count(*)::int as n from product_template_attribute_values ptav
+        join product_template_attribute_lines al on al.id = ptav.line_id
+        where ptav.id = any(${p.ptav_ids}::uuid[]) and al.template_id = ${zeile.template_id}`
+      if (Number(n) !== new Set(p.ptav_ids).size) throw new Error('Eine Zuordnung gehört nicht zu diesem Produkt')
+    }
+
+    let name = zeile.name
+    if (p.component_variant_id && p.component_variant_id !== zeile.component_variant_id) {
+      const [neu] = await t<{ uom_id: string; template_id: string; name: string }[]>`
+        select pt.uom_id, pv.template_id, variant_display_name(pv.id) as name
+        from product_variants pv join product_templates pt on pt.id = pv.template_id
+        where pv.id = ${p.component_variant_id}`
+      if (!neu) throw new Error('Komponente nicht gefunden')
+      if (neu.template_id === zeile.template_id) throw new Error('Ein Produkt kann nicht Komponente seiner selbst sein')
+      await t`update bom_lines set component_variant_id = ${p.component_variant_id}, uom_id = ${neu.uom_id}
+              where id = ${p.line_id}`
+      name = neu.name
+    }
+    await t`update bom_lines set qty = ${p.qty} where id = ${p.line_id}`
+    await t`delete from bom_line_variant_filters where bom_line_id = ${p.line_id}`
+    for (const ptavId of new Set(p.ptav_ids)) {
+      await t`insert into bom_line_variant_filters (bom_line_id, ptav_id) values (${p.line_id}, ${ptavId})`
+    }
+    await t`select log_event('product_template', ${zeile.template_id}, 'note',
+      ${`Stückliste: ${name} geändert — Menge ${p.qty}, ${p.ptav_ids.length ? `gilt für ${plural(p.ptav_ids.length, 'Optionswert', 'Optionswerte')}` : 'gilt für alle Varianten'}`},
+      ${ctx.actor})`
+    return `${name}: Menge ${p.qty}, ${p.ptav_ids.length ? 'Zuordnung gesetzt' : 'gilt für alle Varianten'}.`
+  })
+  return { recordId: bomId, text }
+}
+
 export async function stuecklistePositionEntfernen(
   p: { line_id: string },
   ctx: AktionsKontext,

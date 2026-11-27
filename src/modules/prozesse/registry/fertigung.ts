@@ -284,6 +284,29 @@ export const FERTIGUNG = {
     revalidate: ['/fertigung/stuecklisten/:id'],
   },
 
+  'fertigung.stueckliste_position_aendern': {
+    label: 'Komponente ändern',
+    bereich: 'fertigung',
+    beschreibung:
+      'Ändert eine Position der Stückliste: Menge und „gilt nur für …"-Zuordnung (leer = alle Varianten), ' +
+      'wahlweise auch die Komponente selbst. Laufende Fertigungsaufträge behalten ihren Stand.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      line_id: z.string().guid(),
+      qty: z.number().positive('Die Menge muss größer als 0 sein'),
+      ptav_ids: z.array(z.string()).default([]),
+      component_variant_id: z.string().guid().optional().describe('andere Komponente; leer = bleibt'),
+    }),
+    formdata: (fd) => ({
+      line_id: String(fd.get('line_id') ?? ''),
+      qty: Number(String(fd.get('qty') ?? '0').replace(',', '.')),
+      ptav_ids: fd.getAll('ptav_ids').map(String).filter(Boolean),
+      component_variant_id: String(fd.get('component_variant_id') ?? '') || undefined,
+    }),
+    revalidate: ['/fertigung/stuecklisten/:id'],
+  },
+
   'fertigung.stueckliste_position_entfernen': {
     label: 'Komponente entfernen',
     bereich: 'fertigung',

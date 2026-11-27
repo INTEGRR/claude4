@@ -24,6 +24,8 @@ export interface ProduktEingabe {
   verkaufbar?: boolean
   einkaufbar?: boolean
   route?: 'kaufen' | 'fertigen'
+  /** Mengeneinheit über den Namen (Standard: Stück). */
+  einheit?: string
   sku?: string
   beschreibung?: string
   attribute?: ProduktAttribut[]
@@ -45,7 +47,10 @@ export async function produktAnlegen(
   p: ProduktEingabe,
   actor: string,
 ): Promise<ProduktErgebnis> {
-  const [uom] = await db<{ id: string }[]>`select id from uoms where name = 'Stück' limit 1`
+  const einheit = p.einheit?.trim() || 'Stück'
+  const [uom] = await db<{ id: string }[]>`
+    select id from uoms where lower(name) = lower(${einheit}) and active limit 1`
+  if (!uom) throw new Error(`Einheit „${einheit}" gibt es nicht — bitte eine vorhandene Mengeneinheit wählen`)
   const attribute = p.attribute ?? []
 
   const [tpl] = await db<{ id: string }[]>`

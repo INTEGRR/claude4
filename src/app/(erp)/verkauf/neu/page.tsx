@@ -20,7 +20,7 @@ export default async function NewOrderPage() {
         <ActionForm action={createOrder} style={{ maxWidth: 460 }}>
           <label className="field">
             <span>Kunde</span>
-            <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
+            <Auswahl nachladen="kunde" kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
               <option value="" disabled>— auswählen —</option>
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>

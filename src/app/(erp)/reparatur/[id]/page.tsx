@@ -438,7 +438,7 @@ export default async function RepairPage({
                 </label>
                 <label className="field" style={{ flex: 3 }}>
                   <span>Teil</span>
-                  <Auswahl name="variant_id" required defaultValue="">
+                  <Auswahl nachladen="variante" name="variant_id" required defaultValue="">
                     <option value="" disabled>— auswählen —</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>

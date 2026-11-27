@@ -574,7 +574,7 @@ export default async function IntegrationenPage() {
                         <input type="hidden" name="sku" value={g.sku ?? ''} />
                         <input type="hidden" name="titel" value={g.title ?? ''} />
                         <div className="row" style={{ gap: 6 }}>
-                          <Auswahl name="variant_id" required defaultValue={g.erkannt_id ?? ''}>
+                          <Auswahl nachladen="variante" name="variant_id" required defaultValue={g.erkannt_id ?? ''}>
                             <option value="" disabled>— Variante wählen —</option>
                             {variants.map((v) => (
                               <option key={v.id} value={v.id}>{v.label}</option>
@@ -625,7 +625,7 @@ export default async function IntegrationenPage() {
                     <td>
                       <ActionForm action={resolveUnmatched.bind(null, u.id)}>
                         <div className="row" style={{ gap: 6 }}>
-                          <Auswahl name="variant_id" required defaultValue="">
+                          <Auswahl nachladen="variante" name="variant_id" required defaultValue="">
                             <option value="" disabled>— Variante wählen —</option>
                             {variants.map((v) => (
                               <option key={v.id} value={v.id}>{v.label}</option>

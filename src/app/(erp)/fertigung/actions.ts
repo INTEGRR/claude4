@@ -93,6 +93,10 @@ export async function addBomLine(bomId: string, formData: FormData): Promise<Act
   return serverAktion('fertigung.stueckliste_position_hinzufuegen', { recordId: bomId, formData })
 }
 
+export async function updateBomLine(bomId: string, formData: FormData): Promise<ActionResult> {
+  return serverAktion('fertigung.stueckliste_position_aendern', { recordId: bomId, formData })
+}
+
 export async function removeBomLine(bomId: string, lineId: string): Promise<ActionResult> {
   return serverAktion('fertigung.stueckliste_position_entfernen', {
     recordId: bomId,

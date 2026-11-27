@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation'
 import { isActionError } from '@/modules/shared/action'
 import { type AuswahlOption, filtern, normalisieren, startwert } from './auswahl-logik'
 import type { Kurzanlage } from './kurzanlage-typen'
+import { NACHLADEN_AB, type NachladeArt } from '@/modules/shared/auswahl-suche'
 
 /**
  * Auswahlbox mit Suche — ersetzt <select> in ganz KRNL (Betreiber
@@ -32,6 +33,9 @@ import type { Kurzanlage } from './kurzanlage-typen'
  *   Reihenfolge, ohne Akzente; `data-suche` an der Option sucht mit).
  * - Liste im Top-Layer (popover): wird weder von Tabellen abgeschnitten
  *   noch von Dialogen verdeckt; klappt nach oben, wenn unten kein Platz ist.
+ * - `nachladen` (A2): die Seite liefert höchstens 500 Einträge mit — wer
+ *   tippt, sucht zusätzlich im Server in ALLEN (Artikel, Kunden,
+ *   Lieferanten); Treffer erscheinen in derselben Liste.
  * - Formular: versteckte Felder tragen den Wert, ein unsichtbares
  *   Pflichtfeld meldet `required`; Zurücksetzen des Formulars stellt die
  *   Vorgabe wieder her.
@@ -61,6 +65,11 @@ interface Props {
    * neue Eintrag ist danach gewählt (src/app/(erp)/kurzanlage.ts).
    */
   kurzanlage?: Kurzanlage
+  /**
+   * Serversuche (A2): beim Tippen zusätzlich in allen Einträgen dieser Art
+   * suchen — für Listen, die größer sind als das, was die Seite mitliefert.
+   */
+  nachladen?: NachladeArt
   children?: ReactNode
 }
 
@@ -127,15 +136,25 @@ export function Auswahl({
   'aria-label': ariaLabel,
   'aria-invalid': ariaInvalid,
   kurzanlage,
+  nachladen,
   children,
 }: Props) {
   // Eben per Kurzanlage angelegt — bis die Seite sie selbst mitliefert.
   const [neue, setNeue] = useState<AuswahlOption[]>([])
+  // Aus der Serversuche nachgeladen (A2) — bleiben, damit eine Wahl daraus ihren Text behält.
+  const [geladen, setGeladen] = useState<AuswahlOption[]>([])
+  const [sucht, setSucht] = useState(false)
   const ausKindern = useMemo(() => optionenAus(children), [children])
-  const optionen = useMemo(
-    () => [...ausKindern, ...neue.filter((n) => !ausKindern.some((o) => o.wert === n.wert))],
-    [ausKindern, neue],
-  )
+  const optionen = useMemo(() => {
+    const bekannt = new Set(ausKindern.map((o) => o.wert))
+    const dazu: AuswahlOption[] = []
+    for (const o of [...neue, ...geladen]) {
+      if (bekannt.has(o.wert)) continue
+      bekannt.add(o.wert)
+      dazu.push(o)
+    }
+    return [...ausKindern, ...dazu]
+  }, [ausKindern, neue, geladen])
   const gesteuert = value !== undefined
   const [eigen, setEigen] = useState<string | string[]>(() => startwert(optionen, defaultValue, multiple))
   const wert: string | string[] = gesteuert ? value : eigen
@@ -168,7 +187,7 @@ export function Auswahl({
 
   const mitNeu = Boolean(kurzanlage)
   // Mit Kurzanlage immer ein Suchfeld: dort steht der Name des Neuen.
-  const mitSuche = optionen.length >= SUCHE_AB || mitNeu
+  const mitSuche = optionen.length >= SUCHE_AB || mitNeu || Boolean(nachladen)
   const router = useRouter()
   /** Werte des Mini-Formulars; null = Liste statt Formular. */
   const [kurz, setKurz] = useState<Record<string, string> | null>(null)
@@ -180,6 +199,42 @@ export function Auswahl({
     () => (offen ? filtern(waehlbar, eingabe) : { treffer: [], mehr: 0 }),
     [offen, waehlbar, eingabe],
   )
+
+  // Serversuche (A2): kurz warten, dann in allen Einträgen suchen. Eine
+  // überholte Antwort (inzwischen weitergetippt) wird verworfen.
+  useEffect(() => {
+    if (!nachladen || !offen) return
+    const q = eingabe.trim()
+    if (q.replace(/\s+/g, '').length < NACHLADEN_AB) {
+      setSucht(false)
+      return
+    }
+    let aktuell = true
+    setSucht(true)
+    const warten = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auswahl?art=${nachladen}&q=${encodeURIComponent(q)}`)
+        if (!res.ok) return
+        const { treffer: zeilen } = (await res.json()) as { treffer: { wert: string; text: string; suche?: string }[] }
+        if (!aktuell) return
+        setGeladen((alt) => {
+          const bekannt = new Set(alt.map((o) => o.wert))
+          const dazu = zeilen
+            .filter((z) => !bekannt.has(z.wert))
+            .map((z) => ({ wert: z.wert, text: z.text, deaktiviert: false, suche: normalisieren(`${z.text} ${z.suche ?? ''}`) }))
+          return dazu.length > 0 ? [...alt, ...dazu] : alt
+        })
+      } catch {
+        // offline o. Ä.: die mitgelieferten Einträge bleiben nutzbar
+      } finally {
+        if (aktuell) setSucht(false)
+      }
+    }, 220)
+    return () => {
+      aktuell = false
+      clearTimeout(warten)
+    }
+  }, [nachladen, offen, eingabe])
 
   // Formular zurückgesetzt (ActionForm nach Erfolg) → Vorgabe wiederherstellen.
   const vorgabeRef = useRef(defaultValue)
@@ -235,6 +290,8 @@ export function Auswahl({
       const breiteFenster = document.documentElement.clientWidth
       const breite = Math.min(Math.max(r.width, 240), breiteFenster - 16)
       const links = Math.min(Math.max(r.left, 8), breiteFenster - breite - 8)
+      // Das Kurzanlage-Formular (bis fünf Felder) braucht mehr Höhe als die Liste.
+      const grenze = kurz ? 560 : 380
       const unten = hoehe - r.bottom - 8
       const oben = r.top - 8
       p.style.left = `${links}px`
@@ -242,11 +299,11 @@ export function Auswahl({
       if (unten >= 220 || unten >= oben) {
         p.style.top = `${r.bottom + 4}px`
         p.style.bottom = 'auto'
-        p.style.maxHeight = `${Math.min(380, unten - 4)}px`
+        p.style.maxHeight = `${Math.min(grenze, unten - 4)}px`
       } else {
         p.style.top = 'auto'
         p.style.bottom = `${window.innerHeight - r.top + 4}px`
-        p.style.maxHeight = `${Math.min(380, oben - 4)}px`
+        p.style.maxHeight = `${Math.min(grenze, oben - 4)}px`
       }
     }
     platzieren()
@@ -258,7 +315,7 @@ export function Auswahl({
       window.removeEventListener('resize', platzieren)
       window.visualViewport?.removeEventListener('resize', platzieren)
     }
-  }, [offen])
+  }, [offen, kurz !== null])
 
   // Aktive Zeile sichtbar halten.
   useEffect(() => {
@@ -591,7 +648,7 @@ export function Auswahl({
                       type="email" — dessen Prüfung würde dort mitgreifen. */}
                   <input
                     type="text"
-                    inputMode={f.art === 'email' ? 'email' : undefined}
+                    inputMode={f.art === 'email' ? 'email' : f.art === 'zahl' ? 'decimal' : undefined}
                     aria-label={f.label}
                     value={kurz[f.name] ?? ''}
                     placeholder={f.platzhalter}
@@ -660,8 +717,13 @@ export function Auswahl({
           {offen && mehr > 0 && (
             <div className="auswahl-hinweis">… {mehr} weitere — Suche eingrenzen</div>
           )}
-          {offen && treffer.length === 0 && !mitNeu && (
+          {offen && treffer.length === 0 && !mitNeu && !sucht && (
             <div className="auswahl-hinweis">Kein Treffer für „{eingabe}"</div>
+          )}
+          {offen && nachladen && (
+            <div className="auswahl-hinweis">
+              {sucht ? 'Suche in allen Einträgen …' : eingabe.trim().length < NACHLADEN_AB ? 'Tippen sucht in allen Einträgen' : null}
+            </div>
           )}
           {offen && kurzanlage && (
             <div

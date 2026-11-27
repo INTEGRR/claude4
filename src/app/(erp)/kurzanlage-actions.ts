@@ -1,6 +1,7 @@
 'use server'
 import { sql } from '@/db/client'
 import { kontaktAusKurzanlage } from '@/modules/kontakte/kurzanlage'
+import { teilAusKurzanlage } from '@/modules/shared/teil-kurzanlage'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { type ActionResult, actionError, actionInfo, isActionError } from '@/modules/shared/action'
 
@@ -47,14 +48,11 @@ export async function artikelKurzAnlegen(
   const name = wert(werte, 'name')
   if (!name) return actionError('Bitte einen Namen angeben')
   const sku = wert(werte, 'sku')
+  // Teil (A4): Einheit, Einstandspreis und Kaufen/Fertigen gleich mit.
+  const teil = zweck === 'einkauf' ? teilAusKurzanlage(werte) : undefined
+  if (teil && 'fehler' in teil) return actionError(teil.fehler)
   const r = await serverAktion('produkte.produkt_anlegen', {
-    parameter: {
-      name,
-      sku,
-      einkaufbar: zweck === 'einkauf',
-      verkaufbar: zweck === 'verkauf',
-      ...(zweck === 'einkauf' ? { route: 'kaufen' } : {}),
-    },
+    parameter: { name, sku, verkaufbar: zweck === 'verkauf', einkaufbar: false, ...teil },
     mitBeleg: true,
   })
   if (isActionError(r)) return r

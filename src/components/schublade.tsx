@@ -10,6 +10,7 @@ export function Schublade({
   id,
   knopf,
   titel,
+  knopfKlasse = 'primary',
   children,
 }: {
   /** Eindeutige DOM-ID des Panels (z. B. "neu-auftrag"). */
@@ -17,11 +18,13 @@ export function Schublade({
   /** Beschriftung des Kopf-Knopfs, z. B. „+ Neuer Fertigungsauftrag". */
   knopf: string
   titel: string
+  /** Klasse des Knopfs — „small" für Knöpfe in Tabellenzeilen (Standard: primary). */
+  knopfKlasse?: string
   children: React.ReactNode
 }) {
   return (
     <>
-      <button type="button" className="primary" popoverTarget={id}>
+      <button type="button" className={knopfKlasse} popoverTarget={id}>
         {knopf}
       </button>
       <div id={id} popover="auto" className="ticket-panel schublade" role="dialog" aria-label={titel}>

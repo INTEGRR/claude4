@@ -13,8 +13,8 @@ import type { ActionResult } from '@/modules/shared/action'
 export interface KurzFeld {
   name: string
   label: string
-  /** text (Standard), email, oder wahl = Knopfreihe aus `optionen`. */
-  art?: 'text' | 'email' | 'wahl'
+  /** text (Standard), email, zahl (Dezimaltastatur), oder wahl = Knopfreihe aus `optionen`. */
+  art?: 'text' | 'email' | 'zahl' | 'wahl'
   pflicht?: boolean
   platzhalter?: string
   optionen?: { wert: string; text: string }[]

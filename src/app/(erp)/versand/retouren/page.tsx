@@ -167,7 +167,7 @@ export default async function RetourenPage({ searchParams }: { searchParams: Pro
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Kunde</span>
-              <Auswahl kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
+              <Auswahl nachladen="kunde" kurzanlage={kurzKunde(user)} name="partner_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>

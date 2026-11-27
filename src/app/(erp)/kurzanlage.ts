@@ -1,4 +1,6 @@
 import 'server-only'
+import { cache } from 'react'
+import { sql } from '@/db/client'
 import type { Kurzanlage } from '@/components/kurzanlage-typen'
 import type { User } from '@/modules/auth'
 import { canWrite, hatRolle } from '@/modules/auth/permissions'
@@ -46,16 +48,56 @@ export function kurzKunde(user: User): Kurzanlage | undefined {
   }
 }
 
-/** Artikel: für den Einkauf einkaufbar (Kaufteil), für den Verkauf verkaufbar. */
-export function kurzArtikel(user: User, zweck: 'einkauf' | 'verkauf'): Kurzanlage | undefined {
+/** Die Mengeneinheiten für die Teil-Kurzanlage — je Anfrage einmal gelesen. */
+export const kurzEinheiten = cache(async (): Promise<string[]> => {
+  const zeilen = await sql<{ name: string }[]>`
+    select u.name from uoms u where u.active order by (u.name = 'Stück') desc, u.category_id, u.ratio`
+  return zeilen.map((z) => z.name)
+})
+
+/**
+ * Artikel: für den Verkauf verkaufbar; als Teil (Einkauf, Stückliste) mit
+ * Einheit, Einstandspreis und Kaufen/Fertigen (A4) — genug, damit Bedarf,
+ * Kalkulation und Beschaffung vom ersten Moment an stimmen.
+ */
+export function kurzArtikel(
+  user: User,
+  zweck: 'einkauf' | 'verkauf',
+  einheiten: string[] = [],
+): Kurzanlage | undefined {
   if (!canWrite(user.rollen, 'produkte', user.befugnisse)) return undefined
+  const felder: Kurzanlage['felder'] = [
+    { name: 'name', label: 'Bezeichnung', pflicht: true },
+    { name: 'sku', label: 'Artikelnummer (optional)', platzhalter: 'z. B. RF-002' },
+  ]
+  if (zweck === 'einkauf') {
+    if (einheiten.length > 1) {
+      felder.push({
+        name: 'einheit',
+        label: 'Einheit',
+        art: 'wahl',
+        vorgabe: einheiten[0],
+        optionen: einheiten.map((e) => ({ wert: e, text: e })),
+      })
+    }
+    felder.push(
+      { name: 'kosten', label: 'Einstandspreis je Einheit (optional)', art: 'zahl', platzhalter: 'z. B. 0,35' },
+      {
+        name: 'beschaffung',
+        label: 'Beschaffung',
+        art: 'wahl',
+        vorgabe: 'kaufen',
+        optionen: [
+          { wert: 'kaufen', text: 'Kaufen' },
+          { wert: 'fertigen', text: 'Selbst fertigen' },
+        ],
+      },
+    )
+  }
   return {
-    titel: zweck === 'einkauf' ? 'Neuer Einkaufsartikel' : 'Neuer Artikel',
-    was: 'Artikel',
-    felder: [
-      { name: 'name', label: 'Bezeichnung', pflicht: true },
-      { name: 'sku', label: 'Artikelnummer (optional)', platzhalter: 'z. B. RF-002' },
-    ],
+    titel: zweck === 'einkauf' ? 'Neues Teil' : 'Neuer Artikel',
+    was: zweck === 'einkauf' ? 'Teil' : 'Artikel',
+    felder,
     aktion: artikelKurzAnlegen.bind(null, zweck),
   }
 }
