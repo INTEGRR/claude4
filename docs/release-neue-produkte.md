@@ -119,35 +119,40 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 
 ## Arbeitspakete
 
+**Stand 27.11.:** ✅ gebaut · ⬜ offen. Gebaut sind K1, A1 und zwei Pakete,
+die im Plan nicht standen: Rückhalt und Höchstmenge für den Einzelverkauf
+(0133) und der Fulfillment-Halt aus Shopify (0134). **Offen sind alle acht
+Schutz-Pakete S1–S8** und A2–A6.
+
 **Block S — Schutz am Release-Tag (muss)**
 
 | Nr. | Paket | Größe |
 |---|---|---|
-| S1 | Mengen nie blind hochsetzen: Erhöhung nur mit Vergleichswert, nicht solange Bestell-Ereignisse offen sind | klein–mittel |
-| S2 | Reservierung mit Sperre auf dem Bestand (`move_reserve`) | klein |
-| S3 | Kontingent-Modus: knappe Teile auf die Varianten aufteilen, Summe ≤ frei; Zweitangebote und der Einzelverkauf des Teils (Rückhalt/Höchstmenge, 0133) eingerechnet | groß |
-| S4 | Webhook-Verarbeitung härten: Ereignisse exklusiv greifen, Bestellungen vor Bestand-Echos, bei Drosselung kurz warten, hängenden Abgleich nach 2 Minuten zurückholen | mittel |
-| S5 | Überverkaufs-Wächter: Bestellung ohne volle Reservierung → Telegram und Vermerk am Auftrag | klein–mittel |
-| S6 | Not-Aus: eine Aktion setzt alle auftragsgefertigten Varianten auf ausverkauft | klein |
-| S7 | Abgleich heilt und meldet Abweichungen, prüft „nicht weiterverkaufen" erneut | klein |
-| S8 | Lasttest: 500 Bestellungen gleichzeitig gegen die Attrappe, Beweis „nie mehr verkauft als Teile da" | mittel |
+| ⬜ S1 | Mengen nie blind hochsetzen: Erhöhung nur mit Vergleichswert, nicht solange Bestell-Ereignisse offen sind | klein–mittel |
+| ⬜ S2 | Reservierung mit Sperre auf dem Bestand (`move_reserve`) | klein |
+| ⬜ S3 | Kontingent-Modus: knappe Teile auf die Varianten aufteilen, Summe ≤ frei; Zweitangebote und der Einzelverkauf des Teils (Rückhalt/Höchstmenge, 0133) eingerechnet | groß |
+| ⬜ S4 | Webhook-Verarbeitung härten: Ereignisse exklusiv greifen, Bestellungen vor Bestand-Echos, bei Drosselung kurz warten, hängenden Abgleich nach 2 Minuten zurückholen | mittel |
+| ⬜ S5 | Überverkaufs-Wächter: Bestellung ohne volle Reservierung → Telegram und Vermerk am Auftrag | klein–mittel |
+| ⬜ S6 | Not-Aus: eine Aktion setzt alle auftragsgefertigten Varianten auf ausverkauft | klein |
+| ⬜ S7 | Abgleich heilt und meldet Abweichungen, prüft „nicht weiterverkaufen" erneut | klein |
+| ⬜ S8 | Lasttest: 500 Bestellungen gleichzeitig gegen die Attrappe, Beweis „nie mehr verkauft als Teile da" | mittel |
 
 **Block K — Klärfälle (gebaut am 23.11.)**
 
 | Nr. | Paket | Größe |
 |---|---|---|
-| K1 | Klärfälle gesammelt auflösen: alle offenen Zeilen eines Shop-Artikels in einem Schritt zuordnen und die Bestellungen neu einlesen (heute 209 Zeilen einzeln) | klein–mittel |
+| ✅ K1 | Klärfälle gesammelt auflösen: alle offenen Zeilen eines Shop-Artikels in einem Schritt zuordnen und die Bestellungen neu einlesen (heute 209 Zeilen einzeln) | klein–mittel |
 
 **Block A — Anlegen (soll, spart dir Zeit beim Aufbau)**
 
 | Nr. | Paket | Größe |
 |---|---|---|
-| A1 | Stückliste kopieren (auf anderes Produkt, Zuordnung über Attribut- und Wertnamen) — **gebaut am 23.11.** | mittel |
-| A2 | Auswahlfelder mit Serversuche statt 500er-Grenze | mittel |
-| A3 | Stücklistenposition bearbeiten (Menge, Zuordnung) | klein–mittel |
-| A4 | Teil-Kurzanlage um Einheit, Einstandspreis, Kauf- oder Fertigteil erweitern | klein |
-| A5 | SKU und EAN aller Varianten in einer Tabelle pflegen | klein–mittel |
-| A6 | Hinweis, wenn ein Shop-Produkt keine Routen oder keine Stückliste hat | klein |
+| ✅ A1 | Stückliste kopieren (auf anderes Produkt, Zuordnung über Attribut- und Wertnamen) — **gebaut am 23.11.** | mittel |
+| ⬜ A2 | Auswahlfelder mit Serversuche statt 500er-Grenze | mittel |
+| ⬜ A3 | Stücklistenposition bearbeiten (Menge, Zuordnung) | klein–mittel |
+| ⬜ A4 | Teil-Kurzanlage um Einheit, Einstandspreis, Kauf- oder Fertigteil erweitern | klein |
+| ⬜ A5 | SKU und EAN aller Varianten in einer Tabelle pflegen | klein–mittel |
+| ⬜ A6 | Hinweis, wenn ein Shop-Produkt keine Routen oder keine Stückliste hat | klein |
 
 **Vorschlag für die fünf Tage**
 
@@ -166,17 +171,30 @@ verteilt nur nach — zuerst senken, dann erhöhen.
   Lücke, täglicher Sicherheits-Check per Telegram läuft seit dem 14.11.
 - Retourenportal, Seitenaufteilung der Listen, Stichtag ohne Rechnungen.
 
-## Offen beim Betreiber (Stand 17.11.)
+## Offen beim Betreiber (Stand 27.11., aus der Produktion gelesen)
 
-- Shopify-Modus steht auf „Probelauf": nichts wird an den Shop gemeldet.
-- 120 Varianten weichen ab; 14 würden beim Umschalten ausverkauft (alle
-  Black-on-Black), 50 wieder verkaufbar (alle FR-4). In Verkauf →
-  Shop-Verfügbarkeit die Spalte „Engpass" ansehen.
-- 17 Fertigungsaufträge warten auf „gebaut oder storniert"
-  (WH/MO/00054–00071); daran hängen die Minusbestände.
-- Druckbrücke meldet sich seit dem 10.11. nicht.
-- Firmendaten unvollständig, ein Admin ohne zweiten Faktor.
-- Alle Lieferungen der letzten sieben Tage liefen über Sendcloud (21 von 21).
+Erledigt seit dem 17.11.:
+
+- ✅ Klärfälle aufgelöst: keine offene Klärzeile, kein Shop-Auftrag mehr
+  als Entwurf (waren 236 Zeilen in 229 Bestellungen).
+- ✅ Fertigungs-Nachfragen WH/MO/00054–00079 beantwortet; offen sind nur
+  noch 11 laufende Aufträge (WH/MO/00080–00104).
+- ✅ Native 1800 (HE und MX, je Plague Black, Emerald Green, Founders),
+  Meinungsmache-Keycaps und Switch Tester aus Shopify übernommen.
+
+Offen:
+
+- ⬜ Native 1800: 144 Varianten ohne Artikelnummer, keine Stückliste,
+  keine Routen; die neuen Teile sind noch nicht angelegt.
+- ⬜ Fehlende Teile aus Odoo anlegen (Case Pink, Case Red, Gateron Ink
+  Pink, Gottlos-auf-Mutter-Keycaps, Packaging Roll).
+- ⬜ Doppelte Artikel zusammenführen; Rückhalt und Höchstmenge für einzeln
+  verkaufte Teile setzen.
+- ⬜ Stichtagsinventur — 10 Artikel stehen im Minus.
+- ⬜ Shopify-Modus steht auf „Probelauf"; Webhooks danach (erneut)
+  registrieren, damit die Halt-Webhooks dabei sind.
+- ⬜ Druckbrücke, Firmendaten, zweiter Faktor für einen Admin.
+- ⬜ Generalprobe mit Testprodukt im echten Shop.
 
 ## Entscheidungen, die noch fehlen
 
