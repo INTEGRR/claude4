@@ -76,6 +76,7 @@ const SEITEN: { href: string; label: string; area: Area; prozess?: string[] }[] 
   { href: '/ki', label: 'KI-Analyse', area: 'ki' },
   { href: '/sprechen', label: 'Sprechen (Sprachmodus)', area: 'ki' },
   { href: '/produkte', label: 'Produkte', area: 'produkte' },
+  { href: '/produkte/zuordnung', label: 'Zuordnungen (Artikel ↔ Shopify ↔ Odoo: was ist verknüpft, was fehlt)', area: 'produkte' },
   { href: '/kontakte', label: 'Kontakte', area: 'kontakte' },
   { href: '/scanner', label: 'Scannen (Packzettel, Wareneingang, Fertigung)', area: 'scanner' },
   { href: '/aufgaben', label: 'Aufgaben (für Mitarbeiter anlegen, abhaken)', area: 'aufgaben' },

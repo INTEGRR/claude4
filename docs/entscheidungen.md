@@ -9,6 +9,25 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Zuordnungen sichtbar machen: eine Mapping-Tabelle
+
+Auslöser (Betreiber): „Bisher war die SKU das Einzige. Ich brauche eine
+Mapping-Tabelle, damit ich sehe, wo was verknüpft ist, was fehlt und wo es
+fehlt — z. B. Silent Red." Die Verknüpfungen sind seit Langem IDs
+(Shopify-Varianten-ID am Artikel, `shopify_zweitangebote`,
+`odoo_verweise`); die SKU stellt sie nur einmal her. Sichtbar war das
+nirgends an einer Stelle.
+
+Entschieden: Keine neue Tabelle in der Datenbank — die Zuordnungen gibt es
+schon. Neu ist die **Ansicht** `/produkte/zuordnung`: je Artikel Shopify,
+weitere Shop-Angebote und Odoo nebeneinander, mit Filtern (ja/nein), Suche
+und Seiten nach der Listen-Regel vom selben Tag, darüber die Lücken als
+Schnellfilter. Nur lesend; geändert wird an der Variante (Codes,
+Shopify-ID, herauslösen) bzw. über „Zusammenführen". Shop-Varianten, die
+KRNL gar nicht kennt, erscheinen als offene Klärfälle (Verweis auf die
+Integrationen-Seite). Umsetzung: `integrationen/zuordnung.ts`, Seite
+`produkte/zuordnung`. Doku: [module/stammdaten.md](module/stammdaten.md).
+
 ## 2026-11-27 — KI-Chat läuft der Antwort wieder nach
 
 Auslöser (Betreiber): „Der KI-Chat scrollt nicht automatisch runter."

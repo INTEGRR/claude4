@@ -71,6 +71,7 @@ export default async function ProduktePage({
         subtitle="Produktvorlagen mit Attributen und Varianten"
         actions={<>
             <Link className="btn" href="/p/artikel_anlegen">Anlage-Assistent</Link>
+            <Link className="btn" href="/produkte/zuordnung">Zuordnungen</Link>
             <Link className="btn" href="/produkte/attribute">Attribute</Link>
             {/* Kategorien, Steuern, Zahlungsbedingungen: Einstellungen → Stammdaten (nur Admin). */}
             {canAccess(user.rollen, 'einstellungen', user.befugnisse) && (
