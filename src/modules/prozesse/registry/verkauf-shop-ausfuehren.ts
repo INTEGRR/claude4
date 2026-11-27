@@ -74,6 +74,7 @@ export async function shopVarianteSetzen(
     modus?: 'auto' | 'immer' | 'aus' | 'erben'
     oos_unter?: number | null
     zurueckhalten?: boolean
+    nicht_einzeln?: boolean
     rueckhalt?: number | null
     hoechstmenge?: number | null
   },
@@ -85,6 +86,7 @@ export async function shopVarianteSetzen(
       shop_modus = case when ${modus !== undefined} then ${modus ?? null} else shop_modus end,
       shop_oos_unter = case when ${p.oos_unter !== undefined} then ${p.oos_unter ?? null}::int else shop_oos_unter end,
       shop_zurueckhalten = coalesce(${p.zurueckhalten ?? null}::boolean, shop_zurueckhalten),
+      shop_nicht_einzeln = coalesce(${p.nicht_einzeln ?? null}::boolean, shop_nicht_einzeln),
       shop_rueckhalt = case when ${p.rueckhalt !== undefined} then ${p.rueckhalt || null}::numeric else shop_rueckhalt end,
       shop_hoechstmenge = case when ${p.hoechstmenge !== undefined} then ${p.hoechstmenge ?? null}::int else shop_hoechstmenge end
     where id = ${p.variant_id}
@@ -93,7 +95,8 @@ export async function shopVarianteSetzen(
   const teile = [
     p.modus ? `Shop: ${MODUS_TEXT[p.modus]}` : null,
     p.oos_unter !== undefined ? (p.oos_unter ? `ausverkauft unter ${p.oos_unter}` : 'keine Schwelle') : null,
-    p.zurueckhalten !== undefined ? (p.zurueckhalten ? 'zurückgehalten' : 'nicht zurückgehalten') : null,
+    p.zurueckhalten !== undefined ? (p.zurueckhalten ? 'für den Shop gesperrt (auch in Tastaturen)' : 'nicht gesperrt') : null,
+    p.nicht_einzeln !== undefined ? (p.nicht_einzeln ? 'nicht einzeln verkaufen' : 'einzeln verkaufbar') : null,
     p.rueckhalt !== undefined ? (p.rueckhalt ? `Rückhalt für die Fertigung ${p.rueckhalt}` : 'kein Rückhalt') : null,
     p.hoechstmenge !== undefined
       ? p.hoechstmenge !== null ? `höchstens ${p.hoechstmenge} im Einzelverkauf` : 'keine Höchstmenge'

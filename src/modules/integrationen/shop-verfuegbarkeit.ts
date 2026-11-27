@@ -85,6 +85,8 @@ export interface WeitererArtikel {
   frei: number
   oosUnter: number | null
   zurueck: boolean
+  /** „Nicht einzeln verkaufen" (0142): der eigene Shop-Eintrag bekommt 0. */
+  nichtEinzeln: boolean
   /** Einzelverkauf (0133): so viele Stück bleiben der Fertigung. */
   rueckhalt: number | null
   /** Einzelverkauf (0133): nie mehr gleichzeitig im Shop anbieten. */
@@ -182,11 +184,11 @@ export async function shopVerfuegbarkeit(): Promise<{
     sql<{
       id: string; template_id: string; sku: string | null; name: string; shop_modus: Modus | null; t_modus: Modus
       frei: number; oos_unter: number | null; zurueck: boolean; soll: number; shop_qty: number | null; shop_verkaufbar: boolean | null
-      rueckhalt: number | null; hoechstmenge: number | null
+      rueckhalt: number | null; hoechstmenge: number | null; nicht_einzeln: boolean
     }[]>`
       select pv.id, pv.template_id, nullif(pv.sku, '') as sku, pv.display_name as name, pv.shop_modus, pt.shop_modus as t_modus,
              free_to_use(pv.id)::float as frei, pv.shop_oos_unter as oos_unter, pv.shop_zurueckhalten as zurueck,
-             pv.shop_rueckhalt::float as rueckhalt, pv.shop_hoechstmenge as hoechstmenge,
+             pv.shop_rueckhalt::float as rueckhalt, pv.shop_hoechstmenge as hoechstmenge, pv.shop_nicht_einzeln as nicht_einzeln,
              coalesce(s.kontingent, shopify_soll_menge(pv.id)) as soll, s.shop_qty::float as shop_qty, s.shop_verkaufbar
       from product_variants pv
       join product_templates pt on pt.id = pv.template_id
@@ -282,7 +284,7 @@ export async function shopVerfuegbarkeit(): Promise<{
     weitere: weitere.map((w) => ({
       id: w.id, templateId: w.template_id, sku: w.sku, name: w.name, modus: w.shop_modus, artikelModus: w.t_modus,
       frei: n(w.frei), oosUnter: w.oos_unter, zurueck: w.zurueck, soll: n(w.soll),
-      rueckhalt: w.rueckhalt === null ? null : n(w.rueckhalt), hoechstmenge: w.hoechstmenge,
+      rueckhalt: w.rueckhalt === null ? null : n(w.rueckhalt), hoechstmenge: w.hoechstmenge, nichtEinzeln: w.nicht_einzeln,
       shopQty: w.shop_qty === null ? null : n(w.shop_qty), shopVerkaufbar: w.shop_verkaufbar,
     })),
     zweitangebote: zweit.map((z) => ({

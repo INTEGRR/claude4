@@ -10,9 +10,11 @@ import {
   addVendorPrice,
   deleteVendorPrice,
   produktZuShopify,
+  setShopRegeln,
   setVariantenCodes,
   updateProduct,
 } from '../actions'
+import { ShopRegelKarte } from '@/components/shop-regel-karte'
 import { canWrite } from '@/modules/auth/permissions'
 import { anlageLuecken } from '@/modules/shared/anlage-luecken'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
@@ -562,6 +564,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         )}
       </Card>
 
+      {/* Material mit genau einer Variante: die Shop-Regeln stehen gleich hier (0142). */}
+      {variants.length === 1 && (
+        <ShopRegelKarte
+          variantId={variants[0].id}
+          darf={canWrite(user.rollen, 'verkauf', user.befugnisse)}
+          action={setShopRegeln}
+        />
+      )}
+      {variants.length > 1 && (
+        <p className="small muted" style={{ margin: '0 0 8px' }}>
+          Shop-Regeln (einzeln verkaufen, sperren, Notreserve) stehen an der jeweiligen Variante — in der Tabelle
+          unten auf den Namen klicken — oder gesammelt unter{' '}
+          <Link href="/verkauf/shop-verfuegbarkeit?ansicht=artikel">Shop-Verfügbarkeit → Teile und Artikel</Link>.
+        </p>
+      )}
       <div id="varianten" />
       <Card title={`Varianten (${variants.length})`} tight>
         {variants.length === 0 ? (

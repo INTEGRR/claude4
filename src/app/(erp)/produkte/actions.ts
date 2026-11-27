@@ -50,6 +50,11 @@ export async function setShopProjekt(formData: FormData): Promise<ActionResult> 
   return serverAktion('produkte.shop_projekt_setzen', { formData })
 }
 
+/** Shop-Regeln eines Artikels (Karte am Produkt und an der Variante) — dieselbe Aktion wie in der Shop-Verfügbarkeit. */
+export async function setShopRegeln(formData: FormData): Promise<ActionResult> {
+  return serverAktion('verkauf.shop_variante_setzen', { formData })
+}
+
 export async function createAttribute(formData: FormData): Promise<ActionResult> {
   return serverAktion('produkte.attribut_anlegen', { formData })
 }

@@ -531,7 +531,15 @@ Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`
   den echten Bestand):
   - **Teil**: Schwelle „ausverkauft unter N" (`shop_oos_unter`: nur was
     darüber liegt, zählt — Blue Cases unter 2 → alles mit Blue Case weg) und
-    **zurückhalten** (`shop_zurueckhalten`: zählt als 0 — Yellow Cases).
+    zwei getrennte Schalter (seit 2026-11-27, 0142 — vorher ein Häkchen
+    „zurückhalten" mit zwei möglichen Bedeutungen):
+    **„Für den Shop sperren"** (`shop_zurueckhalten`: das Teil zählt als 0 —
+    auch jede Tastatur, die es braucht, ist ausverkauft; Yellow Cases) und
+    **„Nicht einzeln verkaufen"** (`shop_nicht_einzeln`, nur Shopartikel:
+    der eigene Shop-Eintrag bekommt 0, Tastaturen mit dem Teil rechnen mit
+    dem vollen Bestand). Dieselben Felder stehen mit ausgeschriebener
+    Erklärung auch am Produkt bzw. an der Variante (Karte
+    „Shop-Verfügbarkeit", `components/shop-regel-karte.tsx`).
   - **Artikel / Variante**: `shop_modus` auto (berechnet), **immer**
     (Deckel — Switch-Tester; der 3D-Druck ist schnell nachgebaut), **aus**
     (0 — Black Week Editions); die Variante überstimmt den Artikel.

@@ -141,7 +141,27 @@ describe('Shop-Verfügbarkeit: Projekte, Regeln, Shop-Stand', () => {
       { parameter: { variant_id: v.caseGelb, zurueckhalten: true } },
       ADMIN,
     )
-    assert.equal(await soll(v['Gelb:Yellow']), 0, 'Yellow Cases zurückgehalten')
+    assert.equal(await soll(v['Gelb:Yellow']), 0, 'Yellow Cases für den Shop gesperrt → Tastatur aus')
+
+    // „Nicht einzeln verkaufen" (0142) ist der andere Schalter: der eigene
+    // Shop-Eintrag des Gehäuses bekommt 0, die Tastatur rechnet weiter voll.
+    await aktionAusfuehrenGeprueft(
+      'verkauf.shop_variante_setzen',
+      { parameter: { variant_id: v.caseGelb, zurueckhalten: false, oos_unter: null } },
+      ADMIN,
+    )
+    await h.sql`update product_variants set shopify_variant_id = 'gid://shopify/ProductVariant/case-gelb' where id = ${v.caseGelb}`
+    const vorher = await soll(v['Gelb:Yellow'])
+    assert.ok(vorher > 0 && (await soll(v.caseGelb)) > 0, 'Gehäuse einzeln im Shop, Tastatur verfügbar')
+    const einzeln = new FormData()
+    einzeln.set('variant_id', v.caseGelb)
+    einzeln.set('nicht_einzeln_feld', '1')
+    einzeln.set('nicht_einzeln', 'on')
+    const r = await aktionAusfuehrenGeprueft('verkauf.shop_variante_setzen', { formData: einzeln }, ADMIN)
+    assert.match(r.text ?? '', /nicht einzeln verkaufen/)
+    assert.equal(await soll(v.caseGelb), 0, 'das Gehäuse wird nicht einzeln angeboten')
+    assert.equal(await soll(v['Gelb:Yellow']), vorher, 'die Tastatur mit diesem Gehäuse ist nicht betroffen')
+    await h.sql`update product_variants set shopify_variant_id = null, shop_nicht_einzeln = false where id = ${v.caseGelb}`
 
     await aktionAusfuehrenGeprueft('verkauf.shop_artikel_setzen', { parameter: { template_id: t.Blau, modus: 'aus' } }, ADMIN)
     assert.equal(await soll(v['Blau:Yellow']), 0, 'ganzer Artikel aus')

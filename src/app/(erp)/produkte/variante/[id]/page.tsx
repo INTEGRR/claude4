@@ -7,7 +7,8 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { barcodeSvg } from '@/modules/shared/barcode'
 import { dateTime, qty } from '@/modules/shared/format'
-import { setVariantCodes } from '../../actions'
+import { setShopRegeln, setVariantCodes } from '../../actions'
+import { ShopRegelKarte } from '@/components/shop-regel-karte'
 import { artikeletikettenDrucken } from '../../../lager/actions'
 import { RecordComments } from '@/components/record-comments'
 
@@ -177,6 +178,8 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
           )}
         </Card>
       </div>
+
+      <ShopRegelKarte variantId={id} darf={canWrite(user.rollen, 'verkauf', user.befugnisse)} action={setShopRegeln} />
 
       <Card title="Bewegungen" tight>
         {moves.length === 0 ? (

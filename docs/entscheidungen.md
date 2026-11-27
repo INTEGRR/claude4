@@ -9,6 +9,38 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — „Zurückhalten" wird zu zwei Schaltern: nicht einzeln verkaufen / für den Shop sperren
+
+Auslöser: Alle NATIVE 75 standen für den Shop auf ausverkauft, obwohl das
+Material da war. Der Betreiber hatte an den sechs Gehäusen und zwei
+Keycap-Sets „zurückhalten" gesetzt — gemeint war „nicht einzeln
+verkaufen". Der Schalter (0101) ließ das Teil aber für den Shop als 0
+zählen, auch in jeder Tastatur: 344 von 345 Tastatur-Varianten waren aus.
+Ein Wort, zwei Bedeutungen — und die Einstellung stand nur in der
+Shop-Verfügbarkeit, nicht am Material.
+
+Entschieden (Betreiber: „zwei getrennte Häkchen, klares Wording und
+Beschreibung, zudem im Produkt/Material auch die Config"):
+
+- **„Nicht einzeln verkaufen"** (neu, `product_variants.shop_nicht_einzeln`,
+  Migration 0142): der eigene Shop-Eintrag des Artikels bekommt 0;
+  Tastaturen mit dem Teil rechnen mit dem vollen Bestand. Nur bei
+  Artikeln, die selbst im Shop stehen.
+- **„Für den Shop sperren"** (bisheriges Verhalten, Spalte
+  `shop_zurueckhalten`): der Artikel zählt als 0 — auch jede Tastatur, die
+  ihn braucht, ist ausverkauft.
+- **Umzug der gesetzten Häkchen:** was bisher „zurückhalten" trug, wird
+  „nicht einzeln verkaufen"; die Sperre wird aufgehoben (Migration 0142).
+  Vor dem 27.11. war der Schalter in der Produktion nie gesetzt.
+- **Am Material:** Karte „Shop-Verfügbarkeit" an jeder Variante und bei
+  Ein-Varianten-Material am Produkt, mit ausgeschriebener Erklärung je
+  Schalter; in der Liste „Teile und Artikel" dieselben zwei Häkchen mit
+  Tooltip. Eine Aktion für beide Orte (`verkauf.shop_variante_setzen`).
+
+Test: `tests/prozesse/shop-verfuegbarkeit.test.ts` (Gehäuse nicht einzeln →
+Tastatur unverändert verfügbar). Doku: [module/integrationen.md](module/integrationen.md)
+„Shop-Verfügbarkeit: Regeln und Ansicht", [module/stammdaten.md](module/stammdaten.md).
+
 ## 2026-11-27 — Shop-Verfügbarkeit kompakt; Montage-Ebenen finden abweichende Attributnamen
 
 Zwei Befunde des Betreibers am selben Tag:

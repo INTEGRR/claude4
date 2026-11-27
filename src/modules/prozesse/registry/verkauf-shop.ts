@@ -72,8 +72,10 @@ export const VERKAUF_SHOP = {
     beschreibung:
       'Für eine Variante: Modus auto/immer/aus oder erben (wie der Artikel). Als Teil bzw. Artikel mit ' +
       'Bestand: Schwelle „ausverkauft unter N Stück" (nur was darüber liegt, zählt; leer = keine) und ' +
-      'zurückhalten (zählt für den Shop als 0 — z. B. Yellow Cases). Wirkt auf alle Tastaturen, die das ' +
-      'Teil brauchen. Nur für den Einzelverkauf eines Lagerartikels (Ersatzteil): rueckhalt = so viele ' +
+      'zurueckhalten = „für den Shop sperren" (zählt als 0 — auch jede Tastatur, die das Teil braucht, ' +
+      'ist dann ausverkauft; z. B. Yellow Cases). nicht_einzeln = „nicht einzeln verkaufen" (nur der ' +
+      'eigene Shop-Eintrag bekommt 0, Tastaturen mit dem Teil sind nicht betroffen). ' +
+      'Nur für den Einzelverkauf eines Lagerartikels (Ersatzteil): rueckhalt = so viele ' +
       'Stück bleiben der Fertigung, hoechstmenge = nie mehr gleichzeitig im Shop anbieten (leer = ohne); ' +
       'Tastaturen rechnen weiter mit dem vollen Bestand.',
     bindung: 'frei',
@@ -82,13 +84,15 @@ export const VERKAUF_SHOP = {
         variant_id: z.string().guid(),
         modus: z.enum(['auto', 'immer', 'aus', 'erben']).optional(),
         oos_unter: z.number().int().min(1).max(100000).nullable().optional(),
-        zurueckhalten: z.boolean().optional(),
+        zurueckhalten: z.boolean().optional().describe('für den Shop sperren — auch in Tastaturen'),
+        nicht_einzeln: z.boolean().optional().describe('nicht einzeln verkaufen — Tastaturen nicht betroffen'),
         rueckhalt: z.number().min(0).max(1000000).nullable().optional(),
         hoechstmenge: z.number().int().min(0).max(100000).nullable().optional(),
       })
       .refine(
         (p) =>
           p.modus !== undefined || p.oos_unter !== undefined || p.zurueckhalten !== undefined ||
+          p.nicht_einzeln !== undefined ||
           p.rueckhalt !== undefined || p.hoechstmenge !== undefined,
         'Nichts zu ändern',
       ),
@@ -96,7 +100,8 @@ export const VERKAUF_SHOP = {
       [
         p.modus ? `Variante an Shopify: ${p.modus}` : null,
         p.oos_unter !== undefined ? (p.oos_unter ? `ausverkauft unter ${p.oos_unter}` : 'keine Schwelle') : null,
-        p.zurueckhalten !== undefined ? (p.zurueckhalten ? 'zurückhalten' : 'nicht zurückhalten') : null,
+        p.zurueckhalten !== undefined ? (p.zurueckhalten ? 'für den Shop sperren' : 'Sperre aufheben') : null,
+        p.nicht_einzeln !== undefined ? (p.nicht_einzeln ? 'nicht einzeln verkaufen' : 'einzeln verkaufen') : null,
         p.rueckhalt !== undefined ? (p.rueckhalt ? `Rückhalt ${p.rueckhalt}` : 'kein Rückhalt') : null,
         p.hoechstmenge !== undefined ? (p.hoechstmenge !== null ? `höchstens ${p.hoechstmenge}` : 'keine Höchstmenge') : null,
       ]
@@ -115,11 +120,12 @@ export const VERKAUF_SHOP = {
         oos_unter: schwelle === undefined ? undefined : schwelle === '' ? null : Number(schwelle),
         // Checkbox: nur auswerten, wenn das Formular sie führt (Marker-Feld).
         zurueckhalten: fd.has('zurueckhalten_feld') ? fd.get('zurueckhalten') === 'on' : undefined,
+        nicht_einzeln: fd.has('nicht_einzeln_feld') ? fd.get('nicht_einzeln') === 'on' : undefined,
         rueckhalt: zahl('rueckhalt'),
         hoechstmenge: zahl('hoechstmenge'),
       }
     },
-    revalidate: ['/verkauf/shop-verfuegbarkeit'],
+    revalidate: ['/verkauf/shop-verfuegbarkeit', '/produkte/variante/:ergebnis'],
   },
 
   'verkauf.shop_option_setzen': {

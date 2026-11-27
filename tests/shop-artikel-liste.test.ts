@@ -13,7 +13,7 @@ const teil = (id: string, name: string, sku: string, artikel: number) => ({
 })
 const shopArtikel = (id: string, name: string, sku: string) => ({
   id, templateId: `t-${id}`, name, sku, modus: null, artikelModus: 'auto' as const, frei: 50, oosUnter: null,
-  zurueck: false, rueckhalt: 10, hoechstmenge: null, soll: 40, shopQty: 40, shopVerkaufbar: true,
+  zurueck: false, nichtEinzeln: false, rueckhalt: 10, hoechstmenge: null, soll: 40, shopQty: 40, shopVerkaufbar: true,
 })
 
 const liste = artikelListe(

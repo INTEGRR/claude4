@@ -68,7 +68,7 @@ const MODI: { wert: Modus; text: string }[] = [
 ]
 
 function teilText(t: TeilInfo): string {
-  const regel = t.zurueck ? ' · zurückgehalten' : t.oosUnter ? ` · aus unter ${qty(t.oosUnter)}` : ''
+  const regel = t.zurueck ? ' · für den Shop gesperrt' : t.oosUnter ? ` · aus unter ${qty(t.oosUnter)}` : ''
   return `${t.name}: ${qty(t.frei)} frei${regel}${t.je > 1 ? ` · ${qty(t.je)} je Stück` : ''} → reicht für ${qty(t.reicht)}`
 }
 
@@ -513,12 +513,13 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
           <details style={{ padding: '0 12px 10px' }}>
             <summary className="small muted" style={{ cursor: 'pointer' }}>Was bedeuten die Regeln?</summary>
             <p className="small muted" style={{ margin: '6px 0 0' }}>
-              <strong>Aus unter N:</strong> für den Shop zählt nur, was darüber liegt (Blue Cases unter 2 → alles mit
-              Blue Case weg). <strong>Zurückhalten:</strong> zählt für den Shop als 0. Beides wirkt sofort auf jede
-              Tastatur, die das Teil braucht — nur für den Shop, die Fertigung sieht weiter den echten Bestand.
-              Nur bei Shopartikeln: <strong>Rückhalt</strong> — so viele Stück bleiben der Fertigung, einzeln
-              verkaufbar ist nur, was darüber liegt; <strong>höchstens</strong> — nie mehr gleichzeitig im Shop
-              anbieten. Beides gilt nur für den Einzelverkauf.
+              <strong>Nicht einzeln verkaufen</strong> (nur Shopartikel): der Artikel wird im Shop nicht einzeln
+              angeboten; Tastaturen, die ihn brauchen, sind nicht betroffen. <strong>Für den Shop sperren:</strong>{' '}
+              der Artikel zählt für den Shop als 0 — auch jede Tastatur, die ihn braucht, ist dann ausverkauft.{' '}
+              <strong>Aus unter N:</strong> Notreserve — für den Shop zählt nur, was über N liegt, im Einzelverkauf
+              und in Tastaturen. Nur bei Shopartikeln und nur für den Einzelverkauf: <strong>Rückhalt</strong> — so
+              viele Stück bleiben der Fertigung; <strong>höchstens</strong> — nie mehr gleichzeitig im Shop anbieten.
+              Alles wirkt sofort und nur für den Shop; die Fertigung sieht weiter den echten Bestand.
             </p>
           </details>
           {zeilen.length === 0 ? (
@@ -547,10 +548,10 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                       <td className="num mono">{qty(z.frei)}</td>
                       <td className="num mono">{z.stuecklisten > 0 ? qty(z.stuecklisten) : <span className="muted">—</span>}</td>
                       <td className="num mono">
-                        {z.nutzbar === null ? <span className="muted">—</span> : z.zurueck ? <Zustand ton="off">zurück</Zustand> : qty(z.nutzbar)}
+                        {z.nutzbar === null ? <span className="muted">—</span> : z.zurueck ? <Zustand ton="off">gesperrt</Zustand> : qty(z.nutzbar)}
                       </td>
                       <td className="num mono">
-                        {!z.shop ? <span className="muted">—</span> : z.shop.soll > 0 ? qty(z.shop.soll) : <Zustand ton="warn">0</Zustand>}
+                        {!z.shop ? <span className="muted">—</span> : z.shop.nichtEinzeln ? <Zustand ton="off">nicht einzeln</Zustand> : z.shop.soll > 0 ? qty(z.shop.soll) : <Zustand ton="warn">0</Zustand>}
                       </td>
                       <td className="num mono">
                         {!z.shop || z.shop.shopVerkaufbar === null ? <span className="muted">—</span> : z.shop.shopVerkaufbar ? qty(z.shop.shopQty ?? 0) : 'aus'}
@@ -587,8 +588,22 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                                   </label>
                                 </>
                               )}
-                              <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                                <input type="checkbox" name="zurueckhalten" defaultChecked={z.zurueck} /> zurückhalten
+                              {z.shop && (
+                                <label
+                                  className="small"
+                                  style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+                                  title="Der Artikel wird im Shop nicht einzeln angeboten (Menge 0). Tastaturen, die ihn brauchen, sind nicht betroffen."
+                                >
+                                  <input type="hidden" name="nicht_einzeln_feld" value="1" />
+                                  <input type="checkbox" name="nicht_einzeln" defaultChecked={z.shop.nichtEinzeln} /> nicht einzeln verkaufen
+                                </label>
+                              )}
+                              <label
+                                className="small"
+                                style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+                                title="Der Artikel zählt für den Shop als 0 — auch jede Tastatur, die ihn braucht, ist dann ausverkauft. Die Fertigung sieht weiter den echten Bestand."
+                              >
+                                <input type="checkbox" name="zurueckhalten" defaultChecked={z.zurueck} /> für den Shop sperren
                               </label>
                               <button type="submit" className="small">
                                 OK
