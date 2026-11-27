@@ -267,7 +267,7 @@ export async function shopVerfuegbarkeit(): Promise<{
     projekte.get(schluessel)!.artikel.push(info)
   }
 
-  // Teile-Regeln: jedes Teil einmal, mit Zahl der Artikel, die es brauchen.
+  // Teile (Ansicht „Teile und Artikel"): jedes Teil einmal, mit Zahl der Artikel, die es brauchen.
   const teile = new Map<string, { info: TeilInfo; artikel: Set<string> }>()
   for (const z of zeilen) {
     if (!teile.has(z.teil)) teile.set(z.teil, { info: teilInfo(z), artikel: new Set() })

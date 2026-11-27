@@ -3,7 +3,10 @@ import { sql } from '@/db/client'
 import { requireArea } from '@/modules/auth'
 import { canWrite } from '@/modules/auth/permissions'
 import { ActionButton, ActionForm } from '@/components/action-button'
-import { Card, PageHeader, TableWrap, Zustand } from '@/components/ui'
+import { Card, Empty, PageHeader, TableWrap, Zustand } from '@/components/ui'
+import { GroesseBehalten, Seiten } from '@/components/seiten'
+import { seitenHref, seitenParameter } from '@/modules/shared/seiten'
+import { artikelListe, jaNein, listeFiltern } from '@/modules/integrationen/shop-artikel-liste'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { shopifyModus } from '@/modules/integrationen/shopify-modus'
 import { madeToOrderEinstellung } from '@/modules/integrationen/made-to-order'
@@ -270,13 +273,41 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
  * plus die Regeln: Artikel/Variante auto·immer·aus, Option deaktivieren,
  * Teil mit Schwelle oder zurückgehalten.
  */
-export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchParams: Promise<{ a?: string }> }) {
+type Ansicht = 'tastaturen' | 'artikel' | 'zweit'
+type Parameter = {
+  a?: string
+  ansicht?: string
+  stl?: string
+  shop?: string
+  q?: string
+  seite?: string
+  pro?: string
+}
+const PFAD = '/verkauf/shop-verfuegbarkeit'
+
+/** Link in der Ansicht „Teile und Artikel" mit geändertem Filter — Suche und Seitengröße bleiben, zurück auf Seite 1. */
+function filterHref(params: Parameter, name: 'stl' | 'shop', wert: 'ja' | 'nein' | null): string {
+  return seitenHref(PFAD, { ...params, ansicht: 'artikel', [name]: wert ?? undefined, seite: undefined }, 1)
+}
+
+export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchParams: Promise<Parameter> }) {
   const user = await requireArea('verkauf')
   const darf = canWrite(user.rollen, 'verkauf', user.befugnisse)
-  const { a: gewaehlt } = await searchParams
+  const params = await searchParams
+  const gewaehlt = params.a
+  const ansicht: Ansicht = params.ansicht === 'artikel' || params.ansicht === 'zweit' ? params.ansicht : 'tastaturen'
   const [daten, mto, modus, notAus, unvollstaendig] = await Promise.all([
     shopVerfuegbarkeit(), madeToOrderEinstellung(), shopifyModus(sql), notAusAktiv(), shopProdukteMitLuecken(),
   ])
+
+  // Eine Liste statt zweier Karten: Stücklistenteile und Shop-Artikel zusammen, gefiltert, gesucht, geblättert.
+  const alle = artikelListe(daten.teile, daten.weitere)
+  const stl = jaNein(params.stl)
+  const shop = jaNein(params.shop)
+  const q = (params.q ?? '').trim()
+  const gefiltert = listeFiltern(alle, { stueckliste: stl, shop, q })
+  const seite = seitenParameter(params)
+  const zeilen = gefiltert.slice(seite.offset, seite.offset + seite.limit)
 
   return (
     <>
@@ -343,13 +374,32 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
         Shop-Stand zuletzt gelesen: {daten.zuletztGelesen ? dateTime(daten.zuletztGelesen) : 'noch nie'}.
       </div>
 
-      {daten.projekte.length === 0 && (
+      <div className="actions" style={{ margin: '0 0 12px' }} role="navigation" aria-label="Ansicht">
+        {(
+          [
+            ['tastaturen', 'Tastaturen', daten.projekte.reduce((n, p) => n + p.artikel.length, 0)],
+            ['artikel', 'Teile und Artikel', alle.length],
+            ['zweit', 'Zweitangebote', daten.zweitangebote.length],
+          ] as const
+        ).map(([key, label, zahl]) => (
+          <Link
+            key={key}
+            href={key === 'tastaturen' ? PFAD : `${PFAD}?ansicht=${key}`}
+            className="btn small"
+            aria-current={ansicht === key ? 'page' : undefined}
+          >
+            {label} <span className="filter-zahl">{zahl}</span>
+          </Link>
+        ))}
+      </div>
+
+      {ansicht === 'tastaturen' && daten.projekte.length === 0 && (
         <Card>
           <p className="small muted" style={{ margin: 0 }}>Keine Shopify-gekoppelten Made-to-Order-Artikel.</p>
         </Card>
       )}
 
-      {daten.projekte.map((p) => {
+      {ansicht === 'tastaturen' && daten.projekte.map((p) => {
         const auswahl = p.artikel.find((a) => a.id === gewaehlt) ?? p.artikel[0]
         return (
           <Card key={p.name} title={p.name}>
@@ -381,215 +431,205 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
         )
       })}
 
-      <Card title={`Teile-Regeln (${daten.teile.length})`} tight>
-        <p className="small muted" style={{ margin: 0, padding: '10px 12px' }}>
-          Schwelle „ausverkauft unter N": für den Shop zählt nur, was darüber liegt (Blue Cases unter 2 → alles mit
-          Blue Case weg). Zurückhalten: zählt als 0 (z. B. Yellow Cases). Wirkt sofort auf jede Tastatur, die das Teil
-          braucht — nur für den Shop, die Fertigung sieht weiter den echten Bestand.
-        </p>
-        <TableWrap>
-          <table>
-            <thead>
-              <tr>
-                <th>Teil</th>
-                <th className="num">frei</th>
-                <th className="num">für den Shop</th>
-                <th className="num">Artikel</th>
-                {darf && <th>Regel</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {daten.teile.map((t) => (
-                <tr key={t.id}>
-                  <td className="small">
-                    <Link href={`/produkte/variante/${t.id}`}>{t.name}</Link>
-                    {t.sku && <span className="muted mono"> · {t.sku}</span>}
-                  </td>
-                  <td className="num mono">{qty(t.frei)}</td>
-                  <td className="num mono">{t.zurueck ? <Zustand ton="off">zurück</Zustand> : qty(t.nutzbar)}</td>
-                  <td className="num mono">{qty(t.artikel)}</td>
-                  {darf && (
-                    <td>
-                      <ActionForm action={varianteSetzen}>
-                        <input type="hidden" name="variant_id" value={t.id} />
-                        <input type="hidden" name="zurueckhalten_feld" value="1" />
-                        <div className="actions">
-                          <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                            aus unter
-                            <input
-                              name="oos_unter"
-                              type="number"
-                              min={1}
-                              defaultValue={t.oosUnter ?? ''}
-                              style={{ width: 70 }}
-                              aria-label={`Schwelle ${t.name}`}
-                            />
-                          </label>
-                          <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                            <input type="checkbox" name="zurueckhalten" defaultChecked={t.zurueck} /> zurückhalten
-                          </label>
-                          <button type="submit" className="small">
-                            OK
-                          </button>
-                        </div>
-                      </ActionForm>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableWrap>
-      </Card>
-
-      <Card title={`Zweitangebote (${daten.zweitangebote.length})`} tight>
-        <p className="small muted" style={{ margin: 0, padding: '10px 12px' }}>
-          Weitere Shop-Angebote mit der SKU eines Artikels — die Bestandteil-Liste eines Bundles (z. B. „Black Week
-          Editions") oder eine Aktions-Edition. Sie bekommen dieselbe Menge wie der Artikel; die Bundles-App rechnet
-          daraus die Bundle-Verfügbarkeit. „aus" meldet nur diesem Angebot 0, der Artikel läuft normal weiter. Gefunden
-          werden sie beim Produktimport und bei „Shop-Stand holen".
-        </p>
-        {daten.zweitangebote.length > 0 && (
-          <TableWrap>
-            <table>
-              <thead>
-                <tr>
-                  <th>Shop-Angebot</th>
-                  <th>Artikel</th>
-                  <th className="num">an Shopify</th>
-                  <th className="num">zuletzt gemeldet</th>
-                  <th className="num">im Shop jetzt</th>
-                  {darf && <th>Steuerung</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {daten.zweitangebote.map((z) => (
-                  <tr key={z.id}>
-                    <td className="small">
-                      {z.produkt ?? '—'}
-                      {z.sku && <span className="muted mono"> · {z.sku}</span>}
-                      {z.fehler && (
-                        <div className="small" style={{ color: 'var(--danger)' }}>
-                          Shopify lehnt ab: {z.fehler}
-                        </div>
+      {ansicht === 'artikel' && (
+        <Card tight>
+          <div className="actions" style={{ padding: 12, rowGap: 8 }}>
+            <span className="mono-label">Stücklistenartikel</span>
+            {([[null, 'alle'], ['ja', 'ja'], ['nein', 'nein']] as const).map(([wert, label]) => (
+              <Link key={`stl-${label}`} href={filterHref(params, 'stl', wert)} className="btn small" aria-current={stl === wert ? 'true' : undefined}>
+                {label}
+              </Link>
+            ))}
+            <span className="mono-label" style={{ marginLeft: 12 }}>Shopartikel</span>
+            {([[null, 'alle'], ['ja', 'ja'], ['nein', 'nein']] as const).map(([wert, label]) => (
+              <Link key={`shop-${label}`} href={filterHref(params, 'shop', wert)} className="btn small" aria-current={shop === wert ? 'true' : undefined}>
+                {label}
+              </Link>
+            ))}
+            <form className="actions" style={{ marginLeft: 'auto', gap: 6 }}>
+              <input type="hidden" name="ansicht" value="artikel" />
+              {stl && <input type="hidden" name="stl" value={stl} />}
+              {shop && <input type="hidden" name="shop" value={shop} />}
+              <GroesseBehalten params={params} />
+              <input
+                type="search"
+                name="q"
+                aria-label="Suche nach Name oder Artikelnummer"
+                placeholder="Name oder Artikelnummer"
+                defaultValue={q}
+                style={{ width: 240 }}
+              />
+              <button type="submit" className="small">Suchen</button>
+            </form>
+          </div>
+          <details style={{ padding: '0 12px 10px' }}>
+            <summary className="small muted" style={{ cursor: 'pointer' }}>Was bedeuten die Regeln?</summary>
+            <p className="small muted" style={{ margin: '6px 0 0' }}>
+              <strong>Aus unter N:</strong> für den Shop zählt nur, was darüber liegt (Blue Cases unter 2 → alles mit
+              Blue Case weg). <strong>Zurückhalten:</strong> zählt für den Shop als 0. Beides wirkt sofort auf jede
+              Tastatur, die das Teil braucht — nur für den Shop, die Fertigung sieht weiter den echten Bestand.
+              Nur bei Shopartikeln: <strong>Rückhalt</strong> — so viele Stück bleiben der Fertigung, einzeln
+              verkaufbar ist nur, was darüber liegt; <strong>höchstens</strong> — nie mehr gleichzeitig im Shop
+              anbieten. Beides gilt nur für den Einzelverkauf.
+            </p>
+          </details>
+          {zeilen.length === 0 ? (
+            <Empty>Keine Artikel für diese Auswahl.</Empty>
+          ) : (
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Artikel</th>
+                    <th className="num">frei</th>
+                    <th className="num">in Tastaturen</th>
+                    <th className="num">für Tastaturen</th>
+                    <th className="num">an Shopify</th>
+                    <th className="num">im Shop jetzt</th>
+                    {darf && <th>Regel</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {zeilen.map((z) => (
+                    <tr key={z.id}>
+                      <td className="small">
+                        <Link href={`/produkte/variante/${z.id}`}>{z.name}</Link>
+                        {z.sku && <span className="muted mono nowrap"> · {z.sku}</span>}
+                      </td>
+                      <td className="num mono">{qty(z.frei)}</td>
+                      <td className="num mono">{z.stuecklisten > 0 ? qty(z.stuecklisten) : <span className="muted">—</span>}</td>
+                      <td className="num mono">
+                        {z.nutzbar === null ? <span className="muted">—</span> : z.zurueck ? <Zustand ton="off">zurück</Zustand> : qty(z.nutzbar)}
+                      </td>
+                      <td className="num mono">
+                        {!z.shop ? <span className="muted">—</span> : z.shop.soll > 0 ? qty(z.shop.soll) : <Zustand ton="warn">0</Zustand>}
+                      </td>
+                      <td className="num mono">
+                        {!z.shop || z.shop.shopVerkaufbar === null ? <span className="muted">—</span> : z.shop.shopVerkaufbar ? qty(z.shop.shopQty ?? 0) : 'aus'}
+                      </td>
+                      {darf && (
+                        <td>
+                          <ActionForm action={varianteSetzen}>
+                            <input type="hidden" name="variant_id" value={z.id} />
+                            <input type="hidden" name="zurueckhalten_feld" value="1" />
+                            <div className="actions">
+                              {z.shop && (
+                                <Auswahl name="modus" defaultValue={z.shop.modus ?? 'erben'} className="small" aria-label={`Steuerung ${z.name}`}>
+                                  <option value="erben">wie Artikel ({MODI.find((m) => m.wert === z.shop?.artikelModus)?.text})</option>
+                                  {MODI.map((m) => (
+                                    <option key={m.wert} value={m.wert}>
+                                      {m.text}
+                                    </option>
+                                  ))}
+                                </Auswahl>
+                              )}
+                              <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                aus unter
+                                <input name="oos_unter" type="number" min={1} defaultValue={z.oosUnter ?? ''} style={{ width: 70 }} aria-label={`Schwelle ${z.name}`} />
+                              </label>
+                              {z.shop && (
+                                <>
+                                  <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                    Rückhalt
+                                    <input name="rueckhalt" type="number" min={0} step="1" defaultValue={z.shop.rueckhalt ?? ''} style={{ width: 70 }} />
+                                  </label>
+                                  <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                    höchstens
+                                    <input name="hoechstmenge" type="number" min={0} step="1" defaultValue={z.shop.hoechstmenge ?? ''} style={{ width: 70 }} />
+                                  </label>
+                                </>
+                              )}
+                              <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                <input type="checkbox" name="zurueckhalten" defaultChecked={z.zurueck} /> zurückhalten
+                              </label>
+                              <button type="submit" className="small">
+                                OK
+                              </button>
+                            </div>
+                          </ActionForm>
+                        </td>
                       )}
-                    </td>
-                    <td className="small">
-                      <Link href={`/produkte/variante/${z.variantId}`}>{z.artikel}</Link>
-                    </td>
-                    <td className="num mono">{z.soll > 0 ? qty(z.soll) : <Zustand ton="warn">0</Zustand>}</td>
-                    <td className="num mono">{z.gemeldet === null ? '—' : qty(z.gemeldet)}</td>
-                    <td className="num mono">
-                      {z.shopVerkaufbar === null ? '—' : z.shopVerkaufbar ? qty(z.shopQty ?? 0) : 'aus'}
-                    </td>
-                    {darf && (
-                      <td>
-                        <ActionForm action={zweitangebotSetzen}>
-                          <input type="hidden" name="angebot_id" value={z.id} />
-                          <div className="actions">
-                            <Auswahl
-                              name="modus"
-                              defaultValue={z.modus}
-                              className="small"
-                              aria-label={`Steuerung ${z.produkt ?? z.artikel}`}
-                            >
-                              <option value="auto">wie der Artikel</option>
-                              <option value="immer">immer verfügbar</option>
-                              <option value="aus">aus (ausverkauft)</option>
-                            </Auswahl>
-                            <button type="submit" className="small">
-                              OK
-                            </button>
-                          </div>
-                        </ActionForm>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
-        )}
-      </Card>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+          <Seiten pfad={PFAD} params={params} seite={seite} gesamt={gefiltert.length} />
+        </Card>
+      )}
 
-      <Card title={`Weitere Shop-Artikel (${daten.weitere.length})`} tight>
-        <details>
-          <summary className="small" style={{ cursor: 'pointer', padding: '10px 12px' }}>
-            Lagerware und Ersatzteile (Zubehör, Switches, Gehäuse, Plates …): freier Bestand, mit Rückhalt für die
-            Fertigung und Höchstmenge im Einzelverkauf — aufklappen
-          </summary>
-          <p className="small muted" style={{ padding: '0 12px 8px', margin: 0 }}>
-            <strong>Rückhalt:</strong> so viele Stück bleiben der Fertigung — einzeln verkaufbar ist nur, was darüber
-            liegt. <strong>Höchstens:</strong> nie mehr gleichzeitig im Shop anbieten. Beides gilt nur für den
-            Einzelverkauf; Tastaturen mit diesem Teil rechnen weiter mit dem vollen Bestand. „Aus unter" dagegen ist
-            eine Notreserve für alles.
+      {ansicht === 'zweit' && (
+        <Card title={`Zweitangebote (${daten.zweitangebote.length})`} tight>
+          <p className="small muted" style={{ margin: 0, padding: '10px 12px' }}>
+            Weitere Shop-Angebote mit der SKU eines Artikels — die Bestandteil-Liste eines Bundles (z. B. „Black Week
+            Editions") oder eine Aktions-Edition. Sie bekommen dieselbe Menge wie der Artikel; die Bundles-App rechnet
+            daraus die Bundle-Verfügbarkeit. „aus" meldet nur diesem Angebot 0, der Artikel läuft normal weiter. Gefunden
+            werden sie beim Produktimport und bei „Shop-Stand holen".
           </p>
-          <TableWrap>
-            <table>
-              <thead>
-                <tr>
-                  <th>Artikel</th>
-                  <th className="num">frei</th>
-                  <th className="num">an Shopify</th>
-                  <th className="num">im Shop jetzt</th>
-                  {darf && <th>Steuerung</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {daten.weitere.map((w) => (
-                  <tr key={w.id}>
-                    <td className="small">
-                      <Link href={`/produkte/variante/${w.id}`}>{w.name}</Link>
-                      {w.sku && <span className="muted mono"> · {w.sku}</span>}
-                    </td>
-                    <td className="num mono">{qty(w.frei)}</td>
-                    <td className="num mono">{w.soll > 0 ? qty(w.soll) : <Zustand ton="warn">0</Zustand>}</td>
-                    <td className="num mono">
-                      {w.shopVerkaufbar === null ? '—' : w.shopVerkaufbar ? qty(w.shopQty ?? 0) : 'aus'}
-                    </td>
-                    {darf && (
-                      <td>
-                        <ActionForm action={varianteSetzen}>
-                          <input type="hidden" name="variant_id" value={w.id} />
-                          <input type="hidden" name="zurueckhalten_feld" value="1" />
-                          <div className="actions">
-                            <Auswahl name="modus" defaultValue={w.modus ?? 'erben'} className="small" aria-label={`Steuerung ${w.name}`}>
-                              <option value="erben">wie Artikel ({MODI.find((m) => m.wert === w.artikelModus)?.text})</option>
-                              {MODI.map((m) => (
-                                <option key={m.wert} value={m.wert}>
-                                  {m.text}
-                                </option>
-                              ))}
-                            </Auswahl>
-                            <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                              aus unter
-                              <input name="oos_unter" type="number" min={1} defaultValue={w.oosUnter ?? ''} style={{ width: 70 }} />
-                            </label>
-                            <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                              Rückhalt
-                              <input name="rueckhalt" type="number" min={0} step="1" defaultValue={w.rueckhalt ?? ''} style={{ width: 70 }} />
-                            </label>
-                            <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                              höchstens
-                              <input name="hoechstmenge" type="number" min={0} step="1" defaultValue={w.hoechstmenge ?? ''} style={{ width: 70 }} />
-                            </label>
-                            <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                              <input type="checkbox" name="zurueckhalten" defaultChecked={w.zurueck} /> zurück
-                            </label>
-                            <button type="submit" className="small">
-                              OK
-                            </button>
-                          </div>
-                        </ActionForm>
-                      </td>
-                    )}
+          {daten.zweitangebote.length > 0 && (
+            <TableWrap>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Shop-Angebot</th>
+                    <th>Artikel</th>
+                    <th className="num">an Shopify</th>
+                    <th className="num">zuletzt gemeldet</th>
+                    <th className="num">im Shop jetzt</th>
+                    {darf && <th>Steuerung</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
-        </details>
-      </Card>
+                </thead>
+                <tbody>
+                  {daten.zweitangebote.map((z) => (
+                    <tr key={z.id}>
+                      <td className="small">
+                        {z.produkt ?? '—'}
+                        {z.sku && <span className="muted mono"> · {z.sku}</span>}
+                        {z.fehler && (
+                          <div className="small" style={{ color: 'var(--danger)' }}>
+                            Shopify lehnt ab: {z.fehler}
+                          </div>
+                        )}
+                      </td>
+                      <td className="small">
+                        <Link href={`/produkte/variante/${z.variantId}`}>{z.artikel}</Link>
+                      </td>
+                      <td className="num mono">{z.soll > 0 ? qty(z.soll) : <Zustand ton="warn">0</Zustand>}</td>
+                      <td className="num mono">{z.gemeldet === null ? '—' : qty(z.gemeldet)}</td>
+                      <td className="num mono">
+                        {z.shopVerkaufbar === null ? '—' : z.shopVerkaufbar ? qty(z.shopQty ?? 0) : 'aus'}
+                      </td>
+                      {darf && (
+                        <td>
+                          <ActionForm action={zweitangebotSetzen}>
+                            <input type="hidden" name="angebot_id" value={z.id} />
+                            <div className="actions">
+                              <Auswahl
+                                name="modus"
+                                defaultValue={z.modus}
+                                className="small"
+                                aria-label={`Steuerung ${z.produkt ?? z.artikel}`}
+                              >
+                                <option value="auto">wie der Artikel</option>
+                                <option value="immer">immer verfügbar</option>
+                                <option value="aus">aus (ausverkauft)</option>
+                              </Auswahl>
+                              <button type="submit" className="small">
+                                OK
+                              </button>
+                            </div>
+                          </ActionForm>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+        </Card>
+      )}
     </>
   )
 }

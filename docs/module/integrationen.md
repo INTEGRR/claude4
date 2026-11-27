@@ -492,7 +492,19 @@ Produkt-Push —, sendet aber **nichts**:
 ### Shop-Verfügbarkeit: Regeln und Ansicht (0101)
 
 **Verkauf → Shop-Verfügbarkeit** (`/verkauf/shop-verfuegbarkeit`) zeigt, was
-Shopify bekommt — aufgebaut wie die Produktseite im Shop:
+Shopify bekommt — aufgebaut wie die Produktseite im Shop.
+
+**Drei Ansichten statt Listen untereinander** (seit 2026-11-27, Umschalter
+oben, `?ansicht=`): **Tastaturen** (Projekte mit Farb-Pills, Standard),
+**Teile und Artikel** und **Zweitangebote**. „Teile und Artikel" ist EINE
+Liste aus den früheren Karten „Teile-Regeln" und „Weitere Shop-Artikel":
+jeder Artikel, der in der Stückliste einer Shop-Tastatur steckt, selbst im
+Shop angeboten wird oder beides — mit den Filtern **Stücklistenartikel
+ja/nein** (`?stl=`) und **Shopartikel ja/nein** (`?shop=`), Suche über Name
+und Artikelnummer (`?q=`) und Seiten (10/25/100). Die Regel-Felder je Zeile
+richten sich nach dem Artikel: „aus unter" und „zurückhalten" immer,
+Steuerung, Rückhalt und Höchstmenge nur bei Shopartikeln. Zusammenführen und
+Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`).
 
 - **Projekte mit Farb-Pills**: Shopify erlaubt je Produkt nur begrenzt viele
   Varianten, darum ist jede Gehäusefarbe der NATIVE 75 ein eigenes
@@ -515,8 +527,8 @@ Shopify bekommt — aufgebaut wie die Produktseite im Shop:
     (0 — Black Week Editions); die Variante überstimmt den Artikel.
   - **Optionswert** deaktivieren (`shop_option_sperren`), wahlweise in allen
     Farben des Projekts (gleicher Options- und Wertname).
-  - Lagerware (Zubehör, einzeln verkaufte Switches) unter „Weitere
-    Shop-Artikel": dieselben Regeln auf den eigenen Bestand.
+  - Lagerware (Zubehör, einzeln verkaufte Switches) in „Teile und
+    Artikel" (Filter Shopartikel: ja): dieselben Regeln auf den eigenen Bestand.
   - **Einzelverkauf eines Teils** (0133, dieselbe Tabelle): **Rückhalt**
     (`shop_rueckhalt`: so viele Stück bleiben der Fertigung — einzeln
     verkaufbar ist nur, was darüber liegt) und **Höchstmenge**

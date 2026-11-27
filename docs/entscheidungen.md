@@ -9,6 +9,31 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Keine Wand aus Listen: eine Liste mit Filtern, Suche und Seiten
+
+Auslöser (Betreiber): In der Shop-Verfügbarkeit standen „Teile-Regeln",
+„Zweitangebote" und „Weitere Shop-Artikel" als lange Tabellen
+untereinander; dieselbe Einstellung („aus unter", „zurückhalten") tauchte
+für denselben Artikel in zwei Karten auf. „Eine Liste, Filter
+Stücklistenartikel ja/nein, Shopartikel ja/nein, Suchleiste, Pagination.
+Generell keine Wall of Lists mehr."
+
+**Entschieden — Produktregel für alle Seiten:** Mehrere lange Tabellen
+untereinander gibt es nicht mehr. Was dieselbe Sache aus zwei Blickwinkeln
+zeigt, wird EINE Liste mit Filter-Schildern (ja/nein), Suchfeld und der
+bestehenden Seitenleiste (`<Seiten>`, 10/25/100). Verschiedene Sachen auf
+einer Seite bekommen einen Umschalter oben (Ansichten), keine Stapelung.
+Filter, Suche und Seite stehen in der Adresse und überleben Speichern und
+Neuladen.
+
+**Umgesetzt an der Shop-Verfügbarkeit:** Ansichten „Tastaturen", „Teile
+und Artikel", „Zweitangebote"; „Teile und Artikel" führt Teile-Regeln und
+Weitere Shop-Artikel zusammen (`integrationen/shop-artikel-liste.ts`, rein,
+unter Test). Keine neue Aktion — die Zeilen speichern weiter über
+`verkauf.shop_variante_setzen`. Andere Seiten folgen, wenn sie angefasst
+werden. Doku: [module/integrationen.md](module/integrationen.md)
+„Shop-Verfügbarkeit: Regeln und Ansicht".
+
 ## 2026-11-27 — Aufgaben der Verwaltung erinnern per Telegram
 
 Auslöser: Der Betreiber will an Betriebs-Todos erinnert werden, ohne in
