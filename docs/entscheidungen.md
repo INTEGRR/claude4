@@ -9,6 +9,27 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Aufgaben der Verwaltung erinnern per Telegram
+
+Auslöser: Der Betreiber will an Betriebs-Todos erinnert werden, ohne in
+KRNL nachzusehen („Mittwoch Supabase wieder herunterstellen"). Aufgaben
+(0104) standen bisher nur in der Übersicht und unter /aufgaben.
+
+Entschieden (Betreiber: „Erinnerung an mich", „jetzt"): Am Fälligkeitstag
+geht je offener Aufgabe der Verwaltung eine Telegram-Nachricht — zur
+Uhrzeit der Aufgabe, ohne Uhrzeit um 8 Uhr (Berlin). „Verwaltung" heißt
+Rolle `admin` oder einem Admin zugeteilt: Telegram geht an den
+Betreiber-Chat, Aufgaben anderer Teams gehören dort nicht hin. Eine
+Nachricht je Aufgabe und Termin (Schlüssel `aufgabe:<ID>:<Tag>` in der
+bestehenden Outbox); wird der Termin verschoben, erinnert der neue Tag
+neu. Gemeldet wird nur, was in den letzten 24 Stunden fällig wurde — beim
+Einschalten kommt kein Schwall alter Aufgaben. Abschaltbar unter
+Einstellungen → Benachrichtigungen (Schalter „Aufgaben"). Kein neuer
+Aufgabentyp, kein neuer Cron: der minütliche Cron `jobs` reiht ein.
+Umsetzung: Migration 0140, `faelligeAufgabenMelden` in
+`integrationen/benachrichtigungen.ts`; Test `tests/benachrichtigungen.test.ts`;
+Doku [module/integrationen.md](module/integrationen.md) „Telegram-Benachrichtigungen".
+
 ## 2026-11-27 — Doppelte Artikel: schon verbaute Teile lassen sich zusammenführen
 
 Auslöser: „Mounting Plate FR-4 ISO" (aus Odoo angelegt) ließ sich nicht in

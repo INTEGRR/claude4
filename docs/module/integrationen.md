@@ -625,6 +625,8 @@ nach außen. Zugangsdaten als Umgebungsvariablen `TELEGRAM_BOT_TOKEN` und
 | Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen, Problem, abgelaufen (Sendung, Bestellung/Eingangssendung, Lieferant, letztes Ereignis, Link) | `zulauf:<verfolgung>:<status>` | Zulauf-Sendungsverfolgung (0112/0114), bei jedem Zustandswechsel genau einmal |
 | Sicherheits-Check: Lücken ab „hoch" in den ausgelieferten Abhängigkeiten, fehlendes Betriebs-Geheimnis, aktives Startkonto, Admins ohne zweiten Faktor, ab 30 Fehlanmeldungen oder 60 Portal-Fehlsuchen in 24 Stunden | `sicherheit:<Tag>` | täglich morgens (Cron `sicherheit`, Job `sicherheits_check`, 0132) — **nur bei Befunden**, einmal je Tag, solange ein Punkt offen ist |
 
+| Fällige Aufgabe der Verwaltung (Rolle `admin` oder einem Admin zugeteilt): Titel, Beschreibung, Link | `aufgabe:<ID>:<Tag>` | am Fälligkeitstag zur Uhrzeit der Aufgabe, ohne Uhrzeit um 8 Uhr (Cron `jobs`, `faelligeAufgabenMelden`, 0140) — einmal je Aufgabe und Termin; nur was in den letzten 24 Stunden fällig wurde |
+
 Die Meldungen liegen in der Outbox `benachrichtigungen` (Status offen /
 gesendet / übersprungen / fehlgeschlagen, 30 Tage, KI-Sperrliste); der Cron
 `jobs` sendet jede Minute, Sendefehler wiederholen mit Backoff bis fünf

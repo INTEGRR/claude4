@@ -11,7 +11,7 @@ import { telegramSicher } from './telegram.ts'
 
 type Db = Sql | TransactionSql
 
-export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf' | 'sicherheit' | 'ueberverkauf'
+export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf' | 'sicherheit' | 'ueberverkauf' | 'aufgabe'
 
 export interface Schalter {
   logins: boolean
@@ -26,8 +26,10 @@ export interface Schalter {
   sicherheit: boolean
   /** Überverkaufs-Wächter: Bestellung ohne volle Deckung, Abweichung Shop/Buch, Not-Aus (0136). */
   ueberverkauf: boolean
+  /** Fällige Aufgaben der Verwaltung: eine Nachricht am Fälligkeitstag (0140). */
+  aufgaben: boolean
 }
-export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true, ueberverkauf: true }
+export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true, ueberverkauf: true, aufgaben: true }
 export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   logins: 'Jede erfolgreiche Anmeldung (wer, wann, IP, Gerät, Methode)',
   fehlversuche: 'Fehlversuche und Kontosperren (gebündelt je Konto und Viertelstunde)',
@@ -37,6 +39,7 @@ export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   zulauf: 'Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen oder Problem (17TRACK)',
   sicherheit: 'Täglicher Sicherheits-Check, nur bei Befunden (Lücken in Abhängigkeiten, Konten ohne zweiten Faktor, auffällige Fehlversuche)',
   ueberverkauf: 'Überverkaufs-Wächter: Shop-Bestellung ohne volle Deckung, Shop zeigt mehr als das Buch, Not-Aus',
+  aufgaben: 'Fällige Aufgaben der Verwaltung: eine Nachricht am Fälligkeitstag (zur Uhrzeit der Aufgabe, sonst um 8 Uhr)',
 }
 
 /** Fehlversuche desselben Kontos werden je Viertelstunde zu einer Nachricht. */
@@ -63,6 +66,7 @@ export async function schalter(db: Db): Promise<Schalter> {
     zulauf: v.zulauf !== false,
     sicherheit: v.sicherheit !== false,
     ueberverkauf: v.ueberverkauf !== false,
+    aufgaben: v.aufgaben !== false,
   }
 }
 
@@ -85,6 +89,8 @@ export function artErlaubt(art: BenachrichtigungsArt, s: Schalter): boolean {
       return s.sicherheit
     case 'ueberverkauf':
       return s.ueberverkauf
+    case 'aufgabe':
+      return s.aufgaben
     default:
       return true
   }
@@ -219,6 +225,56 @@ export function textZulauf(p: {
     (p.ereignis ? `\n${telegramSicher(p.ereignis.slice(0, 300))}` : '') +
     (p.link ? `\n${p.link}` : '')
   )
+}
+
+/** Fällige Aufgabe (0140): „🗓 Aufgabe fällig heute — Supabase herunterstellen" plus Beschreibung und Link. */
+export function textAufgabe(p: {
+  titel: string
+  beschreibung?: string | null
+  uhrzeit?: string | null
+  zustaendig?: string | null
+  link?: string | null
+}): string {
+  const wann = p.uhrzeit ? `heute, ${p.uhrzeit.slice(0, 5)} Uhr` : 'heute'
+  return (
+    `🗓 <b>Aufgabe fällig ${wann}</b> — ${telegramSicher(p.titel)}` +
+    (p.zustaendig ? ` (${telegramSicher(p.zustaendig)})` : '') +
+    (p.beschreibung ? `\n${telegramSicher(p.beschreibung.slice(0, 500))}` : '') +
+    (p.link ? `\n${p.link}` : '')
+  )
+}
+
+/**
+ * Reiht für jede offene Aufgabe der Verwaltung, deren Erinnerungszeit
+ * erreicht ist, genau eine Nachricht ein (0140). Erinnerungszeit: die
+ * Uhrzeit der Aufgabe, ohne Uhrzeit 8 Uhr am Fälligkeitstag (Berlin).
+ * „Verwaltung" = Rolle admin oder einem Admin zugeteilt — Telegram geht an
+ * den Betreiber-Chat, Aufgaben fürs Lager gehören dort nicht hin. Nur die
+ * letzten 24 Stunden: beim Einschalten kommt kein Schwall alter Aufgaben,
+ * und ein neu gesetzter Termin (anderer Tag) erinnert neu.
+ */
+export async function faelligeAufgabenMelden(db: Db, basisUrl: string | null = null): Promise<number> {
+  const aufgaben = await db<
+    { id: string; titel: string; beschreibung: string | null; uhrzeit: string | null; tag: string; wer: string | null; link: string | null }[]
+  >`
+    select a.id, a.titel, a.beschreibung, a.uhrzeit::text, a.faellig_am::text as tag, u.name as wer, a.link
+    from aufgaben a
+    left join users u on u.id = a.zustaendig_id
+    where a.status = 'offen'
+      and (a.rolle = 'admin' or u.role = 'admin' or 'admin' = any(coalesce(u.zusatz_rollen, '{}')))
+      and ((a.faellig_am + coalesce(a.uhrzeit, time '08:00')) at time zone 'Europe/Berlin')
+          between now() - interval '24 hours' and now()
+      and not exists (
+        select 1 from benachrichtigungen b where b.schluessel = 'aufgabe:' || a.id || ':' || a.faellig_am)`
+  const basis = basisUrl?.replace(/\/+$/, '') ?? null
+  for (const a of aufgaben) {
+    await einreihen(db, 'aufgabe', `aufgabe:${a.id}:${a.tag}`,
+      textAufgabe({
+        titel: a.titel, beschreibung: a.beschreibung, uhrzeit: a.uhrzeit, zustaendig: a.wer,
+        link: basis ? `${basis}${a.link ?? '/aufgaben'}` : null,
+      }))
+  }
+  return aufgaben.length
 }
 
 export function textTest(): string {

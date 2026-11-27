@@ -12,6 +12,7 @@ import {
   benachrichtigungenAufraeumen,
   benachrichtigungenSenden,
   einreihen,
+  faelligeAufgabenMelden,
   fehlgeschlageneJobsMelden,
   letzteBenachrichtigungen,
   schalter,
@@ -139,6 +140,40 @@ describe('Benachrichtigungen (Outbox)', () => {
     })
   })
 
+  test('fällige Aufgaben der Verwaltung: eine Nachricht am Fälligkeitstag, nur einmal', async () => {
+    await withRollback(async (t) => {
+      // Die Datenbank kann eigene fällige Aufgaben tragen (Einrichtungsaufgaben) — hier zählen nur die des Tests.
+      await t`delete from aufgaben`
+      const aufgabe = async (titel: string, extra: { rolle?: string; tage?: number; uhrzeit?: string | null } = {}) =>
+        (await t<{ id: string }[]>`
+          insert into aufgaben (titel, beschreibung, rolle, faellig_am, uhrzeit, erstellt_von)
+          values (${titel}, 'Compute and Disk <Micro>', ${extra.rolle ?? 'admin'}::user_role,
+                  (now() at time zone 'Europe/Berlin')::date + ${extra.tage ?? 0}::int,
+                  ${extra.uhrzeit === undefined ? '00:00' : extra.uhrzeit}::time, 'test')
+          returning id`)[0].id
+      const heute = await aufgabe('Supabase herunterstellen')
+      await aufgabe('Erst morgen', { tage: 1 })
+      await aufgabe('Lange überfällig', { tage: -3 })
+      await aufgabe('Regal auffüllen', { rolle: 'lager' })
+      // Ohne Uhrzeit gilt 8 Uhr — vorgestern 8 Uhr liegt außerhalb der 24 Stunden.
+      await aufgabe('Vorgestern ohne Uhrzeit', { tage: -2, uhrzeit: null })
+
+      assert.equal(await faelligeAufgabenMelden(t, 'https://krnl.example/'), 1)
+      assert.equal(await faelligeAufgabenMelden(t, 'https://krnl.example/'), 0, 'zweiter Lauf meldet nichts Neues')
+      const [m] = await t<{ art: string; text: string; schluessel: string }[]>`
+        select art, text, schluessel from benachrichtigungen where schluessel like ${`aufgabe:${heute}:%`}`
+      assert.equal(m.art, 'aufgabe')
+      assert.match(m.text, /Aufgabe fällig heute, 00:00 Uhr<\/b> — Supabase herunterstellen/)
+      assert.match(m.text, /Compute and Disk &lt;Micro&gt;/, 'Nutzertext maskiert')
+      assert.match(m.text, /https:\/\/krnl\.example\/aufgaben$/)
+
+      // Erledigt → keine Nachricht mehr, auch wenn der Termin verschoben würde.
+      await t`update benachrichtigungen set status = 'gesendet', gesendet_at = now() where schluessel = ${m.schluessel}`
+      assert.equal(await faelligeAufgabenMelden(t), 0)
+      assert.equal(artErlaubt('aufgabe', { ...(await schalter(t)), aufgaben: false }), false)
+    })
+  })
+
   test('Texte: maskiert, mit Zeit und IP; Bucket; Aufräumen; Liste', async () => {
     const zeit = new Date('2026-09-25T12:02:00Z')
     const login = textLogin({ name: 'Max <b>Mustermann</b>', rolle: 'Administrator', ip: '203.0.113.7', geraet: 'Chrome · Windows', methode: 'Passwort · TOTP', zeit })
@@ -154,8 +189,8 @@ describe('Benachrichtigungen (Outbox)', () => {
     assert.match(textJob({ kind: 'daten_tuev', versuche: 1, max: 1, fehler: null }), /ohne Fehlertext/)
     assert.equal(zeitBucket(15 * 60_000 * 7 + 1000), '7')
     assert.equal(zeitBucket(15 * 60_000 * 8), '8')
-    assert.equal(artErlaubt('test', { logins: false, fehlversuche: false, jobs: false, dienste: false, einkauf: false, zulauf: false, sicherheit: false, ueberverkauf: false }), true)
-    assert.equal(artErlaubt('sperre', { logins: true, fehlversuche: false, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true, ueberverkauf: true }), false)
+    assert.equal(artErlaubt('test', { logins: false, fehlversuche: false, jobs: false, dienste: false, einkauf: false, zulauf: false, sicherheit: false, ueberverkauf: false, aufgaben: false }), true)
+    assert.equal(artErlaubt('sperre', { logins: true, fehlversuche: false, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true, ueberverkauf: true, aufgaben: true }), false)
 
     await withRollback(async (t) => {
       await einreihen(t, 'test', 'test:alt', 'alt')

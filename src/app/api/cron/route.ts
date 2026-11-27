@@ -6,6 +6,7 @@ import { KI_SPUR_BUDGET_MS, runDueJobs } from '@/modules/integrationen/jobs'
 import { pruneMonitorData } from '@/modules/integrationen/transaktionen'
 import {
   benachrichtigungenAufraeumen,
+  faelligeAufgabenMelden,
   fehlgeschlageneJobsMelden,
 } from '@/modules/integrationen/benachrichtigungen'
 import { benachrichtigungenVersenden } from '@/modules/integrationen/benachrichtigungen-versand'
@@ -70,8 +71,14 @@ export async function GET(request: Request) {
         // Telegram: endgültig gescheiterte Jobs melden, dann die Outbox der
         // Benachrichtigungen senden (Anmeldungen, Fehlversuche, Dienste).
         const gemeldet = await fehlgeschlageneJobsMelden(sql)
+        // Fällige Aufgaben der Verwaltung: eine Telegram-Nachricht am Fälligkeitstag (0140).
+        const aufgaben = await faelligeAufgabenMelden(
+          sql,
+          process.env.ERP_PUBLIC_URL ??
+            (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null),
+        ).catch(() => 0)
         const benachrichtigungen = await benachrichtigungenVersenden()
-        return NextResponse.json({ task, ...jobs, jobs_gemeldet: gemeldet, benachrichtigungen })
+        return NextResponse.json({ task, ...jobs, jobs_gemeldet: gemeldet, aufgaben_gemeldet: aufgaben, benachrichtigungen })
       }
 
       case 'mail': {
