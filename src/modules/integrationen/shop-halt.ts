@@ -2,7 +2,7 @@ import 'server-only'
 import type { TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
 import { fetchOrder, fetchOrderHalt, shopifyConfigured } from './shopify'
-import { type ShopHalt, haltAenderung, haltAusShop, haltText } from './shop-halt-logik'
+import { type ShopHalt, haltAenderung, haltAusShop, haltText, zahlungOffen } from './shop-halt-logik'
 
 /**
  * Fulfillment-Halt aus Shopify (0134, Entscheidungslog 2026-11-24).
@@ -107,16 +107,32 @@ export async function versandHaltPruefen(pickingId: string): Promise<void> {
     where p.id = ${pickingId}`
   if (!so?.shopify_order_id) return
   if (shopifyConfigured()) {
-    const halt = await haltVomShop(so.shopify_order_id)
+    // Ein Aufruf liefert Halt UND Zahlstatus (0135) — beides frisch.
+    let frisch: Awaited<ReturnType<typeof fetchOrderHalt>> = null
+    try {
+      frisch = await fetchOrderHalt(so.shopify_order_id)
+    } catch {
+      // Recht fehlt oder Shop gestört: haltVomShop fällt auf den Anzeige-Status zurück.
+    }
+    const halt = frisch
+      ? haltAusShop(frisch.displayFulfillmentStatus, frisch.auftraege)
+      : await haltVomShop(so.shopify_order_id)
     if (halt !== undefined) await tx((t) => haltNachziehen(t, so.id, halt))
+    if (frisch?.displayFinancialStatus) {
+      await sql`update sales_orders set shopify_zahlstatus = ${frisch.displayFinancialStatus}
+                where id = ${so.id} and shopify_zahlstatus is distinct from ${frisch.displayFinancialStatus}`
+    }
   }
   const [jetzt] = await sql<
-    { halt: boolean; grund: string | null; notiz: string | null; name: string }[]
+    { halt: boolean; grund: string | null; notiz: string | null; name: string; zahlstatus: string | null }[]
   >`
     select shopify_halt as halt, shopify_halt_grund as grund, shopify_halt_notiz as notiz,
-           coalesce(shopify_order_name, number) as name
+           coalesce(shopify_order_name, number) as name, shopify_zahlstatus as zahlstatus
     from sales_orders where id = ${so.id}`
   if (jetzt?.halt) {
     throw new Error(`${jetzt.name} ist in Shopify angehalten (${haltText(jetzt)}) — erst dort freigeben, dann versenden.`)
+  }
+  if (zahlungOffen(jetzt?.zahlstatus)) {
+    throw new Error(`${jetzt.name} ist laut Shopify noch nicht bezahlt — Versand erst nach Zahlungseingang.`)
   }
 }

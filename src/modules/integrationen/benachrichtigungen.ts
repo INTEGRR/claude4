@@ -11,7 +11,7 @@ import { telegramSicher } from './telegram.ts'
 
 type Db = Sql | TransactionSql
 
-export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf' | 'sicherheit'
+export type BenachrichtigungsArt = 'login' | 'fehlversuch' | 'sperre' | 'job' | 'dienst' | 'test' | 'einkauf' | 'zulauf' | 'sicherheit' | 'ueberverkauf'
 
 export interface Schalter {
   logins: boolean
@@ -24,8 +24,10 @@ export interface Schalter {
   zulauf: boolean
   /** Täglicher Sicherheits-Check: nur bei Befunden (0132). */
   sicherheit: boolean
+  /** Überverkaufs-Wächter: Bestellung ohne volle Deckung, Abweichung Shop/Buch, Not-Aus (0136). */
+  ueberverkauf: boolean
 }
-export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true }
+export const SCHALTER_STANDARD: Schalter = { logins: true, fehlversuche: true, jobs: true, dienste: true, einkauf: true, zulauf: true, sicherheit: true, ueberverkauf: true }
 export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   logins: 'Jede erfolgreiche Anmeldung (wer, wann, IP, Gerät, Methode)',
   fehlversuche: 'Fehlversuche und Kontosperren (gebündelt je Konto und Viertelstunde)',
@@ -34,6 +36,7 @@ export const SCHALTER_LABELS: Record<keyof Schalter, string> = {
   einkauf: 'Tägliche Einkaufs-Zusammenfassung je Einkäufer (Überfälliges, fehlende Dokumente und Rechnungen, Raten, ETA)',
   zulauf: 'Zulauf-Sendung abholbereit, zugestellt, Zustellung fehlgeschlagen oder Problem (17TRACK)',
   sicherheit: 'Täglicher Sicherheits-Check, nur bei Befunden (Lücken in Abhängigkeiten, Konten ohne zweiten Faktor, auffällige Fehlversuche)',
+  ueberverkauf: 'Überverkaufs-Wächter: Shop-Bestellung ohne volle Deckung, Shop zeigt mehr als das Buch, Not-Aus',
 }
 
 /** Fehlversuche desselben Kontos werden je Viertelstunde zu einer Nachricht. */
@@ -59,6 +62,7 @@ export async function schalter(db: Db): Promise<Schalter> {
     einkauf: v.einkauf !== false,
     zulauf: v.zulauf !== false,
     sicherheit: v.sicherheit !== false,
+    ueberverkauf: v.ueberverkauf !== false,
   }
 }
 
@@ -79,6 +83,8 @@ export function artErlaubt(art: BenachrichtigungsArt, s: Schalter): boolean {
       return s.zulauf
     case 'sicherheit':
       return s.sicherheit
+    case 'ueberverkauf':
+      return s.ueberverkauf
     default:
       return true
   }

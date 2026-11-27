@@ -32,6 +32,11 @@ erfuhr nichts. Die Shopify-Rückmeldung hängt weiterhin am **Warenausgang**,
 der jetzt mit dem Label zusammenfällt (wie Sendclouds „Rückmeldung bei
 Label-Erstellung").
 
+**Zahlung offen (0135):** Shop-Bestellungen werden beim Eingang bestätigt
+und reserviert, auch unbezahlt. Ihre Lieferung ist erst nach
+Zahlungseingang versandbereit — bis dahin steht sie mit „Zahlung offen" in
+der Karte „Angehalten oder unbezahlt", Packtisch und Label verweigern.
+
 **Im Shop angehalten (0134):** Hält der Shop das Fulfillment einer
 Bestellung an, ist ihre Lieferung nicht versandbereit — sie steht in der
 Karte „In Shopify angehalten" mit Grund und Notiz, Packtisch und Label

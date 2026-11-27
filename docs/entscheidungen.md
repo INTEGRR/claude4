@@ -9,6 +9,73 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Release-Schutz: Kontingent je Teil, Buch je Angebot, Reservieren beim Eingang
+
+Am 29.11. um 16:30 gehen vier neue Tastaturen in den Verkauf; Bestellungen
+kommen im Sekundentakt, Überverkauf darf es nicht geben. Drei Ursachen
+standen im Code: geteilte Teile wurden jeder Variante voll angeboten, die
+absolute Bestandsmeldung konnte einen eben von Shopify abgezogenen Kauf
+wieder hochsetzen, und die Reservierung las den Bestand ohne Sperre.
+
+Entschieden (Betreiber):
+
+- **Reservieren beim Eingang**, nicht erst bei Zahlung. Shopify zählt beim
+  Kauf herunter, KRNL muss dasselbe sehen. Unbezahltes wird reserviert und
+  gefertigt, aber nicht versandt.
+- **Kontingent nach erwarteter Nachfrage** (Gewicht je Artikel und
+  Optionswert), nicht gleichmäßig.
+
+Umsetzung und Gründe:
+
+- **Kontingent statt „jede Variante bekommt alles".** Die Summe der
+  angebotenen Mengen übersteigt je Teil nie den freien Bestand; dann zählt
+  Shopify selbst atomar herunter, und der Schutz hängt nicht daran, dass
+  KRNL schnell ist. Eine Schwelle „ab wann gilt ein Teil als knapp" braucht
+  es nicht: reicht ein Teil für alle Deckel, bekommt jeder seinen Deckel.
+  Preis: eine Variante kann kurz ausverkauft erscheinen, obwohl Teile da
+  sind — bis der nächste Abgleich (Sekunden nach jeder Bestellung)
+  nachverteilt. Gewichte und der Nachfrage-Zuschlag halten das klein.
+- **Differenz statt absoluter Menge.** KRNL führt je Angebot Buch und sendet
+  nur die Differenz zum Kontingent; ein Kauf, den KRNL noch nicht kennt,
+  bleibt im Shop abgezogen. Das ersetzt die Regel „nicht erhöhen, solange
+  Bestell-Ereignisse offen sind" aus dem Plan — unter Dauerlast wäre dann
+  nie erhöht worden.
+- **Senken mit Vergleichswert, gesättigt; Erhöhen nur aus Budget.** Der
+  erste Entwurf (Differenz in beide Richtungen) fiel im Zufallstest durch:
+  wird ein Angebot gesenkt, auf dem ein unbekannter Kauf liegt, ist die
+  Senkung nur scheinbar — die Stücke sind schon verkauft —, und die damit
+  „finanzierte" Erhöhung anderswo ist ungedeckt. Jetzt senkt der Shop nur,
+  wenn er den Buchwert zeigt; sonst liest KRNL nach und senkt höchstens um
+  das, was noch dasteht. Erhöht wird nur, was Pool minus Buch hergibt.
+- **Im Zweifel zeigt der Shop zu wenig.** Storno zählt als zurückgelagert,
+  eine Bestellung nahe an einer absoluten Meldung zählt nicht, bei
+  Abbruch zwischen Shop und Buch steht der Shop niedriger. Abweichungen
+  nach unten heilt der Abgleich in ruhiger Zeit, nach oben sofort.
+- **Unbezahlt: reserviert, nicht versandt.** Dieselbe Sperre wie beim
+  Fulfillment-Halt (`shipping_ready`, Trigger, Packtisch, Label).
+- **Wächter, Not-Aus, Heilen** als zweite Linie: Telegram bei einer
+  Bestellung ohne volle Deckung, ein Knopf, der alles absolut auf 0 setzt,
+  und ein Abgleich, der Shop und Buch wieder zusammenführt.
+- **Lasttest gegen einen eigenständigen Shop-Nachbau** statt gegen die
+  Produktion — Fake-Bestellungen dort ließen sich nur über Löschen in der
+  Produktionsdatenbank zurücknehmen.
+
+Der Lasttest (bis 600 Käufe in 10 Sekunden, auch mit stark gestörten
+Webhooks und knappem Abruf-Kontingent) besteht: kein Teil überverkauft,
+kein Augenblick ohne Deckung, alle Bestellungen angekommen und voll
+reserviert. Unterwegs hat er fünf Fehler aufgedeckt, darunter einen, der
+mit dem Release nichts zu tun hat (Webhook-Inhalt doppelt verpackt
+gespeichert) — Einzelheiten in release-neue-produkte.md.
+
+Nicht geprüft: das Verhalten des echten Shops bei `inventoryAdjustQuantities`
+mit Vergleichswert (Fehlercode, Feldpfad). Der Code verträgt beides — nennt
+der Shop keine Position, wird der Block halbiert —, die Generalprobe mit
+einem Testprodukt im echten Shop bleibt Pflicht.
+
+Doku: [module/integrationen.md](module/integrationen.md) (Kontingent und
+Buch, Webhook-Verarbeitung unter Last), [release-neue-produkte.md](release-neue-produkte.md);
+Migrationen 0135–0139; Lasttest unter `lasttest/`.
+
 ## 2026-11-24 — Fulfillment-Halt: Shopify führt, KRNL sperrt den Versand
 
 Der Betreiber hält im Shop-Admin ab und zu das Fulfillment einer Bestellung

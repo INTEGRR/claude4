@@ -149,3 +149,89 @@ const ZWEIT_TEXT: Record<string, string> = {
   immer: 'immer verfügbar',
   aus: 'aus (ausverkauft)',
 }
+
+/**
+ * Not-Aus (S6, 0136): alle Angebote sofort auf ausverkauft — absolut gesetzt,
+ * unabhängig vom Buch — bzw. wieder freigeben. Wirkt sofort (der Abgleich
+ * läuft im selben Zug), nicht erst mit dem nächsten Job.
+ */
+export async function shopNotAus(p: { aktiv: boolean }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const stand = { aktiv: p.aktiv, seit: new Date().toISOString(), von: ctx.actor }
+  await sql`
+    insert into settings (key, value) values ('shopify', ${sql.json({ not_aus: stand })})
+    on conflict (key) do update set value = settings.value || ${sql.json({ not_aus: stand })}::jsonb`
+  const { einreihen } = await import('../../integrationen/benachrichtigungen.ts')
+  await einreihen(sql, 'ueberverkauf', `not-aus:${stand.seit}`,
+    p.aktiv
+      ? `🛑 <b>Not-Aus</b> für den Shop ausgelöst von ${ctx.actor}: alle Angebote stehen auf ausverkauft.`
+      : `✅ Not-Aus aufgehoben von ${ctx.actor}: die Kontingente werden neu verteilt.`)
+
+  // Sofort melden. Läuft gerade ein Abgleich, sieht er den Anstoß und rechnet eine weitere Runde.
+  await anstossen()
+  let gemeldet: string
+  try {
+    const { inventarAbgleichen } = await import('../../integrationen/inventar.ts')
+    const r = await inventarAbgleichen()
+    gemeldet = r.gesperrt
+      ? 'Ein Abgleich läuft gerade — er übernimmt den Not-Aus in der nächsten Runde (Sekunden).'
+      : `${plural(r.uebertragen + r.angeboteUebertragen, 'Angebot', 'Angebote')} gemeldet.`
+  } catch (err) {
+    gemeldet = `Meldung an den Shop gescheitert (${err instanceof Error ? err.message : String(err)}) — der Abgleich versucht es weiter.`
+  }
+  return {
+    text: p.aktiv
+      ? `Not-Aus aktiv: alle Angebote auf ausverkauft. ${gemeldet}`
+      : `Not-Aus aufgehoben: die Kontingente werden neu verteilt. ${gemeldet}`,
+  }
+}
+
+/**
+ * Erwartete Nachfrage (0136): Gewicht eines Artikels oder Optionswerts für
+ * die Verteilung knapper Teile. Wirkt beim nächsten Abgleich.
+ */
+export async function shopGewichtSetzen(
+  p: { template_id: string; ptav_id?: string; gewicht: number | null; alle_farben: boolean },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  if (!p.ptav_id) {
+    const [pt] = await sql<{ name: string }[]>`
+      update product_templates set shop_gewicht = ${p.gewicht} where id = ${p.template_id} returning name`
+    if (!pt) throw new Error('Artikel nicht gefunden')
+    await sql`select log_event('product_template', ${p.template_id}, 'note',
+      ${`Shop-Gewicht des Artikels: ${p.gewicht ?? 1}`}, ${ctx.actor})`
+    await anstossen()
+    return { recordId: p.template_id, text: `Gewicht von „${pt.name}": ${p.gewicht ?? 1}.` }
+  }
+  // Wie beim Sperren: mit alle_farben auch die gleich benannten Werte der
+  // übrigen Artikel desselben Projekts.
+  const ziele = await sql<{ template_id: string; ptav_id: string; wert: string }[]>`
+    with quelle as (
+      select pt.projekt, pa.name as option, pav.name as wert
+      from product_template_attribute_values ptav
+      join product_template_attribute_lines al on al.id = ptav.line_id
+      join product_attributes pa on pa.id = al.attribute_id
+      join product_attribute_values pav on pav.id = ptav.value_id
+      join product_templates pt on pt.id = al.template_id
+      where ptav.id = ${p.ptav_id} and al.template_id = ${p.template_id}
+    )
+    select al.template_id, ptav.id as ptav_id, pav.name as wert
+    from quelle q
+    join product_templates pt on (pt.id = ${p.template_id}
+                                  or (${p.alle_farben} and q.projekt is not null and pt.projekt = q.projekt))
+    join product_template_attribute_lines al on al.template_id = pt.id
+    join product_attributes pa on pa.id = al.attribute_id and pa.name = q.option
+    join product_template_attribute_values ptav on ptav.line_id = al.id
+    join product_attribute_values pav on pav.id = ptav.value_id and pav.name = q.wert`
+  if (ziele.length === 0) throw new Error('Optionswert gehört nicht zu diesem Artikel')
+  await sql`update product_template_attribute_values set shop_gewicht = ${p.gewicht}
+            where id = any(${ziele.map((z) => z.ptav_id)}::uuid[])`
+  for (const z of ziele) {
+    await sql`select log_event('product_template', ${z.template_id}, 'note',
+      ${`Shop-Gewicht ${z.wert}: ${p.gewicht ?? 1}`}, ${ctx.actor})`
+  }
+  await anstossen()
+  return {
+    recordId: p.template_id,
+    text: `Gewicht von ${ziele[0].wert}: ${p.gewicht ?? 1} in ${plural(ziele.length, 'Artikel', 'Artikeln')}.`,
+  }
+}

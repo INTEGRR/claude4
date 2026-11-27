@@ -86,7 +86,8 @@ export function fehlerJePosition(
   const ergebnis = new Map<number, string>()
   for (const fehler of userErrors) {
     const feld = fehler.field ?? []
-    const i = feld.indexOf('quantities')
+    // „quantities" bei der absoluten Meldung, „changes" bei der Differenz (0136).
+    const i = Math.max(feld.indexOf('quantities'), feld.indexOf('changes'))
     const index = i >= 0 ? Number(feld[i + 1]) : Number.NaN
     const ziele = Number.isInteger(index) && index >= 0 && index < anzahl ? [index] : [...Array(anzahl).keys()]
     for (const z of ziele) {
@@ -105,6 +106,8 @@ export function inventoryItemGid(id: string | number): string {
 export interface InventarMeldung {
   inventoryItemGid: string
   verfuegbar: number
+  /** Zeitpunkt der Änderung laut Shop (0136) — null, wenn der Payload ihn nicht trägt. */
+  geaendertAm: Date | null
 }
 
 /**
@@ -117,7 +120,138 @@ export function deuteInventarPayload(payload: Record<string, unknown>): Inventar
   const verfuegbar = payload.available
   if (item === undefined || item === null) return null
   if (typeof verfuegbar !== 'number' || !Number.isFinite(verfuegbar)) return null
-  return { inventoryItemGid: inventoryItemGid(item as string | number), verfuegbar }
+  const zeit = typeof payload.updated_at === 'string' ? new Date(payload.updated_at) : null
+  return {
+    inventoryItemGid: inventoryItemGid(item as string | number),
+    verfuegbar,
+    geaendertAm: zeit && !Number.isNaN(zeit.getTime()) ? zeit : null,
+  }
+}
+
+// --- Buch und Differenz (0136) -------------------------------------------------
+
+/** Ein Shop-Angebot mit Ziel (Kontingent) und Buch. */
+export interface AngebotStand {
+  inventory_item_gid: string | null
+  /** Ziel: das Kontingent dieses Angebots. */
+  frei: number
+  /** Buch: was der Shop zeigt, wenn alle Bestellungen bekannt sind. null = nie gesetzt. */
+  pushed_qty: number | null
+  /** Seit wann das Buch läuft. null = es muss erst absolut gesetzt werden. */
+  buch_ab: Date | string | null
+}
+
+export interface MeldePlan<T> {
+  /** Noch nie gemeldet: einmal absolut setzen, danach läuft das Buch. */
+  erst: T[]
+  /** Differenz < 0 — zuerst senden, damit die Summe nie über dem Bestand liegt. */
+  senken: (T & { delta: number })[]
+  /** Differenz > 0 — zuletzt. */
+  heben: (T & { delta: number })[]
+  ohneZuordnung: T[]
+}
+
+/**
+ * Was ist zu melden? Statt absoluter Mengen die DIFFERENZ zwischen Kontingent
+ * und Buch (Entscheidungslog 2026-11-27): ein Kauf, den KRNL noch nicht
+ * kennt, hat den Shop schon heruntergezählt — eine Differenz lässt das
+ * stehen, eine absolute Menge überschriebe es (Überverkauf). Reihenfolge
+ * der Meldung: senken, erstmalig setzen, heben.
+ */
+export function meldungPlanen<T extends AngebotStand>(angebote: T[]): MeldePlan<T> {
+  const plan: MeldePlan<T> = { erst: [], senken: [], heben: [], ohneZuordnung: [] }
+  for (const a of angebote) {
+    if (!a.inventory_item_gid) {
+      plan.ohneZuordnung.push(a)
+      continue
+    }
+    if (a.pushed_qty === null || a.buch_ab === null) {
+      plan.erst.push(a)
+      continue
+    }
+    const delta = Math.floor(Number(a.frei)) - Math.round(Number(a.pushed_qty))
+    if (delta < 0) plan.senken.push({ ...a, delta })
+    else if (delta > 0) plan.heben.push({ ...a, delta })
+  }
+  return plan
+}
+
+/**
+ * InventoryAdjustQuantitiesInput einer Differenz-Meldung. changeFromQuantity
+ * ist seit 2026-04 Pflicht:
+ *
+ * - ERHÖHEN mit null („nicht vergleichen"): die Differenz gilt, was immer
+ *   der Shop gerade zeigt — ein unbekannter Kauf bleibt abgezogen.
+ * - SENKEN mit dem Buchwert (`erwartet`): der Shop senkt nur, wenn er genau
+ *   das zeigt, was das Buch sagt. Liegt ein unbekannter Kauf darauf, lehnt
+ *   er ab (CHANGE_FROM_QUANTITY_STALE) — sonst wäre die Senkung nur
+ *   scheinbar (die Stücke sind schon verkauft), und was mit dem
+ *   „freigewordenen" Bestand anderswo erhöht würde, wäre ungedeckt.
+ */
+export function deltaInput(
+  block: { inventory_item_gid: string | null; delta: number; erwartet?: number | null }[],
+  locationGid: string,
+): Record<string, unknown> {
+  return {
+    name: 'available',
+    reason: 'correction',
+    referenceDocumentUri: 'erp://bestandsabgleich',
+    changes: block.map((v) => ({
+      inventoryItemId: v.inventory_item_gid,
+      locationId: locationGid,
+      delta: v.delta,
+      changeFromQuantity: v.erwartet ?? null,
+    })),
+  }
+}
+
+/**
+ * Die Differenz-Mutation. Der Schlüssel der @idempotent-Direktive sorgt
+ * dafür, dass eine wiederholte Zustellung desselben Aufrufs die Differenz
+ * nicht zweimal bucht.
+ */
+export const DELTA_MUTATION = `mutation bestandDelta($input: InventoryAdjustQuantitiesInput!, $idempotencyKey: String!) {
+  inventoryAdjustQuantities(input: $input) @idempotent(key: $idempotencyKey) { userErrors { field message code } }
+}`
+
+/** Hat der Shop die Senkung abgelehnt, weil er nicht (mehr) den Buchwert zeigt? */
+export function istVeraltet(grund: string): boolean {
+  return /CHANGE_FROM_QUANTITY_STALE|stale|changed since|quantity has changed/i.test(grund)
+}
+
+/**
+ * Wie weit darf erhöht werden (0136)? Erhöhungen sind nur aus Bestand
+ * gedeckt, der wirklich frei ist: Pool minus dem, was die Angebote laut Buch
+ * schon halten. Hat der Shop eine Senkung abgelehnt, hält das Angebot seinen
+ * alten Buchwert — und bindet damit weiter Teile, die anderswo NICHT
+ * verteilt werden dürfen. Rückgabe: je Angebot die erlaubte Erhöhung
+ * (0 … gewünscht), in der gegebenen Reihenfolge vergeben.
+ */
+export function erhoehungenImBudget(
+  wuensche: { id: string; delta: number }[],
+  /** Was jedes Angebot laut Buch aus den Pools hält (Stück, ohne eigenen Vorrat). */
+  gehalten: Map<string, number>,
+  bedarf: Map<string, { komponente: string; je: number }[]>,
+  pool: Map<string, number>,
+): Map<string, number> {
+  const frei = new Map<string, number>()
+  for (const [k, v] of pool) frei.set(k, Math.max(Number(v) || 0, 0))
+  for (const [id, stueck] of gehalten) {
+    for (const b of bedarf.get(id) ?? []) frei.set(b.komponente, (frei.get(b.komponente) ?? 0) - Math.max(stueck, 0) * b.je)
+  }
+  const erlaubt = new Map<string, number>()
+  for (const w of wuensche) {
+    const teile = bedarf.get(w.id) ?? []
+    let d = Math.max(Math.floor(w.delta), 0)
+    for (const b of teile) {
+      if (b.je <= 0) continue
+      d = Math.min(d, Math.floor(((frei.get(b.komponente) ?? 0) + 1e-9) / b.je))
+    }
+    d = Math.max(d, 0)
+    erlaubt.set(w.id, d)
+    for (const b of teile) frei.set(b.komponente, (frei.get(b.komponente) ?? 0) - d * b.je)
+  }
+  return erlaubt
 }
 
 /**
@@ -129,7 +263,7 @@ export function deuteInventarPayload(payload: Record<string, unknown>): Inventar
  * argument: changeFromQuantity").
  */
 export function bestandsInput(
-  block: VarianteMitBestand[],
+  block: { inventory_item_gid: string | null; frei: number }[],
   locationGid: string,
 ): Record<string, unknown> {
   return {

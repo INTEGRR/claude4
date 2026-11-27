@@ -3,15 +3,20 @@ import { sql } from '@/db/client'
 import { ShopifyError, shopifyGraphQL } from './shopify'
 import {
   type AngebotMitBestand,
+  type AngebotStand,
+  DELTA_MUTATION,
+  erhoehungenImBudget,
+  istVeraltet,
   INVENTAR_MUTATION,
   type VarianteMitBestand,
-  angeboteZuMelden,
   bestandsInput,
+  deltaInput,
   deuteInventarPayload,
   fehlerJePosition,
   inBloecken,
-  zuUebertragen,
+  meldungPlanen,
 } from './inventar-logik'
+import { type Abnehmer, kontingentVerteilen } from './kontingent-logik'
 import { zweitangebotMerken } from './zweitangebote'
 
 /**
@@ -108,10 +113,27 @@ export interface PushErgebnis {
   angebote: number
   angeboteUebertragen: number
   angeboteAbgelehnt: number
+  /**
+   * Auf die nächste Runde verschoben (0136): Senkungen, auf denen ein
+   * unbekannter Kauf liegt, und Erhöhungen, die deshalb noch nicht gedeckt sind.
+   */
+  verschoben?: number
 }
 
-type VarianteZeile = VarianteMitBestand & ProbeFelder & { mto: boolean; eingerichtet: boolean }
-type AngebotZeile = AngebotMitBestand & ProbeFelder & { shopify_variant_id: string; eingerichtet: boolean }
+/** Was die Kontingent-Rechnung je Angebot braucht (0136). */
+interface KontingentFelder {
+  /** Menge ohne Teilen — der Deckel des Angebots (shopify_soll_menge). */
+  soll: number
+  buch_ab: Date | null
+  modus: string
+  gewicht: number
+  verkauft: number
+  eigen: number
+  bedarf: [string, number][]
+}
+
+type VarianteZeile = VarianteMitBestand & ProbeFelder & KontingentFelder & { mto: boolean; eingerichtet: boolean; shopify_variant_id: string }
+type AngebotZeile = AngebotMitBestand & ProbeFelder & KontingentFelder & { shopify_variant_id: string; eingerichtet: boolean }
 
 /**
  * Zweitangebote mit Soll-Menge (0106) — ohne Angebote, die inzwischen selbst
@@ -123,12 +145,18 @@ async function zweitangeboteLaden(): Promise<AngebotZeile[]> {
            v.display_name as name, coalesce(z.produkt, 'Zweitangebot') as produkt,
            z.shopify_variant_id,
            z.shopify_inventory_item_gid as inventory_item_gid,
+           shopify_soll_menge_zweitangebot(z.id) as soll,
            shopify_soll_menge_zweitangebot(z.id) as frei,
-           z.pushed_qty, z.push_fehler_qty,
+           z.pushed_qty, z.buch_ab, z.push_fehler_qty,
            ist_made_to_order(z.variant_id) as mto,
            z.mto_eingerichtet_at is not null as eingerichtet,
            z.probe_qty,
-           z.probe_eingerichtet_at is not null as probe_eingerichtet
+           z.probe_eingerichtet_at is not null as probe_eingerichtet,
+           case when z.shop_modus in ('aus', 'immer') then z.shop_modus else shop_modus_von(z.variant_id) end as modus,
+           shop_gewicht(z.variant_id) * coalesce(z.shop_gewicht, 1) as gewicht,
+           0 as verkauft,
+           greatest(shop_frei(z.variant_id), 0) as eigen,
+           coalesce((select json_agg(json_build_array(b.komponente, b.je)) from shop_bedarf(z.variant_id) b), '[]'::json) as bedarf
     from shopify_zweitangebote z
     join product_variants v on v.id = z.variant_id
     where v.active
@@ -136,31 +164,260 @@ async function zweitangeboteLaden(): Promise<AngebotZeile[]> {
     order by v.sku, z.produkt`
 }
 
-/**
- * Meldet die verfügbare Menge aller Shopify-gekoppelten Varianten an den
- * Shop — und dieselbe Menge an ihre Zweitangebote (0106: Bundle-Bestandteile,
- * Aktions-Editionen mit derselben SKU). Übertragen wird nur, was sich seit
- * der letzten Meldung geändert hat — ein leerer Durchlauf kostet keinen
- * einzigen API-Aufruf.
- */
-export async function pushInventar(): Promise<PushErgebnis> {
-  const varianten = await sql<VarianteZeile[]>`
-    select v.id as variant_id, v.sku, v.display_name as name,
+/** Alle Shopify-gekoppelten Varianten mit allem, was Kontingent und Meldung brauchen. */
+async function variantenLaden(): Promise<VarianteZeile[]> {
+  return sql<VarianteZeile[]>`
+    select v.id as variant_id, v.sku, v.display_name as name, v.shopify_variant_id,
            v.shopify_inventory_item_gid as inventory_item_gid,
+           shopify_soll_menge(v.id) as soll,
            shopify_soll_menge(v.id) as frei,
-           s.pushed_qty,
+           s.pushed_qty, s.buch_ab,
            ist_made_to_order(v.id) as mto,
            s.mto_eingerichtet_at is not null as eingerichtet,
            s.probe_qty,
-           s.probe_eingerichtet_at is not null as probe_eingerichtet
+           s.probe_eingerichtet_at is not null as probe_eingerichtet,
+           shop_modus_von(v.id) as modus,
+           shop_gewicht(v.id) as gewicht,
+           coalesce((select sum(l.qty) from sales_order_lines l
+                     join sales_orders so on so.id = l.order_id
+                     where l.variant_id = v.id and so.state <> 'cancel'
+                       and so.order_date > now() - interval '6 hours'), 0) as verkauft,
+           greatest(shop_frei(v.id), 0) as eigen,
+           coalesce((select json_agg(json_build_array(b.komponente, b.je)) from shop_bedarf(v.id) b), '[]'::json) as bedarf
     from product_variants v
     left join shopify_inventory_state s on s.variant_id = v.id
     where v.shopify_variant_id is not null and v.active
     order by v.sku`
+}
+
+/**
+ * Kontingent (0136): verteilt den freien Bestand jedes Teils auf die
+ * Angebote, die es brauchen, und schreibt das Ergebnis als `frei` in die
+ * Zeilen — ab hier ist `frei` das Ziel der Meldung, nicht mehr die Menge
+ * ohne Teilen. Die Rechnung selbst liegt in kontingent-logik.ts.
+ */
+async function kontingentAnwenden(varianten: VarianteZeile[], angebote: AngebotZeile[]): Promise<KontingentLage> {
+  const abnehmer: Abnehmer[] = []
+  const eintrag = (id: string, z: KontingentFelder & { variant_id: string; mto: boolean }): Abnehmer => ({
+    id,
+    deckel: Math.max(Math.floor(Number(z.soll)), 0),
+    // Was sich gerade verkauft, bekommt mehr: Grundgewicht × (1 + Stück der letzten sechs Stunden).
+    gewicht: Math.max(Number(z.gewicht) || 1, 0.0001) * (1 + Math.max(Number(z.verkauft) || 0, 0)),
+    // „Immer verfügbar" hängt an keinem Bestand — der Deckel gilt.
+    bedarf: z.modus === 'immer' ? [] : z.bedarf.map(([komponente, je]) => ({ komponente, je: Number(je) })),
+    eigen: z.mto && Number(z.eigen) > 0 ? { schluessel: z.variant_id, menge: Number(z.eigen) } : undefined,
+  })
+  for (const v of varianten) abnehmer.push(eintrag(`v:${v.variant_id}`, v))
+  for (const a of angebote) abnehmer.push(eintrag(`z:${a.angebot_id}`, a))
+
+  const teile = [...new Set(abnehmer.flatMap((a) => a.bedarf.map((b) => b.komponente)))]
+  const pool = new Map<string, number>()
+  if (teile.length > 0) {
+    const zeilen = await sql<{ id: string; menge: number }[]>`
+      select k as id, shop_pool(k) as menge from unnest(${teile}::uuid[]) k`
+    for (const z of zeilen) pool.set(z.id, Number(z.menge))
+    // Shop-Bestellungen im Entwurf: im Shop schon abgezogen, in KRNL noch nicht reserviert.
+    const entwurf = await sql<{ komponente: string; menge: number }[]>`select komponente, menge from shop_entwurf_bedarf()`
+    for (const e of entwurf) {
+      if (pool.has(e.komponente)) pool.set(e.komponente, Math.max(pool.get(e.komponente)! - Number(e.menge), 0))
+    }
+  }
+
+  const ausEigen = new Map<string, number>()
+  const kontingent = kontingentVerteilen(abnehmer, pool, ausEigen)
+  for (const v of varianten) v.frei = kontingent.get(`v:${v.variant_id}`) ?? 0
+  for (const a of angebote) a.frei = kontingent.get(`z:${a.angebot_id}`) ?? 0
+
+  // Fürs Auge (Shop-Verfügbarkeit): das Kontingent je Angebot festhalten.
+  if (varianten.length > 0) {
+    await sql`
+      insert into shopify_inventory_state (variant_id, kontingent, kontingent_at)
+      select x.id, x.k, now()
+      from unnest(${varianten.map((v) => v.variant_id)}::uuid[], ${varianten.map((v) => v.frei)}::int[]) as x(id, k)
+      on conflict (variant_id) do update set kontingent = excluded.kontingent, kontingent_at = now()
+      where shopify_inventory_state.kontingent is distinct from excluded.kontingent`
+  }
+  if (angebote.length > 0) {
+    await sql`
+      update shopify_zweitangebote z set kontingent = x.k, kontingent_at = now()
+      from unnest(${angebote.map((a) => a.angebot_id)}::uuid[], ${angebote.map((a) => a.frei)}::int[]) as x(id, k)
+      where z.id = x.id and z.kontingent is distinct from x.k`
+  }
+  return {
+    pool,
+    bedarf: new Map(abnehmer.map((a) => [a.id, a.bedarf])),
+    gewicht: new Map(abnehmer.map((a) => [a.id, a.gewicht])),
+    ausEigen,
+  }
+}
+
+/** Was die Meldung von der Kontingent-Rechnung wissen muss, um Erhöhungen zu decken. */
+interface KontingentLage {
+  pool: Map<string, number>
+  bedarf: Map<string, { komponente: string; je: number }[]>
+  gewicht: Map<string, number>
+  ausEigen: Map<string, number>
+}
+
+/** Not-Aus (S6): steht er, ist das Ziel jedes Angebots 0. */
+export async function notAusAktiv(): Promise<boolean> {
+  const [row] = await sql<{ an: boolean | null }[]>`
+    select (value -> 'not_aus' ->> 'aktiv')::boolean as an from settings where key = 'shopify'`
+  return row?.an === true
+}
+
+/** Ein Angebot auf dem Weg zum Shop: Variante oder Zweitangebot. */
+type Posten = { art: 'v' | 'z'; id: string; inventory_item_gid: string | null; frei: number; shop_gid?: string | null }
+
+/** Was zeigt der Shop JETZT? Menge je Shop-Variante — für Angebote, deren Senkung er abgelehnt hat. */
+async function shopMengenLesen(gids: string[]): Promise<Map<string, number>> {
+  const mengen = new Map<string, number>()
+  for (const block of inBloecken([...new Set(gids)], 100)) {
+    const data = await shopifyGraphQL<{ nodes: ({ id: string; inventoryQuantity: number | null } | null)[] }>(
+      `query shopMengen($ids: [ID!]!) {
+         nodes(ids: $ids) { ... on ProductVariant { id inventoryQuantity } }
+       }`,
+      { ids: block },
+    )
+    for (const n of data.nodes) if (n && typeof n.inventoryQuantity === 'number') mengen.set(n.id, n.inventoryQuantity)
+  }
+  return mengen
+}
+
+/** Buch um eine Differenz fortschreiben — als Rechnung in der Datenbank, nie als fester Wert. */
+async function buchFortschreiben(posten: (Posten & { delta: number })[], vorzeichen: 1 | -1): Promise<void> {
+  const v = posten.filter((p) => p.art === 'v')
+  const z = posten.filter((p) => p.art === 'z')
+  if (v.length > 0) {
+    await sql`
+      update shopify_inventory_state s set pushed_qty = s.pushed_qty + x.d, pushed_at = now()
+      from unnest(${v.map((p) => p.id)}::uuid[], ${v.map((p) => p.delta * vorzeichen)}::int[]) as x(id, d)
+      where s.variant_id = x.id`
+  }
+  if (z.length > 0) {
+    await sql`
+      update shopify_zweitangebote s set pushed_qty = s.pushed_qty + x.d, pushed_at = now(),
+             push_fehler = null, push_fehler_qty = null
+      from unnest(${z.map((p) => p.id)}::uuid[], ${z.map((p) => p.delta * vorzeichen)}::int[]) as x(id, d)
+      where s.id = x.id`
+  }
+}
+
+/**
+ * Buch nach einer absoluten Meldung: ab jetzt zählen Bestellungen dagegen —
+ * mit fünf Sekunden Abstand (eigene Uhr gegen die des Shops; im Zweifel
+ * zählt eine Bestellung nicht, dann zeigt der Shop eher zu wenig).
+ */
+async function buchSetzen(posten: Posten[]): Promise<void> {
+  const v = posten.filter((p) => p.art === 'v')
+  const z = posten.filter((p) => p.art === 'z')
+  if (v.length > 0) {
+    await sql`
+      insert into shopify_inventory_state (variant_id, pushed_qty, pushed_at, buch_ab, shop_qty, shop_seen_at)
+      select x.id, x.q, now(), now() + interval '5 seconds', x.q, now()
+      from unnest(${v.map((p) => p.id)}::uuid[], ${v.map((p) => Math.floor(p.frei))}::int[]) as x(id, q)
+      on conflict (variant_id) do update
+        set pushed_qty = excluded.pushed_qty, pushed_at = now(), buch_ab = excluded.buch_ab,
+            shop_qty = excluded.shop_qty, shop_seen_at = now()`
+  }
+  if (z.length > 0) {
+    await sql`
+      update shopify_zweitangebote s
+      set pushed_qty = x.q, pushed_at = now(), buch_ab = now() + interval '5 seconds', shop_qty = x.q, shop_seen_at = now(),
+          push_fehler = null, push_fehler_qty = null
+      from unnest(${z.map((p) => p.id)}::uuid[], ${z.map((p) => Math.floor(p.frei))}::int[]) as x(id, q)
+      where s.id = x.id`
+  }
+}
+
+/**
+ * Sendet einen Block an Shopify. Lehnt der Shop einzelne Positionen ab, gilt
+ * die ganze Mutation als nicht ausgeführt: die genannten Positionen fallen
+ * heraus (Zweitangebote merken den Grund), der Rest wird einmal wiederholt.
+ * Rückgabe: was wirklich gesendet wurde, und die Ablehnungen.
+ */
+async function blockSenden<T extends Posten>(
+  block: T[],
+  mutation: string,
+  eingabe: (teil: T[]) => Record<string, unknown>,
+  feld: 'inventorySetQuantities' | 'inventoryAdjustQuantities',
+): Promise<{ gesendet: T[]; abgelehnt: { posten: T; grund: string }[] }> {
+  let offen = block
+  const abgelehnt: { posten: T; grund: string }[] = []
+  for (let versuch = 0; versuch < 3 && offen.length > 0; versuch++) {
+    const data = await shopifyGraphQL<Record<string, { userErrors: { field: string[] | null; message: string; code?: string | null }[] }>>(
+      mutation,
+      { input: eingabe(offen), idempotencyKey: randomUUID() },
+    )
+    const fehler = data[feld].userErrors
+    if (fehler.length === 0) return { gesendet: offen, abgelehnt }
+    const jePosition = fehlerJePosition(offen.length, fehler.map((f) => ({ field: f.field, message: f.code ? `${f.message} [${f.code}]` : f.message })))
+    // Nennt der Shop keine Position (alle gelten als abgelehnt): halbieren —
+    // sonst hielte eine einzige abgelehnte Position den ganzen Block auf.
+    if (jePosition.size === offen.length && offen.length > 1 && fehler.length < offen.length) {
+      const mitte = Math.ceil(offen.length / 2)
+      const links = await blockSenden(offen.slice(0, mitte), mutation, eingabe, feld)
+      const rechts = await blockSenden(offen.slice(mitte), mutation, eingabe, feld)
+      return { gesendet: [...links.gesendet, ...rechts.gesendet], abgelehnt: [...abgelehnt, ...links.abgelehnt, ...rechts.abgelehnt] }
+    }
+    for (const [i, grund] of jePosition) abgelehnt.push({ posten: offen[i], grund })
+    offen = offen.filter((_, i) => !jePosition.has(i))
+  }
+  return { gesendet: [], abgelehnt: [...abgelehnt, ...offen.map((posten) => ({ posten, grund: 'nach Wiederholung weiter abgelehnt' }))] }
+}
+
+/** Ablehnungen vermerken: am Zweitangebot mit Grund; Artikel sammeln sich für die Fehlermeldung. */
+async function ablehnungenMerken(abgelehnt: { posten: Posten; grund: string }[]): Promise<string[]> {
+  const artikel: string[] = []
+  for (const { posten, grund } of abgelehnt) {
+    if (posten.art === 'z') {
+      await sql`update shopify_zweitangebote set push_fehler = ${grund.slice(0, 500)}, push_fehler_qty = ${Math.floor(posten.frei)}
+                where id = ${posten.id}`
+    } else {
+      artikel.push(grund)
+    }
+  }
+  return artikel
+}
+
+/**
+ * Meldet die Kontingente an den Shop (0136, Entscheidungslog 2026-11-27):
+ *
+ * 1. Kontingent rechnen — die Summe über alle Angebote, die ein Teil
+ *    brauchen, übersteigt nie dessen freien Bestand.
+ * 2. Nur die DIFFERENZ zum Buch senden (inventoryAdjustQuantities), nie
+ *    eine absolute Menge: ein Kauf, den KRNL noch nicht kennt, bleibt im
+ *    Shop abgezogen. Absolut gesetzt wird nur, was noch nie gemeldet wurde
+ *    — und alles beim Not-Aus.
+ * 3. Reihenfolge: erst senken, dann erstmalig setzen, zuletzt heben — die
+ *    Summe liegt auch mitten in der Meldung nie über dem Bestand.
+ *    Gesenkt wird MIT Vergleichswert (der Shop senkt nur, wenn er den
+ *    Buchwert zeigt): liegt ein unbekannter Kauf auf dem Angebot, wäre die
+ *    Senkung nur scheinbar. Der Shop lehnt dann ab, das Angebot behält
+ *    seinen Stand, und erhöht wird nur, was aus wirklich freiem Bestand
+ *    gedeckt ist (erhoehungenImBudget).
+ * 4. Buch und Shop bleiben auch bei einem Abbruch auf der sicheren Seite:
+ *    gesenkt wird erst im Shop, dann im Buch; gehoben erst im Buch, dann im
+ *    Shop. Reißt die Verbindung dazwischen, zeigt der Shop zu wenig, nie zu
+ *    viel — der Abgleich heilt es.
+ *
+ * Ein leerer Durchlauf kostet keinen einzigen API-Aufruf.
+ */
+export async function pushInventar(): Promise<PushErgebnis> {
+  const varianten = await variantenLaden()
   const angebote = await zweitangeboteLaden()
 
   const leer = { geprueft: 0, uebertragen: 0, ohneZuordnung: 0, angebote: 0, angeboteUebertragen: 0, angeboteAbgelehnt: 0 }
   if (varianten.length === 0 && angebote.length === 0) return leer
+
+  const notAus = await notAusAktiv()
+  let lage: KontingentLage | null = null
+  if (notAus) {
+    for (const v of varianten) v.frei = 0
+    for (const a of angebote) a.frei = 0
+  } else {
+    lage = await kontingentAnwenden(varianten, angebote)
+  }
 
   // Probelauf (0102): rechnen wie scharf, aber nichts senden — nur
   // protokollieren, was gemeldet würde, gegen den eigenen Probe-Stand.
@@ -173,94 +430,147 @@ export async function pushInventar(): Promise<PushErgebnis> {
     varianten.filter((v) => v.mto && !v.eingerichtet),
     angebote.filter((a) => a.mto && !a.eingerichtet),
   )
-  const { melden, ohneZuordnung } = zuUebertragen(varianten)
-  const zweit = angeboteZuMelden(angebote)
+
+  const posten: (Posten & AngebotStand & { fehlerMenge: number | null; shop_gid: string | null })[] = [
+    ...varianten.map((v) => ({
+      art: 'v' as const, id: v.variant_id, inventory_item_gid: v.inventory_item_gid, frei: v.frei,
+      pushed_qty: v.pushed_qty, buch_ab: v.buch_ab, fehlerMenge: null, shop_gid: v.shopify_variant_id,
+    })),
+    ...angebote.map((a) => ({
+      art: 'z' as const, id: a.angebot_id, inventory_item_gid: a.inventory_item_gid, frei: a.frei,
+      pushed_qty: a.pushed_qty, buch_ab: a.buch_ab, fehlerMenge: a.push_fehler_qty, shop_gid: a.shopify_variant_id,
+    })),
+  ]
+  // Not-Aus setzt ALLES absolut auf 0 — unabhängig vom Buch, solange es nicht schon bei 0 steht.
+  const plan = notAus
+    ? {
+        erst: posten.filter((p) => p.inventory_item_gid && (p.pushed_qty === null || p.buch_ab === null || Number(p.pushed_qty) !== 0)),
+        senken: [], heben: [],
+        ohneZuordnung: posten.filter((p) => !p.inventory_item_gid),
+      }
+    : meldungPlanen(posten)
+  // Ein Zweitangebot, dessen Menge Shopify schon einmal abgelehnt hat, versucht es erst mit neuer Menge wieder.
+  const versuchen = <T extends { art: 'v' | 'z'; frei: number; fehlerMenge: number | null }>(liste: T[]) =>
+    liste.filter((p) => p.art === 'v' || p.fehlerMenge === null || Math.floor(Number(p.fehlerMenge)) !== Math.floor(p.frei))
+  const senken = versuchen(plan.senken)
+  const erst = versuchen(plan.erst)
+  const heben = versuchen(plan.heben)
+
   const ergebnis = {
     geprueft: varianten.length,
-    uebertragen: melden.length,
-    ohneZuordnung: ohneZuordnung.length + zweit.ohneZuordnung.length,
+    uebertragen: 0,
+    ohneZuordnung: plan.ohneZuordnung.length,
     angebote: angebote.length,
     angeboteUebertragen: 0,
     angeboteAbgelehnt: 0,
+    verschoben: 0,
   }
-  if (melden.length === 0 && zweit.melden.length === 0) return ergebnis
+  if (senken.length === 0 && erst.length === 0 && heben.length === 0) return ergebnis
 
   const location = await locationGid()
+  const fehlerArtikel: string[] = []
+  const zaehlen = (gesendet: Posten[], abgelehnt: { posten: Posten }[]) => {
+    ergebnis.uebertragen += gesendet.filter((p) => p.art === 'v').length
+    ergebnis.angeboteUebertragen += gesendet.filter((p) => p.art === 'z').length
+    ergebnis.angeboteAbgelehnt += abgelehnt.filter((a) => a.posten.art === 'z').length
+  }
 
-  for (const block of inBloecken(melden, 200)) {
-    const data = await shopifyGraphQL<{
-      inventorySetQuantities: { userErrors: { field: string[] | null; message: string }[] }
-    }>(
-      // changeFromQuantity: null je Position (Pflichtfeld, null = nicht
-      // vergleichen — das ERP ist die Quelle der Wahrheit) und @idempotent
-      // mit frischem Schlüssel je Aufruf; Details in inventar-logik.ts.
-      INVENTAR_MUTATION,
-      { input: bestandsInput(block, location), idempotencyKey: randomUUID() },
+  // Buchstand je Angebot, fortgeschrieben mit dem, was der Shop wirklich annimmt.
+  const buchNach = new Map<string, number>()
+  for (const p of posten) buchNach.set(`${p.art}:${p.id}`, p.pushed_qty === null ? 0 : Math.round(Number(p.pushed_qty)))
+
+  // 1. Senken: erst der Shop, dann das Buch — GESÄTTIGT und mit
+  //    Vergleichswert. Erst nachsehen, was der Shop zeigt, dann höchstens
+  //    um das senken, was wirklich noch dasteht: was schon verkauft ist
+  //    (unbekannter Kauf), lässt sich nicht mehr senken — das Angebot hält
+  //    dann mehr als sein Kontingent, und genau so viel weniger wird unten
+  //    erhöht. Der Vergleichswert sichert die Zeit zwischen Lesen und
+  //    Schreiben: kauft jemand dazwischen, lehnt der Shop ab (kein Fehler,
+  //    die nächste Runde versucht es neu).
+  for (const block of inBloecken(senken, 200)) {
+    const mengen = await shopMengenLesen(block.map((p) => p.shop_gid ?? '').filter(Boolean))
+    const gesaettigt: ((typeof block)[number] & { erwartet: number })[] = []
+    for (const p of block) {
+      const imShop = p.shop_gid ? mengen.get(p.shop_gid) : undefined
+      if (imShop === undefined) {
+        ergebnis.verschoben++
+        continue
+      }
+      let buch = Math.round(Number(p.pushed_qty))
+      if (imShop > buch) {
+        // Der Shop zeigt MEHR als das Buch (von Hand geändert): das Buch übernimmt.
+        await buchSetzen([{ ...p, frei: imShop }])
+        buch = imShop
+        buchNach.set(`${p.art}:${p.id}`, buch)
+      }
+      const wunsch = buch - Math.floor(p.frei)
+      const d = Math.min(wunsch, Math.max(imShop, 0))
+      if (d < wunsch) ergebnis.verschoben++
+      if (d <= 0) continue
+      gesaettigt.push({ ...p, delta: -d, erwartet: imShop, frei: buch - d })
+    }
+    if (gesaettigt.length === 0) continue
+    const r = await blockSenden(
+      gesaettigt, DELTA_MUTATION, (teil) => deltaInput(teil, location), 'inventoryAdjustQuantities',
     )
-    const fehler = data.inventorySetQuantities.userErrors
-    if (fehler.length > 0) {
-      throw new ShopifyError(
-        `Bestandsmeldung abgelehnt: ${fehler.map((f) => f.message).join('; ')}`,
-        false,
-      )
-    }
-    for (const v of block) {
-      await sql`
-        insert into shopify_inventory_state (variant_id, pushed_qty, pushed_at, shop_qty, shop_seen_at)
-        values (${v.variant_id}, ${v.frei}, now(), ${Math.floor(v.frei)}, now())
-        on conflict (variant_id) do update
-          set pushed_qty = excluded.pushed_qty, pushed_at = now(),
-              shop_qty = excluded.shop_qty, shop_seen_at = now()`
+    await buchFortschreiben(r.gesendet, 1)
+    for (const p of r.gesendet) buchNach.set(`${p.art}:${p.id}`, Math.floor(p.frei))
+    const echt = r.abgelehnt.filter((x) => !istVeraltet(x.grund))
+    ergebnis.verschoben += r.abgelehnt.length - echt.length
+    fehlerArtikel.push(...(await ablehnungenMerken(echt)))
+    zaehlen(r.gesendet, echt)
+  }
+
+  // 2. Erstmalig (oder Not-Aus): absolut setzen, danach läuft das Buch.
+  for (const block of inBloecken(erst, 200)) {
+    const r = await blockSenden(block, INVENTAR_MUTATION, (teil) => bestandsInput(teil, location), 'inventorySetQuantities')
+    await buchSetzen(r.gesendet)
+    for (const p of r.gesendet) buchNach.set(`${p.art}:${p.id}`, Math.floor(p.frei))
+    fehlerArtikel.push(...(await ablehnungenMerken(r.abgelehnt)))
+    zaehlen(r.gesendet, r.abgelehnt)
+  }
+
+  // 3. Heben: erst das Buch, dann der Shop — scheitert die Meldung sicher
+  //    (Ablehnung, Drosselung), geht das Buch zurück; bei unklarem Ausgang
+  //    bleibt es stehen (der Shop zeigt dann eher zu wenig).
+  //    Gedeckt ist eine Erhöhung nur aus Bestand, den die Angebote laut
+  //    Buch nicht mehr halten: hat der Shop oben eine Senkung abgelehnt,
+  //    bindet jenes Angebot seine Teile weiter.
+  let hebenGedeckt = heben
+  if (lage && heben.length > 0) {
+    const gehalten = new Map<string, number>()
+    for (const [id, b] of buchNach) gehalten.set(id, Math.max(b - (lage.ausEigen.get(id) ?? 0), 0))
+    const reihenfolge = [...heben].sort(
+      (x, y) => (lage!.gewicht.get(`${y.art}:${y.id}`) ?? 1) - (lage!.gewicht.get(`${x.art}:${x.id}`) ?? 1),
+    )
+    const erlaubt = erhoehungenImBudget(
+      reihenfolge.map((p) => ({ id: `${p.art}:${p.id}`, delta: p.delta })), gehalten, lage.bedarf, lage.pool,
+    )
+    hebenGedeckt = heben
+      .map((p) => ({ ...p, delta: erlaubt.get(`${p.art}:${p.id}`) ?? 0 }))
+      .filter((p) => p.delta > 0)
+      .map((p) => ({ ...p, frei: Math.round(Number(p.pushed_qty)) + p.delta }))
+    ergebnis.verschoben += heben.length - hebenGedeckt.length
+  }
+  for (const block of inBloecken(hebenGedeckt, 200)) {
+    await buchFortschreiben(block, 1)
+    try {
+      const r = await blockSenden(block, DELTA_MUTATION, (teil) => deltaInput(teil, location), 'inventoryAdjustQuantities')
+      await buchFortschreiben(r.abgelehnt.map((a) => a.posten as (typeof block)[number]), -1)
+      fehlerArtikel.push(...(await ablehnungenMerken(r.abgelehnt)))
+      zaehlen(r.gesendet, r.abgelehnt)
+    } catch (err) {
+      const sicherNichtGebucht =
+        !(err instanceof ShopifyError) || !err.retryable || /thrott|429/i.test(err.message)
+      if (sicherNichtGebucht) await buchFortschreiben(block, -1)
+      throw err
     }
   }
 
-  const r = await angeboteMelden(zweit.melden, location)
-  return { ...ergebnis, angeboteUebertragen: r.gemeldet, angeboteAbgelehnt: r.abgelehnt }
-}
-
-/**
- * Zweitangebote melden — als EIGENE Mutation nach der Hauptmeldung, damit
- * ein Angebot, das Shopify ablehnt (z. B. nicht am Standort geführt), nie den
- * Bestand der Artikel blockiert. Lehnt Shopify Positionen ab, gilt die ganze
- * Mutation als nicht ausgeführt: die genannten Angebote werden mit Grund
- * vermerkt (push_fehler) und der Rest einmal ohne sie wiederholt.
- */
-async function angeboteMelden(
-  melden: AngebotZeile[],
-  location: string,
-): Promise<{ gemeldet: number; abgelehnt: number }> {
-  let gemeldet = 0
-  let abgelehnt = 0
-  for (const block of inBloecken(melden, 200)) {
-    let offen = block
-    for (let versuch = 0; versuch < 2 && offen.length > 0; versuch++) {
-      const data = await shopifyGraphQL<{
-        inventorySetQuantities: { userErrors: { field: string[] | null; message: string }[] }
-      }>(INVENTAR_MUTATION, { input: bestandsInput(offen, location), idempotencyKey: randomUUID() })
-      const fehler = data.inventorySetQuantities.userErrors
-      if (fehler.length === 0) {
-        for (const a of offen) {
-          await sql`
-            update shopify_zweitangebote
-            set pushed_qty = ${a.frei}, pushed_at = now(), shop_qty = ${Math.floor(a.frei)}, shop_seen_at = now(),
-                push_fehler = null, push_fehler_qty = null
-            where id = ${a.angebot_id}`
-        }
-        gemeldet += offen.length
-        break
-      }
-      const jePosition = fehlerJePosition(offen.length, fehler)
-      for (const [i, grund] of jePosition) {
-        await sql`
-          update shopify_zweitangebote
-          set push_fehler = ${grund.slice(0, 500)}, push_fehler_qty = ${offen[i].frei}
-          where id = ${offen[i].angebot_id}`
-      }
-      abgelehnt += jePosition.size
-      offen = offen.filter((_, i) => !jePosition.has(i))
-    }
+  if (fehlerArtikel.length > 0) {
+    throw new ShopifyError(`Bestandsmeldung abgelehnt: ${[...new Set(fehlerArtikel)].join('; ')}`, false)
   }
-  return { gemeldet, abgelehnt }
+  return ergebnis
 }
 
 /** InventoryItems der Zweitangebote nachholen (fehlt, wenn der Shop-Stand sie nicht lieferte). */
@@ -625,12 +935,116 @@ export async function shopStandHolen(): Promise<{
   return ergebnis
 }
 
+// --- Buch heilen (S7) ------------------------------------------------------------
+
+export interface BuchAbgleich {
+  /** Shop zeigte mehr als das Buch — sofort übernommen (danach senkt der Abgleich). */
+  hoch: number
+  /** Shop zeigte weniger als das Buch — nur in ruhiger Zeit übernommen. */
+  runter: number
+  /** Keine offenen Bestell-Ereignisse — dann heilt, was seit drei Minuten nicht bestellt wurde. */
+  ruhe: boolean
+  /** Auftragsgefertigte Angebote, die im Shop wieder „weiterverkaufen" oder ohne Mengenverfolgung stehen. */
+  einrichtung: number
+}
+
+/**
+ * Gleicht das Buch mit dem frisch gelesenen Shop-Stand ab (S7, nach
+ * shopStandHolen im Viertelstunden-Abgleich):
+ *
+ * - Shop zeigt MEHR als das Buch: nie durch Käufe erklärbar — sofort
+ *   übernehmen, der nächste Abgleich senkt. Meldung per Telegram.
+ * - Shop zeigt WENIGER: meist Käufe, die noch unterwegs sind. Übernommen
+ *   wird je Angebot nur in ruhiger Zeit (keine offenen Bestell-Ereignisse,
+ *   für diesen Artikel seit drei Minuten keine neue Shop-Bestellung) — dann
+ *   ist es eine echte Abweichung, und der Shop bekommt den Rest zurück.
+ * - „Nicht weiterverkaufen" und Mengenverfolgung der auftragsgefertigten
+ *   Angebote: steht im Shop etwas anderes, richtet der nächste Abgleich sie
+ *   neu ein.
+ */
+export async function buchAbgleichen(): Promise<BuchAbgleich> {
+  // Frisch = eben gelesen, nach der letzten eigenen Buchung UND nach der
+  // jüngsten gezählten Bestellung (0139) — sonst vergliche man einen alten
+  // Shop-Stand mit einem Buch, das schon weiter ist.
+  const frisch = sql`shop_seen_at > now() - interval '3 minutes' and (pushed_at is null or shop_seen_at > pushed_at)
+                     and (buch_bestellt_bis is null or shop_seen_at > buch_bestellt_bis)`
+  const hochV = await sql`
+    update shopify_inventory_state
+    set pushed_qty = shop_qty, buch_ab = shop_seen_at + interval '5 seconds', pushed_at = now()
+    where pushed_qty is not null and buch_ab is not null and shop_qty is not null
+      and shop_qty > round(pushed_qty) and ${frisch}
+    returning variant_id`
+  const hochZ = await sql`
+    update shopify_zweitangebote
+    set pushed_qty = shop_qty, buch_ab = shop_seen_at + interval '5 seconds', pushed_at = now()
+    where pushed_qty is not null and buch_ab is not null and shop_qty is not null
+      and shop_qty > round(pushed_qty) and ${frisch}
+    returning id`
+
+  // Ruhe je Angebot: keine offenen Bestell-Ereignisse, und für DIESEN
+  // Artikel seit drei Minuten keine neue Shop-Bestellung. Ein Renner heilt
+  // erst, wenn er zur Ruhe kommt; alles andere schon mitten im Ansturm.
+  const [{ ruhe }] = await sql<{ ruhe: boolean }[]>`
+    select not exists (select 1 from shopify_webhook_events
+                       where status = 'pending' and (topic like 'orders/%' or topic like 'fulfillment_orders/%')) as ruhe`
+  let runter = 0
+  if (ruhe) {
+    const juengst = sql`
+      select 1 from sales_order_lines l join sales_orders so on so.id = l.order_id
+      where so.source = 'shopify' and so.created_at > now() - interval '3 minutes'`
+    const v = await sql`
+      update shopify_inventory_state s
+      set pushed_qty = shop_qty, buch_ab = shop_seen_at + interval '5 seconds', pushed_at = now()
+      where pushed_qty is not null and buch_ab is not null and shop_qty is not null
+        and shop_qty < round(pushed_qty) and ${frisch}
+        and not exists (${juengst} and l.variant_id = s.variant_id)
+      returning variant_id`
+    const z = await sql`
+      update shopify_zweitangebote s
+      set pushed_qty = shop_qty, buch_ab = shop_seen_at + interval '5 seconds', pushed_at = now()
+      where pushed_qty is not null and buch_ab is not null and shop_qty is not null
+        and shop_qty < round(pushed_qty) and ${frisch}
+        and not exists (${juengst} and l.variant_id = s.variant_id)
+      returning id`
+    runter = v.length + z.length
+  }
+
+  // „Nicht weiterverkaufen" erneut prüfen: weicht der Shop ab, neu einrichten.
+  const neu = await sql`
+    update shopify_inventory_state s
+    set mto_eingerichtet_at = null
+    where s.mto_eingerichtet_at is not null and ist_made_to_order(s.variant_id)
+      and s.shop_seen_at > now() - interval '3 minutes'
+      and (s.shop_policy is distinct from 'DENY' or s.shop_tracked is distinct from true)
+      and s.shop_policy is not null
+    returning variant_id`
+
+  const hoch = hochV.length + hochZ.length
+  if (hoch > 0 || runter > 0 || neu.length > 0) await sql`select inventar_abgleich_anstossen()`
+  if (hoch > 0) {
+    const { einreihen } = await import('./benachrichtigungen')
+    await einreihen(sql, 'ueberverkauf', `abweichung:${new Date().toISOString().slice(0, 13)}`,
+      `⚠️ <b>Abweichung im Shop</b>: ${hoch} ${hoch === 1 ? 'Angebot zeigte' : 'Angebote zeigten'} mehr als KRNL gebucht hat ` +
+      '(von Hand im Shop geändert?). KRNL hat den Stand übernommen und senkt auf das Kontingent.')
+  }
+  return { hoch, runter, ruhe, einrichtung: neu.length }
+}
+
 // --- Webhook -------------------------------------------------------------------
 
 /**
  * Verarbeitet inventory_levels/update: der Shop berichtet seinen Stand.
- * Weicht er vom ERP ab (jemand hat im Shopify-Admin von Hand gebucht),
- * wird ein korrigierender Push eingereiht — das ERP behält recht.
+ *
+ * Mit dem Buch (0136) gilt:
+ * - Shop zeigt WENIGER als das Buch: der Normalfall — ein Kauf, den KRNL
+ *   noch nicht eingelesen hat. Nichts tun; die Bestellung zieht es vom
+ *   Buch ab, sobald sie da ist.
+ * - Shop zeigt MEHR als das Buch: das erklärt kein Kauf — jemand hat im
+ *   Shop von Hand gebucht oder ein Storno hat zurückgelagert. Das Buch
+ *   übernimmt den Shop-Stand (ab dem Zeitpunkt der Meldung), der nächste
+ *   Abgleich senkt auf das Kontingent.
+ * Meldungen, die älter sind als die letzte eigene Buchung, zählen nicht —
+ * Webhooks überholen einander.
  */
 export async function verarbeiteInventarWebhook(
   payload: Record<string, unknown>,
@@ -638,59 +1052,75 @@ export async function verarbeiteInventarWebhook(
   const meldung = deuteInventarPayload(payload)
   if (!meldung) return 'Kein verwertbarer Bestands-Payload — übersprungen'
 
-  const [variante] = await sql<{ id: string; sku: string | null; frei: number }[]>`
-    select id, sku, shopify_soll_menge(id) as frei
-    from product_variants
-    where shopify_inventory_item_gid = ${meldung.inventoryItemGid}`
+  const [variante] = await sql<{ id: string; sku: string | null }[]>`
+    select id, sku from product_variants where shopify_inventory_item_gid = ${meldung.inventoryItemGid}`
   if (!variante) return angebotWebhook(meldung)
 
-  await sql`
+  const [stand] = await sql<{ buch: number | null; pushed_at: Date | null; bestellt_bis: Date | null }[]>`
     insert into shopify_inventory_state (variant_id, shop_qty, shop_seen_at)
     values (${variante.id}, ${meldung.verfuegbar}, now())
     on conflict (variant_id) do update
-      set shop_qty = excluded.shop_qty, shop_seen_at = now()`
-
-  const soll = Math.floor(variante.frei)
-  if (meldung.verfuegbar > soll) {
-    // Shop bietet mehr an als das ERP hergibt — sofort korrigieren. Nicht
-    // selbst pushen (Webhooks kommen in Wellen): der Anstoß bündelt.
-    await sql`select inventar_abgleich_anstossen()`
-    return `Abweichung bei ${variante.sku ?? variante.id}: Shop ${meldung.verfuegbar}, ERP ${soll} — Abgleich angestoßen`
-  }
-  if (meldung.verfuegbar < soll) {
-    // Shop zeigt weniger: meist hat Shopify eine Bestellung abgezogen, die
-    // das ERP noch nicht importiert hat. NICHT sofort hochsetzen (das würde
-    // die Bestellung überschreiben, Überverkauf!) — nur den Shop-Stand als
-    // gemeldet merken; der nächste reguläre Abgleich (nach dem Import bzw.
-    // minütlich) setzt die richtige Menge.
+      set shop_qty = excluded.shop_qty, shop_seen_at = now()
+    returning pushed_qty as buch, pushed_at, buch_bestellt_bis as bestellt_bis`
+  const name = variante.sku ?? variante.id
+  const urteil = shopStandBeurteilen(meldung, stand?.buch ?? null, stand?.pushed_at ?? null, stand?.bestellt_bis ?? null)
+  if (urteil === 'mehr') {
     await sql`
-      update shopify_inventory_state set pushed_qty = ${meldung.verfuegbar}
+      update shopify_inventory_state
+      set pushed_qty = ${meldung.verfuegbar}, buch_ab = coalesce(${meldung.geaendertAm}, now() + interval '5 seconds'), pushed_at = now()
       where variant_id = ${variante.id}`
-    return `Shop niedriger bei ${variante.sku ?? variante.id}: Shop ${meldung.verfuegbar}, ERP ${soll} — wird beim nächsten Abgleich gesetzt`
+    await sql`select inventar_abgleich_anstossen()`
+    return `Abweichung bei ${name}: Shop ${meldung.verfuegbar}, Buch ${Math.round(Number(stand!.buch))} — Buch übernimmt den Shop-Stand, Abgleich angestoßen`
   }
-  return `Stand bestätigt (${variante.sku ?? variante.id}: ${meldung.verfuegbar})`
+  if (urteil === 'weniger') {
+    return `Shop niedriger bei ${name}: Shop ${meldung.verfuegbar}, Buch ${Math.round(Number(stand!.buch))} — Bestellung unterwegs, nichts zu tun`
+  }
+  if (urteil === 'veraltet') return `Veraltete Meldung zu ${name} (${meldung.verfuegbar}) — übersprungen`
+  return `Stand bestätigt (${name}: ${meldung.verfuegbar})`
 }
 
 /**
- * Dieselbe Regel für Zweitangebote (0106): mehr im Shop als das Soll →
- * sofort korrigieren; weniger → nur merken, der nächste Abgleich setzt es.
+ * Wie steht die Shop-Meldung zum Buch? Überholt ist sie, wenn sie älter ist
+ * als die letzte eigene Buchung — oder nicht jünger als die jüngste
+ * gezählte Bestellung (0139): dann hat das Buch diesen Kauf schon
+ * abgezogen, und „mehr" wäre ein Trugschluss.
  */
-async function angebotWebhook(meldung: { inventoryItemGid: string; verfuegbar: number }): Promise<string> {
-  const [angebot] = await sql<{ id: string; bezeichnung: string; frei: number }[]>`
-    select id, coalesce(sku, produkt, shopify_variant_id) as bezeichnung,
-           shopify_soll_menge_zweitangebot(id) as frei
-    from shopify_zweitangebote where shopify_inventory_item_gid = ${meldung.inventoryItemGid}`
+function shopStandBeurteilen(
+  meldung: { verfuegbar: number; geaendertAm: Date | null },
+  buch: number | null,
+  gebuchtAm: Date | null,
+  bestelltBis: Date | null = null,
+): 'ohne-buch' | 'veraltet' | 'mehr' | 'weniger' | 'gleich' {
+  if (buch === null) return 'ohne-buch'
+  if (meldung.geaendertAm && gebuchtAm && meldung.geaendertAm.getTime() < gebuchtAm.getTime()) return 'veraltet'
+  // Sekundengenau: eine Meldung aus derselben Sekunde wie die Bestellung gilt als überholt.
+  if (meldung.geaendertAm && bestelltBis && Math.floor(meldung.geaendertAm.getTime() / 1000) <= Math.floor(bestelltBis.getTime() / 1000)) {
+    return 'veraltet'
+  }
+  const b = Math.round(Number(buch))
+  return meldung.verfuegbar > b ? 'mehr' : meldung.verfuegbar < b ? 'weniger' : 'gleich'
+}
+
+/** Dieselbe Regel für Zweitangebote (0106). */
+async function angebotWebhook(meldung: { inventoryItemGid: string; verfuegbar: number; geaendertAm: Date | null }): Promise<string> {
+  const [angebot] = await sql<{ id: string; bezeichnung: string; buch: number | null; pushed_at: Date | null; bestellt_bis: Date | null }[]>`
+    update shopify_zweitangebote set shop_qty = ${meldung.verfuegbar}, shop_seen_at = now()
+    where shopify_inventory_item_gid = ${meldung.inventoryItemGid}
+    returning id, coalesce(sku, produkt, shopify_variant_id) as bezeichnung, pushed_qty as buch, pushed_at,
+              buch_bestellt_bis as bestellt_bis`
   if (!angebot) return 'InventoryItem keiner Variante zugeordnet — übersprungen'
-  await sql`update shopify_zweitangebote set shop_qty = ${meldung.verfuegbar}, shop_seen_at = now()
-            where id = ${angebot.id}`
-  const soll = Math.floor(angebot.frei)
-  if (meldung.verfuegbar > soll) {
+  const urteil = shopStandBeurteilen(meldung, angebot.buch, angebot.pushed_at, angebot.bestellt_bis)
+  if (urteil === 'mehr') {
+    await sql`
+      update shopify_zweitangebote
+      set pushed_qty = ${meldung.verfuegbar}, buch_ab = coalesce(${meldung.geaendertAm}, now() + interval '5 seconds'), pushed_at = now()
+      where id = ${angebot.id}`
     await sql`select inventar_abgleich_anstossen()`
-    return `Abweichung beim Zweitangebot ${angebot.bezeichnung}: Shop ${meldung.verfuegbar}, ERP ${soll} — Abgleich angestoßen`
+    return `Abweichung beim Zweitangebot ${angebot.bezeichnung}: Shop ${meldung.verfuegbar}, Buch ${Math.round(Number(angebot.buch))} — Buch übernimmt den Shop-Stand, Abgleich angestoßen`
   }
-  if (meldung.verfuegbar < soll) {
-    await sql`update shopify_zweitangebote set pushed_qty = ${meldung.verfuegbar} where id = ${angebot.id}`
-    return `Zweitangebot ${angebot.bezeichnung} im Shop niedriger: Shop ${meldung.verfuegbar}, ERP ${soll} — wird beim nächsten Abgleich gesetzt`
+  if (urteil === 'weniger') {
+    return `Zweitangebot ${angebot.bezeichnung} im Shop niedriger: Shop ${meldung.verfuegbar}, Buch ${Math.round(Number(angebot.buch))} — Bestellung unterwegs, nichts zu tun`
   }
+  if (urteil === 'veraltet') return `Veraltete Meldung zum Zweitangebot ${angebot.bezeichnung} — übersprungen`
   return `Stand bestätigt (Zweitangebot ${angebot.bezeichnung}: ${meldung.verfuegbar})`
 }

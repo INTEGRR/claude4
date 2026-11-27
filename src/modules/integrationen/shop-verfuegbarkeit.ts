@@ -40,6 +40,8 @@ export interface WertInfo {
   ptavId: string
   name: string
   gesperrt: boolean
+  /** Erwartete Nachfrage für das Kontingent (0136) — null = 1. */
+  gewicht: number | null
   teile: TeilInfo[]
   varianten: number
   aktiv: number
@@ -59,6 +61,8 @@ export interface ArtikelInfo {
   kurz: string
   projekt: string | null
   modus: Modus
+  /** Erwartete Nachfrage des Artikels für das Kontingent (0136) — null = 1. */
+  gewicht: number | null
   gemeinsam: TeilInfo[]
   optionen: OptionInfo[]
   varianten: VarianteInfo[]
@@ -128,8 +132,8 @@ export async function shopVerfuegbarkeit(): Promise<{
   zweitangebote: ZweitangebotInfo[]
   zuletztGelesen: string | null
 }> {
-  const artikel = await sql<{ id: string; name: string; projekt: string | null; shop_modus: Modus }[]>`
-    select pt.id, pt.name, pt.projekt, pt.shop_modus
+  const artikel = await sql<{ id: string; name: string; projekt: string | null; shop_modus: Modus; gewicht: number | null }[]>`
+    select pt.id, pt.name, pt.projekt, pt.shop_modus, pt.shop_gewicht::float as gewicht
     from product_templates pt
     where pt.active and exists (
       select 1 from product_variants pv
@@ -145,7 +149,7 @@ export async function shopVerfuegbarkeit(): Promise<{
       select pv.id, pv.template_id, nullif(pv.sku, '') as sku, pv.display_name as name, pv.shop_modus,
              coalesce((select array_agg(a.ptav_id::text) from product_variant_attribute_values a where a.variant_id = pv.id), '{}') as ptavs,
              b.menge::float as baubar, e.display_name as engpass,
-             shopify_soll_menge(pv.id) as soll,
+             coalesce(s.kontingent, shopify_soll_menge(pv.id)) as soll,
              s.shop_qty::float as shop_qty, s.shop_verkaufbar
       from product_variants pv
       cross join lateral baubar(pv.id, 0, true) b
@@ -153,8 +157,8 @@ export async function shopVerfuegbarkeit(): Promise<{
       left join shopify_inventory_state s on s.variant_id = pv.id
       where pv.template_id = any(${ids}::uuid[]) and pv.active and pv.shopify_variant_id is not null
       order by pv.display_name`,
-    sql<{ template_id: string; option: string; ptav_id: string; wert: string; gesperrt: boolean }[]>`
-      select al.template_id, pa.name as option, ptav.id as ptav_id, pav.name as wert,
+    sql<{ template_id: string; option: string; ptav_id: string; wert: string; gesperrt: boolean; gewicht: number | null }[]>`
+      select al.template_id, pa.name as option, ptav.id as ptav_id, pav.name as wert, ptav.shop_gewicht::float as gewicht,
              exists (select 1 from shop_option_sperren s where s.template_id = al.template_id and s.ptav_id = ptav.id) as gesperrt
       from product_template_attribute_lines al
       join product_attributes pa on pa.id = al.attribute_id
@@ -183,7 +187,7 @@ export async function shopVerfuegbarkeit(): Promise<{
       select pv.id, pv.template_id, nullif(pv.sku, '') as sku, pv.display_name as name, pv.shop_modus, pt.shop_modus as t_modus,
              free_to_use(pv.id)::float as frei, pv.shop_oos_unter as oos_unter, pv.shop_zurueckhalten as zurueck,
              pv.shop_rueckhalt::float as rueckhalt, pv.shop_hoechstmenge as hoechstmenge,
-             shopify_soll_menge(pv.id) as soll, s.shop_qty::float as shop_qty, s.shop_verkaufbar
+             coalesce(s.kontingent, shopify_soll_menge(pv.id)) as soll, s.shop_qty::float as shop_qty, s.shop_verkaufbar
       from product_variants pv
       join product_templates pt on pt.id = pv.template_id
       left join shopify_inventory_state s on s.variant_id = pv.id
@@ -195,7 +199,7 @@ export async function shopVerfuegbarkeit(): Promise<{
       push_fehler: string | null
     }[]>`
       select z.id, z.produkt, coalesce(z.sku, pv.sku) as sku, z.variant_id, pv.display_name as artikel, z.shop_modus,
-             shopify_soll_menge_zweitangebot(z.id) as soll, z.pushed_qty::float as pushed_qty,
+             coalesce(z.kontingent, shopify_soll_menge_zweitangebot(z.id)) as soll, z.pushed_qty::float as pushed_qty,
              z.shop_qty::float as shop_qty, z.shop_verkaufbar, z.push_fehler
       from shopify_zweitangebote z
       join product_variants pv on pv.id = z.variant_id
@@ -236,6 +240,7 @@ export async function shopVerfuegbarkeit(): Promise<{
         ptavId: o.ptav_id,
         name: o.wert,
         gesperrt: o.gesperrt,
+        gewicht: o.gewicht,
         teile: eigeneZeilen.filter((z) => z.filter.includes(o.ptav_id)).map(teilInfo),
         varianten: mit.length,
         aktiv: mit.filter((v) => v.soll > 0).length,
@@ -250,6 +255,7 @@ export async function shopVerfuegbarkeit(): Promise<{
       kurz: kurzname(a.name, a.projekt),
       projekt: a.projekt,
       modus: a.shop_modus,
+      gewicht: a.gewicht,
       gemeinsam: eigeneZeilen.filter((z) => z.filter.length === 0).map(teilInfo).sort((x, y) => x.reicht - y.reicht),
       optionen: [...opts.values()],
       varianten: vs,

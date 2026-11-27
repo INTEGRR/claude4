@@ -1127,9 +1127,10 @@ export const EINSTELLUNGEN = {
       einkauf: z.boolean().default(true),
       zulauf: z.boolean().default(true),
       sicherheit: z.boolean().default(true),
+      ueberverkauf: z.boolean().default(true),
     }),
     zusammenfassung: (p) =>
-      `Telegram: ${(['logins', 'fehlversuche', 'jobs', 'dienste', 'einkauf', 'zulauf', 'sicherheit'] as const)
+      `Telegram: ${(['logins', 'fehlversuche', 'jobs', 'dienste', 'einkauf', 'zulauf', 'sicherheit', 'ueberverkauf'] as const)
         .filter((k) => p[k])
         .join(', ') || 'alles aus'}`,
     formdata: (fd) => ({
@@ -1140,6 +1141,7 @@ export const EINSTELLUNGEN = {
       einkauf: fd.get('einkauf') === 'on',
       zulauf: fd.get('zulauf') === 'on',
       sicherheit: fd.get('sicherheit') === 'on',
+      ueberverkauf: fd.get('ueberverkauf') === 'on',
     }),
     revalidate: ['/einstellungen/benachrichtigungen'],
   },

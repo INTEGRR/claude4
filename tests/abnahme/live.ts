@@ -398,16 +398,19 @@ export function abnahmeLauf(datenbank: Sql, szenario: Szenario, erwartung: Erwar
     spur(text)
     assert.equal(abweichungen.length, 0, text)
 
-    // Die Attrappe hat zuletzt genau die Mengen bekommen, die der Shop zeigen soll.
-    const { fakeLetzterAufruf } = await import('../../src/modules/integrationen/shopify-fake.ts')
-    const aufruf = fakeLetzterAufruf('inventorySetQuantities') as
-      | { input: { quantities: { inventoryItemId: string; quantity: number }[] } }
-      | undefined
-    assert.ok(aufruf, 'Bestand wurde an Shopify gemeldet')
-    for (const q of aufruf.input.quantities) {
-      const p = PRODUKTE.find((x) => q.inventoryItemId === `gid://shopify/InventoryItem/${x.shopify}`)
-      assert.ok(p, `gemeldetes InventoryItem ${q.inventoryItemId} gehört zu einem Szenario-Artikel`)
-      assert.equal(q.quantity, erwartung.monate[monat].shopify.soll[p.sku], `${p.sku}: an Shopify übergebene Menge`)
+    // Das Buch (0136) führt je Angebot, was der Shop zeigt, wenn alle
+    // Bestellungen bekannt sind — genau die Menge, die der Shop zeigen soll.
+    // (Seit 0136 gehen nur noch Differenzen hinaus; die letzte absolute
+    // Meldung sagt nichts mehr über den Stand.)
+    const buch = await sql()<{ sku: string; buch: number | null }[]>`
+      select v.sku, s.pushed_qty::float as buch from product_variants v
+      join shopify_inventory_state s on s.variant_id = v.id
+      where v.shopify_variant_id is not null`
+    assert.ok(buch.length > 0, 'Bestand wurde an Shopify gemeldet')
+    for (const b of buch) {
+      const p = PRODUKTE.find((x) => x.sku === b.sku)
+      assert.ok(p, `gemeldetes Angebot ${b.sku} gehört zu einem Szenario-Artikel`)
+      assert.equal(b.buch, erwartung.monate[monat].shopify.soll[p.sku], `${p.sku}: an Shopify übergebene Menge`)
     }
   }
 

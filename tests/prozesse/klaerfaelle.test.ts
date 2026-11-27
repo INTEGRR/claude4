@@ -137,7 +137,7 @@ describe('Klärfälle gesammelt auflösen', () => {
 
     assert.deepEqual(await auftrag(7001).then((a) => [a.state, a.zeilen]), ['sale', 1], 'bezahlt, vollständig → bestätigt')
     assert.deepEqual(await auftrag(7002).then((a) => [a.state, a.zeilen]), ['sale', 2])
-    assert.deepEqual(await auftrag(7003).then((a) => [a.state, a.zeilen]), ['draft', 1], 'unbezahlt: Position da, aber nicht bestätigt')
+    assert.deepEqual(await auftrag(7003).then((a) => [a.state, a.zeilen]), ['sale', 1], 'unbezahlt: reserviert beim Eingang (0135) — versandt wird erst nach Zahlung')
     assert.deepEqual(await auftrag(7005).then((a) => [a.state, a.zeilen]), ['draft', 1], 'der Switch Tester ist dort noch offen')
     assert.equal((await auftrag(7004)).state, 'draft')
 

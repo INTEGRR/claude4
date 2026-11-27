@@ -114,20 +114,23 @@ describe('Made-to-Order: baubare Menge an Shopify', () => {
     assert.equal((await inventarAbgleichen()).gesperrt, false)
   })
 
-  test('Rückmeldung des Shops: zu viel → sofort korrigieren, zu wenig → nie still hochsetzen', async () => {
+  test('Rückmeldung des Shops: mehr als das Buch → Buch übernimmt und senkt; weniger → Bestellung unterwegs, nichts überschreiben', async () => {
     const { verarbeiteInventarWebhook, inventarAbgleichen } = await import('../../src/modules/integrationen/inventar.ts')
     const zaehler = async () =>
       Number((await h.sql<{ n: string }[]>`select value ->> 'n' as n from shopify_sync_state where key = 'inventar_anstoss'`)[0].n)
 
     const vorher = await zaehler()
+    // Jemand bucht im Shop von Hand auf 9 — der Shop meldet es.
+    const { fakeBestandSetzen } = await import('../../src/modules/integrationen/shopify-fake.ts')
+    fakeBestandSetzen('gid://shopify/InventoryItem/501', 9)
     assert.match(await verarbeiteInventarWebhook({ inventory_item_id: 501, available: 9 }), /angestoßen/)
     assert.equal(await zaehler(), vorher + 1)
 
     // Shopify hat eine Bestellung abgezogen, die KRNL noch nicht kennt: nicht zurücksetzen.
-    assert.match(await verarbeiteInventarWebhook({ inventory_item_id: 501, available: 0 }), /nächsten Abgleich/)
+    assert.match(await verarbeiteInventarWebhook({ inventory_item_id: 501, available: 0 }), /Bestellung unterwegs, nichts zu tun/)
     assert.equal(await zaehler(), vorher + 1, 'kein Anstoß')
-    assert.equal((await stand(v.tastatur)).gemeldet, 0, 'Shop-Stand gemerkt')
-    // Der nächste reguläre Abgleich setzt wieder die richtige Menge.
+    assert.equal((await stand(v.tastatur)).gemeldet, 9, 'das Buch bleibt (0136) — die Bestellung zieht es ab, sobald sie da ist')
+    // Der Abgleich nach der Abweichung senkt um die Differenz auf das Kontingent.
     assert.equal((await inventarAbgleichen()).uebertragen, 1)
     assert.equal((await stand(v.tastatur)).gemeldet, 1)
   })

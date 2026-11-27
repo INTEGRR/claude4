@@ -61,7 +61,7 @@ async function accessToken(): Promise<string> {
   const start = Date.now()
   let res: Response
   try {
-    res = await fetch(`https://${c.shop}/admin/oauth/access_token`, {
+    res = await fetch(`${apiBasis(c)}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -163,6 +163,20 @@ function operationName(query: string): string {
   return /(?:query|mutation)[^{]*\{\s*(\w+)/.exec(query)?.[1] ?? 'anonym'
 }
 
+/** Wartezeiten bei Drosselung, je Anlauf (S4). */
+const DROSSEL_PAUSEN_MS = [700, 1500, 3000]
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Adresse der Admin-API. Im Betrieb immer der Shop. SHOPIFY_API_BASE lenkt
+ * auf einen Nachbau um — nur für den Lasttest (lasttest/), der die echte
+ * App gegen einen eigenständigen Shop-Nachbau fährt; in Produktion ist die
+ * Variable nicht gesetzt.
+ */
+function apiBasis(c: ShopifyConfig): string {
+  return (process.env.SHOPIFY_API_BASE || `https://${c.shop}`).replace(/\/+$/, '')
+}
+
 export async function shopifyGraphQL<T>(
   query: string,
   variables: Record<string, unknown> = {},
@@ -212,7 +226,7 @@ export async function shopifyGraphQL<T>(
   }
 
   const anfrage = async () =>
-    fetch(`https://${c.shop}/admin/api/${c.apiVersion}/graphql.json`, {
+    fetch(`${apiBasis(c)}/admin/api/${c.apiVersion}/graphql.json`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -221,38 +235,53 @@ export async function shopifyGraphQL<T>(
       body: JSON.stringify({ query, variables }),
     })
 
-  let res: Response
-  try {
-    res = await anfrage()
-    // 401 mit Grant-Token: Token kann widerrufen oder gerade abgelaufen sein —
-    // einmal frisch holen und wiederholen, erst dann ist es ein echter Fehler.
-    if (res.status === 401 && !c.token) {
-      tokenCache = null
+  // Drosselung (S4): Shopify füllt sein Kontingent binnen Sekunden wieder
+  // auf. Kurz warten und wiederholen statt das Ereignis für Minuten in die
+  // Warteschlange zu schicken — erst nach drei Anläufen ist es ein Fehler.
+  let res!: Response
+  let body!: GraphQLResponse<T>
+  for (let versuch = 0; ; versuch++) {
+    try {
       res = await anfrage()
+      // 401 mit Grant-Token: Token kann widerrufen oder gerade abgelaufen sein —
+      // einmal frisch holen und wiederholen, erst dann ist es ein echter Fehler.
+      if (res.status === 401 && !c.token) {
+        tokenCache = null
+        res = await anfrage()
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      await protokoll(false, null, null, `Netzwerkfehler: ${message}`)
+      throw new ShopifyError(`Shopify nicht erreichbar: ${message}`, true)
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    await protokoll(false, null, null, `Netzwerkfehler: ${message}`)
-    throw new ShopifyError(`Shopify nicht erreichbar: ${message}`, true)
-  }
 
-  // 429/5xx sind vorübergehend - der Job-Runner versucht es später erneut.
-  if (res.status === 429 || res.status >= 500) {
-    await protokoll(false, res.status, null, `Shopify antwortete mit ${res.status}`)
-    throw new ShopifyError(`Shopify antwortete mit ${res.status}`, true)
-  }
-  if (!res.ok) {
-    const text = await res.text()
-    await protokoll(false, res.status, null, text.slice(0, 500))
-    throw new ShopifyError(`Shopify antwortete mit ${res.status}: ${text}`, false)
-  }
+    if (res.status === 429 && versuch < DROSSEL_PAUSEN_MS.length) {
+      await pause(DROSSEL_PAUSEN_MS[versuch])
+      continue
+    }
+    // 429/5xx sind vorübergehend - der Job-Runner versucht es später erneut.
+    if (res.status === 429 || res.status >= 500) {
+      await protokoll(false, res.status, null, `Shopify antwortete mit ${res.status}`)
+      throw new ShopifyError(`Shopify antwortete mit ${res.status}`, true)
+    }
+    if (!res.ok) {
+      const text = await res.text()
+      await protokoll(false, res.status, null, text.slice(0, 500))
+      throw new ShopifyError(`Shopify antwortete mit ${res.status}: ${text}`, false)
+    }
 
-  const body = (await res.json()) as GraphQLResponse<T>
-  if (body.errors?.length) {
-    const throttled = body.errors.some((e) => e.extensions?.code === 'THROTTLED')
-    const message = body.errors.map((e) => e.message).join('; ')
-    await protokoll(false, res.status, body.errors, message)
-    throw new ShopifyError(message, throttled)
+    body = (await res.json()) as GraphQLResponse<T>
+    if (body.errors?.length) {
+      const throttled = body.errors.some((e) => e.extensions?.code === 'THROTTLED')
+      if (throttled && versuch < DROSSEL_PAUSEN_MS.length) {
+        await pause(DROSSEL_PAUSEN_MS[versuch])
+        continue
+      }
+      const message = body.errors.map((e) => e.message).join('; ')
+      await protokoll(false, res.status, body.errors, message)
+      throw new ShopifyError(message, throttled)
+    }
+    break
   }
   if (!body.data) {
     await protokoll(false, res.status, null, 'Shopify lieferte keine Daten')
@@ -378,6 +407,24 @@ export async function fetchOrder(gid: string): Promise<ShopifyOrder | null> {
     { id: gid },
   )
   return data.order
+}
+
+/**
+ * Mehrere Bestellungen in EINEM Aufruf (S4): unter Last zählt jeder Abruf
+ * gegen das Kontingent des Shops — ein Stapel Ereignisse holt seine
+ * Bestellungen gemeinsam. Nicht gefundene fehlen in der Rückgabe.
+ */
+export async function fetchOrders(gids: string[]): Promise<Map<string, ShopifyOrder>> {
+  const ergebnis = new Map<string, ShopifyOrder>()
+  const eindeutig = [...new Set(gids)]
+  for (let i = 0; i < eindeutig.length; i += 25) {
+    const data = await shopifyGraphQL<{ nodes: (ShopifyOrder | null)[] }>(
+      `query bestellungen($ids: [ID!]!) { nodes(ids: $ids) { ... on Order { ${ORDER_FIELDS} } } }`,
+      { ids: eindeutig.slice(i, i + 25) },
+    )
+    for (const o of data.nodes) if (o?.id) ergebnis.set(o.id, o)
+  }
+  return ergebnis
 }
 
 /**
@@ -533,11 +580,13 @@ export async function fetchFulfillmentOrders(orderGid: string): Promise<Fulfillm
  */
 export async function fetchOrderHalt(orderGid: string): Promise<{
   displayFulfillmentStatus: string | null
+  displayFinancialStatus: string | null
   auftraege: { status: string; fulfillmentHolds: { reason: string; reasonNotes: string | null }[] }[]
 } | null> {
   const data = await shopifyGraphQL<{
     order: {
       displayFulfillmentStatus: string | null
+      displayFinancialStatus?: string | null
       fulfillmentOrders: {
         nodes: { status: string; fulfillmentHolds: { reason: string; reasonNotes: string | null }[] | null }[]
       }
@@ -546,6 +595,7 @@ export async function fetchOrderHalt(orderGid: string): Promise<{
     `query($id: ID!) {
        order(id: $id) {
          displayFulfillmentStatus
+         displayFinancialStatus
          fulfillmentOrders(first: 20) {
            nodes { id status fulfillmentHolds { reason reasonNotes } }
          }
@@ -556,6 +606,7 @@ export async function fetchOrderHalt(orderGid: string): Promise<{
   if (!data.order) return null
   return {
     displayFulfillmentStatus: data.order.displayFulfillmentStatus,
+    displayFinancialStatus: data.order.displayFinancialStatus ?? null,
     auftraege: data.order.fulfillmentOrders.nodes.map((n) => ({
       status: n.status,
       fulfillmentHolds: n.fulfillmentHolds ?? [],

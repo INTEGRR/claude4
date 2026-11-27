@@ -119,23 +119,26 @@ verteilt nur nach — zuerst senken, dann erhöhen.
 
 ## Arbeitspakete
 
-**Stand 27.11.:** ✅ gebaut · ⬜ offen. Gebaut sind K1, A1 und zwei Pakete,
-die im Plan nicht standen: Rückhalt und Höchstmenge für den Einzelverkauf
-(0133) und der Fulfillment-Halt aus Shopify (0134). **Offen sind alle acht
-Schutz-Pakete S1–S8** und A2–A6.
+**Stand 27.11. abends:** ✅ gebaut · ⬜ offen. Gebaut sind K1, A1, die
+Schutz-Pakete **S1–S8** und zwei Pakete, die im Plan nicht standen: Rückhalt
+und Höchstmenge für den Einzelverkauf (0133) und der Fulfillment-Halt aus
+Shopify (0134). Wie der Schutz arbeitet, steht in
+[module/integrationen.md](module/integrationen.md) unter „Kontingent und
+Buch". Entschieden am 27.11.: reservieren beim Eingang, Kontingent nach
+erwarteter Nachfrage, Release am 29.11. um 16:30.
 
 **Block S — Schutz am Release-Tag (muss)**
 
 | Nr. | Paket | Größe |
 |---|---|---|
-| ⬜ S1 | Mengen nie blind hochsetzen: Erhöhung nur mit Vergleichswert, nicht solange Bestell-Ereignisse offen sind | klein–mittel |
-| ⬜ S2 | Reservierung mit Sperre auf dem Bestand (`move_reserve`) | klein |
-| ⬜ S3 | Kontingent-Modus: knappe Teile auf die Varianten aufteilen, Summe ≤ frei; Zweitangebote und der Einzelverkauf des Teils (Rückhalt/Höchstmenge, 0133) eingerechnet | groß |
-| ⬜ S4 | Webhook-Verarbeitung härten: Ereignisse exklusiv greifen, Bestellungen vor Bestand-Echos, bei Drosselung kurz warten, hängenden Abgleich nach 2 Minuten zurückholen | mittel |
-| ⬜ S5 | Überverkaufs-Wächter: Bestellung ohne volle Reservierung → Telegram und Vermerk am Auftrag | klein–mittel |
-| ⬜ S6 | Not-Aus: eine Aktion setzt alle auftragsgefertigten Varianten auf ausverkauft | klein |
-| ⬜ S7 | Abgleich heilt und meldet Abweichungen, prüft „nicht weiterverkaufen" erneut | klein |
-| ⬜ S8 | Lasttest: 500 Bestellungen gleichzeitig gegen die Attrappe, Beweis „nie mehr verkauft als Teile da" | mittel |
+| ✅ S1 | Mengen nie blind hochsetzen — gebaut als Buch je Angebot: gesendet wird die Differenz, gesenkt mit Vergleichswert, erhöht nur aus gedecktem Budget | klein–mittel |
+| ✅ S2 | Reservierung mit Sperre auf dem Bestand (`move_reserve`) | klein |
+| ✅ S3 | Kontingent-Modus: knappe Teile auf die Varianten aufteilen, Summe ≤ frei; Zweitangebote und der Einzelverkauf des Teils (Rückhalt/Höchstmenge, 0133) eingerechnet | groß |
+| ✅ S4 | Webhook-Verarbeitung härten: Ereignisse exklusiv greifen, Bestellungen vor Bestand-Echos, bei Drosselung kurz warten, hängenden Abgleich nach 2 Minuten zurückholen | mittel |
+| ✅ S5 | Überverkaufs-Wächter: Bestellung ohne volle Reservierung → Telegram und Vermerk am Auftrag | klein–mittel |
+| ✅ S6 | Not-Aus: eine Aktion setzt alle auftragsgefertigten Varianten auf ausverkauft | klein |
+| ✅ S7 | Abgleich heilt und meldet Abweichungen, prüft „nicht weiterverkaufen" erneut | klein |
+| ✅ S8 | Lasttest gegen einen eigenständigen Shop-Nachbau (`lasttest/`), Ergebnisse unten | mittel |
 
 **Block K — Klärfälle (gebaut am 23.11.)**
 
@@ -162,6 +165,46 @@ Schutz-Pakete S1–S8** und A2–A6.
 - Tag 4: S8 und Nacharbeit aus dem Lasttest; A3 bis A6.
 - Tag 5: Generalprobe mit echtem Shop im Modus „schreiben" an einem
   Testprodukt, Altprodukte umstellen, Stichtags-Schalter.
+
+## Lasttest (S8) — Ergebnisse vom 27.11.
+
+Echte App gegen einen eigenständigen Shop-Nachbau und eine
+Wegwerf-Datenbank ([lasttest/README.md](../lasttest/README.md)). Sortiment:
+32 Tastaturen, die sich 92 Gehäuse, zwei Plates, vier Switch-Sorten, zwei
+Keycap-Sets und das PCB teilen, plus eine einzeln verkaufte Plate.
+
+| Lauf | Käufe angenommen | Teile überverkauft | Augenblicke ohne Deckung | Bestellungen in KRNL, voll reserviert | Kauf → Auftrag (Median / 95 %) | alles verarbeitet nach |
+|---|---|---|---|---|---|---|
+| 300 Käufe in 20 s | 97 | keines | 0 | 97 von 97 | 0,6 s / 2 s | 5 s |
+| 600 Käufe in 10 s | 103 | keines | 0 | 103 von 103 | 0,6 s / 2,1 s | 8 s |
+| 400 Käufe in 15 s, Störmodus | 94 | keines | 0 | 94 von 94 | 7,7 s / 19 s | 64 s |
+
+Störmodus: Webhooks bis 4 s verzögert, 30 % doppelt, 15 % bis 15 s
+verspätet, halbes Abruf-Kontingent des Shops. In allen Läufen wurden die
+Gehäuse bis auf die letzten ein bis zwei verkauft (der Puffer hält sie
+zurück), und am Ende zeigte der Shop genau die Kontingente.
+
+Was der Test unterwegs aufgedeckt hat — alles behoben:
+
+- **Scheinbare Senkung**: ein Angebot zu senken, auf dem ein unbekannter
+  Kauf liegt, gibt keinen Bestand frei. Jetzt wird gesättigt und mit
+  Vergleichswert gesenkt, erhöht nur aus gedecktem Budget.
+- **Drosselung fraß die Mengenmeldungen**: jedes Ereignis holte seine
+  Bestellung einzeln. Jetzt holt ein Stapel gemeinsam, Echos kosten keinen
+  Abruf, gedrosselte Ereignisse kommen nach fünf Sekunden wieder.
+- **Verspätete Bestands-Webhooks** setzten das Buch fälschlich hoch; im
+  härtesten Lauf blieben 12 von 92 Gehäusen unverkauft. Jetzt zählt eine
+  Shop-Meldung nur, wenn sie jünger ist als die jüngste gezählte Bestellung.
+- **Zwei gleichzeitige Erstbestellungen desselben Kunden** scheiterten an
+  der doppelten Kundenanlage.
+- **Webhook-Inhalt doppelt verpackt gespeichert**: Bestands- und
+  Produkt-Webhooks des Shops wurden immer als „nicht verwertbar"
+  übersprungen. In Produktion unbemerkt, weil dort noch keine Webhooks
+  registriert sind.
+
+Grenzen des Tests: ein Server statt vieler Vercel-Instanzen, und der
+Nachbau folgt der Shopify-Dokumentation — die Generalprobe im echten Shop
+ersetzt er nicht.
 
 ## Schon geprüft
 
@@ -198,10 +241,22 @@ Offen:
 
 ## Entscheidungen, die noch fehlen
 
-1. **Unbezahlte Bestellungen:** reservieren sie schon beim Eingang, oder
-   erst bei Zahlung? Reservieren ist sicherer gegen Überverkauf, bindet aber
-   Teile für Bestellungen, die platzen können.
-2. **Aufteilung im Kontingent-Modus:** gleichmäßig auf alle Varianten, oder
-   nach erwarteter Nachfrage (Gewicht je Variante)? Und ab welcher Menge
-   eines Teils gilt es als knapp?
-3. **Release-Datum** — S1 bis S8 müssen davor fertig und getestet sein.
+Alle drei am 27.11. entschieden:
+
+1. **Unbezahlte Bestellungen** reservieren beim Eingang; versandt wird erst
+   nach Zahlung.
+2. **Kontingent nach erwarteter Nachfrage** (Gewicht je Artikel und
+   Optionswert). Eine Knappheits-Schwelle braucht es nicht — reicht ein Teil
+   für alle, bekommt jede Variante ihren Deckel.
+3. **Release am 29.11. um 16:30.**
+
+## Vor dem Release vom Betreiber zu tun (zum Schutz)
+
+- Gewichte setzen: Verkauf → Shop-Verfügbarkeit, je Artikel und je
+  Optionswert (z. B. beliebter Switch 3, Exot 0,5). Leer = 1.
+- Shopify auf „schreiben" stellen — die erste Meldung setzt jedes Angebot
+  einmal absolut, danach laufen Buch und Differenzen. Webhooks registrieren.
+- Generalprobe an einem Testprodukt im echten Shop: ein Kauf, eine
+  Bestandsänderung in KRNL, ein Storno — und prüfen, dass die
+  Differenz-Meldung (`inventoryAdjustQuantities`) vom Shop angenommen wird.
+- Not-Aus kennen: Verkauf → Shop-Verfügbarkeit → „Not-Aus".

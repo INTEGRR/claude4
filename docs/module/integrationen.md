@@ -230,25 +230,157 @@ Orten, abgerundet auf ganze Stücke), für **Made-to-Order** die baubare Menge
   Zähler hoch (`inventar_anstoss`), und der laufende Abgleich rechnet eine
   weitere Runde, wenn sich der Zähler währenddessen bewegt hat (höchstens
   fünf). Wichtig bei Releases mit vielen Bestellungen in kurzer Zeit.
-- **Mechanik**: `inventorySetQuantities` (name `available`, reason
-  `correction`, `ignoreCompareQuantity: true` — das ERP hat recht), höchstens
-  200 Mengen je Aufruf. Adressiert wird das InventoryItem der Variante; die
-  Zuordnung wird einmal über `nodes(ids:…)` erfragt und an der Variante
-  gespeichert (`shopify_inventory_item_gid`). Der Standort ist der erste
-  aktive des Shops und wird in `shopify_sync_state` festgehalten.
-- **Abweichungserkennung**: Webhook `inventory_levels/update` schreibt den
-  Shop-Stand nach `shopify_inventory_state.shop_qty`; die Sicht
-  `shopify_inventory_drift` zeigt Differenzen zur Soll-Menge auf der
-  Monitor-Seite. **Asymmetrisch** (seit 0100): zeigt der Shop MEHR als das
-  ERP hergibt, wird sofort korrigiert; zeigt er WENIGER, hat Shopify meist
-  eine Bestellung abgezogen, die das ERP noch nicht importiert hat — dann
-  wird nicht hochgesetzt (das überschriebe die Bestellung), sondern nur der
-  Shop-Stand als gemeldet gemerkt; der nächste reguläre Abgleich setzt die
-  richtige Menge.
+- **Mechanik (seit 0136)**: gemeldet wird das **Kontingent** je Angebot, und
+  zwar als **Differenz** zum Buch (`inventoryAdjustQuantities`, name
+  `available`, reason `correction`, `@idempotent`) — siehe „Kontingent und
+  Buch" unten. Absolut (`inventorySetQuantities`) wird nur gesetzt, was noch
+  nie gemeldet wurde, und alles beim Not-Aus. Höchstens 200 Positionen je
+  Aufruf. Adressiert wird das InventoryItem der Variante; die Zuordnung wird
+  einmal über `nodes(ids:…)` erfragt und an der Variante gespeichert
+  (`shopify_inventory_item_gid`). Der Standort ist der erste aktive des
+  Shops und wird in `shopify_sync_state` festgehalten.
+- **Abweichungserkennung (seit 0136)**: Webhook `inventory_levels/update`
+  schreibt den Shop-Stand nach `shopify_inventory_state.shop_qty`; die Sicht
+  `shopify_inventory_drift` zeigt Differenzen zum Kontingent auf der
+  Monitor-Seite. Zeigt der Shop **weniger** als das Buch, ist das der
+  Normalfall (ein Kauf ist unterwegs) — nichts passiert. Zeigt er **mehr**,
+  übernimmt das Buch den Shop-Stand und der Abgleich senkt auf das
+  Kontingent. Meldungen, die älter sind als die letzte eigene Buchung,
+  zählen nicht.
 - **Scopes**: zusätzlich `write_inventory` und `read_locations`;
   `write_products` für die Made-to-Order-Einrichtung.
 
-### Zweitangebote — derselbe Bestand an jedes Angebot der SKU (0106)
+### Kontingent und Buch — nie mehr angeboten, als Teile da sind (0136)
+
+Der Schutz gegen Überverkauf (Entscheidungslog 2026-11-27). Das Prinzip:
+
+> Für jedes Teil gilt: Σ (im Shop angebotene Menge × Bedarf je Stück) ≤
+> freier Bestand. Dann zählt Shopify selbst herunter, und es kann auch dann
+> nichts überverkauft werden, wenn KRNL langsam ist oder steht.
+
+**Kontingent.** Bisher bekam jede Variante die Menge, die sie *allein* bauen
+könnte — 30 Varianten mit demselben Gehäuse boten zusammen das Dreißigfache
+an. Jetzt verteilt `kontingentVerteilen` (`kontingent-logik.ts`, ohne
+Datenbank) den freien Bestand jedes Teils auf die Angebote, die es
+brauchen:
+
+- **Abnehmer** sind alle Shop-Angebote: auftragsgefertigte Varianten (Bedarf
+  = Teile der Stückliste, eine Ebene, `shop_bedarf`), Lagerartikel im
+  Einzelverkauf (Bedarf = sie selbst; Rückhalt und Höchstmenge aus 0133
+  bleiben als Deckel), und **Zweitangebote** — die teilen sich den Bestand
+  mit dem Hauptangebot, statt ihn doppelt anzubieten.
+- **Deckel** je Angebot ist die bisherige Soll-Menge
+  (`shopify_soll_menge`: baubar − Puffer, höchstens der Deckel; „aus",
+  gesperrte Option → 0). „Immer verfügbar" hängt an keinem Bestand.
+- **Pool** je Teil ist `shop_pool` (frei nach den Shop-Regeln, plus was sich
+  aus eigener Stückliste nachbauen ließe), abzüglich der Teile für
+  Shop-Bestellungen im Entwurf (`shop_entwurf_bedarf` — im Shop schon
+  abgezogen, in KRNL noch nicht reserviert).
+- **Gewicht** (erwartete Nachfrage): Artikel × alle Optionswerte der
+  Variante (`shop_gewicht`, leer = 1), mal (1 + Stück der letzten sechs
+  Stunden) — was sich verkauft, bekommt von selbst mehr. Gepflegt in der
+  Shop-Verfügbarkeit je Artikel und je Optionswert
+  (`verkauf.shop_gewicht_setzen`, „alle Farben" wie beim Sperren).
+- **Verfahren**: Wasserfüllen — alle wachsen im Verhältnis ihrer Gewichte,
+  bis ein Teil aufgebraucht oder ein Deckel erreicht ist; abgerundet wird
+  nie auf, der Rest geht in ganzen Stücken nach Gewicht. Die Garantie ist
+  an 500 zufälligen Sortimenten getestet (`tests/kontingent.test.ts`).
+
+**Buch.** Eine absolute Menge an den Shop überschreibt, was Shopify gerade
+selbst abgezogen hat: Kauf um 12:00:00, KRNL setzt um 12:00:01 „3" — der
+Kauf ist weg, das Stück wird zweimal verkauft. Deshalb führt KRNL je Angebot
+Buch (`pushed_qty`: was der Shop zeigt, wenn alle Bestellungen bekannt
+sind) und sendet nur die **Differenz** zwischen Kontingent und Buch:
+
+- Jede eingelesene Bestellung zieht ihre Menge vom Buch ab — genau einmal,
+  beim Anlegen (`shop_buch_bestellung`); ein Storno zählt sie wieder dazu.
+  Gezählt werden nur Bestellungen, die nach der letzten absoluten Meldung
+  angelegt wurden (`buch_ab`; bei eigener Uhr mit fünf Sekunden Abstand).
+  `buch_bestellt_bis` (0139) merkt die jüngste gezählte Bestellung: eine
+  Shop-Meldung, die nicht jünger ist, gilt als überholt.
+- **Reihenfolge**: erst senken, dann erstmalig setzen, zuletzt erhöhen.
+- **Gesättigt senken, mit Vergleichswert**: KRNL liest, was der Shop gerade
+  zeigt, und senkt höchstens um das, was wirklich noch dasteht — was schon
+  verkauft ist (unbekannter Kauf), lässt sich nicht mehr senken. Der
+  Vergleichswert (`changeFromQuantity` = gelesener Stand) sichert die Zeit
+  zwischen Lesen und Schreiben: kauft jemand dazwischen, lehnt der Shop ab,
+  die nächste Runde versucht es neu.
+- **Erhöhen nur aus gedecktem Budget** (`erhoehungenImBudget`): Pool minus
+  dem, was die Angebote laut Buch halten. Ein Angebot, das nicht gesenkt
+  werden konnte, bindet seine Teile weiter — genau so viel weniger wird
+  anderswo erhöht. Erhöht wird ohne Vergleichswert: die Differenz gilt, was
+  immer der Shop zeigt.
+- **Abbruchsicher**: gesenkt wird erst im Shop, dann im Buch; erhöht erst
+  im Buch, dann im Shop. Reißt die Verbindung dazwischen, zeigt der Shop zu
+  wenig, nie zu viel.
+- **Scharfschalten** (Modus → „schreiben") leert das Buch: die erste
+  Meldung setzt jedes Angebot einmal absolut.
+
+**Heilen (S7).** Der Viertelstunden-Abgleich liest den Shop-Stand und
+gleicht das Buch ab (`buchAbgleichen`): zeigt der Shop mehr, übernimmt das
+Buch sofort (Telegram); zeigt er weniger, nur in ruhiger Zeit (keine
+offenen Bestell-Ereignisse, seit drei Minuten keine neue Bestellung).
+„Nicht weiterverkaufen" und Mengenverfolgung der auftragsgefertigten
+Angebote werden dabei erneut geprüft und bei Abweichung neu eingerichtet.
+
+**Wächter (S5).** Nach jeder bestätigten Shop-Bestellung prüft der Import,
+ob sie voll gedeckt ist (Teile der Fertigungsaufträge, Lagerware der
+Lieferung). Fehlt etwas: Vermerk am Auftrag und Telegram (Art
+`ueberverkauf`, einmal je Bestellung). Nur im Modus „schreiben".
+
+**Not-Aus (S6).** Shop-Verfügbarkeit → „Not-Aus"
+(`verkauf.shop_not_aus`): setzt jedes Angebot sofort absolut auf 0 und hält
+es dort; Aufheben verteilt die Kontingente neu. Beides geht per Telegram
+hinaus.
+
+**Grenzen.** Stücklisten werden eine Ebene tief verteilt (Unterbaugruppen
+gelten als ein Pool). Bestelländerungen im Shop zählen nicht gegen das Buch
+— die Abweichung fängt der Webhook bzw. der Abgleich. Der Shop muss für
+alle Angebote „nicht weiterverkaufen" führen; für auftragsgefertigte
+stellt KRNL das selbst ein, für Lagerartikel der Betreiber.
+
+Tests: `tests/prozesse/release-schutz.test.ts` (u. a. 300 Schritte kaufen /
+verspätet einlesen / melden in zufälliger Folge — in jedem Augenblick gilt
+„verkauft + angeboten ≤ Bestand"), `tests/kontingent.test.ts`, und der
+Lasttest gegen einen eigenständigen Shop-Nachbau
+([lasttest/README.md](../../lasttest/README.md), Ergebnisse in
+[release-neue-produkte.md](../release-neue-produkte.md)).
+
+### Webhook-Verarbeitung unter Last (S4, 0135)
+
+- **Exklusiv greifen**: jeder Lauf nimmt sich seine Ereignisse
+  (`for update skip locked`) und setzt eine Frist von zwei Minuten;
+  parallele Läufe überspringen sie, ein abgestürzter Lauf gibt sie nach der
+  Frist von selbst zurück.
+- **Bestellungen vor Bestands-Echos**; mehrere Ereignisse derselben
+  Bestellung in einem Lauf werden einmal eingelesen.
+- **Eine Bestellung zur Zeit** (Advisory-Lock je Bestellung): Shopify
+  schickt `create` und `updated` gleichzeitig — das zweite sieht den
+  fertigen Auftrag statt an der Eindeutigkeit zu scheitern. Zwei
+  gleichzeitige Erstbestellungen desselben Kunden legen ihn nicht doppelt
+  an.
+- **Drosselung**: bei `THROTTLED`/429 wartet der Aufruf 0,7 / 1,5 / 3 s und
+  wiederholt; reicht das nicht, kommt das Ereignis nach fünf Sekunden
+  wieder, ohne einen Versuch zu verbrauchen.
+- **Abrufe sparen**: alle Bestellungen eines Stapels kommen in einem Aufruf
+  (`fetchOrders`). Ein Ereignis, dessen Stand (`updated_at`) KRNL schon
+  eingelesen hat (`sales_orders.shopify_stand_at`, 0138), wird ohne Abruf
+  erledigt — Shopify schickt zu jedem Kauf `create` und `updated`.
+- **Payload als Objekt** (seit 27.11.): der Eingang speicherte den Inhalt
+  doppelt verpackt, Bestands- und Produkt-Webhooks galten dadurch als
+  „nicht verwertbar". Alte Zeilen werden beim Verarbeiten ausgepackt.
+- **Reservierung mit Sperre** (`move_reserve … for update`): gleichzeitige
+  Bestellungen reservieren dieselbe Ware nie doppelt.
+- **Reservieren beim Eingang**: Shop-Bestellungen werden sofort bestätigt
+  und reserviert, auch unbezahlt (Shopify hat da schon heruntergezählt).
+  Unbezahltes (`PENDING`, `AUTHORIZED`, `VOIDED`, `EXPIRED`) ist nicht
+  versandbereit, Packtisch und Label verweigern, die Datenbank lässt das
+  Ausbuchen nicht zu — bis Shopify die Zahlung meldet.
+
+### Zweitangebote — eigene Meldung je Angebot der SKU (0106)
+
+*Seit 0136 teilen sich Hauptangebot und Zweitangebote den Bestand
+(Kontingent) — vorher bekam jedes die volle Menge.*
 
 Eine SKU ist genau ein Artikel (Abschnitt „Produkt-Sync" unten), im Shop
 kann sie aber in mehreren Angeboten stecken: in der Bestandteil-Liste eines

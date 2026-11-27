@@ -13,6 +13,7 @@ import { herkunftHref } from '@/app/(erp)/lager/herkunft'
 import { adressePruefen } from '@/app/(erp)/versand/actions'
 import { dhlConfigured } from '@/modules/versand/dhl'
 import { shopifyBestellungUrl } from '@/modules/integrationen/shopify-links'
+import { zahlungOffen } from '@/modules/integrationen/shop-halt-logik'
 import {
   addLine,
   cancelOrder,
@@ -61,6 +62,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       shopify_halt_grund: string | null
       shopify_halt_notiz: string | null
       shopify_halt_seit: string | null
+      shopify_zahlstatus: string | null
       origin_model: string | null
       origin_id: string | null
       origin_label: string | null
@@ -382,6 +384,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {!order.shopify_halt && order.shopify_halt_notiz && order.delivery_status !== 'full' && order.state !== 'cancel' && (
         <div className="notice info">
           War in Shopify angehalten — Hinweis fürs Packen: {order.shopify_halt_notiz}
+        </div>
+      )}
+
+      {/* Zahlung offen (0135): reserviert beim Eingang, Versand erst nach Zahlung. */}
+      {shopAuftrag && zahlungOffen(order.shopify_zahlstatus) && order.state === 'sale' && order.delivery_status !== 'full' && (
+        <div className="notice warn">
+          <span className="led warn" /> <strong>Zahlung laut Shopify offen</strong> — die Ware ist reserviert, der
+          Versand ist gesperrt, bis Shopify den Zahlungseingang meldet.
         </div>
       )}
 

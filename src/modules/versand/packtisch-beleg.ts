@@ -65,6 +65,7 @@ interface PacktischTreffer {
   halt: boolean | null
   halt_grund: string | null
   halt_notiz: string | null
+  zahlung_offen: boolean | null
 }
 
 export type PacktischErgebnis =
@@ -81,7 +82,8 @@ export async function packtischBelegLaden(code: string): Promise<PacktischErgebn
            part.name as kunde,
            so.ship_name, so.ship_street, so.ship_house_number,
            so.ship_zip, so.ship_city, so.ship_country_code,
-           so.shopify_halt as halt, so.shopify_halt_grund as halt_grund, so.shopify_halt_notiz as halt_notiz
+           so.shopify_halt as halt, so.shopify_halt_grund as halt_grund, so.shopify_halt_notiz as halt_notiz,
+           shop_zahlung_offen(so.shopify_zahlstatus) as zahlung_offen
     from stock_pickings p
     join operation_types ot on ot.id = p.operation_type_id
     left join sales_orders so on so.id = p.origin_id and p.origin_model = 'sales_order'
@@ -113,6 +115,11 @@ export async function packtischBelegLaden(code: string): Promise<PacktischErgebn
     return { ok: false, status: 409, error: `${picking.shopify ?? picking.number} ist in Shopify angehalten (${
       [picking.halt_grund, picking.halt_notiz].filter(Boolean).join(': ') || 'ohne Angabe'
     }) — erst dort freigeben, dann packen` }
+  }
+
+  // Zahlung offen (0135): reserviert, aber nicht packen.
+  if (picking.zahlung_offen) {
+    return { ok: false, status: 409, error: `${picking.shopify ?? picking.number} ist laut Shopify noch nicht bezahlt — erst nach Zahlungseingang packen` }
   }
 
   // „Versand wartet immer auf MTO": offene Fertigungen des Auftrags mit

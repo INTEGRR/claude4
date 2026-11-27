@@ -164,5 +164,52 @@ export const VERKAUF_SHOP = {
     revalidate: ['/verkauf/shop-verfuegbarkeit', '/einstellungen/anbindungen'],
   },
 
+  'verkauf.shop_not_aus': {
+    label: 'Shop: Not-Aus',
+    bereich: 'verkauf',
+    prozessfrei: true,
+    beschreibung:
+      'Not-Aus für den Shop (0136): setzt JEDES Angebot sofort auf 0 (ausverkauft) — absolut, unabhängig ' +
+      'vom Buch — und hält es dort, bis der Not-Aus aufgehoben wird. Für den Fall, dass am Release-Tag ' +
+      'etwas nicht stimmt. Aufheben verteilt die Kontingente neu.',
+    bindung: 'frei',
+    schema: z.object({
+      aktiv: z.boolean().describe('true = alles auf ausverkauft, false = Not-Aus aufheben'),
+    }),
+    zusammenfassung: (p) => (p.aktiv ? 'Not-Aus: alle Angebote auf ausverkauft' : 'Not-Aus aufheben'),
+    formdata: (fd) => ({ aktiv: fd.get('aktiv') === 'true' }),
+    revalidate: ['/verkauf/shop-verfuegbarkeit', '/'],
+  },
+
+  'verkauf.shop_gewicht_setzen': {
+    label: 'Shop: erwartete Nachfrage (Gewicht) setzen',
+    bereich: 'verkauf',
+    prozessfrei: true,
+    ki: true,
+    beschreibung:
+      'Kontingent (0136): Gewicht eines Artikels oder eines Optionswerts für die Verteilung knapper Teile ' +
+      'auf die Shop-Angebote — doppeltes Gewicht bekommt doppelt so viel. Leer = 1. Das Gewicht einer ' +
+      'Variante ist Artikel × alle ihre Optionswerte. alle_farben: für gleich benannte Optionswerte der ' +
+      'übrigen Artikel desselben Shop-Projekts.',
+    bindung: 'frei',
+    schema: z.object({
+      template_id: z.string().guid(),
+      ptav_id: z.string().guid().optional().describe('Optionswert; leer = Gewicht des Artikels'),
+      gewicht: z.number().positive().max(1000).nullable().describe('leer = 1'),
+      alle_farben: z.boolean().default(false),
+    }),
+    zusammenfassung: (p) => `Gewicht ${p.gewicht ?? 1}${p.ptav_id ? ' für einen Optionswert' : ' für den Artikel'}`,
+    formdata: (fd) => {
+      const roh = String(fd.get('gewicht') ?? '').trim().replace(',', '.')
+      return {
+        template_id: String(fd.get('template_id') ?? ''),
+        ptav_id: String(fd.get('ptav_id') ?? '') || undefined,
+        gewicht: roh === '' ? null : Number(roh),
+        alle_farben: fd.get('alle_farben') === 'on',
+      }
+    },
+    revalidate: ['/verkauf/shop-verfuegbarkeit'],
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<string, RegistrierteAktion<any>>

@@ -361,5 +361,7 @@ export const AUSFUEHRUNG = {
   'verkauf.shop_option_setzen': verkaufShop.shopOptionSetzen,
   'verkauf.shop_zweitangebot_setzen': verkaufShop.shopZweitangebotSetzen,
   'verkauf.shop_stand_holen': verkaufShop.shopStandHolen,
+  'verkauf.shop_not_aus': verkaufShop.shopNotAus,
+  'verkauf.shop_gewicht_setzen': verkaufShop.shopGewichtSetzen,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<AktionsName, AktionsFn<any>>

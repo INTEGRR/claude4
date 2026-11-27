@@ -141,11 +141,21 @@ export async function shopifyModusSetzen(
   p: { modus: 'lesen' | 'probe' | 'schreiben' },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
+  const [vorher] = await sql<{ modus: string | null }[]>`
+    select value ->> 'modus' as modus from settings where key = 'shopify'`
   await sql`
     insert into settings (key, value)
     values ('shopify', ${sql.json({ modus: p.modus })})
     on conflict (key) do update set value =
       settings.value || ${sql.json({ modus: p.modus })}::jsonb`
+
+  // Buch (0136): Beim Scharfschalten weiß KRNL nicht, was der Shop gerade
+  // zeigt — die erste Meldung setzt deshalb jedes Angebot einmal absolut,
+  // erst danach laufen Buch und Differenzen.
+  if (p.modus === 'schreiben' && vorher?.modus !== 'schreiben') {
+    await sql`update shopify_inventory_state set pushed_qty = null, buch_ab = null where pushed_qty is not null or buch_ab is not null`
+    await sql`update shopify_zweitangebote set pushed_qty = null, buch_ab = null where pushed_qty is not null or buch_ab is not null`
+  }
 
   return {
     text:
@@ -1106,13 +1116,13 @@ export async function benutzerZweifaktorZuruecksetzen(
 }
 
 export async function benachrichtigungenSetzen(
-  p: { logins: boolean; fehlversuche: boolean; jobs: boolean; dienste: boolean; einkauf: boolean; zulauf: boolean; sicherheit: boolean },
+  p: { logins: boolean; fehlversuche: boolean; jobs: boolean; dienste: boolean; einkauf: boolean; zulauf: boolean; sicherheit: boolean; ueberverkauf: boolean },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   await sql`
     insert into settings (key, value) values ('benachrichtigungen', ${sql.json(p)})
     on conflict (key) do update set value = excluded.value`
-  const an = (['logins', 'fehlversuche', 'jobs', 'dienste', 'einkauf', 'zulauf', 'sicherheit'] as const).filter((k) => p[k])
+  const an = (['logins', 'fehlversuche', 'jobs', 'dienste', 'einkauf', 'zulauf', 'sicherheit', 'ueberverkauf'] as const).filter((k) => p[k])
   return { text: an.length ? `Telegram meldet: ${an.join(', ')}.` : 'Telegram meldet nichts mehr.' }
 }
 

@@ -94,7 +94,13 @@ describe('Shopify-Bestandsabgleich: Logik', () => {
     assert.deepEqual(deuteInventarPayload({ inventory_item_id: 7, available: 12, location_id: 1 }), {
       inventoryItemGid: 'gid://shopify/InventoryItem/7',
       verfuegbar: 12,
+      geaendertAm: null,
     })
+    assert.equal(
+      deuteInventarPayload({ inventory_item_id: 7, available: 12, updated_at: '2026-11-29T16:30:05+01:00' })?.geaendertAm?.toISOString(),
+      '2026-11-29T15:30:05.000Z',
+      'Zeitpunkt der Änderung laut Shop (0136)',
+    )
     assert.equal(deuteInventarPayload({ available: 12 }), null, 'ohne Item-ID')
     assert.equal(deuteInventarPayload({ inventory_item_id: 7 }), null, 'ohne Menge')
     assert.equal(

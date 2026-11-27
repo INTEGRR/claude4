@@ -95,8 +95,10 @@ export async function GET(request: Request) {
         // Ist-Stand des Shops für die Shop-Verfügbarkeit (nur lesend, best effort).
         let shopStand: unknown = null
         try {
-          const { shopStandHolen } = await import('@/modules/integrationen/inventar')
+          const { buchAbgleichen, shopStandHolen } = await import('@/modules/integrationen/inventar')
           shopStand = await shopStandHolen()
+          // Buch heilen (S7): Abweichungen zwischen Shop und Buch übernehmen bzw. melden.
+          shopStand = { ...(shopStand as object), buch: await buchAbgleichen() }
         } catch (err) {
           shopStand = { fehler: err instanceof Error ? err.message : String(err) }
         }

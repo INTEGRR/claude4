@@ -50,9 +50,13 @@ export async function POST(request: Request) {
         : null
 
   // Gleiche Webhook-ID => genau ein Datensatz (Shopify kann doppelt zustellen).
+  // Der Payload geht als OBJEKT in die jsonb-Spalte: `${raw}::jsonb` hätte
+  // der Treiber ein zweites Mal verpackt (JSON-Text in JSON), und Bestands-
+  // und Produkt-Webhooks wären als „nicht verwertbar" übersprungen worden
+  // (gefunden im Lasttest 2026-11-27).
   await sql`
     insert into shopify_webhook_events (webhook_id, topic, shopify_order_id, payload)
-    values (${webhookId}, ${topic}, ${orderGid}, ${raw}::jsonb)
+    values (${webhookId}, ${topic}, ${orderGid}, ${sql.json(payload as never)})
     on conflict (webhook_id) do nothing`
 
   // Nach der Antwort sofort verarbeiten — Fehler landen am Event und werden

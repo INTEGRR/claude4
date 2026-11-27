@@ -249,10 +249,11 @@ export default async function VersandPage({
       )}
 
       {angehalten.length > 0 && (
-        <Card title={`In Shopify angehalten (${angehalten.length})`} tight>
+        <Card title={`Angehalten oder unbezahlt (${angehalten.length})`} tight>
           <p className="muted small" style={{ margin: '8px 12px' }}>
-            Diese Bestellungen sind im Shop angehalten und deshalb nicht versandbereit. Die Ware bleibt reserviert.
-            Freigegeben wird in Shopify — danach erscheinen sie von selbst unter „Versandbereit".
+            Diese Bestellungen sind im Shop angehalten oder noch nicht bezahlt und deshalb nicht versandbereit. Die
+            Ware bleibt reserviert. Nach Freigabe in Shopify bzw. Zahlungseingang erscheinen sie von selbst unter
+            „Versandbereit".
           </p>
           <TableWrap>
             <table>

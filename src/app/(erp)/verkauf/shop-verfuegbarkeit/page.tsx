@@ -7,6 +7,7 @@ import { Card, PageHeader, TableWrap, Zustand } from '@/components/ui'
 import { serverAktion } from '@/modules/prozesse/server-aktion'
 import { shopifyModus } from '@/modules/integrationen/shopify-modus'
 import { madeToOrderEinstellung } from '@/modules/integrationen/made-to-order'
+import { notAusAktiv } from '@/modules/integrationen/inventar'
 import {
   type ArtikelInfo,
   type Modus,
@@ -38,6 +39,18 @@ async function standHolen() {
 async function zweitangebotSetzen(formData: FormData) {
   'use server'
   return serverAktion('verkauf.shop_zweitangebot_setzen', { formData })
+}
+async function gewichtSetzen(formData: FormData) {
+  'use server'
+  return serverAktion('verkauf.shop_gewicht_setzen', { formData })
+}
+async function notAusAn() {
+  'use server'
+  return serverAktion('verkauf.shop_not_aus', { parameter: { aktiv: true } })
+}
+async function notAusAb() {
+  'use server'
+  return serverAktion('verkauf.shop_not_aus', { parameter: { aktiv: false } })
 }
 
 const MODI: { wert: Modus; text: string }[] = [
@@ -93,6 +106,24 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
           </div>
         </ActionForm>
       )}
+      {darf && (
+        <ActionForm action={gewichtSetzen}>
+          <input type="hidden" name="template_id" value={a.id} />
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field" style={{ maxWidth: 260 }}>
+              <span>Erwartete Nachfrage des Artikels (Gewicht)</span>
+              <input name="gewicht" inputMode="decimal" defaultValue={a.gewicht ?? ''} placeholder="1" />
+            </label>
+            <div className="shrink field">
+              <button type="submit" className="small">Gewicht setzen</button>
+            </div>
+            <p className="muted small" style={{ margin: '0 0 6px', flex: 1 }}>
+              Knappe Teile werden nach Gewicht auf die Varianten verteilt: Artikel × Optionswerte. Doppeltes Gewicht
+              bekommt doppelt so viel; was sich gerade verkauft, bekommt von selbst mehr.
+            </p>
+          </div>
+        </ActionForm>
+      )}
 
       {a.gemeinsam.length > 0 && (
         <div className="shop-option">
@@ -138,6 +169,25 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
                         <button type="submit" className={w.gesperrt ? 'small' : 'small danger'}>
                           {w.gesperrt ? 'Freigeben' : 'Deaktivieren'}
                         </button>
+                        {mehrereFarben && (
+                          <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                            <input type="checkbox" name="alle_farben" /> alle Farben
+                          </label>
+                        )}
+                      </div>
+                    </ActionForm>
+                  )}
+                  {darf && a.modus !== 'aus' && !w.gesperrt && (
+                    <ActionForm action={gewichtSetzen}>
+                      <input type="hidden" name="template_id" value={a.id} />
+                      <input type="hidden" name="ptav_id" value={w.ptavId} />
+                      <div className="actions" style={{ marginTop: 6, alignItems: 'center' }}>
+                        <input
+                          name="gewicht" inputMode="decimal" defaultValue={w.gewicht ?? ''} placeholder="1"
+                          aria-label={`Gewicht ${w.name}`} title="Erwartete Nachfrage (Gewicht) — leer = 1"
+                          style={{ width: 64 }}
+                        />
+                        <button type="submit" className="small">Gewicht</button>
                         {mehrereFarben && (
                           <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                             <input type="checkbox" name="alle_farben" /> alle Farben
@@ -223,7 +273,9 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
   const user = await requireArea('verkauf')
   const darf = canWrite(user.rollen, 'verkauf', user.befugnisse)
   const { a: gewaehlt } = await searchParams
-  const [daten, mto, modus] = await Promise.all([shopVerfuegbarkeit(), madeToOrderEinstellung(), shopifyModus(sql)])
+  const [daten, mto, modus, notAus] = await Promise.all([
+    shopVerfuegbarkeit(), madeToOrderEinstellung(), shopifyModus(sql), notAusAktiv(),
+  ])
 
   return (
     <>
@@ -232,14 +284,32 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
         subtitle="Was Shopify bekommt — Tastaturen aus dem Material berechnet, mit euren Regeln je Artikel, Option und Teil"
         actions={
           darf && (
-            <ActionButton action={standHolen} className="small">
-              Shop-Stand holen
-            </ActionButton>
+            <>
+              <ActionButton action={standHolen} className="small">
+                Shop-Stand holen
+              </ActionButton>
+              {notAus ? (
+                <ActionButton action={notAusAb} className="small" confirm="Not-Aus aufheben? Die Kontingente werden neu verteilt und an den Shop gemeldet.">
+                  Not-Aus aufheben
+                </ActionButton>
+              ) : (
+                <ActionButton action={notAusAn} className="small danger" confirm="Not-Aus: ALLE Angebote im Shop sofort auf ausverkauft setzen?">
+                  Not-Aus
+                </ActionButton>
+              )}
+            </>
           )
         }
       />
+      {notAus && (
+        <div className="notice danger">
+          <span className="led warn" /> <strong>Not-Aus aktiv:</strong> alle Angebote stehen im Shop auf ausverkauft.
+          Bestellungen, die schon eingegangen sind, laufen normal weiter. Aufheben verteilt die Kontingente neu.
+        </div>
+      )}
       <div className={modus === 'schreiben' ? 'notice info' : 'notice warn'}>
-        Meldung für Tastaturen:{' '}
+        Geteilte Teile werden als Kontingent auf die Angebote verteilt — die Summe übersteigt nie den freien
+        Bestand. Deckel je Tastatur:{' '}
         {mto.modus === 'fest'
           ? `${mto.deckel}, solange mehr als ${mto.puffer} baubar`
           : `baubar − ${mto.puffer}, höchstens ${mto.deckel}`}{' '}

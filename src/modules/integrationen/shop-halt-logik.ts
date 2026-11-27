@@ -64,6 +64,14 @@ export function haltAusShop(
   }
 }
 
+/**
+ * Zahlung laut Shop offen (0135)? Solche Bestellungen sind reserviert, gehen
+ * aber nicht raus. Gegenstück zur SQL-Funktion shop_zahlung_offen.
+ */
+export function zahlungOffen(zahlstatus: string | null | undefined): boolean {
+  return ['PENDING', 'AUTHORIZED', 'VOIDED', 'EXPIRED'].includes(zahlstatus ?? '')
+}
+
 /** „Sonstiges: Kabel beilegen" — Grund und Notiz in einer Zeile. */
 export function haltText(halt: { grund: string | null; notiz: string | null }): string {
   return [halt.grund, halt.notiz].filter(Boolean).join(': ') || 'ohne Angabe'

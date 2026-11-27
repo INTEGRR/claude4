@@ -138,7 +138,11 @@ An einem ruhigen Tag, **vor** dem Release:
 
 ### Etappe 5 — Release der neuen Produkte
 
-- [ ] Schutz gegen Überverkauf fertig und im Lasttest bewiesen (S1–S8).
+- [x] Schutz gegen Überverkauf gebaut (S1–S7, 27.11.): Kontingent je Teil,
+      Buch je Angebot, Reservierung mit Sperre, Wächter, Not-Aus.
+- [x] Lasttest gegen den Shop-Nachbau (S8, 27.11.): bis 600 Käufe in 10 s,
+      kein Überverkauf, Ergebnisse in release-neue-produkte.md.
+- [ ] Gewichte je Artikel und Optionswert setzen (Shop-Verfügbarkeit).
 - [ ] Generalprobe mit einem Testprodukt im echten Shop.
 - [ ] Neue Produkte im Shop aktiv schalten.
 
@@ -149,7 +153,7 @@ An einem ruhigen Tag, **vor** dem Release:
 | Artikelnummern im Shop, Teileliste, Stücklisten | K1 Klärfälle gesammelt auflösen (fertig) |
 | Fertigungs-Nachfragen beantworten | A1 Stückliste kopieren, A2 Auswahlfelder |
 | Zählen | S1–S8 Schutz am Release-Tag |
-| Umschalten am Stichtag | Lasttest, Generalprobe begleiten |
+| Umschalten am Stichtag, Gewichte setzen | Lasttest, Generalprobe begleiten |
 
 ## Der wichtigste Gedanke
 

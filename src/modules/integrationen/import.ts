@@ -4,7 +4,7 @@ import { sql, tx } from '@/db/client'
 import { splitStreet } from '@/modules/shared/address'
 import { externVersandNachziehen } from '@/modules/verkauf/extern-versand'
 import { stornoNachlauf } from '@/modules/verkauf/storno-nachlauf'
-import { fetchOrder, type ShopifyOrder } from './shopify'
+import { ShopifyError, fetchOrder, fetchOrders, type ShopifyOrder } from './shopify'
 import { haltNachziehen, shopHaltLesen } from './shop-halt'
 import { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText } from './bestellung-felder'
 import { netto, positionNetto, runden, satzAusSteuerzeilen } from './shopify-preise'
@@ -12,6 +12,40 @@ import { plural } from '@/modules/shared/format'
 
 export { splitStreet }
 export { listenpreisNetto, positionsName, rechnungsanschrift, zahlungsartText }
+
+/**
+ * Überverkaufs-Wächter (S5, 0136): Ist die eben bestätigte Bestellung voll
+ * gedeckt? Geprüft werden die Teile ihrer Fertigungsaufträge und die
+ * Lagerware ihrer Lieferung (auftragsgefertigte Positionen warten ohnehin
+ * auf die Fertigung). Fehlt etwas, steht es am Auftrag und geht per
+ * Telegram hinaus — einmal je Bestellung. Nur im Modus „schreiben": solange
+ * KRNL die Shop-Mengen nicht führt, ist eine Lücke kein Befund.
+ */
+async function ueberverkaufPruefen(t: TransactionSql, auftragId: string, name: string): Promise<string | null> {
+  const { shopifyModus } = await import('./shopify-modus')
+  if ((await shopifyModus(t)) !== 'schreiben') return null
+  const fehlt = await t<{ teil: string; fehlt: number }[]>`
+    select coalesce(nullif(pv.sku, ''), pv.display_name) as teil, sum(m.qty - m.reserved_qty)::float as fehlt
+    from stock_moves m
+    join stock_locations l on l.id = m.src_location_id and l.type = 'internal'
+    join product_variants pv on pv.id = m.variant_id
+    where m.state not in ('done', 'cancel', 'draft') and m.qty > m.reserved_qty
+      and (m.production_id in (select id from manufacturing_orders
+                               where sales_order_id = ${auftragId} and state not in ('done', 'cancel'))
+           or (m.picking_id in (select p.id from stock_pickings p
+                                join operation_types ot on ot.id = p.operation_type_id and ot.kind = 'delivery'
+                                where p.origin_model = 'sales_order' and p.origin_id = ${auftragId})
+               and not ist_made_to_order(m.variant_id)))
+    group by 1 order by 1`
+  if (fehlt.length === 0) return null
+  const liste = fehlt.map((f) => `${f.fehlt} × ${f.teil}`).join(', ')
+  await t`select log_event('sales_order', ${auftragId}, 'error',
+    ${`Nicht voll gedeckt — es fehlen: ${liste}. Die Bestellung wartet auf Ware.`}, 'shopify')`
+  const { einreihen } = await import('./benachrichtigungen')
+  await einreihen(t, 'ueberverkauf', `ueberverkauf:${auftragId}`,
+    `⚠️ <b>Überverkauf</b>: Bestellung ${name} ist nicht voll gedeckt — es fehlen: ${liste}.`)
+  return `nicht voll gedeckt (${liste})`
+}
 
 /**
  * Import-Pipeline: aus einer Shopify-Order wird ein Verkaufsauftrag.
@@ -55,6 +89,8 @@ async function upsertCustomer(t: TransactionSql, order: ShopifyOrder): Promise<s
     }
   }
 
+  // on conflict (0135/S4): zwei gleichzeitige Erstbestellungen desselben
+  // Kunden legen ihn nicht doppelt an — die zweite wartet und nimmt ihn.
   const [created] = await t<{ id: string }[]>`
     insert into partners (
       name, is_customer, email, street, house_number, street2, zip, city,
@@ -63,6 +99,7 @@ async function upsertCustomer(t: TransactionSql, order: ShopifyOrder): Promise<s
       ${name}, true, ${email ?? null}, ${street}, ${houseNumber},
       ${addr?.address2 ?? null}, ${addr?.zip ?? null}, ${addr?.city ?? null},
       ${addr?.countryCodeV2 ?? 'DE'}, ${addr?.phone ?? null}, ${shopifyCustomerId})
+    on conflict (shopify_customer_id) do update set is_customer = true
     returning id`
   return created.id
 }
@@ -222,6 +259,11 @@ export async function importShopifyOrder(
   // Auftrag, zieht KRNL nach der Transaktion noch die DHL-Labels nach.
   let storniert: string | null = null
   const ergebnis = await tx(async (t): Promise<ImportResult> => {
+    // Eine Bestellung zur Zeit (S4): Shopify schickt zu jedem Kauf mehrere
+    // Ereignisse gleichzeitig (create + updated). Die Sperre gilt bis zum
+    // Ende der Transaktion — das zweite Ereignis sieht den fertigen Auftrag,
+    // statt an der Eindeutigkeit der Bestellnummer zu scheitern.
+    await t`select pg_advisory_xact_lock(hashtextextended(${order.id}, 0))`
     const [existing] = await t<{ id: string; state: string; delivery_status: string }[]>`
       select id, state, delivery_status from sales_orders where shopify_order_id = ${order.id}`
 
@@ -242,6 +284,12 @@ export async function importShopifyOrder(
       const retoureMeldung = await retourenErstattungNachziehen(t, existing.id, order)
       await t`select cancel_sales_order(${existing.id}, 'shopify')`
       storniert = existing.id
+      // Buch (0136): Shopify lagert beim Storno in der Regel zurück — die
+      // Menge zählt wieder zum Angebot. Hat der Shop nicht zurückgelagert,
+      // zeigt er weniger als das Buch (die sichere Seite); der Abgleich heilt es.
+      for (const item of order.lineItems?.nodes ?? []) {
+        await t`select shop_buch_bestellung(${item.variant?.id ?? null}, ${-item.quantity}, ${order.createdAt})`
+      }
       if (erstattet) {
         await t`select log_event('sales_order', ${existing.id}, 'note',
           'In Shopify erstattet — Auftrag storniert.', 'shopify')`
@@ -284,7 +332,8 @@ export async function importShopifyOrder(
       // Lauf aus einer Lieferung entsteht, liest ihn schon.
       await t`update sales_orders
                  set shopify_zahlstatus = ${order.displayFinancialStatus ?? null},
-                     shopify_offen = coalesce(${shopOffen(order)}, shopify_offen)
+                     shopify_offen = coalesce(${shopOffen(order)}, shopify_offen),
+                     shopify_stand_at = greatest(shopify_stand_at, ${order.updatedAt ?? null}::timestamptz)
                where id = ${existing.id}`
       // Fulfillment-Halt (0134) VOR allem, was ausbucht: ein aufgehobener
       // Halt muss weg sein, bevor ein Versand im Shop nachgezogen wird.
@@ -362,10 +411,14 @@ export async function importShopifyOrder(
       const [{ zeilen }] = await t<{ zeilen: number }[]>`
         select count(*)::int as zeilen from sales_order_lines where order_id = ${existing.id}`
 
+      // Reservieren beim Eingang (0135): auch unbezahlt wird bestätigt —
+      // versandt wird erst nach Zahlung (shipping_ready, Trigger).
       let bestaetigt = false
-      if (order.displayFinancialStatus === 'PAID' && Number(offen) === 0 && Number(zeilen) > 0) {
+      let luecke: string | null = null
+      if (Number(offen) === 0 && Number(zeilen) > 0) {
         await t`select confirm_sales_order(${existing.id}, 'shopify')`
         bestaetigt = true
+        luecke = await ueberverkaufPruefen(t, existing.id, order.name)
       }
 
       return {
@@ -374,7 +427,7 @@ export async function importShopifyOrder(
         unmatched: Number(offen),
         message:
           nachgezogen > 0 || bestaetigt
-            ? `${order.name}: ${plural(nachgezogen, 'Position', 'Positionen')} nachgezogen${bestaetigt ? ', Auftrag bestätigt' : ''}`
+            ? `${order.name}: ${plural(nachgezogen, 'Position', 'Positionen')} nachgezogen${bestaetigt ? ', Auftrag bestätigt' : ''}${luecke ? ` — ${luecke}` : ''}`
             : haltMeldung
               ? `${order.name} ${haltMeldung}`
               : `${order.name} war bereits importiert`,
@@ -388,14 +441,14 @@ export async function importShopifyOrder(
     const [created] = await t<{ id: string }[]>`
       insert into sales_orders (
         number, partner_id, source, shopify_order_id, shopify_order_name,
-        order_date, currency, versandkosten, shopify_brutto, shopify_zahlstatus, shopify_offen,
+        order_date, currency, versandkosten, shopify_brutto, shopify_zahlstatus, shopify_offen, shopify_stand_at,
         ship_name, ship_street, ship_house_number, ship_street2,
         ship_zip, ship_city, ship_country_code, ship_phone, ship_email,
         rechnungsanschrift, zahlungsart)
       values (
         next_sequence('sale'), ${partnerId}, 'shopify', ${order.id}, ${order.name},
         ${order.createdAt}, ${order.totalPriceSet.shopMoney.currencyCode}, ${versandNetto(order)}, ${shopBrutto(order)},
-        ${order.displayFinancialStatus ?? null}, ${shopOffen(order)},
+        ${order.displayFinancialStatus ?? null}, ${shopOffen(order)}, ${order.updatedAt ?? null},
         ${addr?.name ?? null}, ${street}, ${houseNumber}, ${addr?.address2 ?? null},
         ${addr?.zip ?? null}, ${addr?.city ?? null}, ${addr?.countryCodeV2 ?? 'DE'},
         ${addr?.phone ?? null}, ${order.email ?? null},
@@ -408,6 +461,13 @@ export async function importShopifyOrder(
     for (const item of order.lineItems.nodes) {
       const qty = item.currentQuantity ?? item.quantity
       if (qty <= 0) continue
+
+      // Buch (0136): Shopify hat diese Menge beim Kauf von seinem Angebot
+      // abgezogen — genau einmal, hier, zählt sie auch gegen das Buch. Nicht
+      // bei Bestellungen, die schon storniert ankommen.
+      if (!beendet) {
+        await t`select shop_buch_bestellung(${item.variant?.id ?? null}, ${qty}, ${order.createdAt})`
+      }
 
       const variantId = await matchVariant(t, item.sku, item.variant?.id ?? null)
       if (!variantId) {
@@ -480,10 +540,21 @@ export async function importShopifyOrder(
     // Fulfillment-Halt (0134): schon beim Anlegen angehalten (z. B. Betrugsprüfung).
     const haltNeu = await haltNachziehen(t, created.id, halt)
 
-    // Bezahlte Orders sofort bestätigen: erzeugt Lieferung + Fertigungsaufträge.
-    const paid = order.displayFinancialStatus === 'PAID'
-    if (paid && unmatched === 0) {
+    // Sofort bestätigen — auch unbezahlt (0135, Entscheidungslog 2026-11-27):
+    // Shopify hat seinen Bestand beim Kauf heruntergezählt, KRNL reserviert
+    // im selben Zug (Lieferung + Fertigungsaufträge). Unbezahltes geht nicht
+    // raus: die Lieferung ist erst nach Zahlung versandbereit.
+    const bezahlt = order.displayFinancialStatus === 'PAID'
+    const bestaetigen = unmatched === 0
+    let luecke: string | null = null
+    if (bestaetigen) {
       await t`select confirm_sales_order(${created.id}, 'shopify')`
+      luecke = await ueberverkaufPruefen(t, created.id, order.name)
+      if (!bezahlt) {
+        await t`select log_event('sales_order', ${created.id}, 'note',
+          ${`Zahlung laut Shopify offen (${order.displayFinancialStatus ?? 'unbekannt'}) — reserviert, Versand erst nach Zahlungseingang.`},
+          'shopify')`
+      }
     }
 
     return {
@@ -492,9 +563,10 @@ export async function importShopifyOrder(
       unmatched,
       message:
         `${order.name} importiert` +
-        (paid && unmatched === 0 ? ' und bestätigt' : '') +
+        (bestaetigen ? (bezahlt ? ' und bestätigt' : ' und bestätigt (Zahlung offen)') : '') +
         (unmatched > 0 ? ` (${plural(unmatched, 'Position', 'Positionen')} offen)` : '') +
-        (haltNeu ? ` — ${haltNeu}` : ''),
+        (haltNeu ? ` — ${haltNeu}` : '') +
+        (luecke ? ` — ${luecke}` : ''),
     }
   })
   if (storniert) await stornoNachlauf(storniert, 'shopify')
@@ -722,21 +794,98 @@ export interface ProcessResult {
 
 /** Arbeitet die gespeicherten Webhook-Events ab. */
 export async function processPendingWebhooks(limit = 25): Promise<ProcessResult> {
-  const events = await sql<
-    { id: string; topic: string; shopify_order_id: string | null; payload: Record<string, unknown> }[]
+  // Exklusiv greifen (S4): jeder Lauf nimmt sich seine Ereignisse und setzt
+  // eine Frist von zwei Minuten — parallele Läufe (jeder Webhook startet
+  // einen) überspringen sie; stirbt ein Lauf, kommt das Ereignis nach der
+  // Frist von selbst zurück. Bestellungen zuerst: ein Bestands-Echo des
+  // Shops darf nie vor der Bestellung stehen, die es ausgelöst hat.
+  const gegriffen = await sql<
+    { id: string; topic: string; shopify_order_id: string | null; payload: Record<string, unknown>; received_at: Date }[]
   >`
-    select id, topic, shopify_order_id, payload
-    from shopify_webhook_events
-    where status = 'pending' and attempts < 5 and next_attempt_at <= now()
-    order by received_at
-    limit ${limit}`
+    update shopify_webhook_events e
+    set next_attempt_at = now() + interval '2 minutes'
+    where e.id in (
+      select id from shopify_webhook_events
+      where status = 'pending' and attempts < 5 and next_attempt_at <= now()
+      order by (topic like 'inventory_levels/%'), received_at
+      limit ${limit}
+      for update skip locked)
+    returning e.id, e.topic, e.shopify_order_id, e.payload, e.received_at`
+  const echo = (topic: string) => (topic.startsWith('inventory_levels/') ? 1 : 0)
+  // Früher doppelt verpackt gespeicherte Payloads (JSON-Text in jsonb) auspacken.
+  for (const e of gegriffen) {
+    if (typeof e.payload === 'string') {
+      try {
+        e.payload = JSON.parse(e.payload) as Record<string, unknown>
+      } catch {
+        e.payload = {}
+      }
+    }
+  }
+  const events = [...gegriffen].sort(
+    (a, b) => echo(a.topic) - echo(b.topic) || a.received_at.getTime() - b.received_at.getTime(),
+  )
 
   let processed = 0
   let failed = 0
   let bestellungen = 0
+  // Mehrere Ereignisse derselben Bestellung in einem Lauf: einmal holen,
+  // einmal einlesen — die übrigen gelten als miterledigt.
+  const erledigt = new Map<string, string>()
+
+  // Echos ohne Abruf erledigen (0138): trägt das Ereignis einen Stand, den
+  // KRNL schon eingelesen hat, gibt es nichts zu holen. Stornos nie — die
+  // sollen immer durch den vollen Weg.
+  const mitStand = events.filter(
+    (e) => e.topic.startsWith('orders/') && e.topic !== 'orders/cancelled' && e.shopify_order_id &&
+      typeof (e.payload as { updated_at?: unknown }).updated_at === 'string',
+  )
+  const bekannt = new Map<string, Date>()
+  if (mitStand.length > 0) {
+    const zeilen = await sql<{ shopify_order_id: string; stand: Date }[]>`
+      select shopify_order_id, shopify_stand_at as stand from sales_orders
+      where shopify_order_id = any(${mitStand.map((e) => e.shopify_order_id!)}::text[]) and shopify_stand_at is not null`
+    for (const z of zeilen) bekannt.set(z.shopify_order_id, z.stand)
+  }
+  const istEcho = (e: (typeof events)[number]): boolean => {
+    const stand = e.shopify_order_id ? bekannt.get(e.shopify_order_id) : undefined
+    const gemeldet = new Date(String((e.payload as { updated_at?: unknown }).updated_at ?? ''))
+    return Boolean(stand) && mitStand.includes(e) && !Number.isNaN(gemeldet.getTime()) && gemeldet.getTime() <= stand!.getTime()
+  }
+
+  // Alle Bestellungen des Stapels in EINEM Abruf (S4) — scheitert er
+  // (Drosselung), fällt jedes Ereignis einzeln auf fetchOrder zurück.
+  const zuHolen = [...new Set(events
+    .filter((e) => e.topic.startsWith('orders/') && e.shopify_order_id && !istEcho(e))
+    .map((e) => e.shopify_order_id!))]
+  let geholt: Map<string, ShopifyOrder> | null = null
+  let stapelFehler: unknown = null
+  if (zuHolen.length > 1) {
+    try {
+      geholt = await fetchOrders(zuHolen)
+    } catch (err) {
+      stapelFehler = err
+    }
+  }
 
   for (const event of events) {
     try {
+      if (istEcho(event)) {
+        await sql`update shopify_webhook_events
+                  set status = 'done', processed_at = now(), error = 'Stand schon eingelesen — kein Abruf nötig'
+                  where id = ${event.id}`
+        processed++
+        continue
+      }
+      if (stapelFehler && event.topic.startsWith('orders/')) throw stapelFehler
+      if (event.topic.startsWith('orders/') && event.shopify_order_id && erledigt.has(event.shopify_order_id)) {
+        await sql`update shopify_webhook_events
+                  set status = 'done', processed_at = now(),
+                      error = ${`Miterledigt: ${erledigt.get(event.shopify_order_id)}`}
+                  where id = ${event.id}`
+        processed++
+        continue
+      }
       // Produktänderungen aus dem Shop: frisch holen und abgleichen.
       if (event.topic.startsWith('products/')) {
         const rohId = (event.payload as { admin_graphql_api_id?: string; id?: number | string })
@@ -801,7 +950,7 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
 
       // Immer den aktuellen Stand von Shopify holen: Webhooks können veraltet
       // oder in falscher Reihenfolge ankommen.
-      const order = await fetchOrder(gid)
+      const order = geholt ? (geholt.get(gid) ?? null) : await fetchOrder(gid)
       if (!order) {
         await sql`update shopify_webhook_events
                   set status = 'skipped', processed_at = now(),
@@ -815,10 +964,20 @@ export async function processPendingWebhooks(limit = 25): Promise<ProcessResult>
         update shopify_webhook_events
         set status = 'done', processed_at = now(), error = ${result.message}
         where id = ${event.id}`
+      erledigt.set(gid, result.message)
       processed++
       bestellungen++
     } catch (err) {
       failed++
+      // Drosselung (S4): kein Fehler der Bestellung — in fünf Sekunden noch
+      // einmal, ohne einen Versuch zu verbrauchen (sonst wartete sie Minuten).
+      if (err instanceof ShopifyError && err.retryable && /thrott|429/i.test(err.message)) {
+        await sql`
+          update shopify_webhook_events
+          set error = 'Shop drosselt — neuer Anlauf in fünf Sekunden', next_attempt_at = now() + interval '5 seconds'
+          where id = ${event.id}`
+        continue
+      }
       // Gleiche Backoff-Staffel wie die Job-Queue statt Sofort-Wiederholung.
       await sql`
         update shopify_webhook_events

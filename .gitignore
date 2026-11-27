@@ -14,3 +14,4 @@ prozess-harness.log
 
 # Temporäre Arbeitskopien von Hintergrund-Agenten (git worktree)
 .claude/worktrees/
+lasttest/ergebnis/

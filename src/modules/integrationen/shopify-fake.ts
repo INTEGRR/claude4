@@ -50,6 +50,40 @@ export function fakeHaltSetzen(
   else FAKE_HALT.set(orderGid, holds)
 }
 
+/** Bestand je InventoryItem, wie ihn der Shop führte (0136). */
+const FAKE_BESTAND = new Map<string, number>()
+const FAKE_SCHLUESSEL = new Set<string>()
+
+export function fakeBestand(inventoryItemGid: string): number | undefined {
+  return FAKE_BESTAND.get(inventoryItemGid)
+}
+
+/** Alle geführten Bestände — für Summenprüfungen über viele Angebote. */
+export function fakeBestaende(): Map<string, number> {
+  return new Map(FAKE_BESTAND)
+}
+
+/**
+ * Ein Kauf im Shop: Shopify zählt sofort herunter — lange bevor KRNL die
+ * Bestellung sieht. false = ausverkauft (nicht weiterverkaufen).
+ */
+export function fakeKauf(inventoryItemGid: string, menge = 1): boolean {
+  const da = FAKE_BESTAND.get(inventoryItemGid) ?? 0
+  if (da < menge) return false
+  FAKE_BESTAND.set(inventoryItemGid, da - menge)
+  return true
+}
+
+/** Bestand von Hand setzen — wie eine Änderung im Shop-Admin. */
+export function fakeBestandSetzen(inventoryItemGid: string, menge: number): void {
+  FAKE_BESTAND.set(inventoryItemGid, menge)
+}
+
+export function fakeBestandLeeren(): void {
+  FAKE_BESTAND.clear()
+  FAKE_SCHLUESSEL.clear()
+}
+
 /**
  * Produkte, die der Fake auf die Seitenabfrage des Produktimports liefert —
  * in der Reihenfolge der Hinterlegung, eine einzige Seite.
@@ -95,9 +129,12 @@ export async function fakeShopifyGraphQL<T>(
       const id = String(variables.id)
       const holds = FAKE_HALT.get(id)
       if (holds === null) throw new Error('Access denied for fulfillmentOrders field.')
-      const bestellung = FAKE_BESTELLUNGEN.get(id) as { displayFulfillmentStatus?: string } | undefined
+      const bestellung = FAKE_BESTELLUNGEN.get(id) as
+        | { displayFulfillmentStatus?: string; displayFinancialStatus?: string }
+        | undefined
       return {
         order: {
+          displayFinancialStatus: bestellung?.displayFinancialStatus ?? null,
           displayFulfillmentStatus: holds?.length ? 'ON_HOLD' : (bestellung?.displayFulfillmentStatus ?? 'UNFULFILLED'),
           fulfillmentOrders: {
             nodes: [{
@@ -129,7 +166,7 @@ export async function fakeShopifyGraphQL<T>(
         },
       }
     }
-    if (op === 'order' && query.includes('displayFinancialStatus')) {
+    if (op === 'order' && query.includes('lineItems')) {
       // fetchOrder: die von der Fixture hinterlegte Bestellung (oder null).
       return { order: FAKE_BESTELLUNGEN.get(String(variables.id)) ?? null }
     }
@@ -170,7 +207,47 @@ export async function fakeShopifyGraphQL<T>(
             ? [{ field: ['input', 'quantities', String(i), 'inventoryItemId'], message: 'The specified inventory item is not stocked at the location.' }]
             : [],
         )
+        // Der Fake führt den Bestand je InventoryItem mit (0136) — so lässt
+        // sich prüfen, was nach absoluten Meldungen, Differenzen und
+        // „Käufen" (fakeKauf) wirklich im Shop stünde.
+        if (userErrors.length === 0) {
+          for (const q of input?.quantities ?? []) FAKE_BESTAND.set(String(q.inventoryItemId), Number(q.quantity))
+        }
         return { inventorySetQuantities: { userErrors } }
+      }
+      case 'inventoryAdjustQuantities': {
+        // Differenz-Meldung (0136): dieselben Pflichten wie die absolute —
+        // changeFromQuantity in jedem Eintrag, @idempotent mit Schlüssel.
+        const input = variables.input as { changes?: Record<string, unknown>[] } | undefined
+        if ((input?.changes ?? []).some((q) => !('changeFromQuantity' in q))) {
+          throw new Error('InventoryChangeInput must include the following argument: changeFromQuantity.')
+        }
+        if (!/@idempotent\s*\(/.test(query) || typeof variables.idempotencyKey !== 'string') {
+          throw new Error('The @idempotent directive is required for this mutation but was not provided.')
+        }
+        // Derselbe Schlüssel zweimal: Shopify bucht nur einmal.
+        if (FAKE_SCHLUESSEL.has(String(variables.idempotencyKey))) {
+          return { inventoryAdjustQuantities: { userErrors: [] } }
+        }
+        const userErrors = (input?.changes ?? []).flatMap((q, i) => {
+          if (String(q.inventoryItemId ?? '').endsWith('404404')) {
+            return [{ field: ['input', 'changes', String(i), 'inventoryItemId'], message: 'The specified inventory item is not stocked at the location.', code: 'ITEM_NOT_STOCKED_AT_LOCATION' }]
+          }
+          // Compare-and-Swap: mit Vergleichswert bucht der Shop nur, wenn er genau diesen Stand zeigt.
+          const erwartet = q.changeFromQuantity
+          if (typeof erwartet === 'number' && (FAKE_BESTAND.get(String(q.inventoryItemId)) ?? 0) !== erwartet) {
+            return [{ field: ['input', 'changes', String(i), 'changeFromQuantity'], message: 'The quantity has changed since it was last read.', code: 'CHANGE_FROM_QUANTITY_STALE' }]
+          }
+          return []
+        })
+        if (userErrors.length === 0) {
+          FAKE_SCHLUESSEL.add(String(variables.idempotencyKey))
+          for (const q of input?.changes ?? []) {
+            const id = String(q.inventoryItemId)
+            FAKE_BESTAND.set(id, (FAKE_BESTAND.get(id) ?? 0) + Number(q.delta))
+          }
+        }
+        return { inventoryAdjustQuantities: { userErrors } }
       }
       case 'tagsAdd':
         return { tagsAdd: { userErrors: [] } }
@@ -180,12 +257,18 @@ export async function fakeShopifyGraphQL<T>(
         // Varianten wie im echten Shop: InventoryItem, Produkt, und für
         // Tastaturen anfangs ohne Mengenverfolgung (so war es bei ANVIL).
         const ids = (variables.ids as string[] | undefined) ?? []
+        // fetchOrders (S4): mehrere Bestellungen in einem Aufruf.
+        if (ids.some((id) => id.includes('/Order/'))) {
+          return { nodes: ids.map((id) => FAKE_BESTELLUNGEN.get(id) ?? null) }
+        }
         return {
           nodes: ids.map((id) => {
             const nr = id.split('/').pop()
             return {
               id,
               inventoryItem: { id: `gid://shopify/InventoryItem/${nr}`, tracked: false },
+              // Was der Shop gerade anbietet (0136) — für die gesättigte Senkung.
+              inventoryQuantity: FAKE_BESTAND.get(`gid://shopify/InventoryItem/${nr}`) ?? 0,
               product: { id: `gid://shopify/Product/${nr}` },
               inventoryPolicy: 'CONTINUE',
             }
