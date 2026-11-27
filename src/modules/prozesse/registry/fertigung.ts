@@ -246,6 +246,45 @@ export const FERTIGUNG = {
     revalidate: ['/fertigung/stuecklisten'],
   },
 
+  'fertigung.stueckliste_erfassen': {
+    label: 'Stückliste mit Positionen anlegen',
+    bereich: 'fertigung',
+    ki: true,
+    beschreibung:
+      'Legt für ein Produkt eine komplette Stückliste in EINEM Schritt an: Referenzmenge und alle Positionen. ' +
+      'Komponenten per SKU, Barcode, ID oder genauem Namen. gilt_fuer je Position: leer = alle Varianten, sonst ' +
+      'Attribut und Wert des Produkts (z. B. Switches = „Gateron - Jade Max") — die Position gilt dann nur für ' +
+      'Varianten mit diesem Wert; mehrere Werte desselben Attributs = eine davon. Das Produkt darf noch keine ' +
+      'aktive Stückliste haben (dann Positionen einzeln ergänzen/ändern). Alles oder nichts: ein Fehler nennt ' +
+      'die Position. Für weitere Produkte mit gleichem Aufbau danach fertigung.stueckliste_kopieren.',
+    bindung: 'frei',
+    prozessfrei: true,
+    schema: z.object({
+      produkt: z
+        .string()
+        .min(1, 'Bitte das Produkt angeben')
+        .describe('Produkt der Stückliste: genauer Produktname, product_templates.id oder SKU/ID einer Variante'),
+      menge: z.number().positive().default(1).describe('Referenzmenge der Stückliste, meist 1'),
+      positionen: z
+        .array(
+          z.object({
+            komponente: z.string().min(1).describe('SKU, Barcode, ID oder genauer Name der Komponente'),
+            menge: z.number().positive('Die Menge muss größer als 0 sein'),
+            verbrauch: z.enum(['backflush', 'manual']).default('backflush').describe('backflush = automatisch bei Fertigmeldung'),
+            gilt_fuer: z
+              .array(z.object({ attribut: z.string().min(1), wert: z.string().min(1) }))
+              .default([])
+              .describe('leer = alle Varianten; sonst Attribut + Wert des Produkts'),
+          }),
+        )
+        .min(1, 'Mindestens eine Position')
+        .max(200),
+    }),
+    zusammenfassung: (p) =>
+      `Stückliste für ${p.produkt}: ${p.positionen.length} ${p.positionen.length === 1 ? 'Position' : 'Positionen'}`,
+    revalidate: ['/fertigung/stuecklisten', '/fertigung/stuecklisten/:ergebnis'],
+  },
+
   'fertigung.montage_ebenen_setzen': {
     label: 'Montage-Übersicht: Gruppierung festlegen',
     bereich: 'fertigung',
@@ -269,7 +308,9 @@ export const FERTIGUNG = {
   'fertigung.stueckliste_kopieren': {
     label: 'Stückliste kopieren',
     bereich: 'fertigung',
+    ki: true,
     beschreibung:
+      'record_id = ID der Quell-Stückliste (boms.id), template_id = Zielprodukt (product_templates.id). ' +
       'Kopiert eine Stückliste auf ein anderes Produkt: alle Positionen mit Menge und Verbrauchsart, ' +
       'Arbeitsgänge und Kuppelprodukte. „Gilt nur für …"-Zuordnungen werden über Attribut und Wert auf ' +
       'das Zielprodukt umgehängt; fehlt dort ein Wert, entfällt er, und eine Position, deren Zuordnung ' +
@@ -278,8 +319,9 @@ export const FERTIGUNG = {
     bindung: 'beleg',
     prozessfrei: true,
     schema: z.object({
-      template_id: z.string().guid('Bitte das Zielprodukt auswählen'),
+      template_id: z.string().guid('Bitte das Zielprodukt auswählen').describe('Zielprodukt: product_templates.id'),
     }),
+    zusammenfassung: (p) => `Stückliste auf Produkt ${p.template_id} kopieren`,
     formdata: (fd) => ({ template_id: String(fd.get('template_id') ?? '') }),
     revalidate: ['/fertigung/stuecklisten'],
   },
@@ -287,15 +329,20 @@ export const FERTIGUNG = {
   'fertigung.stueckliste_position_hinzufuegen': {
     label: 'Komponente hinzufügen',
     bereich: 'fertigung',
-    beschreibung: 'Nimmt eine Komponente in die Stückliste auf, wahlweise nur für bestimmte Varianten.',
+    ki: true,
+    beschreibung:
+      'Nimmt eine Komponente in eine bestehende Stückliste auf (record_id = boms.id), wahlweise nur für ' +
+      'bestimmte Varianten: ptav_ids = IDs aus product_template_attribute_values des Stücklisten-Produkts ' +
+      '(leer = alle Varianten).',
     bindung: 'beleg',
     prozessfrei: true,
     schema: z.object({
-      component_variant_id: z.string().min(1, 'Bitte eine Komponente auswählen'),
+      component_variant_id: z.string().min(1, 'Bitte eine Komponente auswählen').describe('Komponente: ID, SKU, Barcode oder genauer Name'),
       qty: z.number().positive('Die Menge muss größer als 0 sein'),
       issue_method: z.enum(['backflush', 'manual']).default('backflush'),
       ptav_ids: z.array(z.string()).default([]),
     }),
+    zusammenfassung: (p) => `${p.qty} × ${p.component_variant_id} in die Stückliste`,
     formdata: (fd) => ({
       component_variant_id: String(fd.get('component_variant_id') ?? ''),
       qty: Number(fd.get('qty') ?? 0),
@@ -308,7 +355,9 @@ export const FERTIGUNG = {
   'fertigung.stueckliste_position_aendern': {
     label: 'Komponente ändern',
     bereich: 'fertigung',
+    ki: true,
     beschreibung:
+      'record_id = boms.id, line_id = bom_lines.id. ' +
       'Ändert eine Position der Stückliste: Menge und „gilt nur für …"-Zuordnung (leer = alle Varianten), ' +
       'wahlweise auch die Komponente selbst. Laufende Fertigungsaufträge behalten ihren Stand.',
     bindung: 'beleg',
@@ -319,6 +368,7 @@ export const FERTIGUNG = {
       ptav_ids: z.array(z.string()).default([]),
       component_variant_id: z.string().guid().optional().describe('andere Komponente; leer = bleibt'),
     }),
+    zusammenfassung: (p) => `Position ${p.line_id}: Menge ${p.qty}`,
     formdata: (fd) => ({
       line_id: String(fd.get('line_id') ?? ''),
       qty: Number(String(fd.get('qty') ?? '0').replace(',', '.')),
@@ -331,10 +381,12 @@ export const FERTIGUNG = {
   'fertigung.stueckliste_position_entfernen': {
     label: 'Komponente entfernen',
     bereich: 'fertigung',
-    beschreibung: 'Entfernt eine Komponente aus der Stückliste.',
+    ki: true,
+    beschreibung: 'Entfernt eine Komponente aus der Stückliste (record_id = boms.id, line_id = bom_lines.id).',
     bindung: 'beleg',
     prozessfrei: true,
-    schema: z.object({ line_id: z.string().min(1) }),
+    schema: z.object({ line_id: z.string().min(1).describe('bom_lines.id') }),
+    zusammenfassung: (p) => `Position ${p.line_id} entfernen`,
     revalidate: ['/fertigung/stuecklisten/:id'],
   },
 

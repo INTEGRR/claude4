@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Die KI kann Stücklisten anlegen, kopieren und pflegen
+
+Auslöser (Betreiber): „Die KI kann keine Stücklisten anlegen! Kopieren
+usw., das wäre super." Bis dahin trug keine Stücklisten-Aktion das
+`ki`-Flag; für sechs neue Tastaturen mit je rund 20 Positionen bleibt sonst
+nur Klicken.
+
+Entschieden:
+- **Eine zusammengesetzte Aktion für die KI:**
+  `fertigung.stueckliste_erfassen` legt eine komplette Stückliste in einem
+  Schritt an — Produkt per Name oder ID, Komponenten per SKU/Barcode/Name,
+  „gilt nur für …" per Attribut + Wert des Produkts. Grund: die
+  Einzelaktionen sind beleggebunden (brauchen die ID der Stückliste, die es
+  vor der Bestätigung noch nicht gibt); die KI müsste in zwei Runden
+  arbeiten und 20 Vorschläge stapeln. Erst alles auflösen und prüfen, dann
+  eine Transaktion; ein Fehler nennt die Position („Position 2 (XY): …
+  nicht gefunden", „… keinen Wert „Silver" (möglich: Yellow)"). Nur für
+  Produkte ohne aktive Stückliste.
+- **`ki: true`** auch für kopieren, Position hinzufügen (Komponente jetzt
+  auch per SKU), ändern und entfernen — mit Beschreibungen, die sagen, woher
+  `record_id`, `line_id` und `ptav_ids` kommen.
+- Unverändert: die KI schlägt nur vor; ausgeführt wird nach Bestätigung
+  über den Torwächter.
+
+Test: `tests/prozesse/anlegen-helfer.test.ts`. Doku:
+[module/fertigung.md](module/fertigung.md).
+
 ## 2026-11-27 — „Zurückhalten" wird zu zwei Schaltern: nicht einzeln verkaufen / für den Shop sperren
 
 Auslöser: Alle NATIVE 75 standen für den Shop auf ausverkauft, obwohl das

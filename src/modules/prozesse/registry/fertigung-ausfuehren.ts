@@ -422,6 +422,9 @@ export async function stuecklistePositionHinzufuegen(
   ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {
   const bomId = ctx.recordId!
+  // Die Maske schickt die ID; KI und API dürfen SKU, Barcode oder Namen nennen.
+  const komponente = await varianteAufloesen(sql, p.component_variant_id)
+  p = { ...p, component_variant_id: komponente.id }
   const [info] = await sql<{ uom_id: string }[]>`
     select pt.uom_id from product_variants pv
     join product_templates pt on pt.id = pv.template_id where pv.id = ${p.component_variant_id}`
@@ -449,6 +452,103 @@ export async function stuecklistePositionHinzufuegen(
  * die Komponente — in einer Transaktion, damit nie eine Position ohne ihre
  * Zuordnung dasteht (sie gälte dann für alle Varianten).
  */
+/**
+ * Komplette Stückliste in einem Schritt (2026-11-27) — der Weg, auf dem die
+ * KI eine Stückliste anlegt: Produkt und Komponenten per Name/SKU,
+ * „gilt nur für …" per Attribut + Wert. Erst alles auflösen und prüfen
+ * (jeder Fehler nennt seine Position), dann in einer Transaktion schreiben.
+ */
+export async function stuecklisteErfassen(
+  p: {
+    produkt: string
+    menge: number
+    positionen: { komponente: string; menge: number; verbrauch: 'backflush' | 'manual'; gilt_fuer: { attribut: string; wert: string }[] }[]
+  },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  // Produkt: ID oder genauer Name der Vorlage, sonst über eine Variante.
+  const kennung = p.produkt.trim()
+  const alsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(kennung) ? kennung : null
+  let vorlagen = await sql<{ id: string; name: string; uom_id: string }[]>`
+    select id, name, uom_id from product_templates
+    where active and (id = ${alsUuid}::uuid or lower(name) = lower(${kennung})) limit 2`
+  if (vorlagen.length === 0) {
+    const variante = await varianteAufloesen(sql, kennung)
+    vorlagen = await sql<{ id: string; name: string; uom_id: string }[]>`
+      select pt.id, pt.name, pt.uom_id from product_templates pt
+      join product_variants pv on pv.template_id = pt.id where pv.id = ${variante.id}`
+  }
+  if (vorlagen.length > 1) throw new Error(`Produkt „${kennung}" ist mehrdeutig — bitte die Produkt-ID angeben`)
+  const tpl = vorlagen[0]
+  const [schonDa] = await sql<{ id: string }[]>`
+    select id from boms where template_id = ${tpl.id} and active and variant_id is null limit 1`
+  if (schonDa) {
+    throw new Error(`${tpl.name} hat schon eine aktive Stückliste — Positionen dort einzeln ergänzen oder ändern.`)
+  }
+
+  // Attributwerte des Produkts: (Attribut, Wert) → ptav.
+  const werte = await sql<{ id: string; attribut: string; wert: string }[]>`
+    select ptav.id, a.name as attribut, av.name as wert
+    from product_template_attribute_lines al
+    join product_attributes a on a.id = al.attribute_id
+    join product_template_attribute_values ptav on ptav.line_id = al.id
+    join product_attribute_values av on av.id = ptav.value_id
+    where al.template_id = ${tpl.id}`
+  const gleich = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+  const zeilen: { variant: string; uom: string; menge: number; verbrauch: string; ptavs: string[] }[] = []
+  for (const [i, pos] of p.positionen.entries()) {
+    const wo = `Position ${i + 1} (${pos.komponente})`
+    let komponente: { id: string; name: string }
+    try {
+      komponente = await varianteAufloesen(sql, pos.komponente.trim())
+    } catch (err) {
+      throw new Error(`${wo}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    const [info] = await sql<{ uom_id: string; template_id: string }[]>`
+      select pt.uom_id, pt.id as template_id from product_variants pv
+      join product_templates pt on pt.id = pv.template_id where pv.id = ${komponente.id}`
+    if (info.template_id === tpl.id) throw new Error(`${wo}: ein Produkt kann nicht Komponente seiner selbst sein`)
+    const ptavs: string[] = []
+    for (const g of pos.gilt_fuer) {
+      const treffer = werte.find((w) => gleich(w.attribut, g.attribut) && gleich(w.wert, g.wert))
+      if (!treffer) {
+        const moeglich = werte.filter((w) => gleich(w.attribut, g.attribut)).map((w) => w.wert)
+        throw new Error(
+          `${wo}: ${tpl.name} hat ${moeglich.length ? `beim Attribut „${g.attribut}" keinen Wert „${g.wert}" (möglich: ${moeglich.join(', ')})` : `kein Attribut „${g.attribut}"`}`,
+        )
+      }
+      ptavs.push(treffer.id)
+    }
+    zeilen.push({ variant: komponente.id, uom: info.uom_id, menge: pos.menge, verbrauch: pos.verbrauch, ptavs: [...new Set(ptavs)] })
+  }
+
+  const bomId = await tx(async (t) => {
+    const [bom] = await t<{ id: string }[]>`
+      insert into boms (template_id, qty, uom_id) values (${tpl.id}, ${p.menge}, ${tpl.uom_id}) returning id`
+    for (const [i, z] of zeilen.entries()) {
+      const [line] = await t<{ id: string }[]>`
+        insert into bom_lines (bom_id, sequence, component_variant_id, qty, uom_id, issue_method)
+        values (${bom.id}, ${(i + 1) * 10}, ${z.variant}, ${z.menge}, ${z.uom}, ${z.verbrauch}::component_issue_method)
+        returning id`
+      for (const ptav of z.ptavs) {
+        await t`insert into bom_line_variant_filters (bom_line_id, ptav_id) values (${line.id}, ${ptav})`
+      }
+    }
+    await t`select log_event('product_template', ${tpl.id}, 'note',
+      ${`Stückliste angelegt: ${plural(zeilen.length, 'Position', 'Positionen')}`}, ${ctx.actor})`
+    return bom.id
+  })
+  const gefiltert = zeilen.filter((z) => z.ptavs.length > 0).length
+  return {
+    recordId: bomId,
+    link: `/fertigung/stuecklisten/${bomId}`,
+    text:
+      `Stückliste für ${tpl.name} angelegt: ${plural(zeilen.length, 'Position', 'Positionen')}` +
+      (gefiltert > 0 ? `, davon ${gefiltert} nur für bestimmte Varianten` : '') + '.',
+  }
+}
+
 /** Gruppierung der Montage-Übersicht (0141) — eine Einstellung, keine Aufträge. */
 export async function montageEbenenSetzen(
   p: { name_teile: string[]; attribute: string[] },

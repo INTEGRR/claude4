@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { type Harness, harnessEnde, harnessStart } from './harness.ts'
 import { aktionAusfuehrenGeprueft } from '../../src/modules/prozesse/torwaechter.ts'
 import { shopProdukteMitLuecken } from '../../src/modules/integrationen/shop-anlage.ts'
+import { kiKatalog } from '../../src/modules/prozesse/introspektion.ts'
 
 const DATENBANK = 'erp_anlegen_helfer_check'
 const ADMIN = { name: 'anlege-test', role: 'admin' as const }
@@ -149,6 +150,72 @@ describe('Produkt speichern mit langer Shop-Beschreibung', () => {
     await aktion('produkte.produkt_aendern', v.b, { ...basis, description_sale: 'Neuer Text' })
     const [t] = await h.sql<{ description_sale: string }[]>`select description_sale from product_templates where id = ${v.b}`
     assert.equal(t.description_sale, 'Neuer Text')
+  })
+})
+
+describe('KI: Stückliste in einem Schritt anlegen, kopieren, Positionen pflegen', () => {
+  const zeilen = (bom: string) =>
+    h.sql<{ sku: string; qty: string; filter: string[] }[]>`
+      select pv.sku, l.qty::text,
+             coalesce(array_agg(av.name order by av.name) filter (where av.id is not null), '{}') as filter
+      from bom_lines l
+      join product_variants pv on pv.id = l.component_variant_id
+      left join bom_line_variant_filters f on f.bom_line_id = l.id
+      left join product_template_attribute_values ptav on ptav.id = f.ptav_id
+      left join product_attribute_values av on av.id = ptav.value_id
+      where l.bom_id = ${bom} group by l.id, pv.sku order by l.sequence`
+
+  test('die Stücklisten-Aktionen stehen im Katalog der KI', () => {
+    const namen = new Set(kiKatalog().map((a) => a.name))
+    for (const a of [
+      'fertigung.stueckliste_erfassen', 'fertigung.stueckliste_kopieren', 'fertigung.stueckliste_position_hinzufuegen',
+      'fertigung.stueckliste_position_aendern', 'fertigung.stueckliste_position_entfernen',
+    ]) assert.ok(namen.has(a), a)
+  })
+
+  test('komplette Stückliste: Produkt per Name, Komponenten per SKU, „gilt für" per Attribut und Wert', async () => {
+    v.c = await board('Board C', ['Yellow', 'Brown'], 'fertigen')
+    const r = await aktion('fertigung.stueckliste_erfassen', undefined, {
+      produkt: 'Board C',
+      positionen: [
+        { komponente: 'AH-SW-Y', menge: 85, gilt_fuer: [{ attribut: 'switches', wert: 'yellow' }] },
+        { komponente: 'ah-sw-b', menge: 85, gilt_fuer: [{ attribut: 'Switches', wert: 'Brown' }] },
+        { komponente: 'AH-KB', menge: 1.5 },
+      ],
+    })
+    assert.match(r.text ?? '', /Stückliste für Board C angelegt: 3 Positionen, davon 2 nur für bestimmte Varianten/)
+    v.bomC = r.recordId!
+    assert.deepEqual(
+      (await zeilen(v.bomC)).map((z) => [z.sku, Number(z.qty), z.filter]),
+      [['AH-SW-Y', 85, ['Yellow']], ['AH-SW-B', 85, ['Brown']], ['AH-KB', 1.5, []]],
+    )
+  })
+
+  test('Fehler nennen die Position; nichts wird halb angelegt', async () => {
+    v.d = await board('Board D', ['Yellow'], 'fertigen')
+    const versuch = (positionen: unknown[]) => aktion('fertigung.stueckliste_erfassen', undefined, { produkt: 'Board D', positionen })
+    await assert.rejects(
+      versuch([{ komponente: 'AH-SW-Y', menge: 1 }, { komponente: 'GIBTS-NICHT', menge: 1 }]),
+      /Position 2 \(GIBTS-NICHT\): Produkt „GIBTS-NICHT" nicht gefunden/,
+    )
+    await assert.rejects(
+      versuch([{ komponente: 'AH-SW-Y', menge: 1, gilt_fuer: [{ attribut: 'Switches', wert: 'Silver' }] }]),
+      /Position 1 \(AH-SW-Y\): Board D hat beim Attribut „Switches" keinen Wert „Silver" \(möglich: Yellow\)/,
+    )
+    const [{ n }] = await h.sql<{ n: number }[]>`select count(*)::int as n from boms where template_id = ${v.d}`
+    assert.equal(n, 0)
+    await assert.rejects(
+      aktion('fertigung.stueckliste_erfassen', undefined, { produkt: 'Board C', positionen: [{ komponente: 'AH-KB', menge: 1 }] }),
+      /hat schon eine aktive Stückliste/,
+    )
+  })
+
+  test('kopieren und eine Komponente per SKU ergänzen', async () => {
+    const kopie = await aktion('fertigung.stueckliste_kopieren', v.bomC, { template_id: v.d })
+    const neu = kopie.recordId!
+    assert.deepEqual((await zeilen(neu)).map((z) => z.sku), ['AH-SW-Y', 'AH-KB'], 'Brown gibt es an Board D nicht — die Zeile entfällt')
+    await aktion('fertigung.stueckliste_position_hinzufuegen', neu, { component_variant_id: 'AH-SW-B', qty: 2, ptav_ids: [] })
+    assert.deepEqual((await zeilen(neu)).map((z) => z.sku), ['AH-SW-Y', 'AH-KB', 'AH-SW-B'])
   })
 })
 
