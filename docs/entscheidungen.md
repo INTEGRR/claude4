@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Doppelte Artikel: schon verbaute Teile lassen sich zusammenführen
+
+Auslöser: „Mounting Plate FR-4 ISO" (aus Odoo angelegt) ließ sich nicht in
+den gleichen Shop-Artikel zusammenführen — „hat Lagerbuchungen außerhalb
+der Odoo-Übernahme". Die Buchungen waren elf abgeschlossene
+Verbrauchsbuchungen aus Fertigungsaufträgen seit dem 30.09. Die Sperre
+traf damit praktisch jedes Odoo-Teil, das seit der Übernahme in einer
+Tastatur verbaut wurde.
+
+Entschieden (Betreiber: „lockern"): Abgeschlossener Verbrauch in der
+Fertigung (Lager → Produktion, mit Fertigungsauftrag) hindert das
+Zusammenführen nicht mehr. Bestand, Stücklistenzeilen, offene Bewegungen
+und Lieferantenpreise wandern wie bisher in den Shop-Artikel; die alten
+Verbrauchsbuchungen bleiben als Historie an der archivierten Odoo-Kopie,
+die Meldung nennt ihre Anzahl. Weiterhin gesperrt: Lieferungen,
+Wareneingänge und Inventuren von Hand an der Odoo-Kopie sowie Belege
+(Verkauf, Einkauf, eigener Fertigungsauftrag, Reparatur, Chargen).
+Umsetzung: `artikelZusammenfuehren` in `migration/odoo/doppelte.ts`;
+Test: `tests/prozesse/odoo-stuecklisten.test.ts`.
+
 ## 2026-11-27 — Webhooks lassen sich schon im Probelauf registrieren
 
 Auslöser: Zwei Tage vor dem Release ist in Produktion kein Webhook

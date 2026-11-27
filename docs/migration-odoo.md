@@ -112,7 +112,10 @@ Attrappe (`odoo-fake.ts`). Ausgelegt auf Odoo 18 (`uom.uom` mit
      wird archiviert, nicht gelöscht.
    - Hart statt still: nur von der Übernahme angelegte Artikel ohne Belege
      (Verkauf, Einkauf, Fertigung, Reparatur, Chargen) und ohne
-     Lagerbuchungen außerhalb der Übernahme; Ziel ist ein Shop-Artikel ohne
+     Lagerbuchungen außerhalb der Übernahme — ausgenommen abgeschlossener
+     Verbrauch in der Fertigung (seit 2026-11-27): schon verbaute Teile
+     lassen sich zusammenführen, die Verbrauchsbuchungen bleiben als
+     Historie an der archivierten Odoo-Kopie; Ziel ist ein Shop-Artikel ohne
      eigene Stückliste in derselben Einheit.
    - **Routen** Fertigen/Auf Auftrag wie in Odoo — nur, wenn jede aktive
      Variante der KRNL-Vorlage eine Stückliste bekommt (sonst liefe eine

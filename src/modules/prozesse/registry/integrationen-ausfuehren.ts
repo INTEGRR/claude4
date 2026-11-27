@@ -342,6 +342,9 @@ export async function odooArtikelZusammenfuehren(
       `${b.von} → ${b.nach}: ${b.bestand} Stück Bestand, ${plural(b.stuecklistenzeilen, 'Stücklistenzeile', 'Stücklistenzeilen')}, ` +
       `${plural(b.offeneBewegungen, 'offene Bewegung', 'offene Bewegungen')}, ${plural(b.lieferantenpreise, 'Lieferantenpreis', 'Lieferantenpreise')} übernommen` +
       (b.preisUebernommen ? ', Einkaufspreis gesetzt' : '') +
+      (b.verbrauchBleibt > 0
+        ? `; ${plural(b.verbrauchBleibt, 'frühere Verbrauchsbuchung bleibt', 'frühere Verbrauchsbuchungen bleiben')} am archivierten Odoo-Artikel`
+        : '') +
       (b.sku === 'sku' ? `, SKU ${b.von} übernommen` : b.sku === 'barcode' ? `, ${b.von} als Barcode` : '') + '.',
     daten: { ...b },
   }

@@ -348,15 +348,45 @@ describe('Odoo-Stücklisten übernehmen', () => {
       /Shop-Artikel wählen/,
     )
 
+    // Schon verbaut (2026-11-27): abgeschlossener Verbrauch in der Fertigung
+    // hindert das Zusammenführen nicht — die Buchung bleibt an der Odoo-Kopie.
+    const [produktion] = await h.sql<{ id: string }[]>`select id from stock_locations where type = 'production' limit 1`
+    const [mo] = await h.sql<{ id: string }[]>`select id from manufacturing_orders order by created_at limit 1`
+    await h.sql`
+      insert into stock_moves (production_id, variant_id, uom_id, qty, qty_done, src_location_id, dest_location_id, state, reference, date_done)
+      values (${mo.id}, ${pl.id}, ${await stueck()}, 2, 2, ${lager.id}, ${produktion.id}, 'done', 'Verbrauch (Test)', now())`
+
+    // Eine Inventur von Hand an einer anderen Odoo-Komponente sperrt weiterhin.
+    const [gh] = await h.sql<{ id: string }[]>`select id from product_variants where sku = 'FAKE-GH-W'`
+    const [ghTpl] = await h.sql<{ id: string }[]>`
+      insert into product_templates (name, uom_id, can_be_sold) values ('Gehäuse Weiß', ${await stueck()}, true) returning id`
+    await h.sql`select generate_variants(${ghTpl.id})`
+    const [ghShop] = await h.sql<{ id: string }[]>`
+      update product_variants set shopify_variant_id = 'gid://shopify/ProductVariant/4712'
+      where template_id = ${ghTpl.id} returning id`
+    const [hand] = await h.sql<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+      values (${lager.id}, ${gh.id}, 5, 0, null) returning id`
+    await h.sql`select inventory_apply(${hand.id}, 'test')`
+    await assert.rejects(
+      aktionAusfuehrenGeprueft(
+        'integrationen.odoo_artikel_zusammenfuehren',
+        { parameter: { aufloesen_id: gh.id, behalten_id: ghShop.id } },
+        ADMIN,
+      ),
+      /weder aus der Odoo-Übernahme noch aus dem Verbrauch/,
+    )
+
     const formular = new FormData()
     formular.set('aufloesen_id', pl.id)
     formular.set('behalten_id', shop.id)
     const r = await aktionAusfuehrenGeprueft('integrationen.odoo_artikel_zusammenfuehren', { formData: formular }, ADMIN)
     const b = r.daten as Record<string, unknown>
     assert.deepEqual(
-      [b.bestand, b.stuecklistenzeilen, b.offeneBewegungen, b.preisUebernommen, b.sku],
-      [30, 2, 2, true, 'sku'],
+      [b.bestand, b.stuecklistenzeilen, b.offeneBewegungen, b.preisUebernommen, b.sku, b.verbrauchBleibt],
+      [30, 2, 2, true, 'sku', 1],
     )
+    assert.match(r.text ?? '', /1 frühere Verbrauchsbuchung bleibt am archivierten Odoo-Artikel/)
 
     const [nachher] = await h.sql<{ sku: string; bestand: number; preis: number; alt_aktiv: boolean; alt_sku: string | null }[]>`
       select pv.sku, on_hand_qty(pv.id, null)::float as bestand, pt.standard_cost::float as preis,

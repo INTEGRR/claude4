@@ -90,6 +90,8 @@ export interface ZusammenfuehrenBericht {
   lieferantenpreise: number
   preisUebernommen: boolean
   sku: 'sku' | 'barcode' | null
+  /** Abgeschlossene Verbrauchsbuchungen der Fertigung — bleiben als Historie an der archivierten Odoo-Kopie. */
+  verbrauchBleibt: number
 }
 
 type Artikel = {
@@ -128,7 +130,11 @@ export async function artikelZusammenfuehren(
     if (!a || !b) throw new Error('Artikel nicht gefunden oder archiviert.')
 
     // --- Prüfungen: hart statt still -----------------------------------------
-    const [pruef] = await t<{ angelegt: boolean; b_odoo: boolean; b_stueckliste: boolean; belege: string | null; fremd: number }[]>`
+    // „fremd" sind abgeschlossene Buchungen, die weder aus der Odoo-Übernahme
+    // stammen noch Verbrauch in der Fertigung sind (seit 2026-11-27: ein
+    // Teil, das schon in Tastaturen verbaut wurde, lässt sich zusammenführen —
+    // sonst wäre nach zwei Monaten Betrieb kaum ein Teil mehr auflösbar).
+    const [pruef] = await t<{ angelegt: boolean; b_odoo: boolean; b_stueckliste: boolean; belege: string | null; fremd: number; verbrauch: number }[]>`
       select
         exists (select 1 from odoo_verweise where krnl_tabelle = 'product_variants' and krnl_id = ${a.id}
                 and herkunft = 'angelegt') as angelegt,
@@ -140,20 +146,34 @@ export async function artikelZusammenfuehren(
           case when exists (select 1 from manufacturing_orders where variant_id = ${a.id}) then 'Fertigung' end,
           case when exists (select 1 from repair_parts where variant_id = ${a.id}) then 'Reparatur' end,
           case when exists (select 1 from stock_lots where variant_id = ${a.id}) then 'Chargen' end) as belege,
-        (select count(*)::int from stock_moves m left join inventory_counts ic on ic.id = m.inventory_id
+        (select count(*)::int from stock_moves m
+          left join inventory_counts ic on ic.id = m.inventory_id
+          join stock_locations von on von.id = m.src_location_id
+          join stock_locations nach on nach.id = m.dest_location_id
           where m.variant_id = ${a.id} and m.state = 'done'
-            and (ic.id is null or ic.note is null or ic.note not like 'Odoo-Übernahme%')) as fremd`
+            and (ic.id is null or ic.note is null or ic.note not like 'Odoo-Übernahme%')
+            and not (m.production_id is not null and von.type = 'internal' and nach.type = 'production')) as fremd,
+        (select count(*)::int from stock_moves m
+          join stock_locations von on von.id = m.src_location_id
+          join stock_locations nach on nach.id = m.dest_location_id
+          where m.variant_id = ${a.id} and m.state = 'done'
+            and m.production_id is not null and von.type = 'internal' and nach.type = 'production') as verbrauch`
     if (!pruef.angelegt) throw new Error(`${a.name}: nur Artikel, die die Odoo-Übernahme angelegt hat, lassen sich auflösen.`)
     if (!b.shopify) throw new Error(`${b.name}: Ziel muss ein Shop-Artikel sein.`)
     if (pruef.b_odoo) throw new Error(`${b.name} ist schon einem Odoo-Artikel zugeordnet.`)
     if (pruef.b_stueckliste) throw new Error(`${b.name} hat eine eigene Stückliste — das ist kein Einzelteil.`)
     if (pruef.belege) throw new Error(`${a.name} hat Belege (${pruef.belege}) — Zusammenführen nicht möglich.`)
-    if (pruef.fremd > 0) throw new Error(`${a.name} hat Lagerbuchungen außerhalb der Odoo-Übernahme — bitte erst prüfen.`)
+    if (pruef.fremd > 0) {
+      throw new Error(
+        `${a.name} hat Lagerbuchungen, die weder aus der Odoo-Übernahme noch aus dem Verbrauch in der Fertigung stammen ` +
+          '(Lieferung, Wareneingang oder Inventur von Hand) — bitte erst prüfen.',
+      )
+    }
     if (a.uom_id !== b.uom_id) throw new Error(`${a.name} und ${b.name} haben verschiedene Einheiten.`)
 
     const bericht: ZusammenfuehrenBericht = {
       von: a.sku ?? a.name, nach: b.name, bestand: 0, stuecklistenzeilen: 0, offeneBewegungen: 0,
-      lieferantenpreise: 0, preisUebernommen: false, sku: null,
+      lieferantenpreise: 0, preisUebernommen: false, sku: null, verbrauchBleibt: pruef.verbrauch,
     }
 
     // --- Stammdaten: Preis vor Bestand (bewertet), nur wo der Shop-Artikel 0 hat.
