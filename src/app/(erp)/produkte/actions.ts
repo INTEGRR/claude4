@@ -66,6 +66,14 @@ export async function deleteProduct(templateId: string): Promise<ActionResult> {
   return ergebnis
 }
 
+/** Variante als eigenes Produkt herauslösen — danach auf das neue Produkt. */
+export async function varianteHerausloesen(variantId: string, formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('produkte.variante_herausloesen', { recordId: variantId, formData })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
+  return ergebnis
+}
+
 export async function restoreProduct(templateId: string): Promise<ActionResult> {
   return serverAktion('produkte.produkt_wiederherstellen', { recordId: templateId })
 }

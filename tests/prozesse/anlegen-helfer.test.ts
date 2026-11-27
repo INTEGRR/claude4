@@ -277,6 +277,55 @@ describe('Produkt löschen: ohne Belege endgültig, mit Belegen ins Archiv', () 
   })
 })
 
+describe('Variante als eigenes Produkt herauslösen (0143)', () => {
+  test('die Variante zieht mit ID, Bestand und Stücklistenzeile in ein eigenes Produkt um', async () => {
+    const r = await aktion('produkte.produkt_anlegen', undefined, {
+      name: 'GATERON Switches', verkaufspreis: 30, verkaufbar: true, einkaufbar: true, route: 'kaufen',
+      attribute: [{ name: 'Typ', werte: [{ name: 'Yellow' }, { name: 'Brown' }, { name: 'Silent Red', aufpreis: 5 }] }],
+    })
+    const gateron = r.recordId!
+    const [cherry] = await h.sql<{ id: string }[]>`
+      update product_variants set sku = 'SW-CH-LSR-T', shopify_variant_id = 'gid://shopify/ProductVariant/cherry'
+      where template_id = ${gateron} and display_name like '%Silent Red%' returning id`
+    const [ort] = await h.sql<{ id: string }[]>`select id from stock_locations where full_path = 'WH/Stock'`
+    const [z] = await h.sql<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+      values (${ort.id}, ${cherry.id}, 1470, 0, 'Test') returning id`
+    await h.sql`select inventory_apply(${z.id}, 'test')`
+    await aktion('fertigung.stueckliste_position_hinzufuegen', v.bomC, { component_variant_id: cherry.id, qty: 85, ptav_ids: [] })
+
+    const e = await aktion('produkte.variante_herausloesen', cherry.id, { name: 'Cherry MX2A Silent Red' })
+    assert.match(e.text ?? '', /ist jetzt ein eigenes Produkt.*Im Shop bleibt es Variante von „GATERON Switches"/)
+    const [nach] = await h.sql<
+      { name: string; produkt: string; sku: string; bestand: number; preis: number; herausgeloest: boolean; gid: string; in_stl: number }[]
+    >`
+      select pv.display_name as name, pt.name as produkt, pv.sku, on_hand_qty(pv.id)::float as bestand,
+             (pt.list_price + pv.price_extra)::float as preis, pv.shop_herausgeloest as herausgeloest, pv.shopify_variant_id as gid,
+             (select count(*)::int from bom_lines l where l.component_variant_id = pv.id) as in_stl
+      from product_variants pv join product_templates pt on pt.id = pv.template_id where pv.id = ${cherry.id}`
+    assert.deepEqual({ ...nach }, {
+      name: 'Cherry MX2A Silent Red', produkt: 'Cherry MX2A Silent Red', sku: 'SW-CH-LSR-T', bestand: 1470, preis: 35,
+      herausgeloest: true, gid: 'gid://shopify/ProductVariant/cherry', in_stl: 1,
+    })
+    assert.equal(e.recordId, (await h.sql<{ template_id: string }[]>`select template_id from product_variants where id = ${cherry.id}`)[0].template_id)
+
+    // Das alte Produkt: zwei Varianten, der Wert ist weg — „Varianten erzeugen" bringt ihn nicht zurück.
+    await h.sql`select generate_variants(${gateron})`
+    const rest = await h.sql<{ name: string }[]>`
+      select display_name as name from product_variants where template_id = ${gateron} and active order by display_name`
+    assert.deepEqual(rest.map((x) => x.name), ['GATERON Switches (Typ: Brown)', 'GATERON Switches (Typ: Yellow)'])
+    v.gateron = gateron
+    v.cherry = cherry.id
+  })
+
+  test('nicht für die einzige Variante und nicht für gefertigte Produkte', async () => {
+    await assert.rejects(aktion('produkte.variante_herausloesen', v.cherry, { name: 'Noch einmal' }), /einzige Variante/)
+    const [board] = await h.sql<{ id: string }[]>`select id from product_variants where template_id = ${v.c} and active limit 1`
+    await assert.rejects(aktion('produkte.variante_herausloesen', board.id, { name: 'Board einzeln' }), /hat eine Stückliste/)
+    await assert.rejects(aktion('produkte.variante_herausloesen', v.cherry, { name: '  ' }))
+  })
+})
+
 describe('Release per Knopfdruck: Shop-Projekt und Verkauf starten/stoppen', () => {
   const stand = () =>
     h.sql<{ name: string; projekt: string | null; shop_modus: string }[]>`

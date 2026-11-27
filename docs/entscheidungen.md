@@ -9,6 +9,41 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Variante als eigenes Produkt herauslösen (Shop-Struktur ≠ Lager-Struktur)
+
+Auslöser: Der Cherry „Silent Red" steht in Shopify als Variante des
+Produkts „GATERON Switches". KRNL übernimmt Shop-Produkte eins zu eins;
+nach dem Zusammenführen mit dem Odoo-Artikel hingen Bestand (1.470),
+Stücklisten und die Artikelnummer SW-CH-LSR-001 an „GATERON Switches (Typ:
+Silent Red)". Fachlich korrekt, aber der Betreiber: „In dem Fall will ich
+nicht, dass es Varianten sind, auch wenn es in Shopify welche sind."
+
+Entschieden:
+- **Die Variante zieht um, ihre ID bleibt.** `produkte.variante_herausloesen`
+  legt ein neues Produkt mit eigenem Namen an (Stammdaten vom alten
+  übernommen, Listenpreis inkl. Aufpreis) und hängt die Variante um. Alles,
+  was auf die Variante zeigt — Bestand, Bewegungen, Stücklistenzeilen,
+  Belege, Artikelnummer —, bleibt unberührt. Kein Kopieren, kein
+  Umbuchen. Das alte Produkt verliert den Attributwert, damit „Varianten
+  erzeugen" die Kombination nicht neu anlegt.
+- **Die Shop-Verknüpfung bleibt an der Variante** (kein Zweitangebot): der
+  Bestellimport findet Artikel über die Shop-Varianten-ID und koppelt
+  unverknüpfte Artikel per SKU ohnehin wieder an — ein Zweitangebot wäre
+  nicht stabil. Stattdessen der Merker `product_variants.shop_herausgeloest`
+  (Migration 0143) mit zwei Schutzregeln: (1) der Shop-Titel und die
+  Shop-Preise gelten nur für das KRNL-Produkt der NICHT herausgelösten
+  Varianten (`vorlageDesShopProdukts`); (2) das Speichern des neuen
+  Produkts überträgt nie Titel, Beschreibung oder Preise in das
+  Shop-Produkt (`aktualisiereProduktInShopify`, `shopifyNachziehen`).
+- **Grenzen:** nicht für die einzige Variante (dann umbenennen), nicht für
+  gefertigte Produkte mit Stückliste (die Stückliste hängt am Produkt).
+  Einzelne Varianten löschen bleibt bewusst aus: wer eine Variante mit
+  Bestand loswerden will, löst sie heraus oder löscht/archiviert das
+  Produkt.
+
+Tests: `tests/prozesse/anlegen-helfer.test.ts`, `tests/produkt-import.test.ts`.
+Doku: [module/stammdaten.md](module/stammdaten.md).
+
 ## 2026-11-27 — Produkte löschen: ohne Belege endgültig, mit Belegen ins Archiv
 
 Auslöser (Betreiber): „Ich kann keine Produkte löschen." Es gab weder

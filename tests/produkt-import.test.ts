@@ -113,3 +113,35 @@ describe('Produktübernahme aus Shopify: Bundles und Zweitangebote', () => {
     assert.equal(zweit.length, 0)
   })
 })
+
+// --- Herausgelöste Varianten (0143) ---------------------------------------------
+
+describe('Shop-Produkt → KRNL-Produkt bei herausgelösten Varianten (0143)', async () => {
+  const { vorlageDesShopProdukts } = await import('../src/modules/integrationen/produkt-import-logik.ts')
+
+  test('die herausgelöste Variante bestimmt nie, welches Produkt der Shop-Titel benennt', () => {
+    assert.equal(
+      vorlageDesShopProdukts([
+        { template_id: 'cherry', herausgeloest: true },
+        { template_id: 'gateron', herausgeloest: false },
+        { template_id: 'gateron', herausgeloest: false },
+      ]),
+      'gateron',
+    )
+  })
+
+  test('mehrere Produkte: das mit den meisten verknüpften Varianten', () => {
+    assert.equal(
+      vorlageDesShopProdukts([
+        { template_id: 'a', herausgeloest: false },
+        { template_id: 'b', herausgeloest: false },
+        { template_id: 'b', herausgeloest: false },
+      ]),
+      'b',
+    )
+  })
+
+  test('alle herausgelöst → kein Produkt wird umbenannt', () => {
+    assert.equal(vorlageDesShopProdukts([{ template_id: 'cherry', herausgeloest: true }]), null)
+  })
+})

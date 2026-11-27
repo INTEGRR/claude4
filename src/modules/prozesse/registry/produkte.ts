@@ -250,6 +250,26 @@ export const PRODUKTE = {
     revalidate: ['/produkte/:id'],
   },
 
+  'produkte.variante_herausloesen': {
+    label: 'Variante als eigenes Produkt herauslösen',
+    bereich: 'produkte',
+    nurAdmin: true,
+    beschreibung:
+      'Macht aus einer Variante ein eigenes Produkt mit neuem Namen (record_id = product_variants.id). Die ' +
+      'Variante behält ihre ID: Bestand, Lagerbewegungen, Stücklistenzeilen, Belege und die Artikelnummer ' +
+      'bleiben unverändert an ihr. Das bisherige Produkt verliert den Attributwert. Eine Shop-Verknüpfung ' +
+      'bleibt — im Shop ist der Artikel weiter Variante des alten Produkts; Titel und Preise werden dann in ' +
+      'keiner Richtung abgeglichen. Nicht für gefertigte Produkte mit Stückliste und nicht für die einzige Variante.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      name: z.string().trim().min(1, 'Bitte den Namen des neuen Produkts angeben').max(200),
+    }),
+    zusammenfassung: (p) => `Variante herauslösen als „${p.name}"`,
+    formdata: (fd) => ({ name: String(fd.get('name') ?? '') }),
+    revalidate: ['/produkte', '/produkte/:ergebnis', '/produkte/variante/:id'],
+  },
+
   'produkte.produkt_loeschen': {
     label: 'Produkt löschen',
     bereich: 'produkte',

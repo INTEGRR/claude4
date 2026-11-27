@@ -1,5 +1,6 @@
 import { requireArea } from '@/modules/auth'
-import { canWrite } from '@/modules/auth/permissions'
+import { canWrite, hatRolle } from '@/modules/auth/permissions'
+import { Schublade } from '@/components/schublade'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -7,7 +8,7 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
 import { barcodeSvg } from '@/modules/shared/barcode'
 import { dateTime, qty } from '@/modules/shared/format'
-import { setShopRegeln, setVariantCodes } from '../../actions'
+import { setShopRegeln, setVariantCodes, varianteHerausloesen } from '../../actions'
 import { ShopRegelKarte } from '@/components/shop-regel-karte'
 import { artikeletikettenDrucken } from '../../../lager/actions'
 import { RecordComments } from '@/components/record-comments'
@@ -33,10 +34,15 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
       incoming: number
       outgoing: number
       forecasted: number
+      geschwister: number
+      stueckliste: boolean
+      herausgeloest: boolean
     }[]
   >`
     select pv.id, pv.template_id, pt.name as product, pv.display_name, pv.sku, pv.barcode,
-           pv.shopify_variant_id, u.name as uom,
+           pv.shopify_variant_id, u.name as uom, pv.shop_herausgeloest as herausgeloest,
+           (select count(*)::int from product_variants x where x.template_id = pv.template_id and x.active and x.id <> pv.id) as geschwister,
+           exists (select 1 from boms b where b.active and (b.variant_id = pv.id or b.template_id = pv.template_id)) as stueckliste,
            on_hand_qty(pv.id) as on_hand, free_to_use(pv.id) as free,
            incoming_qty(pv.id) as incoming, outgoing_qty(pv.id) as outgoing,
            forecasted_qty(pv.id) as forecasted
@@ -86,7 +92,33 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
         subtitle={
           <Link href={`/produkte/${variant.template_id}`}>zum Produkt {variant.product}</Link>
         }
+        actions={
+          // Herauslösen (0143): nur wo es Sinn hat — mehrere Varianten, kein gefertigtes Produkt.
+          hatRolle(user.rollen, 'admin') && variant.geschwister > 0 && !variant.stueckliste ? (
+            <Schublade id="herausloesen" knopf="Als eigenes Produkt herauslösen" knopfKlasse="" titel="Variante als eigenes Produkt herauslösen">
+              <ActionForm action={varianteHerausloesen.bind(null, id)}>
+                <p className="small" style={{ marginTop: 0 }}>
+                  „{label}" wird ein eigenes Produkt. Bestand, Lagerbewegungen, Stücklisten, Belege und die
+                  Artikelnummer bleiben unverändert daran; „{variant.product}" verliert diese Variante.
+                  {variant.shopify_variant_id &&
+                    ` Im Shop bleibt der Artikel Variante von „${variant.product}" — Bestellungen und Bestand laufen weiter, Titel und Preise werden nicht mehr abgeglichen.`}
+                </p>
+                <label className="field">
+                  <span>Name des neuen Produkts</span>
+                  <input name="name" required maxLength={200} placeholder="z. B. Cherry MX2A Silent Red" />
+                </label>
+                <button className="primary" type="submit">Herauslösen</button>
+              </ActionForm>
+            </Schublade>
+          ) : undefined
+        }
       />
+      {variant.herausgeloest && (
+        <div className="notice info">
+          Dieser Artikel ist in KRNL ein eigenes Produkt, im Shop aber Variante eines anderen Produkts
+          (herausgelöst). Bestellungen und Bestand laufen normal; Titel und Preise werden nicht abgeglichen.
+        </div>
+      )}
 
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Stat label="Bestand" value={`${qty(variant.on_hand)} ${variant.uom}`} />

@@ -138,3 +138,24 @@ export function teileZweitangebote(
   }
   return { neu, zweit }
 }
+
+/**
+ * Welches KRNL-Produkt gehört zu einem Shop-Produkt? (0143) Herausgelöste
+ * Varianten — im Shop Variante dieses Produkts, in KRNL ein eigenes Produkt —
+ * zählen nicht: sonst benennte der Shop-Titel („GATERON Switches") das
+ * herausgelöste Produkt („Cherry Silent Red") um. Von den übrigen gewinnt das
+ * Produkt mit den meisten verknüpften Varianten. Sind alle herausgelöst, gibt
+ * es kein Produkt, das der Shop-Titel benennen darf.
+ */
+export function vorlageDesShopProdukts(
+  verknuepfte: { template_id: string; herausgeloest: boolean }[],
+): string | null {
+  const zahl = new Map<string, number>()
+  for (const v of verknuepfte) {
+    if (v.herausgeloest) continue
+    zahl.set(v.template_id, (zahl.get(v.template_id) ?? 0) + 1)
+  }
+  let beste: string | null = null
+  for (const [id, n] of zahl) if (beste === null || n > (zahl.get(beste) ?? 0)) beste = id
+  return beste
+}

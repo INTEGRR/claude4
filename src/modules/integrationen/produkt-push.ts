@@ -220,11 +220,17 @@ export async function aktualisiereProduktInShopify(templateId: string): Promise<
   if (!tpl) return 'Produkt nicht mehr vorhanden'
 
   const varianten = await sql<
-    { id: string; sku: string | null; barcode: string | null; price_extra: number; shopify_variant_id: string | null }[]
-  >`select id, sku, barcode, price_extra, shopify_variant_id
+    { id: string; sku: string | null; barcode: string | null; price_extra: number; shopify_variant_id: string | null; herausgeloest: boolean }[]
+  >`select id, sku, barcode, price_extra, shopify_variant_id, shop_herausgeloest as herausgeloest
     from product_variants where template_id = ${templateId} and active`
-  const verknuepft = varianten.filter((v) => v.shopify_variant_id)
-  if (verknuepft.length === 0) return 'Nicht mit Shopify verknüpft — nichts zu übertragen'
+  // Herausgelöste Varianten (0143) gehören im Shop zu einem ANDEREN Produkt:
+  // Titel, Beschreibung und Preise dieses KRNL-Produkts dürfen es nie überschreiben.
+  const verknuepft = varianten.filter((v) => v.shopify_variant_id && !v.herausgeloest)
+  if (verknuepft.length === 0) {
+    return varianten.some((v) => v.shopify_variant_id)
+      ? 'Im Shop Variante eines anderen Produkts (herausgelöst) — Titel und Preise werden nicht übertragen'
+      : 'Nicht mit Shopify verknüpft — nichts zu übertragen'
+  }
 
   // Produkt-GID über eine verknüpfte Variante ermitteln.
   const kopf = await shopifyGraphQL<{

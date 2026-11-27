@@ -8,6 +8,7 @@ import {
   ordneVariantenZu,
   preisAufteilung,
   teileZweitangebote,
+  vorlageDesShopProdukts,
 } from './produkt-import-logik'
 import { zweitangebotMerken } from './zweitangebote'
 import { plural } from '@/modules/shared/format'
@@ -357,8 +358,8 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
   if (!p?.id) return 'Produkt in Shopify nicht gefunden — übersprungen'
 
   const gids = p.variants.nodes.map((v) => v.id)
-  const verknuepfte = await sql<{ id: string; shopify_variant_id: string; template_id: string }[]>`
-    select id, shopify_variant_id, template_id from product_variants
+  const verknuepfte = await sql<{ id: string; shopify_variant_id: string; template_id: string; herausgeloest: boolean }[]>`
+    select id, shopify_variant_id, template_id, shop_herausgeloest as herausgeloest from product_variants
     where shopify_variant_id in ${sql(gids)}`
 
   if (verknuepfte.length === 0) {
@@ -370,7 +371,20 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
     return `„${p.title}" ${ergebnis === 'angelegt' ? 'im ERP angelegt' : ergebnis === 'verknuepft' ? 'verknüpft' : 'unverändert'}${zweit}`
   }
 
-  const templateId = verknuepfte[0].template_id
+  // Herausgelöste Varianten (0143) sind in KRNL ein eigenes Produkt: der
+  // Shop-Titel und die Shop-Preise gehören dem Produkt der übrigen Varianten.
+  const templateId = vorlageDesShopProdukts(verknuepfte)
+  const herausgeloest = new Set(verknuepfte.filter((v) => v.herausgeloest).map((v) => v.id))
+  if (templateId === null) {
+    for (const sv of p.variants.nodes) {
+      const v = verknuepfte.find((x) => x.shopify_variant_id === sv.id)
+      if (!v) continue
+      await sql`update product_variants
+                set shopify_inventory_item_gid = coalesce(shopify_inventory_item_gid, ${sv.inventoryItem.id})
+                where id = ${v.id}`
+    }
+    return `„${p.title}": alle Varianten sind in KRNL eigene Produkte (herausgelöst) — Titel und Preise bleiben unberührt`
+  }
   const shopVarianten: ShopVarianteRoh[] = p.variants.nodes.map((v) => ({
     id: v.id, sku: v.sku, barcode: v.barcode, price: v.price, optionen: v.selectedOptions,
   }))
@@ -387,6 +401,13 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
   const offen: string[] = []
   for (const sv of p.variants.nodes) {
     const erpId = erpJeGid.get(sv.id)
+    if (erpId && herausgeloest.has(erpId)) {
+      // Eigenes KRNL-Produkt: nur die technische Kopplung nachziehen, weder Codes noch Preis.
+      await sql`update product_variants
+                set shopify_inventory_item_gid = coalesce(shopify_inventory_item_gid, ${sv.inventoryItem.id})
+                where id = ${erpId}`
+      continue
+    }
     if (erpId) {
       await sql`update product_variants
                 set sku = coalesce(${sv.sku}, sku),
