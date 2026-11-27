@@ -49,11 +49,41 @@ export function nameTeil(produkt: string, teile: string[]): string {
   return SONSTIGE
 }
 
+/**
+ * Wert einer Ebene. Attribute heißen nicht bei jedem Produkt gleich
+ * („Switches" bei der NATIVE 75, „Gateron Switches" bei den Black Week
+ * Editions — Befund am ersten Tag): erst der genaue Name, dann die mit „|"
+ * genannten Alternativen, zuletzt ein Attribut, dessen Name den gesuchten
+ * als eigenes Wort enthält.
+ */
+export function ebenenWert(werte: Record<string, string>, ebene: string): string | null {
+  const namen = ebene.split('|').map((n) => n.trim()).filter(Boolean)
+  const schluessel = Object.keys(werte)
+  for (const n of namen) {
+    const genau = schluessel.find((k) => klein(k) === klein(n))
+    if (genau) return werte[genau]
+  }
+  for (const n of namen) {
+    const wort = new RegExp(`(^|[^a-z0-9äöüß])${klein(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9äöüß])`, 'i')
+    const aehnlich = schluessel.find((k) => wort.test(klein(k)))
+    if (aehnlich) return werte[aehnlich]
+  }
+  return null
+}
+
+/** „PC (+20€)" und „PC" sind dieselbe Plate — der Aufpreis aus dem Shop gehört nicht zur Gruppe. */
+export function ohneAufpreis(wert: string): string {
+  return wert.replace(/\s*\(\s*\+[^)]*\)\s*$/, '').trim() || wert
+}
+
 /** Der Pfad einer Zeile durch die Ebenen, z. B. ['HE', 'FR4', 'Gateron - Jade Max']. */
 export function montagePfad(z: MontageZeile, e: MontageEinstellung): string[] {
   const pfad: string[] = []
   if (e.nameTeile.length > 0) pfad.push(nameTeil(z.produkt, e.nameTeile))
-  for (const a of e.attribute) pfad.push(z.werte[a] ?? OHNE)
+  for (const a of e.attribute) {
+    const wert = ebenenWert(z.werte, a)
+    pfad.push(wert === null ? OHNE : ohneAufpreis(wert))
+  }
   // Ohne jede Ebene bleibt das Produkt selbst die Gruppe.
   return pfad.length > 0 ? pfad : [z.produkt]
 }

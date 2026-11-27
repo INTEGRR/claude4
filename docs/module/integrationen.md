@@ -510,6 +510,16 @@ Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`
   Varianten, darum ist jede Gehäusefarbe der NATIVE 75 ein eigenes
   Shopify-Produkt (Phoenix Gold, Cosmic Purple …). `product_templates.projekt`
   fasst sie wie im Shop zusammen; je Pill Ampel und „aktiv x/y · bis N".
+- **Kompakt seit 2026-11-27:** die Karte eines Projekts trägt „Verkauf
+  starten/stoppen" in der Kopfzeile; der gewählte Artikel hat eine
+  Einstellzeile (an Shopify, Shop-Projekt, Gewicht), die gemeinsamen Teile
+  stehen als eine aufklappbare Zeile mit dem Engpass, und die Optionen
+  stehen nebeneinander als dichte Zeilen — je Wert Zustand, Gewicht und
+  „Sperren". Teile-Details eines Werts stehen im Tooltip; im Text steht nur
+  der Engpass, wenn der Wert ausverkauft ist. Ob Sperren und Gewichte für
+  „nur diese Farbe" oder „alle Farben" gelten, ist ein Umschalter über den
+  Optionen (`?alle=1`) statt eines Häkchens je Zeile. Die Beschreibung der
+  Inhalte darunter gilt weiter:
 - **Optionen als Chips** (Keycap Set, Mounting Plate, Switches) für die
   gewählte Farbe: unter jedem Wert die Teile, die er laut Stückliste braucht
   (aus den Variantenfiltern), ihr freier Bestand, die Regel und „reicht für

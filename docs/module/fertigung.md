@@ -166,7 +166,11 @@ Max" — Switches in die Plate).
   ändern"): zuerst Stichwörter im Produktnamen (Standard `HE`, `MX` — als
   eigenes Wort, sonst „Sonstige"), dann Attribute in dieser Reihenfolge
   (Standard `Mounting Plate`, `Switches`). Farben und Keycaps zählen
-  zusammen, solange sie keine Ebene sind.
+  zusammen, solange sie keine Ebene sind. Heißt ein Attribut je Produkt
+  anders („Gateron Switches" statt „Switches"), greift die Ebene trotzdem:
+  genauer Name, dann mit `|` genannte Alternativen (`Switches | Typ`), dann
+  ein Attribut, das den Namen als Wort enthält. Aufpreise aus dem Shop
+  („PC (+20€)") werden aus dem Gruppennamen entfernt.
 - **Darstellung:** je Stichwort eine Spalte mit Summe, darin je Plate ein
   Kasten, darin je Switch ein Balken; darüber die größten Bündel. Alle vier
   Sekunden fragt die Seite `GET /api/montage` ab (nur lesend, Zugriff

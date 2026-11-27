@@ -2038,27 +2038,37 @@ html[data-splash-gesehen] .splash { display: none; }
 }
 
 /* Shop-Verfügbarkeit (0101): Farb-Pills und Options-Chips wie im Shop. */
-.shop-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+.shop-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 .shop-pill {
-  display: inline-flex; flex-direction: column; gap: 2px;
-  padding: 8px 16px; border: 2px solid var(--border); border-radius: 999px;
-  color: var(--text); text-decoration: none; min-width: 120px;
+  display: inline-flex; align-items: baseline; gap: 8px; padding: 4px 12px;
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  color: var(--text); text-decoration: none; font-weight: 600; font-size: 13.5px;
 }
-.shop-pill .klein { font-size: 11px; color: var(--text-muted); }
+.shop-pill .klein { font-size: 11px; font-weight: 400; color: var(--text-muted); }
 .shop-pill.aktiv { border-color: var(--success); }
 .shop-pill.leer { border-color: var(--danger); }
 .shop-pill.gesperrt { border-style: dashed; opacity: 0.7; }
-.shop-pill[aria-current='page'] { box-shadow: 0 0 0 3px var(--accent-soft); border-width: 3px; }
-.shop-option { margin: 16px 0 6px; }
-.shop-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 6px; }
-.shop-chip { border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
-.shop-chip .wert { display: inline-block; font-weight: 600; padding: 4px 14px; border: 1px solid var(--border-strong); border-radius: 999px; }
-.shop-chip .status { margin-top: 6px; }
-.shop-chip .teil, .shop-option .teil { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-.shop-chip.aktiv { border-color: var(--success); }
-.shop-chip.aktiv .wert { border-color: var(--success); }
-.shop-chip.leer { border-color: var(--danger); }
-.shop-chip.gesperrt { border-style: dashed; opacity: 0.75; }
+.shop-pill[aria-current='page'] { box-shadow: 0 0 0 2px var(--accent-soft); border-width: 2px; }
+/* Artikel kompakt (2026-11-27): eine Einstellzeile, Optionen nebeneinander als dichte Zeilen. */
+.shop-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; margin-bottom: 6px; }
+.shop-zeile form { margin: 0; }
+.shop-teile { margin: 6px 0; }
+.shop-teile > summary { cursor: pointer; }
+.shop-teile .teil { font-size: 12px; color: var(--text-muted); margin: 3px 0 0 14px; }
+.shop-optionen { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 4px 22px; margin: 4px 0 8px; align-items: start; }
+.shop-optionsspalte { display: grid; gap: 2px; }
+.shop-wert {
+  display: grid; grid-template-columns: minmax(90px, 1fr) auto auto; align-items: center; gap: 8px;
+  padding: 2px 0 2px 8px; border-left: 3px solid var(--border); min-height: 30px;
+}
+.shop-wert.aktiv { border-left-color: var(--success); }
+.shop-wert.leer { border-left-color: var(--danger); }
+.shop-wert.gesperrt { border-left-style: dashed; opacity: 0.7; }
+.shop-wert-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop-wert-status { font-size: 12px; white-space: nowrap; }
+.shop-wert-steuer { display: inline-flex; align-items: center; gap: 6px; }
+.shop-wert-steuer form { margin: 0; }
+.shop-wert-steuer input { padding: 2px 6px; min-height: 0; height: 26px; }
 
 /* Shopify-Probelauf (0102): Debug-Box unten rechts. */
 .probe-box {

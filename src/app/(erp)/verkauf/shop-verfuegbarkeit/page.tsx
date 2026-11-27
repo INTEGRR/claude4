@@ -67,152 +67,158 @@ const MODI: { wert: Modus; text: string }[] = [
   { wert: 'aus', text: 'aus (ausverkauft)' },
 ]
 
-function Teilzeile({ t }: { t: TeilInfo }) {
+function teilText(t: TeilInfo): string {
   const regel = t.zurueck ? ' · zurückgehalten' : t.oosUnter ? ` · aus unter ${qty(t.oosUnter)}` : ''
-  return (
-    <div className="teil">
-      {t.name}: {qty(t.frei)} frei{regel}
-      {t.je > 1 ? ` · ${qty(t.je)} je Stück` : ''} → <strong>reicht für {qty(t.reicht)}</strong>
-    </div>
-  )
+  return `${t.name}: ${qty(t.frei)} frei${regel}${t.je > 1 ? ` · ${qty(t.je)} je Stück` : ''} → reicht für ${qty(t.reicht)}`
 }
 
-function ShopIst({ verkaufbar, bekannt }: { verkaufbar: number; bekannt: number }) {
-  if (bekannt === 0) return null
-  return (
-    <div className="teil">
-      im Shop jetzt: {verkaufbar === 0 ? 'ausverkauft' : `${qty(verkaufbar)} von ${qty(bekannt)} verkaufbar`}
-    </div>
-  )
+/** Das knappste Teil einer Liste — der Engpass. */
+function engpass(teile: TeilInfo[]): TeilInfo | null {
+  return teile.reduce<TeilInfo | null>((min, t) => (min === null || t.reicht < min.reicht ? t : min), null)
 }
 
-function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: ProjektInfo; darf: boolean }) {
+/**
+ * Ein Artikel, kompakt (2026-11-27): Einstellungen in einer Zeile, die
+ * Optionen nebeneinander als dichte Zeilen — je Wert Zustand, Gewicht und
+ * Sperre; Teile-Details stehen im Tooltip und nur beim Engpass im Text.
+ */
+function ArtikelAnsicht({
+  a,
+  projekt,
+  darf,
+  alleFarben,
+  alleHref,
+}: {
+  a: ArtikelInfo
+  projekt: ProjektInfo
+  darf: boolean
+  alleFarben: boolean
+  alleHref: string
+}) {
   const mehrereFarben = projekt.artikel.length > 1
+  const knapp = engpass(a.gemeinsam)
   return (
     <>
       {darf && (
-        <ActionForm action={artikelSetzen}>
-          <input type="hidden" name="template_id" value={a.id} />
-          <div className="row">
-            <label className="field">
-              <span>{a.name} — an Shopify</span>
-              <Auswahl name="modus" defaultValue={a.modus}>
+        <div className="shop-zeile">
+          <ActionForm action={artikelSetzen}>
+            <input type="hidden" name="template_id" value={a.id} />
+            <span className="actions">
+              <span className="small muted">an Shopify</span>
+              <Auswahl name="modus" defaultValue={a.modus} className="small" aria-label={`${a.name} an Shopify`} style={{ width: 190 }}>
                 {MODI.map((m) => (
                   <option key={m.wert} value={m.wert}>
                     {m.text}
                   </option>
                 ))}
               </Auswahl>
-            </label>
-            <label className="field">
-              <span>Shop-Projekt (Farb-Pills)</span>
-              <input name="projekt" defaultValue={a.projekt ?? ''} placeholder="z. B. NATIVE 75" />
-            </label>
-            <div className="shrink field">
-              <button type="submit">Speichern</button>
-            </div>
-          </div>
-        </ActionForm>
-      )}
-      {darf && (
-        <ActionForm action={gewichtSetzen}>
-          <input type="hidden" name="template_id" value={a.id} />
-          <div className="row" style={{ alignItems: 'flex-end' }}>
-            <label className="field" style={{ maxWidth: 260 }}>
-              <span>Erwartete Nachfrage des Artikels (Gewicht)</span>
-              <input name="gewicht" inputMode="decimal" defaultValue={a.gewicht ?? ''} placeholder="1" />
-            </label>
-            <div className="shrink field">
-              <button type="submit" className="small">Gewicht setzen</button>
-            </div>
-            <p className="muted small" style={{ margin: '0 0 6px', flex: 1 }}>
-              Knappe Teile werden nach Gewicht auf die Varianten verteilt: Artikel × Optionswerte. Doppeltes Gewicht
-              bekommt doppelt so viel; was sich gerade verkauft, bekommt von selbst mehr.
-            </p>
-          </div>
-        </ActionForm>
+              <span className="small muted">Shop-Projekt</span>
+              <input name="projekt" defaultValue={a.projekt ?? ''} placeholder="z. B. NATIVE 75" aria-label="Shop-Projekt" style={{ width: 170 }} />
+              <button type="submit" className="small">Speichern</button>
+            </span>
+          </ActionForm>
+          <ActionForm action={gewichtSetzen}>
+            <input type="hidden" name="template_id" value={a.id} />
+            <span
+              className="actions"
+              title="Erwartete Nachfrage des Artikels. Knappe Teile werden nach Gewicht verteilt: Artikel × Optionswerte. Doppeltes Gewicht bekommt doppelt so viel; was sich gerade verkauft, bekommt von selbst mehr. Leer = 1."
+            >
+              <span className="small muted">Gewicht</span>
+              <input name="gewicht" inputMode="decimal" defaultValue={a.gewicht ?? ''} placeholder="1" aria-label={`Gewicht ${a.name}`} style={{ width: 56 }} />
+              <button type="submit" className="small">OK</button>
+            </span>
+          </ActionForm>
+        </div>
       )}
 
-      {a.gemeinsam.length > 0 && (
-        <div className="shop-option">
-          <div className="mono-label">Gemeinsame Teile (jede Variante)</div>
-          {a.gemeinsam.slice(0, 4).map((t) => (
-            <Teilzeile key={t.id} t={t} />
+      {a.gemeinsam.length > 0 && knapp && (
+        <details className="shop-teile">
+          <summary className="small">
+            <span className="muted">Gemeinsame Teile ({qty(a.gemeinsam.length)}) — Engpass:</span> {knapp.name},{' '}
+            <strong>reicht für {qty(knapp.reicht)}</strong>
+          </summary>
+          {a.gemeinsam.map((t) => (
+            <div key={t.id} className="teil">{teilText(t)}</div>
           ))}
-          {a.gemeinsam.length > 4 && <div className="teil">… und {qty(a.gemeinsam.length - 4)} weitere mit mehr Bestand</div>}
-        </div>
+        </details>
       )}
 
-      {a.optionen.map((o) => (
-        <div key={o.name} className="shop-option">
-          <div className="mono-label">{o.name}</div>
-          <div className="shop-chips">
-            {o.werte.map((w) => {
-              const zustand = a.modus === 'aus' ? 'gesperrt' : w.gesperrt ? 'gesperrt' : w.aktiv > 0 ? 'aktiv' : 'leer'
-              return (
-                <div key={w.ptavId} className={`shop-chip ${zustand}`}>
-                  <span className="wert">{w.name}</span>
-                  <div className="status">
-                    {zustand === 'aktiv' ? (
-                      <Zustand ton="ok">
-                        aktiv · bis {qty(w.maxSoll)}
-                        {w.aktiv < w.varianten ? ` · ${qty(w.aktiv)}/${qty(w.varianten)}` : ''}
-                      </Zustand>
-                    ) : zustand === 'gesperrt' ? (
-                      <Zustand ton="off">{w.gesperrt ? 'gesperrt' : 'Artikel aus'}</Zustand>
-                    ) : (
-                      <Zustand ton="warn">ausverkauft · Material</Zustand>
-                    )}
-                  </div>
-                  {w.teile.map((t) => (
-                    <Teilzeile key={t.id} t={t} />
-                  ))}
-                  <ShopIst verkaufbar={w.shopVerkaufbar} bekannt={w.shopBekannt} />
-                  {darf && a.modus !== 'aus' && (
-                    <ActionForm action={optionSetzen}>
-                      <input type="hidden" name="template_id" value={a.id} />
-                      <input type="hidden" name="ptav_id" value={w.ptavId} />
-                      <input type="hidden" name="gesperrt" value={w.gesperrt ? 'false' : 'true'} />
-                      <div className="actions" style={{ marginTop: 6 }}>
-                        <button type="submit" className={w.gesperrt ? 'small' : 'small danger'}>
-                          {w.gesperrt ? 'Freigeben' : 'Deaktivieren'}
-                        </button>
-                        {mehrereFarben && (
-                          <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                            <input type="checkbox" name="alle_farben" /> alle Farben
-                          </label>
+      {a.optionen.length > 0 && (
+        <>
+          {darf && mehrereFarben && (
+            <div className="small muted" style={{ margin: '8px 0 4px' }}>
+              Sperren und Gewichte gelten für:{' '}
+              <Link href={alleHref} scroll={false} className="btn small" aria-current={alleFarben ? undefined : 'true'}>nur diese Farbe</Link>{' '}
+              <Link href={`${alleHref}${alleHref.includes('?') ? '&' : '?'}alle=1`} scroll={false} className="btn small" aria-current={alleFarben ? 'true' : undefined}>alle Farben</Link>
+            </div>
+          )}
+          <div className="shop-optionen">
+            {a.optionen.map((o) => (
+              <div key={o.name} className="shop-optionsspalte">
+                <div className="mono-label">{o.name}</div>
+                {o.werte.map((w) => {
+                  const zustand = a.modus === 'aus' ? 'gesperrt' : w.gesperrt ? 'gesperrt' : w.aktiv > 0 ? 'aktiv' : 'leer'
+                  const eng = engpass(w.teile)
+                  const tipp = [
+                    ...w.teile.map(teilText),
+                    w.shopBekannt > 0
+                      ? `im Shop jetzt: ${w.shopVerkaufbar === 0 ? 'ausverkauft' : `${qty(w.shopVerkaufbar)} von ${qty(w.shopBekannt)} verkaufbar`}`
+                      : null,
+                  ].filter(Boolean).join('\n')
+                  return (
+                    <div key={w.ptavId} className={`shop-wert ${zustand}`} title={tipp || undefined}>
+                      <span className="shop-wert-name">{w.name}</span>
+                      <span className="shop-wert-status">
+                        {zustand === 'aktiv' ? (
+                          <Zustand ton="ok">
+                            bis {qty(w.maxSoll)}
+                            {w.aktiv < w.varianten ? ` · ${qty(w.aktiv)}/${qty(w.varianten)}` : ''}
+                          </Zustand>
+                        ) : zustand === 'gesperrt' ? (
+                          <Zustand ton="off">{w.gesperrt ? 'gesperrt' : 'Artikel aus'}</Zustand>
+                        ) : (
+                          <Zustand ton="warn">aus{eng ? ` · ${eng.name}` : ' · Material'}</Zustand>
                         )}
-                      </div>
-                    </ActionForm>
-                  )}
-                  {darf && a.modus !== 'aus' && !w.gesperrt && (
-                    <ActionForm action={gewichtSetzen}>
-                      <input type="hidden" name="template_id" value={a.id} />
-                      <input type="hidden" name="ptav_id" value={w.ptavId} />
-                      <div className="actions" style={{ marginTop: 6, alignItems: 'center' }}>
-                        <input
-                          name="gewicht" inputMode="decimal" defaultValue={w.gewicht ?? ''} placeholder="1"
-                          aria-label={`Gewicht ${w.name}`} title="Erwartete Nachfrage (Gewicht) — leer = 1"
-                          style={{ width: 64 }}
-                        />
-                        <button type="submit" className="small">Gewicht</button>
-                        {mehrereFarben && (
-                          <label className="small" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                            <input type="checkbox" name="alle_farben" /> alle Farben
-                          </label>
-                        )}
-                      </div>
-                    </ActionForm>
-                  )}
-                </div>
-              )
-            })}
+                      </span>
+                      {darf && a.modus !== 'aus' && (
+                        <span className="shop-wert-steuer">
+                          {!w.gesperrt && (
+                            <ActionForm action={gewichtSetzen}>
+                              <input type="hidden" name="template_id" value={a.id} />
+                              <input type="hidden" name="ptav_id" value={w.ptavId} />
+                              {alleFarben && <input type="hidden" name="alle_farben" value="on" />}
+                              <span className="actions" style={{ gap: 4 }}>
+                                <input
+                                  name="gewicht" inputMode="decimal" defaultValue={w.gewicht ?? ''} placeholder="1"
+                                  aria-label={`Gewicht ${w.name}`} title="Erwartete Nachfrage (Gewicht) — leer = 1"
+                                  style={{ width: 46 }}
+                                />
+                                <button type="submit" className="small" aria-label={`Gewicht ${w.name} speichern`}>OK</button>
+                              </span>
+                            </ActionForm>
+                          )}
+                          <ActionForm action={optionSetzen}>
+                            <input type="hidden" name="template_id" value={a.id} />
+                            <input type="hidden" name="ptav_id" value={w.ptavId} />
+                            <input type="hidden" name="gesperrt" value={w.gesperrt ? 'false' : 'true'} />
+                            {alleFarben && <input type="hidden" name="alle_farben" value="on" />}
+                            <button type="submit" className={w.gesperrt ? 'small' : 'small danger'}>
+                              {w.gesperrt ? 'Freigeben' : 'Sperren'}
+                            </button>
+                          </ActionForm>
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
           </div>
-        </div>
-      ))}
+        </>
+      )}
 
-      <details className="shop-option">
-        <summary className="small" style={{ cursor: 'pointer' }}>
+      <details className="shop-teile">
+        <summary className="small">
           Varianten einzeln ({qty(a.aktiv)} von {qty(a.varianten.length)} aktiv)
         </summary>
         <TableWrap>
@@ -280,6 +286,8 @@ function ArtikelAnsicht({ a, projekt, darf }: { a: ArtikelInfo; projekt: Projekt
 type Ansicht = 'tastaturen' | 'artikel' | 'zweit'
 type Parameter = {
   a?: string
+  /** „1" = Sperren und Gewichte der Optionswerte gelten für alle Farben des Projekts. */
+  alle?: string
   ansicht?: string
   stl?: string
   shop?: string
@@ -406,13 +414,43 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
       {ansicht === 'tastaturen' && daten.projekte.map((p) => {
         const auswahl = p.artikel.find((a) => a.id === gewaehlt) ?? p.artikel[0]
         return (
-          <Card key={p.name} title={p.name}>
-            <div className="mono-label">{p.artikel.length > 1 ? 'Gehäusefarbe (je ein Shopify-Produkt)' : 'Artikel'}</div>
+          <Card
+            key={p.name}
+            title={
+              <>
+                {p.name}{' '}
+                <span className="small muted" style={{ fontWeight: 400 }}>
+                  · {p.artikel.filter((x) => x.modus !== 'aus').length} von {p.artikel.length} im Verkauf
+                </span>
+              </>
+            }
+            actions={
+              darf && (
+                // Verkauf starten/stoppen für ALLE Artikel der Karte (Release per Knopfdruck).
+                <>
+                  <ActionButton
+                    action={verkaufSchalten.bind(null, p.artikel.map((x) => x.id), true)}
+                    className="small primary"
+                    confirm={`Verkauf starten: ${p.artikel.length === 1 ? 'den Artikel' : `alle ${p.artikel.length} Artikel`} von „${p.name}" auf „berechnet" stellen? Die Regeln greifen, die Mengen gehen an Shopify.`}
+                  >
+                    Verkauf starten
+                  </ActionButton>
+                  <ActionButton
+                    action={verkaufSchalten.bind(null, p.artikel.map((x) => x.id), false)}
+                    className="small danger"
+                    confirm={`Verkauf stoppen: ${p.artikel.length === 1 ? 'den Artikel' : `alle ${p.artikel.length} Artikel`} von „${p.name}" auf „aus" stellen? Shopify bekommt 0.`}
+                  >
+                    Verkauf stoppen
+                  </ActionButton>
+                </>
+              )
+            }
+          >
             <div className="shop-pills">
               {p.artikel.map((a) => (
                 <Link
                   key={a.id}
-                  href={`/verkauf/shop-verfuegbarkeit?a=${a.id}`}
+                  href={`${PFAD}?a=${a.id}${params.alle === '1' ? '&alle=1' : ''}`}
                   scroll={false}
                   className={`shop-pill ${a.modus === 'aus' ? 'gesperrt' : a.aktiv > 0 ? 'aktiv' : 'leer'}`}
                   aria-current={a.id === auswahl.id ? 'page' : undefined}
@@ -424,35 +462,19 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                       : a.modus === 'immer'
                         ? 'immer verfügbar'
                         : a.aktiv > 0
-                          ? `aktiv · ${qty(a.aktiv)}/${qty(a.varianten.length)} · bis ${qty(a.maxSoll)}`
+                          ? `${qty(a.aktiv)}/${qty(a.varianten.length)} · bis ${qty(a.maxSoll)}`
                           : 'ausverkauft'}
                   </span>
                 </Link>
               ))}
             </div>
-            {darf && (
-              // Verkauf starten/stoppen für ALLE Artikel der Karte (Release per Knopfdruck).
-              <div className="actions" style={{ margin: '4px 0 14px' }}>
-                <span className="small muted">
-                  {p.artikel.filter((a) => a.modus !== 'aus').length} von {p.artikel.length} im Verkauf
-                </span>
-                <ActionButton
-                  action={verkaufSchalten.bind(null, p.artikel.map((a) => a.id), true)}
-                  className="small primary"
-                  confirm={`Verkauf starten: ${p.artikel.length === 1 ? 'den Artikel' : `alle ${p.artikel.length} Artikel`} von „${p.name}" auf „berechnet" stellen? Die Regeln greifen, die Mengen gehen an Shopify.`}
-                >
-                  Verkauf starten
-                </ActionButton>
-                <ActionButton
-                  action={verkaufSchalten.bind(null, p.artikel.map((a) => a.id), false)}
-                  className="small danger"
-                  confirm={`Verkauf stoppen: ${p.artikel.length === 1 ? 'den Artikel' : `alle ${p.artikel.length} Artikel`} von „${p.name}" auf „aus" stellen? Shopify bekommt 0.`}
-                >
-                  Verkauf stoppen
-                </ActionButton>
-              </div>
-            )}
-            <ArtikelAnsicht a={auswahl} projekt={p} darf={darf} />
+            <ArtikelAnsicht
+              a={auswahl}
+              projekt={p}
+              darf={darf}
+              alleFarben={params.alle === '1'}
+              alleHref={`${PFAD}?a=${auswahl.id}`}
+            />
           </Card>
         )
       })}

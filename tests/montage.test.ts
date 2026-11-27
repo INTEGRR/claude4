@@ -2,6 +2,7 @@ import test, { describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   type MontageZeile,
+  ebenenWert,
   listeAusText,
   montageBaum,
   montageBuendel,
@@ -42,6 +43,19 @@ describe('Montage-Übersicht: Gruppierung', () => {
     assert.deepEqual(montagePfad(ZEILEN[0], E), ['HE', 'FR4', 'Gateron - Jade Max'])
     assert.deepEqual(montagePfad({ produkt: 'Sonderbau MX', werte: {}, offen: 1 }, E), ['MX', '—', '—'])
     assert.deepEqual(montagePfad(ZEILEN[0], { nameTeile: [], attribute: [] }), ['NATIVE 1800 HE (QWERTZ) Plague Black'])
+  })
+
+  test('Attribute heißen je Produkt anders: genauer Name, Alternative mit |, sonst enthaltenes Wort', () => {
+    const blackWeek = { Edition: 'Blackout', 'Mounting Plate': 'PC (+20€)', 'Gateron Switches': 'Silent Red (+19€)' }
+    assert.equal(ebenenWert(blackWeek, 'Switches'), 'Silent Red (+19€)', '„Gateron Switches" enthält „Switches"')
+    assert.equal(ebenenWert({ Typ: 'Jade Max' }, 'Switches | Typ'), 'Jade Max', 'Alternative')
+    assert.equal(ebenenWert({ 'Keyboard switch type': 'x' }, 'Switches'), null, '„switch" ist nicht „Switches"')
+    assert.equal(ebenenWert({ Switches: 'A', 'Gateron Switches': 'B' }, 'Switches'), 'A', 'der genaue Name gewinnt')
+    assert.deepEqual(
+      montagePfad({ produkt: 'ANVIL NATIVE 75 - Black Week Editions', werte: blackWeek, offen: 2 }, E),
+      ['Sonstige', 'PC', 'Silent Red'],
+      'Aufpreis aus dem Shop gehört nicht zur Gruppe',
+    )
   })
 
   test('Baum: wie viele HE und MX, je Plate, je Switch — Farben und Keycaps zählen zusammen', () => {

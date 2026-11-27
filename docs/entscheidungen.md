@@ -9,6 +9,26 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Shop-Verfügbarkeit kompakt; Montage-Ebenen finden abweichende Attributnamen
+
+Zwei Befunde des Betreibers am selben Tag:
+
+- **„Ein Artikel mit seinen Varianten ist fast Fullscreen."** Die
+  Artikel-Ansicht der Shop-Verfügbarkeit ist jetzt dicht: Verkauf
+  starten/stoppen in der Kartenkopfzeile, eine Einstellzeile, gemeinsame
+  Teile als eine aufklappbare Zeile mit Engpass, Optionen nebeneinander
+  als Zeilen (Zustand, Gewicht, Sperren) statt Kacheln mit Teilelisten.
+  Details wandern in Tooltips; „alle Farben" ist ein Umschalter statt
+  zweier Häkchen je Wert. Gleiche Aktionen, gleiche Daten — rund ein
+  Drittel der Höhe.
+- **Montage-Übersicht zeigte „—" statt des Switches.** Die Black Week
+  Editions nennen das Attribut „Gateron Switches", die Ebene hieß
+  „Switches". Ebenen finden ihr Attribut jetzt über den genauen Namen, über
+  mit `|` genannte Alternativen oder über ein Attribut, das den Namen als
+  Wort enthält; Shop-Aufpreise im Wert („PC (+20€)") zählen nicht zum
+  Gruppennamen, damit „PC" eine Gruppe bleibt (`ebenenWert`,
+  `ohneAufpreis` in `fertigung/montage-logik.ts`, unter Test).
+
 ## 2026-11-27 — Montage-Übersicht: live, gruppiert nach HE/MX → Plate → Switch
 
 Auslöser (Betreiber): Für den Release-Tag eine Übersicht für die Montage —
