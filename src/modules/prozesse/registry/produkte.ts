@@ -250,6 +250,33 @@ export const PRODUKTE = {
     revalidate: ['/produkte/:id'],
   },
 
+  'produkte.produkt_loeschen': {
+    label: 'Produkt löschen',
+    bereich: 'produkte',
+    nurAdmin: true,
+    beschreibung:
+      'Löscht ein Produkt mit seinen Varianten und seiner Stückliste endgültig — sofern es in keinem Beleg ' +
+      'vorkommt (keine Aufträge, Lagerbewegungen, Rechnungen). Kommt es in Belegen vor, wird es stattdessen ' +
+      'archiviert: es verschwindet aus Listen und Auswahlfeldern, die Belege bleiben lesbar, und es lässt sich ' +
+      'wiederherstellen. Abgelehnt wird, solange Bestand da ist, Bewegungen offen sind oder das Produkt ' +
+      'Komponente einer aktiven Stückliste ist.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/produkte'],
+  },
+
+  'produkte.produkt_wiederherstellen': {
+    label: 'Archiviertes Produkt wiederherstellen',
+    bereich: 'produkte',
+    nurAdmin: true,
+    beschreibung: 'Macht ein archiviertes Produkt mit seinen Varianten wieder aktiv.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({}),
+    revalidate: ['/produkte', '/produkte/:id'],
+  },
+
   'produkte.shop_projekt_setzen': {
     label: 'Shop-Projekt für mehrere Produkte setzen',
     bereich: 'produkte',

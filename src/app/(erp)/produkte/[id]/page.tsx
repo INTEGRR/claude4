@@ -8,14 +8,16 @@ import { money, plural, qty } from '@/modules/shared/format'
 import {
   addAttribute,
   addVendorPrice,
+  deleteProduct,
   deleteVendorPrice,
   produktZuShopify,
+  restoreProduct,
   setShopRegeln,
   setVariantenCodes,
   updateProduct,
 } from '../actions'
 import { ShopRegelKarte } from '@/components/shop-regel-karte'
-import { canWrite } from '@/modules/auth/permissions'
+import { canWrite, hatRolle } from '@/modules/auth/permissions'
 import { anlageLuecken } from '@/modules/shared/anlage-luecken'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
@@ -44,6 +46,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       bill_policy: string
       can_be_sold: boolean
       can_be_purchased: boolean
+      active: boolean
       route_buy: boolean
       route_manufacture: boolean
       route_mto: boolean
@@ -85,7 +88,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     }[]
   >`
     select id, display_name, sku, barcode, on_hand_qty(id) as on_hand, shopify_variant_id
-    from product_variants where template_id = ${id} and active order by display_name`
+    from product_variants where template_id = ${id} and (active or not ${tpl.active}) order by display_name`
 
   const attributes = await sql<{ attribute: string; values: string[] }[]>`
     select a.name as attribute,
@@ -190,10 +193,28 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             ) : tpl.route_manufacture ? (
               <Link className="btn" href="/fertigung/stuecklisten">Stückliste anlegen</Link>
             ) : null}
+            {hatRolle(user.rollen, 'admin') &&
+              (tpl.active ? (
+                <ActionButton
+                  action={deleteProduct.bind(null, id)}
+                  className="danger"
+                  confirm={`„${tpl.name}" löschen? Ohne Belege wird das Produkt mit Varianten und Stückliste endgültig gelöscht. Kommt es in Belegen vor, wird es archiviert.`}
+                >
+                  Löschen
+                </ActionButton>
+              ) : (
+                <ActionButton action={restoreProduct.bind(null, id)}>Wiederherstellen</ActionButton>
+              ))}
           </>
         }
       />
 
+      {!tpl.active && (
+        <div className="notice warn">
+          <span className="led warn" /> <strong>Archiviert:</strong> dieses Produkt steht in keiner Liste und keinem
+          Auswahlfeld mehr; alte Belege zeigen es weiter.
+        </div>
+      )}
       {luecken.length > 0 && (
         <div className="notice warn">
           <span className="led warn" /> <strong>Anlage unvollständig{imShop ? ' (Produkt ist im Shop)' : ''}:</strong>

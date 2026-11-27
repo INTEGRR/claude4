@@ -244,6 +244,103 @@ export async function variantenCodes(
   }
 }
 
+/** Tabellen, die ein Löschen verhindern — in Betriebsdeutsch für die Meldung. */
+const BELEG_WORTE: Record<string, string> = {
+  stock_moves: 'Lagerbewegungen',
+  stock_quants: 'Lagerbeständen',
+  stock_valuation_layers: 'der Lagerbewertung',
+  inventory_counts: 'Inventuren',
+  sales_order_lines: 'Verkaufsaufträgen',
+  purchase_order_lines: 'Bestellungen',
+  manufacturing_orders: 'Fertigungsaufträgen',
+  kundenrechnung_positionen: 'Rechnungen',
+  repair_orders: 'Reparaturen',
+  repair_parts: 'Reparaturen',
+  retoure_positionen: 'Retouren',
+  bom_lines: 'Stücklisten',
+  bom_byproducts: 'Stücklisten',
+  unbuild_orders: 'Demontagen',
+  packagings: 'Verpackungen',
+  landed_cost_allocations: 'Bezugsnebenkosten',
+  stock_lot_quants: 'Chargenbeständen',
+}
+
+/**
+ * Produkt löschen (2026-11-27). Regel aus dem Gründungsmodell: gelöscht wird
+ * nur, was in keinem Beleg vorkommt — sonst archiviert. Die Datenbank ist
+ * der Richter (Fremdschlüssel mit „restrict"): erst der Löschversuch, bei
+ * einem Verweis das Archiv. Vorher drei harte Sperren, bei denen auch das
+ * Archivieren Schaden anrichtete: Bestand, offene Bewegungen, Komponente
+ * einer aktiven Stückliste.
+ */
+export async function produktLoeschen(_p: Record<string, never>, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const templateId = ctx.recordId!
+  const [tpl] = await sql<{ name: string; im_shop: boolean; bestand: number; offen: number }[]>`
+    select pt.name,
+           exists (select 1 from product_variants pv where pv.template_id = pt.id and pv.shopify_variant_id is not null) as im_shop,
+           coalesce((select sum(q.on_hand) from stock_quants q
+                      join stock_locations l on l.id = q.location_id and l.type = 'internal'
+                      join product_variants pv on pv.id = q.variant_id where pv.template_id = pt.id), 0)::float as bestand,
+           (select count(*)::int from stock_moves m join product_variants pv on pv.id = m.variant_id
+             where pv.template_id = pt.id and m.state not in ('done', 'cancel')) as offen
+    from product_templates pt where pt.id = ${templateId}`
+  if (!tpl) throw new Error('Produkt nicht gefunden')
+  if (tpl.bestand !== 0) {
+    throw new Error(`${tpl.name} hat noch Bestand (${tpl.bestand}) — erst ausbuchen (Inventur), dann löschen.`)
+  }
+  if (tpl.offen > 0) {
+    throw new Error(
+      `${tpl.name} hat ${plural(tpl.offen, 'offene Lagerbewegung', 'offene Lagerbewegungen')} (Aufträge, Fertigung, Lieferungen) — erst abschließen oder stornieren.`,
+    )
+  }
+  const verbaut = await sql<{ name: string }[]>`
+    select distinct pt.name from bom_lines l
+    join boms b on b.id = l.bom_id and b.active
+    join product_templates pt on pt.id = b.template_id and pt.active
+    join product_variants pv on pv.id = l.component_variant_id
+    where pv.template_id = ${templateId} and b.template_id <> ${templateId}
+    order by pt.name limit 4`
+  if (verbaut.length > 0) {
+    throw new Error(
+      `${tpl.name} ist Komponente in aktiven Stücklisten (${verbaut.slice(0, 3).map((v) => v.name).join(', ')}${verbaut.length > 3 ? ', …' : ''}) — dort erst entfernen oder ersetzen.`,
+    )
+  }
+  const shop = tpl.im_shop ? ' Im Shop bleibt das Produkt bestehen — dort getrennt entfernen.' : ''
+
+  try {
+    await tx(async (t) => {
+      await t`delete from product_templates where id = ${templateId}`
+      await t`select log_event('product_template', ${templateId}, 'note', ${`Produkt gelöscht: ${tpl.name}`}, ${ctx.actor})`
+    })
+    return { text: `„${tpl.name}" gelöscht.${shop}`, link: '/produkte', daten: { art: 'geloescht' } }
+  } catch (err) {
+    const e = err as { code?: string; table_name?: string }
+    if (e.code !== '23503') throw err
+    await tx(async (t) => {
+      await t`update product_variants set active = false where template_id = ${templateId}`
+      await t`update product_templates set active = false where id = ${templateId}`
+      await t`select log_event('product_template', ${templateId}, 'note', ${`Produkt archiviert (kommt in Belegen vor): ${tpl.name}`}, ${ctx.actor})`
+    })
+    const wo = BELEG_WORTE[e.table_name ?? ''] ?? 'Belegen'
+    return {
+      recordId: templateId,
+      text: `„${tpl.name}" kommt in ${wo} vor und wurde deshalb archiviert statt gelöscht — wiederherstellbar über Produkte → Archivierte.${shop}`,
+      link: '/produkte?archiv=1',
+      daten: { art: 'archiviert' },
+    }
+  }
+}
+
+export async function produktWiederherstellen(_p: Record<string, never>, ctx: AktionsKontext): Promise<AktionsErgebnis> {
+  const templateId = ctx.recordId!
+  const [tpl] = await sql<{ name: string }[]>`
+    update product_templates set active = true where id = ${templateId} and not active returning name`
+  if (!tpl) throw new Error('Produkt nicht gefunden oder nicht archiviert')
+  await sql`update product_variants set active = true where template_id = ${templateId}`
+  await sql`select log_event('product_template', ${templateId}, 'note', 'Produkt wiederhergestellt', ${ctx.actor})`
+  return { recordId: templateId, text: `„${tpl.name}" ist wieder aktiv.`, link: `/produkte/${templateId}` }
+}
+
 /** Shop-Projekt für mehrere Produkte auf einmal (Produktliste, 2026-11-27) — reine Anzeige-Gruppierung. */
 export async function shopProjektSetzen(
   p: { template_ids: string[]; projekt: string | null },

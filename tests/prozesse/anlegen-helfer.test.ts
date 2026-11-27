@@ -219,6 +219,64 @@ describe('KI: Stückliste in einem Schritt anlegen, kopieren, Positionen pflegen
   })
 })
 
+describe('Produkt löschen: ohne Belege endgültig, mit Belegen ins Archiv', () => {
+  const lager = async () => (await h.sql<{ id: string }[]>`select id from stock_locations where full_path = 'WH/Stock'`)[0].id
+  const zaehlen = async (variant: string, menge: number) => {
+    const ort = await lager()
+    const [z] = await h.sql<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+      values (${ort}, ${variant}, ${menge},
+              (select coalesce(sum(on_hand), 0) from stock_quants where variant_id = ${variant} and location_id = ${ort}), 'Test')
+      returning id`
+    await h.sql`select inventory_apply(${z.id}, 'test')`
+  }
+  const tplVon = async (variant: string) =>
+    (await h.sql<{ template_id: string }[]>`select template_id from product_variants where id = ${variant}`)[0].template_id
+
+  test('ohne Belege: Produkt, Varianten und Stückliste sind weg', async () => {
+    const id = await board('Wegwerf-Board', ['Yellow'], 'fertigen')
+    await aktion('fertigung.stueckliste_erfassen', undefined, { produkt: 'Wegwerf-Board', positionen: [{ komponente: 'AH-KB', menge: 1 }] })
+    const r = await aktion('produkte.produkt_loeschen', id)
+    assert.match(r.text ?? '', /„Wegwerf-Board" gelöscht/)
+    const [{ n }] = await h.sql<{ n: number }[]>`
+      select (select count(*) from product_templates where id = ${id})::int
+           + (select count(*) from product_variants where template_id = ${id})::int
+           + (select count(*) from boms where template_id = ${id})::int as n`
+    assert.equal(n, 0)
+  })
+
+  test('mit Bestand, als Komponente oder mit offenen Bewegungen: abgelehnt mit Grund', async () => {
+    const teilId = await teil('Lösch-Teil', 'AH-DEL')
+    await zaehlen(teilId, 5)
+    await assert.rejects(aktion('produkte.produkt_loeschen', await tplVon(teilId)), /hat noch Bestand \(5\)/)
+    // AH-KB steckt in der Stückliste von Board C.
+    await assert.rejects(aktion('produkte.produkt_loeschen', await tplVon(await teil('Kabel 2', 'AH-KB2').then(async (k) => {
+      await aktion('fertigung.stueckliste_position_hinzufuegen', v.bomC, { component_variant_id: k, qty: 1, ptav_ids: [] })
+      return k
+    }))), /ist Komponente in aktiven Stücklisten \(Board C\)/)
+  })
+
+  test('mit Belegen (Bestand wieder 0): archiviert, aus der Auswahl verschwunden, wiederherstellbar', async () => {
+    const [teilV] = await h.sql<{ id: string }[]>`select id from product_variants where sku = 'AH-DEL'`
+    await zaehlen(teilV.id, 0)
+    const tpl = await tplVon(teilV.id)
+    const r = await aktion('produkte.produkt_loeschen', tpl)
+    assert.match(r.text ?? '', /kommt in (Lagerbewegungen|Inventuren|Lagerbeständen|der Lagerbewertung) vor und wurde deshalb archiviert/)
+    const aktiv = async () =>
+      (await h.sql<{ t: boolean; v: boolean }[]>`
+        select pt.active as t, pv.active as v from product_templates pt join product_variants pv on pv.template_id = pt.id where pt.id = ${tpl}`)[0]
+    assert.deepEqual({ ...(await aktiv()) }, { t: false, v: false })
+    await assert.rejects(
+      aktion('fertigung.stueckliste_position_hinzufuegen', v.bomC, { component_variant_id: 'AH-DEL', qty: 1, ptav_ids: [] }),
+      /nicht gefunden/,
+      'archivierte Artikel lassen sich nicht mehr verbauen',
+    )
+    await aktion('produkte.produkt_wiederherstellen', tpl)
+    assert.deepEqual({ ...(await aktiv()) }, { t: true, v: true })
+    await assert.rejects(aktion('produkte.produkt_wiederherstellen', tpl), /nicht archiviert/)
+  })
+})
+
 describe('Release per Knopfdruck: Shop-Projekt und Verkauf starten/stoppen', () => {
   const stand = () =>
     h.sql<{ name: string; projekt: string | null; shop_modus: string }[]>`

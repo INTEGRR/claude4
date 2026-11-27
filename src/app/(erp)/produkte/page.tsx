@@ -6,7 +6,9 @@ import { ActionForm } from '@/components/action-button'
 import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { Schublade } from '@/components/schublade'
 import { money, qty } from '@/modules/shared/format'
-import { createProduct, setShopProjekt } from './actions'
+import { createProduct, restoreProduct, setShopProjekt } from './actions'
+import { ActionButton } from '@/components/action-button'
+import { hatRolle } from '@/modules/auth/permissions'
 import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { GroesseBehalten, Seiten } from '@/components/seiten'
@@ -16,13 +18,18 @@ export const dynamic = 'force-dynamic'
 export default async function ProduktePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; seite?: string; pro?: string }>
+  searchParams: Promise<{ q?: string; seite?: string; pro?: string; archiv?: string }>
 }) {
   const user = await requireArea('produkte')
   const params = await searchParams
   const { q } = params
   const seite = seitenParameter(params)
   const darf = canWrite(user.rollen, 'produkte', user.befugnisse)
+  // Archiv-Ansicht (2026-11-27): archivierte Produkte ansehen und wiederherstellen.
+  const archiv = params.archiv === '1'
+  const admin = hatRolle(user.rollen, 'admin')
+  const [{ archiviert }] = await sql<{ archiviert: number }[]>`
+    select count(*)::int as archiviert from product_templates where not active`
 
   const rows = await sql<
     {
@@ -39,14 +46,14 @@ export default async function ProduktePage({
     }[]
   >`
     select count(*) over () as gesamt, pt.id, pt.name, u.name as uom, pt.list_price,
-           (select count(*) from product_variants pv where pv.template_id = pt.id and pv.active)::int as variants,
+           (select count(*) from product_variants pv where pv.template_id = pt.id and (pv.active or ${archiv}))::int as variants,
            coalesce((select sum(on_hand_qty(pv.id)) from product_variants pv
-                      where pv.template_id = pt.id and pv.active), 0) as on_hand,
+                      where pv.template_id = pt.id and (pv.active or ${archiv})), 0) as on_hand,
            exists (select 1 from boms b where b.template_id = pt.id and b.active) as has_bom,
            pt.route_manufacture, pt.route_buy, pt.projekt
     from product_templates pt
     join uoms u on u.id = pt.uom_id
-    where pt.active
+    where pt.active = ${!archiv}
       and (${q ?? null}::text is null or pt.name ilike ${'%' + (q ?? '') + '%'}
            or pt.projekt ilike ${'%' + (q ?? '') + '%'})
     order by pt.name limit ${seite.limit} offset ${seite.offset}`
@@ -112,26 +119,35 @@ export default async function ProduktePage({
       />
 
       <Card tight>
-        <div style={{ padding: 12 }}>
-          <form className="row" style={{ maxWidth: 420 }}>
+        <div className="actions" style={{ padding: 12, alignItems: 'flex-end' }}>
+          <form className="row" style={{ maxWidth: 420, flex: 1, marginBottom: 0 }}>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Suche</span>
               <GroesseBehalten params={params} />
+              {archiv && <input type="hidden" name="archiv" value="1" />}
               <input type="search" name="q" placeholder="Produkt oder Shop-Projekt" defaultValue={q ?? ''} />
             </label>
             <div className="shrink field">
               <button type="submit">Suchen</button>
             </div>
           </form>
+          {(archiviert > 0 || archiv) && (
+            <span className="actions" style={{ marginLeft: 'auto' }}>
+              <Link className="btn small" href="/produkte" aria-current={archiv ? undefined : 'true'}>Aktive</Link>
+              <Link className="btn small" href="/produkte?archiv=1" aria-current={archiv ? 'true' : undefined}>
+                Archivierte <span className="filter-zahl">{archiviert}</span>
+              </Link>
+            </span>
+          )}
         </div>
 
         {rows.length === 0 ? (
-          <Empty>Keine Produkte gefunden.</Empty>
+          <Empty>{archiv ? 'Keine archivierten Produkte.' : 'Keine Produkte gefunden.'}</Empty>
         ) : (
           // Eine Form um die Tabelle: Produkte anhaken und allen auf einmal
           // dasselbe Shop-Projekt geben (2026-11-27) — statt einzeln in der Shop-Verfügbarkeit.
           <ActionForm action={setShopProjekt}>
-            {darf && (
+            {darf && !archiv && (
               <div className="actions" style={{ padding: '0 12px 12px' }}>
                 <span className="mono-label">Für angehakte</span>
                 <input name="projekt" placeholder="Shop-Projekt, z. B. NATIVE 1800" aria-label="Shop-Projekt" style={{ width: 260 }} />
@@ -143,7 +159,7 @@ export default async function ProduktePage({
               <table>
                 <thead>
                   <tr>
-                    {darf && <th style={{ width: 32 }} aria-label="Auswahl" />}
+                    {darf && !archiv && <th style={{ width: 32 }} aria-label="Auswahl" />}
                     <th>Name</th>
                     <th>Shop-Projekt</th>
                     <th className="num">Varianten</th>
@@ -151,12 +167,13 @@ export default async function ProduktePage({
                     <th>Einheit</th>
                     <th className="num">Preis</th>
                     <th>Beschaffung</th>
+                    {archiv && admin && <th />}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
-                      {darf && (
+                      {darf && !archiv && (
                         <td>
                           <input type="checkbox" name="template_id" value={r.id} aria-label={`${r.name} auswählen`} />
                         </td>
@@ -177,6 +194,11 @@ export default async function ProduktePage({
                           {r.route_buy && <span className="badge neutral">Einkauf</span>}
                         </span>
                       </td>
+                      {archiv && admin && (
+                        <td className="num">
+                          <ActionButton action={restoreProduct.bind(null, r.id)} className="small">Wiederherstellen</ActionButton>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -55,6 +55,21 @@ export async function setShopRegeln(formData: FormData): Promise<ActionResult> {
   return serverAktion('verkauf.shop_variante_setzen', { formData })
 }
 
+/**
+ * Löschen bzw. Archivieren. Wirklich gelöscht → zurück zur Liste (die Seite
+ * gibt es nicht mehr); archiviert → die Meldung bleibt stehen und erklärt, warum.
+ */
+export async function deleteProduct(templateId: string): Promise<ActionResult> {
+  const ergebnis = await serverAktion('produkte.produkt_loeschen', { recordId: templateId })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.daten?.art === 'geloescht') redirect('/produkte')
+  return ergebnis
+}
+
+export async function restoreProduct(templateId: string): Promise<ActionResult> {
+  return serverAktion('produkte.produkt_wiederherstellen', { recordId: templateId })
+}
+
 export async function createAttribute(formData: FormData): Promise<ActionResult> {
   return serverAktion('produkte.attribut_anlegen', { formData })
 }

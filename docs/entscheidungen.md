@@ -9,6 +9,31 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-27 — Produkte löschen: ohne Belege endgültig, mit Belegen ins Archiv
+
+Auslöser (Betreiber): „Ich kann keine Produkte löschen." Es gab weder
+Löschen noch Archivieren in der Oberfläche — Testartikel und Dubletten
+blieben für immer in Listen und Auswahlfeldern.
+
+Entschieden — die Regel aus dem Gründungsmodell („deaktivieren statt
+löschen, sobald ein Beleg die Variante referenziert"), jetzt als Knopf:
+- **Ein Knopf „Löschen"** auf der Produktseite (nur Admin). Die Datenbank
+  ist der Richter: erst der Löschversuch (Varianten, Stückliste,
+  Lieferantenpreise fallen mit); verhindert ihn ein Verweis aus einem Beleg
+  (Fremdschlüssel „restrict"), wird stattdessen **archiviert** und die
+  Meldung sagt, wo das Produkt vorkommt.
+- **Drei harte Sperren**, bei denen auch das Archiv Schaden anrichtete:
+  Bestand ungleich 0, offene Lagerbewegungen, Komponente einer aktiven
+  Stückliste — jeweils mit Grund und nächstem Schritt.
+- **Archiv ist umkehrbar:** Produktliste → „Archivierte" →
+  „Wiederherstellen". Die Artikelnummer bleibt am archivierten Produkt.
+- **Shop:** KRNL entfernt nichts im Shop; die Meldung weist darauf hin.
+
+Umsetzung: `produkte.produkt_loeschen`, `produkte.produkt_wiederherstellen`
+(Registry `produkte.ts`), Knopf auf `/produkte/[id]`, Ansicht
+`/produkte?archiv=1`. Test: `tests/prozesse/anlegen-helfer.test.ts`. Doku:
+[module/stammdaten.md](module/stammdaten.md).
+
 ## 2026-11-27 — Die KI kann Stücklisten anlegen, kopieren und pflegen
 
 Auslöser (Betreiber): „Die KI kann keine Stücklisten anlegen! Kopieren
