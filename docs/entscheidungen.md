@@ -9,6 +9,47 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Inventurtag: Suche nach Artikelnummer, Namen ziehen nach, KRNL führt die Artikelnummer
+
+Meldung des Betreibers während der Zählung: in der Inventur „funktionieren
+Varianten nicht", Artikel erscheinen „mehrfach", die Suchfelder finden
+Artikel nicht — „der Abgleich mit Shopify hat's etwas zerhauen". Aus der
+Produktion gelesen, drei Ursachen:
+
+- **Das Auswahlfeld fand nichts über die Artikelnummer.** Die Seite liefert
+  ihre Einträge ohne Artikelnummer mit; die Serversuche (A2) fand den
+  Artikel zwar, das Feld verwarf den Treffer aber, weil der Eintrag schon in
+  der Liste stand. Jetzt ergänzt ein Servertreffer den Suchtext des
+  vorhandenen Eintrags; die Inventur liefert Artikelnummer, Barcode und
+  Produktnamen gleich als Suchtext mit und zeigt die Artikelnummer an.
+- **Variantennamen blieben nach einer Umbenennung alt.** Shopify-Webhooks
+  setzen den Produkttitel; der gespeicherte Anzeigename der Varianten
+  (`display_name`) wurde nur beim Anlegen neu gebildet. Auswahlfelder
+  kannten „GATERON Switches", Listen zeigten „GATERON G Pro 3.0 Switches" —
+  derselbe Artikel sah aus wie zwei, und die Suche nach dem neuen Namen
+  lief ins Leere (15 Varianten). Migration 0145: Trigger ziehen die Namen
+  nach (Produkt, Attribut, Attributwert), bestehende Abweichungen werden
+  einmalig geheilt. Die Serversuche sucht zusätzlich im Produktnamen.
+- **Shopify überschrieb Artikelnummern.** Jedes `products/update` setzte
+  SKU und Barcode der verknüpften Variante auf den Shop-Wert — auch auf
+  einen leeren (`coalesce` hält nur NULL auf, nicht den leeren Text). So
+  wurden aus `SW-GT-CB-001` ein `SH00000117` und aus einer Artikelnummer
+  nichts. **Entscheidung: KRNL führt Artikelnummer und Barcode** — der Shop
+  füllt nur leere Felder. Begründung: die Nummer steht auf Etiketten,
+  Stücklisten und Zähllisten; die Kopplung an den Shop hängt an der
+  gespeicherten Varianten-ID, nicht an der Nummer. Gestern als Frage
+  gestellt, heute durch den Schaden beantwortet.
+
+Nicht angefasst: Bestände und die Zählungen des Tages — keine der
+Änderungen bucht etwas. Bereits überschriebene Artikelnummern stellt die
+Änderung nicht wieder her (die alte Nummer ist nirgends gespeichert); sie
+sind am Präfix `SH0…` zu erkennen und werden von Hand zurückgesetzt.
+
+Nachweis: `tests/auswahl.test.ts`, `tests/prozesse/produkt-import.test.ts`
+(Shop-Update lässt die Artikelnummer stehen, Umbenennung zieht die
+Variantennamen nach). Doku: [module/integrationen.md](module/integrationen.md)
+„Produkt-Sync".
+
 ## 2026-11-27 — Abverkauf (Command Center) und nummerierte Auflage
 
 Wunsch des Betreibers für den Release-Tag: eine Übersicht, die in Echtzeit

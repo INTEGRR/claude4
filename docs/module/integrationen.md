@@ -586,7 +586,10 @@ Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`
   SKU, Barcode.
 - **Shop → ERP**: Webhooks `products/create` und `products/update` gleichen
   sofort ab (`aktualisiereProduktAusShopify`): verknüpfte Produkte folgen dem
-  Shop bei Titel, Preisen und Codes; neue Shop-Varianten werden per
+  Shop bei Titel und Preisen. **Artikelnummer und Barcode führt KRNL**
+  (seit 2026-11-28): der Shop füllt nur, was in KRNL leer ist — er
+  überschreibt und leert nichts. Die Variantennamen ziehen bei einer
+  Umbenennung von selbst nach (Migration 0145). Neue Shop-Varianten werden per
   SKU/Barcode angekoppelt, Unzuordenbares steht als Klärfall am Produkt;
   unbekannte Produkte laufen durch Verknüpfen/Anlegen wie die Erstübernahme.
 - **Erstübernahme**: Knopf auf dem Monitor holt den kompletten Shop-Katalog

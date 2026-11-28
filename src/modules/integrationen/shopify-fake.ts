@@ -301,6 +301,9 @@ export async function fakeShopifyGraphQL<T>(
       }
       case 'products':
         return { products: { nodes: FAKE_PRODUKTE, pageInfo: { hasNextPage: false, endCursor: null } } }
+      case 'node':
+        // aktualisiereProduktAusShopify: ein einzelnes hinterlegtes Produkt.
+        return { node: (FAKE_PRODUKTE as { id?: string }[]).find((x) => x.id === variables.id) ?? null }
       default:
         return null
     }

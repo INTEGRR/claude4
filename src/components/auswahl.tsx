@@ -146,14 +146,22 @@ export function Auswahl({
   const [sucht, setSucht] = useState(false)
   const ausKindern = useMemo(() => optionenAus(children), [children])
   const optionen = useMemo(() => {
-    const bekannt = new Set(ausKindern.map((o) => o.wert))
+    // Ein Servertreffer, den die Seite schon mitgeliefert hat, bringt seinen
+    // Suchtext mit (Artikelnummer, Barcode) — sonst fände „K-013" den Artikel
+    // nicht, obwohl er in der Liste steht (Inventurtag 2026-11-28).
+    const zusatz = new Map(geladen.map((o) => [o.wert, o.suche]))
+    const basis = ausKindern.map((o) => {
+      const mehr = zusatz.get(o.wert)
+      return mehr && !o.suche.includes(mehr) ? { ...o, suche: `${o.suche} ${mehr}` } : o
+    })
+    const bekannt = new Set(basis.map((o) => o.wert))
     const dazu: AuswahlOption[] = []
     for (const o of [...neue, ...geladen]) {
       if (bekannt.has(o.wert)) continue
       bekannt.add(o.wert)
       dazu.push(o)
     }
-    return [...ausKindern, ...dazu]
+    return [...basis, ...dazu]
   }, [ausKindern, neue, geladen])
   const gesteuert = value !== undefined
   const [eigen, setEigen] = useState<string | string[]>(() => startwert(optionen, defaultValue, multiple))

@@ -299,8 +299,8 @@ async function verarbeiteProdukt(p: ShopProdukt): Promise<Verarbeitung> {
       }
       const item = p.variants.nodes.find((v) => v.id === paar.shop.id)
       await t`update product_variants
-              set sku = coalesce(${paar.shop.sku}, sku),
-                  barcode = coalesce(${paar.shop.barcode}, barcode),
+              set sku = coalesce(nullif(sku, ''), nullif(${paar.shop.sku}, '')),
+                  barcode = coalesce(nullif(barcode, ''), nullif(${paar.shop.barcode}, '')),
                   price_extra = ${extra.get(paar.shop.id) ?? 0},
                   shopify_variant_id = ${paar.shop.id},
                   shopify_inventory_item_gid = ${item?.inventoryItem.id ?? null}
@@ -409,9 +409,11 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
       continue
     }
     if (erpId) {
+      // KRNL führt Artikelnummer und Barcode (2026-11-28): der Shop füllt nur,
+      // was hier leer ist — er überschreibt und leert nichts.
       await sql`update product_variants
-                set sku = coalesce(${sv.sku}, sku),
-                    barcode = coalesce(${sv.barcode}, barcode),
+                set sku = coalesce(nullif(sku, ''), nullif(${sv.sku}, '')),
+                    barcode = coalesce(nullif(barcode, ''), nullif(${sv.barcode}, '')),
                     price_extra = ${extra.get(sv.id) ?? 0},
                     shopify_inventory_item_gid = coalesce(shopify_inventory_item_gid, ${sv.inventoryItem.id})
                 where id = ${erpId}`

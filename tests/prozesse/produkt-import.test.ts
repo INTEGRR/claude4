@@ -31,7 +31,7 @@ function variante(n: number, sku: string | null, option: [string, string]) {
   return {
     id: gid('ProductVariant', n),
     sku,
-    barcode: null,
+    barcode: null as string | null,
     price: '299.00',
     selectedOptions: [{ name: option[0], value: option[1] }],
     inventoryItem: { id: gid('InventoryItem', n) },
@@ -201,5 +201,24 @@ describe('Produktübernahme: Bundles und Zweitangebote', () => {
     const zeilen = await h.sql<{ variant_id: string }[]>`
       select variant_id from sales_order_lines where order_id = ${ergebnis.salesOrderId}`
     assert.deepEqual(zeilen.map((z) => z.variant_id), [artikel.id])
+  })
+
+  test('ein Shop-Update überschreibt keine Artikelnummer — und die Variantennamen folgen dem neuen Titel', async () => {
+    const { aktualisiereProduktAusShopify } = await import('../../src/modules/integrationen/produkt-import.ts')
+    // Im Shop: neuer Titel, eine Variante mit anderer SKU, eine mit leerer.
+    fakeProdukteHinterlegen([
+      produkt(3, 'Test Nexus White 2.0', 'Schalter', [
+        { ...variante(31, 'SH00000117', ['Schalter', 'W']), barcode: '4260000000999' },
+        variante(32, '', ['Schalter', 'R']),
+      ]),
+    ])
+    await aktualisiereProduktAusShopify(gid('Product', 3))
+    const danach = await h.sql<{ sku: string | null; barcode: string | null; display_name: string }[]>`
+      select pv.sku, pv.barcode, pv.display_name from product_variants pv
+      join product_templates pt on pt.id = pv.template_id
+      where pt.name = 'Test Nexus White 2.0' and pv.active order by pv.sku`
+    assert.deepEqual(danach.map((v) => v.sku), ['T-WEISS-R', 'T-WEISS-W'], 'KRNL führt die Artikelnummer')
+    assert.equal(danach[1].barcode, '4260000000999', 'ein leerer Barcode wird aus dem Shop gefüllt')
+    assert.ok(danach.every((v) => v.display_name.startsWith('Test Nexus White 2.0 (')), 'Anzeigenamen nachgezogen')
   })
 })

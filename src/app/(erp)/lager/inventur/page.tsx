@@ -31,8 +31,11 @@ export default async function InventurPage() {
     order by c.applied_at nulls first, c.created_at desc
     limit 100`
 
-  const variants = await sql<{ id: string; label: string; on_hand: number }[]>`
-    select pv.id, coalesce(pv.display_name, pt.name) as label, on_hand_qty(pv.id) as on_hand
+  // Artikelnummer und Barcode reisen als Suchtext mit — gezählt wird mit der Nummer in der Hand.
+  const variants = await sql<{ id: string; label: string; sku: string | null; suche: string; on_hand: number }[]>`
+    select pv.id, variant_display_name(pv.id) as label, nullif(pv.sku, '') as sku,
+           pt.name || ' ' || coalesce(pv.sku, '') || ' ' || coalesce(pv.barcode, '') as suche,
+           on_hand_qty(pv.id) as on_hand
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.active and pt.active and pt.type = 'goods'
     order by label limit 500`
@@ -55,8 +58,8 @@ export default async function InventurPage() {
               <Auswahl nachladen="variante-ware" name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label} (Bestand: {qty(v.on_hand)})
+                  <option key={v.id} value={v.id} data-suche={v.suche}>
+                    {v.label}{v.sku ? ` · ${v.sku}` : ''} (Bestand: {qty(v.on_hand)})
                   </option>
                 ))}
               </Auswahl>

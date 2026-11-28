@@ -26,13 +26,13 @@ export async function GET(request: Request) {
     const treffer = await sql<{ wert: string; text: string; suche: string }[]>`
       select pv.id as wert,
              coalesce(pv.display_name, pt.name) || coalesce(' · ' || nullif(pv.sku, ''), '') as text,
-             coalesce(pv.barcode, '') as suche
+             coalesce(pv.barcode, '') || ' ' || pt.name as suche
       from product_variants pv join product_templates pt on pt.id = pv.template_id
       where pv.active and pt.active
         and (${art} <> 'variante-ware' or pt.type = 'goods')
         and (${art} <> 'variante-verkauf' or pt.can_be_sold)
         and (${art} <> 'variante-einkauf' or pt.can_be_purchased)
-        and (select bool_and(lower(coalesce(pv.display_name, pt.name) || ' ' || coalesce(pv.sku, '') || ' ' || coalesce(pv.barcode, '')) like m)
+        and (select bool_and(lower(pt.name || ' ' || coalesce(pv.display_name, '') || ' ' || coalesce(pv.sku, '') || ' ' || coalesce(pv.barcode, '')) like m)
              from unnest(${muster}::text[]) m)
       order by 2 limit 40`
     return NextResponse.json({ treffer })
