@@ -512,8 +512,10 @@ Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`
   fasst sie wie im Shop zusammen; je Pill Ampel und „aktiv x/y · bis N".
 - **Kompakt seit 2026-11-27:** die Karte eines Projekts trägt „Verkauf
   starten/stoppen" in der Kopfzeile; der gewählte Artikel hat eine
-  Einstellzeile (an Shopify, Shop-Projekt, Gewicht), die gemeinsamen Teile
-  stehen als eine aufklappbare Zeile mit dem Engpass, und die Optionen
+  Einstellzeile (an Shopify, Shop-Projekt, Gewicht), die Teile, die in jeder
+  Variante des Artikels verbaut sind („In jeder Variante verbaut", seit
+  2026-11-28 mit dem Hinweis, mit wie vielen weiteren Artikeln ein Teil
+  seinen Bestand teilt), stehen als eine aufklappbare Zeile mit dem Engpass, und die Optionen
   stehen nebeneinander als dichte Zeilen — je Wert Zustand, Gewicht und
   „Sperren". Teile-Details eines Werts stehen im Tooltip; im Text steht nur
   der Engpass, wenn der Wert ausverkauft ist. Ob Sperren und Gewichte für

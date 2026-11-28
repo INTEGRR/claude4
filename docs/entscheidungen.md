@@ -9,6 +9,17 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Shop-Verfügbarkeit: „In jeder Variante verbaut" statt „Gemeinsame Teile"
+
+Frage des Betreibers: „Warum zählt das grüne Gehäuse zu den gemeinsamen
+Teilen?" Gemeint war mit der Überschrift: Teile ohne Bedingung in der
+Stückliste dieses Artikels — sie stecken in jeder Variante der grünen
+Tastatur. Gelesen wurde sie als „von allen Artikeln geteilt". Die Zeile
+heißt jetzt „In jeder Variante verbaut", erklärt sich beim Aufklappen in
+einem Satz und sagt je Teil, mit wie vielen weiteren Artikeln es seinen
+Bestand tatsächlich teilt (das Gehäuse mit keinem, die Schrauben mit fünf).
+Rechnung unverändert.
+
 ## 2026-11-28 — Ein Artikel, eine Seite — mit Aktionsleiste; Stücklisten-Bedingung als Satz
 
 Zwei Rückmeldungen des Betreibers vom Inventurtag:

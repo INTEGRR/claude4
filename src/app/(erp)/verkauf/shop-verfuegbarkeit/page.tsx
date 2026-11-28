@@ -19,7 +19,7 @@ import {
   type TeilInfo,
   shopVerfuegbarkeit,
 } from '@/modules/integrationen/shop-verfuegbarkeit'
-import { dateTime, qty } from '@/modules/shared/format'
+import { dateTime, plural, qty } from '@/modules/shared/format'
 import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
@@ -88,12 +88,15 @@ function ArtikelAnsicht({
   darf,
   alleFarben,
   alleHref,
+  geteilt,
 }: {
   a: ArtikelInfo
   projekt: ProjektInfo
   darf: boolean
   alleFarben: boolean
   alleHref: string
+  /** Teil → in wie vielen Artikeln es steckt (sein Bestand wird unter ihnen aufgeteilt). */
+  geteilt: Map<string, number>
 }) {
   const mehrereFarben = projekt.artikel.length > 1
   const knapp = engpass(a.gemeinsam)
@@ -134,11 +137,21 @@ function ArtikelAnsicht({
       {a.gemeinsam.length > 0 && knapp && (
         <details className="shop-teile">
           <summary className="small">
-            <span className="muted">Gemeinsame Teile ({qty(a.gemeinsam.length)}) — Engpass:</span> {knapp.name},{' '}
+            <span className="muted">In jeder Variante verbaut ({qty(a.gemeinsam.length)} Teile) — Engpass:</span> {knapp.name},{' '}
             <strong>reicht für {qty(knapp.reicht)}</strong>
+            {(geteilt.get(knapp.id) ?? 1) > 1 && (
+              <span className="muted"> · geteilt mit {plural((geteilt.get(knapp.id) ?? 1) - 1, 'weiterem Artikel', 'weiteren Artikeln')}</span>
+            )}
           </summary>
+          <div className="teil">
+            Diese Teile stecken in jeder Variante von „{a.kurz}" — egal, was der Kunde wählt. „Reicht für" zählt
+            Tastaturen. Steckt ein Teil auch in anderen Artikeln, teilen sie sich seinen Bestand.
+          </div>
           {a.gemeinsam.map((t) => (
-            <div key={t.id} className="teil">{teilText(t)}</div>
+            <div key={t.id} className="teil">
+              {teilText(t)}
+              {(geteilt.get(t.id) ?? 1) > 1 && ` · auch in ${plural((geteilt.get(t.id) ?? 1) - 1, 'weiterem Artikel', 'weiteren Artikeln')}`}
+            </div>
           ))}
         </details>
       )}
@@ -314,6 +327,8 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
 
   // Eine Liste statt zweier Karten: Stücklistenteile und Shop-Artikel zusammen, gefiltert, gesucht, geblättert.
   const alle = artikelListe(daten.teile, daten.weitere)
+  // Teil → Anzahl Artikel, in denen es steckt: geteilte Teile begrenzen alle zusammen.
+  const geteilt = new Map(daten.teile.map((t) => [t.id, t.artikel]))
   const stl = jaNein(params.stl)
   const shop = jaNein(params.shop)
   const q = (params.q ?? '').trim()
@@ -474,6 +489,7 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
               darf={darf}
               alleFarben={params.alle === '1'}
               alleHref={`${PFAD}?a=${auswahl.id}`}
+              geteilt={geteilt}
             />
           </Card>
         )
