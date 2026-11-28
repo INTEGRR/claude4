@@ -9,6 +9,7 @@ import {
   preisAufteilung,
   teileZweitangebote,
   vorlageDesShopProdukts,
+  ohneShopZaehlnummern,
 } from './produkt-import-logik'
 import { zweitangebotMerken } from './zweitangebote'
 import { plural } from '@/modules/shared/format'
@@ -76,7 +77,7 @@ async function fetchProductsPage(
     { after },
   )
   return {
-    produkte: data.products.nodes,
+    produkte: data.products.nodes.map(ohneShopZaehlnummern),
     endCursor: data.products.pageInfo.hasNextPage ? data.products.pageInfo.endCursor : null,
   }
 }
@@ -354,8 +355,8 @@ export async function aktualisiereProduktAusShopify(gid: string): Promise<string
      }`,
     { id: gid },
   )
-  const p = data.node
-  if (!p?.id) return 'Produkt in Shopify nicht gefunden — übersprungen'
+  if (!data.node?.id) return 'Produkt in Shopify nicht gefunden — übersprungen'
+  const p = ohneShopZaehlnummern(data.node)
 
   const gids = p.variants.nodes.map((v) => v.id)
   const verknuepfte = await sql<{ id: string; shopify_variant_id: string; template_id: string; herausgeloest: boolean }[]>`

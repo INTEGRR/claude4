@@ -145,3 +145,13 @@ describe('Shop-Produkt → KRNL-Produkt bei herausgelösten Varianten (0143)', a
     assert.equal(vorlageDesShopProdukts([{ template_id: 'cherry', herausgeloest: true }]), null)
   })
 })
+
+test('Shop-Zählnummern sind keine Artikelnummern', async () => {
+  const { artikelnummerAusShop, ohneShopZaehlnummern } = await import('../src/modules/integrationen/produkt-import-logik.ts')
+  assert.deepEqual(
+    ['SH00000117', 'sh00000106', ' SH1 ', 'SW-GT-LS-001', 'SHIRT-001', '', null].map(artikelnummerAusShop),
+    [null, null, null, 'SW-GT-LS-001', 'SHIRT-001', null, null],
+  )
+  const p = ohneShopZaehlnummern({ id: 'x', variants: { nodes: [{ sku: 'SH00000117', id: 1 }, { sku: 'CS-BLU-001', id: 2 }] } })
+  assert.deepEqual(p.variants.nodes, [{ sku: null, id: 1 }, { sku: 'CS-BLU-001', id: 2 }])
+})

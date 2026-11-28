@@ -27,6 +27,8 @@ import { DokumenteKarte } from '@/components/dokumente'
 import { TagEditor } from '@/components/tag-editor'
 import { Auswahl } from '@/components/auswahl'
 import { Schublade } from '@/components/schublade'
+import { AlleVorschlaege, VorschlagKnopf } from '@/components/artikelnummer-vorschlag'
+import { artikelnummerVorschlaege } from '@/modules/shared/artikelnummer'
 import { kurzKategorie, kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
@@ -126,6 +128,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     join uom_categories c on c.id = u.category_id
     where u.active and c.id = (select category_id from uoms where id = ${tpl.uom_id})
     order by u.ratio`
+
+  // Artikelnummer-Vorschlag (2026-11-28) für jede Variante ohne Nummer — nach dem Muster, untereinander eindeutig.
+  const ohneNummer = tpl.active ? variants.filter((v) => !v.sku?.trim()) : []
+  const skuVorschlag =
+    ohneNummer.length === 0
+      ? new Map<string, string>()
+      : artikelnummerVorschlaege(
+          ohneNummer.map((v) => ({ id: v.id, produkt: tpl.name, werte: v.werte ? [v.werte] : [] })),
+          (await sql<{ sku: string }[]>`select sku from product_variants where coalesce(sku, '') <> ''`).map((x) => x.sku),
+        )
 
   const boms = await sql<{ id: string; lines: number }[]>`
     select b.id, (select count(*) from bom_lines l where l.bom_id = b.id)::int as lines
@@ -653,6 +665,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           // Eine Tabelle für alle Artikelnummern und Barcodes (A5) — ein
           // Speichern statt je Variante eine eigene Seite.
           <ActionForm action={setVariantenCodes.bind(null, id)}>
+            {skuVorschlag.size > 0 && (
+              <div className="actions" style={{ padding: '10px 12px 0' }}>
+                <span className="small muted">
+                  {plural(skuVorschlag.size, 'Variante', 'Varianten')} ohne Artikelnummer — KRNL schlägt nach dem
+                  Nummernmuster vor (Art-Merkmal-Modell-Farbe-Laufnummer).
+                </span>
+                <AlleVorschlaege anzahl={skuVorschlag.size} />
+              </div>
+            )}
             <TableWrap>
               <table>
                 <thead>
@@ -671,14 +692,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         <Link href={`/produkte/variante/${v.id}`}>{v.display_name ?? tpl.name}</Link>
                       </td>
                       <td>
-                        <input
-                          className="mono small"
-                          name={`sku:${v.id}`}
-                          defaultValue={v.sku ?? ''}
-                          maxLength={60}
-                          autoComplete="off"
-                          aria-label={`Artikelnummer ${v.display_name ?? tpl.name}`}
-                        />
+                        <span className="actions" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                          <input
+                            className="mono small"
+                            name={`sku:${v.id}`}
+                            defaultValue={v.sku ?? ''}
+                            maxLength={60}
+                            autoComplete="off"
+                            aria-label={`Artikelnummer ${v.display_name ?? tpl.name}`}
+                            placeholder={skuVorschlag.get(v.id)}
+                            data-vorschlag={skuVorschlag.get(v.id)}
+                          />
+                          {skuVorschlag.has(v.id) && variants.length <= 12 && (
+                            <VorschlagKnopf feld={`sku:${v.id}`} vorschlag={skuVorschlag.get(v.id)!} />
+                          )}
+                        </span>
                       </td>
                       <td>
                         <input

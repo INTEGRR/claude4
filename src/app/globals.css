@@ -2443,3 +2443,7 @@ label.field > span.auswahl {
   .abv-zeile.puls-weniger { animation: none; }
   .abv-balken > span, .abv-verlauf > span { transition: none; }
 }
+
+/* Artikelnummer-Vorschlag (2026-11-28): unaufdringlicher Knopf am Feld. */
+.vorschlag-knopf { white-space: nowrap; color: var(--text-muted); border-style: dashed; }
+.vorschlag-knopf:hover { color: var(--text); border-style: solid; }

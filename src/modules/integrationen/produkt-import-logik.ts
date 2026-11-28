@@ -159,3 +159,21 @@ export function vorlageDesShopProdukts(
   for (const [id, n] of zahl) if (beste === null || n > (zahl.get(beste) ?? 0)) beste = id
   return beste
 }
+
+/**
+ * Shop-Zählnummern sind keine Artikelnummern (Betreiber 2026-11-28): der Shop
+ * vergibt von sich aus fortlaufende Nummern („SH00000117"). Sie bedeuten in
+ * KRNL nichts und werden wie „keine Artikelnummer" behandelt — relevant sind
+ * die sprechenden Nummern (SW-GT-LS-001).
+ */
+export const SHOP_ZAEHLNUMMER = /^SH\d+$/i
+
+export function artikelnummerAusShop(sku: string | null | undefined): string | null {
+  const s = sku?.trim()
+  return s && !SHOP_ZAEHLNUMMER.test(s) ? s : null
+}
+
+/** Ein Shop-Produkt, dessen Varianten nur echte Artikelnummern tragen. */
+export function ohneShopZaehlnummern<P extends { variants: { nodes: { sku: string | null }[] } }>(p: P): P {
+  return { ...p, variants: { ...p.variants, nodes: p.variants.nodes.map((v) => ({ ...v, sku: artikelnummerAusShop(v.sku) })) } }
+}

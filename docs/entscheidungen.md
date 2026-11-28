@@ -9,6 +9,49 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Artikelnummern: KRNL schlägt nach dem Muster vor, Shop-Zählnummern zählen nicht
+
+Betreiber beim Aufräumen: „SH-Nummern vollkommen egal, kommen alle raus —
+relevant sind nur die Nummern wie SW-GT-LS-001" und „wir vergeben die SKUs,
+ein Pattern wird immer von KRNL vorgeschlagen — du kannst das Muster
+analysieren".
+
+**Das Muster**, abgelesen aus den 268 vorhandenen Nummern:
+`ART-MERKMAL-MODELL-FARBE-LAUFNUMMER` — z. B. `CS-1800-BLK-001`,
+`MP-F-1800-001`, `PCB-HE-1800-001`, `SW-GT-JMX-001`, `FM-B-N75-001`.
+
+- ART: Teileart (CS Gehäuse, MP Mounting Plate, PCB, SW Switch, KC Keycaps,
+  FM Foam, STB Stabilizer, SCR Schraube, CBL Kabel, CC Coiled Cable, CLIP,
+  QS Quickstart, ST Switch Tester, KCP, AS, BAG, DM, GR, TL, KB Tastatur).
+- MERKMAL: was innerhalb der Art unterscheidet (Plate F/P, PCB HE/MX/ISO/
+  ANSI/DB, Foam B/M, Stabilizer L/S, Switch Hersteller + Typ: GT-JMX).
+- MODELL: N75 oder 1800, entfällt bei Teilen für alle Modelle.
+- FARBE: dreistellig (BLK, BLU, GRE, WHT, YEL, VLT).
+- LAUFNUMMER: dreistellig ab 001 (Tastaturen vierstellig); zählt hoch, wenn
+  die Nummer vergeben ist.
+
+Umsetzung (`src/modules/shared/artikelnummer.ts`, reine Logik):
+
+- **Vorschlag, kein Automatismus.** Der Vorschlag steht als Knopf am Feld
+  und als Platzhalter; vergeben wird, was der Mensch speichert. Stellen:
+  Variantentabelle am Produkt (einzeln und „alle Vorschläge übernehmen"),
+  Variante, Neuanlage in der Produktliste, Kurzanlage in Auswahlfeldern
+  (`GET /api/artikelnummer`). Die KI kennt das Muster aus der
+  Schema-Beschreibung und schlägt danach vor.
+- **Geprüft gegen den Bestand:** der Vorschlag trifft 34 von 34 geprüften
+  echten Nummern — auch die drei überschriebenen Switch-Nummern
+  (`tests/artikelnummer.test.ts`). Unbekannte Teilearten bekommen die
+  Anfangsbuchstaben des Namens; neue Kürzel werden in der Datei ergänzt.
+- **Shop-Zählnummern (`SH` + Ziffern) sind keine Artikelnummern.** Der
+  Import behandelt sie wie „keine Nummer" (`artikelnummerAusShop`) — sonst
+  füllte der Shop die bereinigten Felder beim nächsten Update wieder.
+  Migration 0146 nimmt die vorhandenen heraus (13 Varianten, dazu leere
+  Texte) und setzt die drei belegten Switch-Nummern zurück, wo das Feld
+  leer und die Nummer frei ist. Nur das Feld Artikelnummer — Bestände,
+  Zählungen und Shop-Verknüpfungen bleiben.
+
+Doku: [module/stammdaten.md](module/stammdaten.md) „Artikelnummern".
+
 ## 2026-11-28 — Ein Teil, ein Artikel: alle Varianten eines Produkts als eigene Produkte
 
 Regel des Betreibers: „Alle Switches sollen einzelne Artikel sein … auch

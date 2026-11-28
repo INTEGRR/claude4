@@ -13,6 +13,7 @@ import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { GroesseBehalten, Seiten } from '@/components/seiten'
 import { produktPasst } from '@/modules/shared/artikel-suche'
+import { VorschlagZumNamen } from '@/components/artikelnummer-vorschlag'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,7 @@ export default async function ProduktePage({
                   <label className="field">
                     <span>Artikelnummer</span>
                     <input name="sku" className="mono" placeholder="optional" />
+                    <VorschlagZumNamen />
                   </label>
                   <label className="field">
                     <span>Einheit</span>

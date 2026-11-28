@@ -201,6 +201,30 @@ export function Auswahl({
   const [kurz, setKurz] = useState<Record<string, string> | null>(null)
   const [kurzFehler, setKurzFehler] = useState<string | null>(null)
   const [kurzLaeuft, setKurzLaeuft] = useState(false)
+  // Artikelnummer-Vorschlag in der Kurzanlage (2026-11-28): zum getippten Namen, solange das Feld „sku" leer ist.
+  const [skuVorschlag, setSkuVorschlag] = useState<string | null>(null)
+  const kurzName = kurz?.name?.trim() ?? ''
+  const kurzMitSku = Boolean(kurzanlage?.felder.some((f) => f.name === 'sku'))
+  useEffect(() => {
+    if (!kurzMitSku || kurzName.length < 3) {
+      setSkuVorschlag(null)
+      return
+    }
+    let aktuell = true
+    const warten = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/artikelnummer?name=${encodeURIComponent(kurzName)}`)
+        const daten = (await res.json()) as { vorschlag?: string | null }
+        if (aktuell) setSkuVorschlag(daten.vorschlag ?? null)
+      } catch {
+        // ohne Verbindung kein Vorschlag
+      }
+    }, 300)
+    return () => {
+      aktuell = false
+      clearTimeout(warten)
+    }
+  }, [kurzMitSku, kurzName])
   // Ein gesperrter Platzhalter („— auswählen —") steht im Knopf, nicht in der Liste.
   const waehlbar = useMemo(() => optionen.filter((o) => !(o.wert === '' && o.deaktiviert)), [optionen])
   const { treffer, mehr } = useMemo(
@@ -663,6 +687,16 @@ export function Auswahl({
                     autoComplete="off"
                     onChange={(e) => setKurz({ ...kurz, [f.name]: e.target.value })}
                   />
+                  {f.name === 'sku' && skuVorschlag && !kurz.sku?.trim() && (
+                    <button
+                      type="button"
+                      className="small mono vorschlag-knopf"
+                      title="Vorschlag nach dem Nummernmuster übernehmen"
+                      onClick={() => setKurz({ ...kurz, sku: skuVorschlag })}
+                    >
+                      ← {skuVorschlag}
+                    </button>
+                  )}
                 </div>
               ),
             )}

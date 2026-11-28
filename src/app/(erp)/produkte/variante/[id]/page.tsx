@@ -1,6 +1,8 @@
 import { requireArea } from '@/modules/auth'
 import { canWrite, hatRolle } from '@/modules/auth/permissions'
 import { Schublade } from '@/components/schublade'
+import { VorschlagKnopf } from '@/components/artikelnummer-vorschlag'
+import { artikelnummerVorschlag } from '@/modules/shared/artikelnummer'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sql } from '@/db/client'
@@ -85,6 +87,14 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
   const label = variant.display_name ?? variant.product
   const codeValue = variant.barcode ?? variant.sku
 
+  // Ohne Artikelnummer: Vorschlag nach dem Muster (2026-11-28).
+  const skuVorschlag = variant.sku?.trim()
+    ? null
+    : artikelnummerVorschlag(
+        { produkt: variant.display_name ?? variant.product },
+        (await sql<{ sku: string }[]>`select sku from product_variants where coalesce(sku, '') <> ''`).map((x) => x.sku),
+      )
+
   return (
     <>
       <PageHeader
@@ -144,10 +154,14 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
           <ActionForm action={setVariantCodes.bind(null, id)}>
             <label className="field" style={{ marginBottom: 4 }}>
               <span>Artikelnummer (SKU)</span>
-              <input name="sku" className="mono" defaultValue={variant.sku ?? ''} />
+              <input name="sku" className="mono" defaultValue={variant.sku ?? ''} placeholder={skuVorschlag ?? undefined} />
             </label>
             <div className="small muted" style={{ marginBottom: 12 }}>
-              muss der Shopify-SKU entsprechen
+              {skuVorschlag ? (
+                <>Vorschlag nach dem Nummernmuster: <VorschlagKnopf feld="sku" vorschlag={skuVorschlag} /></>
+              ) : (
+                'Die Artikelnummer führt KRNL — der Shop überschreibt sie nicht.'
+              )}
             </div>
             <label className="field" style={{ marginBottom: 4 }}>
               <span>Barcode</span>
