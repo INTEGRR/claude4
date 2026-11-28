@@ -570,6 +570,13 @@ export async function importShopifyOrder(
     }
   })
   if (storniert) await stornoNachlauf(storniert, 'shopify')
+  // Schnellstopp (feste Menge, Entscheidungslog 2026-11-28): die Bestellung
+  // ist angelegt und reserviert — sofort sperren, was mit ihren Teilen nicht
+  // mehr geht, statt auf den vollen Abgleich zu warten. Stört den Import nie.
+  if (ergebnis.created && ergebnis.salesOrderId) {
+    const { schnellStoppNachBestellung } = await import('./inventar')
+    await schnellStoppNachBestellung(ergebnis.salesOrderId)
+  }
   return ergebnis
 }
 

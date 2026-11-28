@@ -658,6 +658,25 @@ export async function runDueJobs(limit = 20, budgetMs = JOB_BUDGET_MS, spur: Job
         continue
       }
 
+      // Drosselung beim Bestandsabgleich (Entscheidungslog 2026-11-28): kein
+      // Fehlschlag — in fünf Sekunden noch einmal, ohne einen Versuch zu
+      // verbrauchen. Mit der Staffel unten wartete ein gedrosselter Stopp
+      // eine Minute, beim zweiten Mal fünf; im Modus „feste Menge" verkauft
+      // der Shop so lange weiter.
+      if (
+        job.kind === 'shopify_inventory_push' && err instanceof ShopifyError && err.retryable &&
+        /thrott|429/i.test(err.message)
+      ) {
+        uebersprungen++
+        await sql`
+          update integration_jobs set
+            status = 'pending', attempts = greatest(attempts - 1, 0), started_at = null,
+            last_error = 'Shop drosselt — neuer Anlauf in fünf Sekunden',
+            next_run_at = now() + interval '5 seconds'
+          where id = ${job.id}`
+        continue
+      }
+
       failed++
       const message = err instanceof Error ? err.message : String(err)
       const permanent =

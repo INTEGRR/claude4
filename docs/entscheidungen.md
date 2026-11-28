@@ -9,6 +9,101 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Schnellstopp: die feste Menge sperrt mit der Bestellung, nicht erst mit dem vollen Abgleich
+
+Revidiert am Eintrag darunter („Feste Menge") zwei Sätze: „Nach einem Kauf
+füllt KRNL die Variante wieder auf" gilt nicht mehr, und der Stopp wartet
+nicht mehr auf den vollen Abgleich.
+
+Der Betreiber, nachdem die erste Messung zeigte, dass die feste Menge bei
+einem Ansturm überverkauft: „Dann ist dein Code zu lahm oder deine Lösung
+Mist. Den Puffer zu erhöhen ist nicht der Weg. Prüfe deinen Prozess." Und
+zur Schwelle selbst: „Generell bei Stücklistenteilen eine Schwelle von 2×
+die Menge in der gerade reservierten Stückliste. 107 Jade-Switches für das
+Board — dann muss Jade automatisch eine Schwelle von 214 haben, damit wir
+zur Not noch zwei Tastaturen bauen können."
+
+**Die Regel des Betreibers ist der Puffer 2.** `shopify_soll_menge` sperrt
+ein Angebot, sobald nicht mehr als „Puffer" Stück baubar sind — gerechnet
+mit der Stückliste genau dieses Angebots. Bei 107 Switches je Tastatur
+sperrt Puffer 2 unter 321, 214 bleiben. Am Teil ist nichts zu pflegen.
+
+**Gemessen in der Produktion** (die letzten acht Shop-Bestellungen,
+Shopify im Probelauf — gerechnet wird wie scharf, gesendet nichts):
+
+| Schritt | Zeit |
+|---|---|
+| Kauf → erstes Ereignis von Shopify bei KRNL | 2,5 bis 3 s (liegt bei Shopify) |
+| Ereignis → Auftrag angelegt, Material reserviert | 0,2 bis 0,7 s |
+| danach der Abgleich-Job (alle 413 Angebote neu rechnen) | 5 bis 15 s Laufzeit, einmal erst nach 61 s gestartet |
+| allein das Laden aller Angebote, jede Soll-Menge doppelt gerechnet | 2,5 s |
+| die gezielte Frage „welche Teile dieser Bestellung sind knapp?" | 0,02 s |
+
+Der Stopp wäre also 9 bis 19 Sekunden nach dem Kauf gekommen.
+
+**Im Lasttest gefunden** (feste Menge, Puffer 2, vor dem Umbau):
+
+- Nach jedem Verkauf füllte KRNL die Variante wieder auf 999 auf: 86
+  Auffüll-Aufrufe bei 94 Käufen.
+- Bei 15 Käufen je Sekunde waren 67 von 256 Shop-Aufrufen gedrosselt. Der
+  gedrosselte Abgleich wartete nach der Job-Staffel eine Minute — der Stopp
+  der Gehäuse kam 67 Sekunden zu spät, 13 von 70 und 7 von 22 waren
+  überverkauft.
+- Gesenkt wurde in zwei Aufrufen (Shop-Stand lesen, dann mit Vergleichswert
+  senken); kauft dazwischen jemand, lehnt der Shop ab.
+
+**Entschieden** (Betreiber: „ja, auf jeden Fall"):
+
+- **Schnellstopp.** `importShopifyOrder` fragt direkt nach dem Reservieren,
+  ob die Artikel dieser Bestellung ein Teil auf die Schwelle gebracht haben
+  (`shop_stopp_kandidaten`, Migration 0147), und sperrt dann alle Angebote
+  mit diesem Teil in einem Aufruf **absolut** auf 0. 0 kann nichts
+  überverkaufen — darum weder Shop-Stand noch Vergleichswert noch die Sperre
+  des vollen Abgleichs. Dieselbe Abkürzung nach einer Shop-Regel von Hand
+  („für den Shop sperren" im Abverkauf, Schwelle, „aus", Options-Sperre,
+  „Verkauf stoppen").
+- **Kein Auffüllen nach jedem Verkauf.** Gehoben wird erst wieder, wenn ein
+  Angebot unter die Hälfte der festen Menge gefallen ist oder wieder
+  aufmacht. Eine Bestellung ohne knappes Teil kostet keinen Mengen-Aufruf.
+- **Der volle Abgleich** sperrt im Modus „fest" ebenfalls absolut und
+  zuerst, rechnet jede Soll-Menge nur noch einmal, und kommt nach einer
+  Drosselung in fünf Sekunden wieder statt nach einer Minute. Nur er macht
+  wieder auf (Nachschub, Storno, Sperre weg).
+- Der Modus „aufgeteilt" bleibt unverändert: dort gibt eine scheinbare
+  Senkung Bestand frei, der anderswo erhöht wird — Vergleichswert und Buch
+  bleiben nötig.
+
+**Was bleibt, ausdrücklich:** Shopify meldet eine Bestellung erst 2,5 bis 3
+Sekunden nach dem Kauf. Was in dieser Zeit mit demselben Teil gekauft wird,
+sieht KRNL zu spät — dafür bleiben die zwei Stück zurück. „In
+Millisekunden" stoppt nur der Shop selbst, also der Modus „aufgeteilt".
+
+**Vom Betreiber verworfen:** den Puffer für den Ansturm zu erhöhen; die
+„Endzone" (die letzten Stücke eines Teils als echte Menge verteilen, damit
+der Shop sie selbst herunterzählt); ein Schalter „nur ein Shop-Projekt
+melden" — stattdessen werden die Abweichungen zwischen dem, was KRNL melden
+würde, und dem Shop-Stand einzeln behoben. Die letzten Stücke einer Auflage
+(Founders) gibt der Betreiber von Hand frei.
+
+**Nicht vor dem Release:** Stücklisten im Shop selbst (Shopify „variant
+fixed bundles", laut Shopify-Doku bis 30 Bauteile je Variante). Dann zählte
+der Shop geteilte Teile selbst — aber Bestellungen kämen als Bauteil-Zeilen
+an, der Bestellimport müsste das können. Das Bestandsverhalten ist nicht
+geprüft.
+
+**Betrieb am 28.11.**, auf Ansage direkt in der Datenbank der Produktion
+(mit Eintrag in der Ereignisleiste): Meldung auf „feste Menge, Puffer 2,
+Menge 999"; die Shop-Variante „NATIVE 75 Mounting Plate (Material: PC)" an
+`MP-P-ISO-N75-001` gehängt, der doppelte Artikel archiviert.
+
+Nachweis: `tests/prozesse/release-schutz.test.ts` („Feste Menge": kein
+Auffüllen und kein Aufruf nach einem Kauf; Schnellstopp mit genau einem
+absoluten Aufruf, auch mit unbekanntem Kauf darauf; Sperren von Hand; nichts
+im Modus „aufgeteilt"). Lasttest: `lasttest/lauf.ts --modus fest`, Messwerte
+in [release-neue-produkte.md](release-neue-produkte.md) („Lasttest feste
+Menge"). Doku: [module/integrationen.md](module/integrationen.md)
+„Bestandsabgleich".
+
 ## 2026-11-28 — Feste Menge an Shopify: ohne Aufteilung, bei der Schwelle alles mit dem Teil auf 0
 
 Der Betreiber zur Aufteilung (Kontingent, 0136), die je Variante nur 1–3

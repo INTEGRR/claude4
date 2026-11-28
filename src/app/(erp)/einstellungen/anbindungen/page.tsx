@@ -313,9 +313,9 @@ export default async function SchnittstellenPage() {
           und stoppt bei 0 — dafür stehen bei vielen Varianten nur wenige Stück je Variante. <strong>Feste Menge</strong>{' '}
           (wie früher in Odoo) zeigt jede Variante mit dem Deckel, solange das Material reicht: mehr als der Puffer
           baubar und jedes Teil über seiner Schwelle („ausverkauft unter N" am Teil). Darunter gehen alle Varianten
-          mit diesem Teil auf 0 — nach der nächsten Bestellung, das dauert Sekunden, nicht Millisekunden. Was in
-          diesen Sekunden noch verkauft wird, ist überverkauft: Puffer und Schwellen so wählen, dass sie den Ansturm
-          dieser Sekunden abdecken.
+          mit diesem Teil auf 0 — direkt mit der Bestellung, die das Teil dorthin bringt. Shopify meldet eine
+          Bestellung aber erst einige Sekunden nach dem Kauf; was in diesen Sekunden mit demselben Teil gekauft
+          wird, ist überverkauft. Der Puffer ist die Zahl der Stücke, die dafür je Teil zurückbleiben.
         </p>
         {mtoZeilen.length === 0 ? (
           <p className="small muted" style={{ margin: 0 }}>Keine Shopify-gekoppelten Made-to-Order-Artikel.</p>

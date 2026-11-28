@@ -389,10 +389,12 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
       <div className={modus === 'schreiben' ? 'notice info' : 'notice warn'}>
         {mto.modus === 'fest' ? (
           <>
-            <strong>Feste Menge:</strong> jede verfügbare Variante bekommt {mto.deckel} — ohne Aufteilung. Sind nur
-            noch {mto.puffer} oder weniger baubar oder fällt ein Teil unter seine Schwelle („aus unter N"), gehen
-            alle Varianten mit diesem Teil auf 0. Das greift Sekunden nach der Bestellung — was bis dahin verkauft
-            wird, ist überverkauft.
+            <strong>Feste Menge:</strong> jede verfügbare Variante bekommt {mto.deckel} — ohne Aufteilung. Reicht
+            ein Teil nur noch für {mto.puffer} Stück oder weniger (oder fällt es unter seine Schwelle „aus unter
+            N"), gehen alle Varianten mit diesem Teil auf 0 — direkt mit der Bestellung, die es dorthin bringt.
+            Shopify meldet eine Bestellung erst einige Sekunden nach dem Kauf; was in diesen Sekunden mit demselben
+            Teil gekauft wird, ist überverkauft. Nach einem Verkauf wird nicht wieder aufgefüllt, die Zahl zählt
+            herunter.
           </>
         ) : (
           <>

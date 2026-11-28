@@ -41,6 +41,16 @@ Schalter: `--kaeufe N`, `--sekunden S` (Dauer des Ansturms), `--cron S`
 verzögert, 30 % doppelt, 15 % bis 15 s verspätet, halbes Abruf-Kontingent),
 `--heilen` (wartet nach dem Lauf auf ruhige Zeit und gleicht noch einmal ab).
 
+Meldemodus: ohne Schalter „aufgeteilt" (Kontingent). Mit `--modus fest`
+läuft die feste Menge mit Schnellstopp; dazu `--puffer N` (Schwelle in
+Stück je Teil, Standard 2) und `--deckel N` (die feste Menge, Standard 999).
+`--verzug von,bis` setzt, wie viele Millisekunden nach dem Kauf der Nachbau
+die Bestellung meldet — in der Produktion gemessen: `2200,3500`.
+
+```bash
+node --experimental-strip-types lasttest/lauf.ts --modus fest --puffer 2 --verzug 2200,3500 --kaeufe 240 --sekunden 120
+```
+
 `SHOPIFY_API_BASE` lenkt die Admin-API der App auf den Nachbau um. Die
 Variable gibt es nur für diesen Test; in Produktion ist sie nicht gesetzt.
 
@@ -48,7 +58,11 @@ Variable gibt es nur für diesen Test; in Produktion ist sie nicht gesetzt.
 
 - **Teile überverkauft** — hat der Shop mehr verkauft, als Teile da waren?
 - **Augenblicke ohne Deckung** — bot der Shop irgendwann mehr an, als Teile
-  da waren (auch wenn es niemand gekauft hat)?
+  da waren (auch wenn es niemand gekauft hat)? Gilt nur „aufgeteilt": die
+  feste Menge bietet mit Absicht voll an, dort zählt allein der Überverkauf.
+- **Stopp je Teil** — vom Kauf, der ein Teil auf die Schwelle brachte, bis
+  alle Angebote mit diesem Teil auf 0 standen, und wie viele Käufe mit dem
+  Teil in dieser Zeit noch durchgingen.
 - **Bestellungen angekommen und voll reserviert** — jede angenommene
   Bestellung steht in KRNL, mit Fertigungsauftrag und reservierten Teilen.
 - **Shop gegen Kontingent am Ende** — mehr wäre ein Fehler, weniger ist die

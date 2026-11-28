@@ -9,9 +9,9 @@ import assert from 'node:assert/strict'
 import { type Harness, harnessEnde, harnessStart } from './harness.ts'
 import { aktionAusfuehrenGeprueft } from '../../src/modules/prozesse/torwaechter.ts'
 import {
-  fakeBestand, fakeBestandLeeren, fakeBestandSetzen, fakeKauf, fakeOrderHinterlegen,
+  fakeAufrufeLeeren, fakeAufrufZahl, fakeBestand, fakeBestandLeeren, fakeBestandSetzen, fakeKauf, fakeOrderHinterlegen,
 } from '../../src/modules/integrationen/shopify-fake.ts'
-import { buchAbgleichen, inventarAbgleichen, verarbeiteInventarWebhook } from '../../src/modules/integrationen/inventar.ts'
+import { buchAbgleichen, inventarAbgleichen, schnellStopp, verarbeiteInventarWebhook } from '../../src/modules/integrationen/inventar.ts'
 import { importShopifyOrder, processPendingWebhooks } from '../../src/modules/integrationen/import.ts'
 import { packtischBelegLaden } from '../../src/modules/versand/packtisch-beleg.ts'
 import { angehalteneLieferungen } from '../../src/modules/versand/angehalten.ts'
@@ -446,13 +446,78 @@ describe('Feste Menge — wie früher in Odoo: voll anbieten, bei der Schwelle a
     await h.sql`update shopify_inventory_state set buch_ab = buch_ab - interval '1 minute'`
   })
 
-  test('ein Kauf: die Variante wird wieder aufgefüllt, die anderen bleiben', async () => {
+  test('ein Kauf: kein Auffüllen und kein einziger Shop-Aufruf — die Variante zählt einfach weiter herunter', async () => {
+    fakeAufrufeLeeren()
     const einlesen = kaufen('F1', 1)!
     assert.equal(shop('F1'), 998)
     await einlesen()
     await inventarAbgleichen()
-    assert.deepEqual(drei(), [999, 999, 999])
+    assert.deepEqual(drei(), [998, 999, 999], 'nach einem Verkauf wird nicht wieder auf 999 gehoben')
+    assert.equal(await buch('F1'), 998, 'das Buch kennt den Verkauf')
     assert.equal(await gehaeuseFrei(), 11)
+    assert.equal(fakeAufrufZahl('inventoryAdjustQuantities') + fakeAufrufZahl('inventorySetQuantities'), 0,
+      'eine Bestellung ohne knappes Teil kostet keinen Mengen-Aufruf')
+  })
+
+  test('Schnellstopp: die Bestellung, die das Gehäuse auf die Schwelle bringt, sperrt sofort alle drei — ein Aufruf, ohne vollen Abgleich', async () => {
+    await gehaeuseFreiSetzen(3)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [998, 999, 999], '3 baubar liegt über dem Puffer 2: alles bleibt offen')
+    fakeAufrufeLeeren()
+    const einlesen = kaufen('F2', 1)!
+    // Nur der Import — kein inventarAbgleichen(): der Stopp hängt an der Bestellung selbst.
+    await einlesen()
+    assert.equal(await gehaeuseFrei(), 2)
+    assert.deepEqual(drei(), [0, 0, 0], 'nur noch 2 baubar: alle Angebote mit dem Gehäuse sind zu')
+    assert.equal(fakeAufrufZahl('inventorySetQuantities'), 1, 'genau ein absoluter Aufruf für alle drei')
+    assert.equal(fakeAufrufZahl('inventoryAdjustQuantities'), 0, 'kein Lesen-und-Senken mit Vergleichswert')
+    assert.deepEqual([await buch('F1'), await buch('F2'), await buch('F3')], [0, 0, 0])
+    // Der volle Abgleich danach findet nichts mehr zu tun.
+    fakeAufrufeLeeren()
+    await inventarAbgleichen()
+    assert.equal(fakeAufrufZahl('inventorySetQuantities') + fakeAufrufZahl('inventoryAdjustQuantities'), 0)
+    assert.deepEqual(drei(), [0, 0, 0])
+  })
+
+  test('Schnellstopp: ein Kauf, den KRNL noch nicht kennt, hält den Stopp nicht auf', async () => {
+    await gehaeuseFreiSetzen(4)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999], 'Nachschub: der volle Abgleich macht wieder auf')
+    await h.sql`update shopify_inventory_state set buch_ab = buch_ab - interval '1 minute'`
+    const erste = kaufen('F1', 1)!
+    const zweite = kaufen('F3', 1)!
+    // Die zweite Bestellung ist im Shop schon abgezogen, in KRNL noch unbekannt.
+    await erste()
+    assert.deepEqual(drei(), [998, 999, 998], '3 baubar: noch über der Schwelle')
+    await zweite()
+    assert.deepEqual(drei(), [0, 0, 0], 'die Bestellung, die auf 2 bringt, sperrt alle — auch F1 mit dem Kauf darauf')
+    assert.equal(await gehaeuseFrei(), 2)
+  })
+
+  test('Schnellstopp von Hand: „für den Shop sperren" am Teil schließt sofort alles, was es braucht', async () => {
+    await gehaeuseFreiSetzen(40)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999])
+    fakeAufrufeLeeren()
+    await aktion('verkauf.shop_variante_setzen', undefined, { variant_id: gehaeuse, zurueckhalten: true })
+    assert.deepEqual(drei(), [0, 0, 0], 'gesperrt — ohne dass der Abgleich-Job gelaufen ist')
+    assert.equal(fakeAufrufZahl('inventorySetQuantities'), 1)
+    await aktion('verkauf.shop_variante_setzen', undefined, { variant_id: gehaeuse, zurueckhalten: false })
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999], 'Sperre weg: der volle Abgleich macht wieder auf')
+  })
+
+  test('Schnellstopp tut nichts, solange nichts knapp ist — und nichts im Modus „aufgeteilt"', async () => {
+    fakeAufrufeLeeren()
+    assert.equal(await schnellStopp([kb.F1.variante, kb.F2.variante]), 0)
+    assert.equal(fakeAufrufZahl('inventorySetQuantities'), 0)
+    await h.sql`update settings set value = value || ${h.sql.json({ mto: { modus: 'baubar', puffer: 2, deckel: 999 } })}::jsonb where key = 'shopify'`
+    await gehaeuseFreiSetzen(1)
+    assert.equal(await schnellStopp([kb.F1.variante]), 0, 'aufgeteilt: der Shop zählt selbst — kein Schnellstopp')
+    await h.sql`update settings set value = value || ${h.sql.json({ mto: { modus: 'fest', puffer: 2, deckel: 999 } })}::jsonb where key = 'shopify'`
+    await gehaeuseFreiSetzen(40)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999])
   })
 
   test('Puffer erreicht: nur noch 2 baubar — alle drei gehen auf 0; Nachschub hebt sie wieder', async () => {

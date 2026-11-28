@@ -97,6 +97,17 @@ export function fakeLetzterAufruf(operation: string): Record<string, unknown> | 
   return FAKE_AUFRUFE.get(operation)
 }
 
+/** Wie oft eine Operation aufgerufen wurde — damit Tests zeigen können, was ein Ablauf an Shop-Aufrufen kostet. */
+const FAKE_ZAEHLER = new Map<string, number>()
+
+export function fakeAufrufZahl(operation: string): number {
+  return FAKE_ZAEHLER.get(operation) ?? 0
+}
+
+export function fakeAufrufeLeeren(): void {
+  FAKE_ZAEHLER.clear()
+}
+
 /** Shop-Stand der Varianten (productVariants) — für den Vergleich Ist/Soll. */
 let FAKE_SHOP_STAND: unknown[] = []
 
@@ -114,6 +125,7 @@ export async function fakeShopifyGraphQL<T>(
 ): Promise<T> {
   const op = operation(query)
   FAKE_AUFRUFE.set(op, variables)
+  FAKE_ZAEHLER.set(op, (FAKE_ZAEHLER.get(op) ?? 0) + 1)
 
   const antwort = (() => {
     // Beide Order-Anfragen beginnen mit `order(id:)` — unterschieden wird

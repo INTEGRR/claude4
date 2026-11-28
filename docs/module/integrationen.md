@@ -224,9 +224,44 @@ Shopify"; seit 2026-11-28 sauber getrennt):
 - **feste Menge** („wie früher in Odoo"): keine Aufteilung. Jedes Angebot
   bekommt den Deckel (z. B. 999), solange mehr als der Puffer baubar ist und
   jedes Teil über seiner Schwelle liegt („ausverkauft unter N" am Teil).
-  Darunter gehen alle Angebote mit diesem Teil auf 0. Der Stopp kommt von
-  KRNL, Sekunden nach der Bestellung — was bis dahin zu viel verkauft wird,
-  ist überverkauft; Puffer und Schwellen decken das ab.
+  Darunter gehen alle Angebote mit diesem Teil auf 0. Der Puffer ist damit
+  die Regel „so viele Stück bleiben je Teil zurück": Puffer 2 heißt, ein
+  Teil mit 107 Stück je Tastatur sperrt unter 321 — 214 bleiben. Gerechnet
+  wird je Angebot mit dessen eigener Stückliste; am Teil ist nichts zu
+  pflegen.
+
+**Schnellstopp (feste Menge, seit 2026-11-28).** Der Stopp hängt an der
+Bestellung selbst, nicht am vollen Abgleich:
+
+- `importShopifyOrder` ruft nach dem Anlegen und Reservieren
+  `schnellStoppNachBestellung` (inventar.ts). Die Datenbank beantwortet
+  eine einzige Frage (`shop_stopp_kandidaten`, 0147): Haben die Artikel
+  dieser Bestellung ein Teil auf die Schwelle gebracht — und welche
+  Angebote, die laut Buch noch im Shop stehen, bekämen jetzt 0? Im
+  Regelfall (nichts knapp) sind das ein paar Millisekunden und kein
+  Shop-Aufruf.
+- Ist ein Teil knapp, gehen alle Angebote mit diesem Teil in **einem**
+  Aufruf **absolut** auf 0 (`inventorySetQuantities`). 0 kann nichts
+  überverkaufen: kein Lesen des Shop-Stands, kein Vergleichswert, keine
+  Ablehnung wegen eines Kaufs dazwischen, kein Warten auf die Sperre des
+  vollen Abgleichs. Das Buch steht danach auf 0.
+- Dieselbe Abkürzung nach einer Shop-Regel von Hand („für den Shop
+  sperren", Schwelle, „aus", Options-Sperre, Verkauf stoppen): die Aktion
+  sperrt sofort, der Abgleich-Job muss nicht erst laufen.
+- **Kein Auffüllen nach jedem Verkauf.** Der volle Abgleich hebt ein
+  Angebot erst wieder auf die feste Menge, wenn es unter die Hälfte gefallen
+  ist oder wieder aufmacht (Nachschub, Storno, Sperre weg). Eine Bestellung
+  ohne knappes Teil kostet damit keinen Mengen-Aufruf — vorher einen je
+  Bestellung, und im Ansturm das Abruf-Kontingent, das der Stopp braucht.
+- Der volle Abgleich sperrt im Modus „fest" ebenfalls absolut und zuerst;
+  wird er gedrosselt, kommt er nach fünf Sekunden wieder (vorher eine
+  Minute, dann fünf). Wieder aufgemacht wird nur von ihm.
+- **Was bleibt:** Shopify meldet eine Bestellung erst nach dem Kauf (in der
+  Produktion gemessen: 2,5 bis 3 Sekunden). Was in dieser Zeit mit demselben
+  Teil gekauft wird, sieht KRNL zu spät — dafür bleibt der Puffer zurück.
+  In Millisekunden stoppt nur der Shop selbst (Modus „aufgeteilt").
+  Messwerte: [release-neue-produkte.md](../release-neue-produkte.md)
+  („Lasttest feste Menge").
 
 - **Push**: Outbox-Job `shopify_inventory_push`, angestoßen über
   `inventar_abgleich_anstossen()` — **nach jeder importierten

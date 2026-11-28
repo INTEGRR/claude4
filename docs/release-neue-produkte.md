@@ -206,6 +206,53 @@ Grenzen des Tests: ein Server statt vieler Vercel-Instanzen, und der
 Nachbau folgt der Shopify-Dokumentation — die Generalprobe im echten Shop
 ersetzt er nicht.
 
+## Lasttest feste Menge — Ergebnisse vom 28.11.
+
+Derselbe Aufbau wie oben, Meldemodus „feste Menge" (999 je Angebot),
+Schwelle 2 Stück je Teil (`lasttest/lauf.ts --modus fest --puffer 2`). Mit
+`--verzug 2200,3500` meldet der Nachbau eine Bestellung so spät wie der
+echte Shop (in der Produktion gemessen: erstes Ereignis 2,5 bis 3 s nach
+dem Kauf).
+
+**Vor dem Umbau** (voller Abgleich nach jeder Bestellung, Auffüllen nach
+jedem Verkauf):
+
+| Lauf | Teile überverkauft | Schwelle → alle Angebote auf 0 |
+|---|---|---|
+| 15 Käufe/s, ohne Verzug | Gehäuse 83 von 70 und 29 von 22, Switch 13 von 10 Tastaturen | Gehäuse 67 s (67 von 256 Shop-Aufrufen gedrosselt, der Abgleich wartete eine Minute) |
+| 5 Käufe/s, mit Verzug | Gehäuse 72 von 70, Switches 39 von 33 und 12 von 10 | 2,4 bis 3,8 s |
+| 2 Käufe/s, mit Verzug | keines | 2,5 bis 2,8 s |
+| 1 Kauf/s, mit Verzug | keines | 2,3 bis 3,2 s |
+
+86 Auffüll-Aufrufe bei 94 Käufen.
+
+**Nach dem Umbau** (Schnellstopp, kein Auffüllen):
+
+| Lauf | Teile überverkauft | Schwelle → alle Angebote auf 0 | Shop-Aufrufe, gedrosselt |
+|---|---|---|---|
+| 1 Kauf/s (60 je Minute), mit Verzug | keines | 2,3 bis 3,2 s | 142, 0 |
+| 2 Käufe/s (120 je Minute), mit Verzug | keines — ein Gehäuse genau aufgebraucht (70 von 70) | 2,5 bis 2,7 s | 159, 0 |
+| 5 Käufe/s (300 je Minute), mit Verzug | Gehäuse 71 von 70, Switches 36 von 33 und 4 von 3 | 2,3 bis 3,1 s | 157, 0 |
+| 15 Käufe/s, mit Verzug | Gehäuse 78 von 70 und 23 von 22, Switches 43 von 33, 14 von 10, 4 von 3 | 2,6 bis 3,1 s | 165, 0 |
+| 15 Käufe/s, ohne Verzug | Gehäuse keines; Switches 38 von 33 und 11 von 10 | 0,1 bis 0,9 s | 153, 0 |
+| zum Vergleich „aufgeteilt", 15 Käufe/s | keines | der Shop zählt selbst | 247, 112 |
+
+Lesart:
+
+- Der Stopp kommt jetzt praktisch mit der Bestellung: die Zeit „Schwelle →
+  auf 0" ist der Verzug, mit dem der Shop die Bestellung meldet, plus
+  Zehntelsekunden. Gedrosselt wird nichts mehr.
+- Die Schwelle von 2 Stück hält, solange in diesen 2,5 bis 3 Sekunden
+  höchstens zwei weitere Käufe mit demselben Teil kommen — im Test bis 120
+  Käufe je Minute. Der bisherige Rekord des Shops: 8 Bestellungen in einer
+  Minute. Bei 300 je Minute gingen ein bis drei Stück je Teil zu viel
+  durch, bei 900 bis zu zehn.
+- Überverkauf ganz ausschließen kann nur der Shop selbst („aufgeteilt").
+- Grenzen wie oben: Nachbau statt echtem Shop, ein Server, kleines
+  Sortiment (33 Angebote). In der Produktion kommen je Bestellung das
+  Anlegen und Reservieren (gemessen 0,2 bis 0,7 s) und ein echter
+  Shop-Aufruf für den Stopp dazu — der ist dort noch nie gelaufen.
+
 ## Schon geprüft
 
 - Bestand, Reservierungen und Bewertung stimmen mit den Buchungen überein;

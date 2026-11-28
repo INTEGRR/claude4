@@ -2,9 +2,28 @@ import { sql } from '@/db/client'
 import type { AktionsErgebnis, AktionsKontext } from './typen.ts'
 import { plural } from '@/modules/shared/format'
 
-/** Jede Regeländerung wirkt sofort: neu rechnen und melden (im Lesemodus übersprungen). */
-async function anstossen(): Promise<void> {
+/**
+ * Jede Regeländerung wirkt sofort: neu rechnen und melden (im Lesemodus
+ * übersprungen). Mit `variantIds` zuerst der Schnellstopp (feste Menge,
+ * Entscheidungslog 2026-11-28): was durch diese Änderung auf 0 muss — der
+ * Artikel selbst und alle Angebote, die ihn in der Stückliste haben —,
+ * geht sofort, nicht erst mit dem vollen Abgleich.
+ */
+async function anstossen(variantIds: string[] = []): Promise<void> {
+  if (variantIds.length > 0) {
+    const { schnellStoppLeise } = await import('@/modules/integrationen/inventar')
+    await schnellStoppLeise(variantIds)
+  }
   await sql`select inventar_abgleich_anstossen()`
+}
+
+/** Die Shop-Varianten dieser Artikel — für den Schnellstopp nach einer Artikel-Regel. */
+async function shopVarianten(templateIds: string[]): Promise<string[]> {
+  if (templateIds.length === 0) return []
+  const rows = await sql<{ id: string }[]>`
+    select id from product_variants
+    where template_id = any(${templateIds}::uuid[]) and active and shopify_variant_id is not null`
+  return rows.map((r) => r.id)
 }
 
 const MODUS_TEXT: Record<string, string> = {
@@ -30,7 +49,7 @@ export async function shopArtikelSetzen(
     p.projekt !== undefined ? `Projekt: ${p.projekt ?? '—'}` : null,
   ].filter(Boolean)
   await sql`select log_event('product_template', ${p.template_id}, 'note', ${teile.join(', ')}, ${ctx.actor})`
-  await anstossen()
+  await anstossen(await shopVarianten([p.template_id]))
   return { recordId: p.template_id, text: `${t.name}: ${teile.join(', ')}.` }
 }
 
@@ -53,7 +72,7 @@ export async function shopVerkaufSchalten(
     await sql`select log_event('product_template', ${a.id}, 'note',
       ${p.start ? 'Shop: Verkauf gestartet (berechnet)' : 'Shop: Verkauf gestoppt (aus)'}, ${ctx.actor})`
   }
-  await anstossen()
+  await anstossen(await shopVarianten(artikel.map((a) => a.id)))
   const { shopifyModus } = await import('../../integrationen/shopify-modus.ts')
   const shop = await shopifyModus(sql)
   const hinweis =
@@ -103,7 +122,7 @@ export async function shopVarianteSetzen(
       : null,
   ].filter(Boolean)
   await sql`select log_event('product_template', ${v.template_id}, 'note', ${`${v.name}: ${teile.join(', ')}`}, ${ctx.actor})`
-  await anstossen()
+  await anstossen([p.variant_id])
   return { recordId: p.variant_id, text: `${v.name}: ${teile.join(', ')}.` }
 }
 
@@ -142,7 +161,7 @@ export async function shopOptionSetzen(
     await sql`select log_event('product_template', ${z.template_id}, 'note',
       ${`Shop-Option ${z.wert}: ${p.gesperrt ? 'gesperrt' : 'freigegeben'}`}, ${ctx.actor})`
   }
-  await anstossen()
+  await anstossen(await shopVarianten([...new Set(ziele.map((z) => z.template_id))]))
   return {
     recordId: p.template_id,
     text: `${ziele[0].wert} ${p.gesperrt ? 'gesperrt' : 'freigegeben'} in ${plural(ziele.length, 'Artikel', 'Artikeln')}.`,

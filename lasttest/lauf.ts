@@ -30,11 +30,22 @@ const arg = (name: string, standard: number): number => {
 }
 const schalter = (name: string): boolean => process.argv.includes(`--${name}`)
 
+const text = (name: string, standard: string): string => {
+  const i = process.argv.indexOf(`--${name}`)
+  return i >= 0 ? String(process.argv[i + 1]) : standard
+}
+
 const KAEUFE = arg('kaeufe', 300)
 const SEKUNDEN = arg('sekunden', 20)
 const CRON_SEKUNDEN = arg('cron', 20)
 const HEILEN = schalter('heilen')
 const CHAOS = schalter('chaos')
+/** Meldemodus: „baubar" (aufgeteilt, Standard) oder „fest" (feste Menge mit Schnellstopp). */
+const MODUS = text('modus', 'baubar') === 'fest' ? 'fest' : 'baubar'
+const PUFFER = arg('puffer', 2)
+const DECKEL = arg('deckel', MODUS === 'fest' ? 999 : 99)
+/** Webhook-Verzug des Shops in ms, „von,bis" — in der Produktion gemessen: 2200 bis 3500. */
+const VERZUG = text('verzug', '').split(',').map(Number).filter((n) => Number.isFinite(n) && n >= 0)
 const APP = (process.env.APP ?? 'http://127.0.0.1:3100').replace(/\/+$/, '')
 const NACHBAU = (process.env.NACHBAU ?? 'http://127.0.0.1:4010').replace(/\/+$/, '')
 const DB = process.env.DATABASE_URL ?? ''
@@ -136,7 +147,7 @@ async function sortimentAnlegen(): Promise<{ angebote: Angebot[]; teilIds: Map<s
   angebote.push({ gid, item, produkt: `gid://shopify/Product/${nr}`, sku: plateSku, titel: 'Plate FR-4 einzeln', bedarf: [['Plate FR-4', 1]], gewicht: 0.03, lagerartikel: true })
 
   await sql`
-    insert into settings (key, value) values ('shopify', ${sql.json({ modus: 'schreiben', mto: { modus: 'baubar', puffer: 2, deckel: 99 } })})
+    insert into settings (key, value) values ('shopify', ${sql.json({ modus: 'schreiben', mto: { modus: MODUS, puffer: PUFFER, deckel: DECKEL } })})
     on conflict (key) do update set value = settings.value || excluded.value`
   await sql`update shopify_inventory_state set pushed_qty = null, buch_ab = null`
   await sql`delete from shopify_sync_state where key in ('inventory_location', 'inventar_sperre')`
@@ -190,7 +201,7 @@ async function ruheAbwarten(maxSekunden: number): Promise<number> {
 }
 
 async function main(): Promise<void> {
-  console.log(`Lasttest: ${KAEUFE} Käufe in ${SEKUNDEN} s — App ${APP}, Shop-Nachbau ${NACHBAU}`)
+  console.log(`Lasttest: ${KAEUFE} Käufe in ${SEKUNDEN} s — App ${APP}, Shop-Nachbau ${NACHBAU}; Modus ${MODUS}, Puffer ${PUFFER}, Menge ${DECKEL}`)
   const { angebote, teilIds } = await sortimentAnlegen()
   await nachbau('/_einrichten', {
     teile: Object.entries(TEILE).map(([id, anfang]) => ({ id, anfang })),
@@ -198,7 +209,7 @@ async function main(): Promise<void> {
     // --chaos: Webhooks bis vier Sekunden verzögert, 30 % doppelt, 15 % bis 15 s verspätet, halbes Abruf-Kontingent.
     einstellung: CHAOS
       ? { verzoegerung: [50, 4000], doppelt: 0.3, spaetAnteil: 0.15, spaet: 15000, eimer: 1000, auffuellung: 50 }
-      : {},
+      : VERZUG.length === 2 ? { verzoegerung: VERZUG } : {},
   })
   const teilName = new Map([...teilIds].map(([name, id]) => [id, name]))
 
@@ -305,20 +316,52 @@ async function main(): Promise<void> {
     return { teil: t.id, anfang: t.anfang, verkauft: t.verkauft, rest: t.anfang - t.verkauft, freiKrnl: f, angeboten: angebotenEnde.get(t.id) ?? 0 }
   })
 
+  // Feste Menge bietet mit Absicht mehr an, als Teile da sind (jedes Angebot steht voll) — dort zählt
+  // allein, ob am Ende ein Teil überverkauft wurde. Die „Augenblicke ohne Deckung" gelten nur aufgeteilt.
+  const fest = MODUS === 'fest'
   const bestanden =
-    ueberverkauft.length === 0 && verletzungen.length === 0 && fehlend.length === 0 && Number(ungedeckt) === 0 && shopMehr.length === 0
+    ueberverkauft.length === 0 && fehlend.length === 0 && Number(ungedeckt) === 0 &&
+    (fest || (verletzungen.length === 0 && shopMehr.length === 0))
+
+  // Wie schnell kam der Stopp? Je Teil: vom Kauf, der es auf die Schwelle brachte, bis alle Angebote mit dem Teil auf 0 standen.
+  const stopps = ende.teile.flatMap((teil) => {
+    const mit = angebote.filter((a) => !a.lagerartikel && a.bedarf.some(([t]) => t === teil.id))
+    const je = mit[0]?.bedarf.find(([t]) => t === teil.id)?.[1] ?? 1
+    const reicht = Math.floor(teil.anfang / je)
+    const skus = new Set(mit.map((a) => a.sku))
+    const stand = new Map<string, number | null>(mit.map((a) => [a.sku, null]))
+    let verkauft = 0
+    let tSchwelle: number | null = null
+    let tStopp: number | null = null
+    let danach = 0
+    for (const p of [...protokoll].sort((x, y) => x.t - y.t)) {
+      const sku = String(p.sku ?? '')
+      if (!skus.has(sku)) continue
+      if (p.art === 'kauf') {
+        verkauft += Number(p.menge ?? 1)
+        if (tSchwelle === null && reicht - verkauft <= PUFFER) tSchwelle = p.t
+        else if (tSchwelle !== null) danach += Number(p.menge ?? 1)
+      }
+      if (p.art === 'kauf' || p.art === 'differenz' || p.art === 'absolut') {
+        stand.set(sku, Number(p.danach))
+        if (tSchwelle !== null && tStopp === null && [...stand.values()].every((v) => v === 0)) tStopp = p.t
+      }
+    }
+    return tSchwelle === null ? [] : [{ teil: teil.id, reicht, verkauft, danach, sekunden: tStopp === null ? null : (tStopp - tSchwelle) / 1000 }]
+  })
   const z = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 })
   const bericht = [
     `# Lasttest ${new Date(tStart).toISOString().slice(0, 19).replace('T', ' ')} — ${bestanden ? 'BESTANDEN' : 'NICHT BESTANDEN'}`,
     '',
     `${KAEUFE} Kaufversuche in ${SEKUNDEN} s (${z(KAEUFE / SEKUNDEN)} je Sekunde) auf ${angebote.length} Angebote mit geteilten Teilen.${CHAOS ? ' Störmodus: Webhooks stark verzögert, doppelt und verspätet, halbes Abruf-Kontingent.' : ''}`,
+    `Meldemodus: ${fest ? `feste Menge ${DECKEL}, Schwelle ${PUFFER} Stück je Teil (Schnellstopp)` : `aufgeteilt (Kontingent), Puffer ${PUFFER}, Deckel ${DECKEL}`}.${VERZUG.length === 2 ? ` Webhook-Verzug ${VERZUG[0]}–${VERZUG[1]} ms.` : ''}`,
     '',
     '## Ergebnis',
     '',
     '| Prüfung | Ergebnis |',
     '|---|---|',
     `| Teile überverkauft | ${ueberverkauft.length === 0 ? 'keines' : ueberverkauft.map((t) => `${t.id}: ${t.verkauft} von ${t.anfang}`).join('; ')} |`,
-    `| Augenblicke, in denen der Shop mehr anbot, als Teile da waren | ${verletzungen.length} |`,
+    `| Augenblicke, in denen der Shop mehr anbot, als Teile da waren | ${fest ? 'entfällt (feste Menge bietet mit Absicht voll an)' : verletzungen.length} |`,
     `| Käufe angenommen / abgewiesen (ausverkauft) | ${gekauft.length} / ${kaeufe.length - gekauft.length} |`,
     `| Bestellungen in KRNL angekommen | ${gekauft.length - fehlend.length} von ${gekauft.length} |`,
     `| Bestellungen ohne volle Reservierung | ${ungedeckt} |`,
@@ -346,13 +389,18 @@ async function main(): Promise<void> {
     `| Webhook-Ereignisse | ${ereignisse.map((e) => `${e.topic}: ${e.n} ${e.status}${e.versuche > 0 ? ` (bis ${e.versuche} Versuche)` : ''}`).join('; ') || '—'} |`,
     `| Abgleich-Jobs | ${jobs.map((j) => `${j.n} ${j.status}`).join(', ') || '—'} |`,
     '',
+    ...(stopps.length > 0
+      ? ['## Stopp je Teil', '',
+        '| Teil | reicht für | verkauft | Käufe nach der Schwelle | Schwelle → alle Angebote auf 0 |', '|---|---|---|---|---|',
+        ...stopps.map((x) => `| ${x.teil} | ${x.reicht} | ${x.verkauft} | ${x.danach} | ${x.sekunden === null ? '—' : `${z(x.sekunden)} s`} |`), '']
+      : []),
     '## Teile',
     '',
     '| Teil | Anfang | verkauft | Rest | frei in KRNL | im Shop noch angeboten |',
     '|---|---|---|---|---|---|',
     ...teilTabelle.map((t) => `| ${t.teil} | ${t.anfang} | ${t.verkauft} | ${t.rest} | ${t.freiKrnl} | ${t.angeboten} |`),
     '',
-    ...(verletzungen.length > 0
+    ...(verletzungen.length > 0 && !fest
       ? ['## Verletzungen (erste 20)', '', '| Anlass | Teil | angeboten | Rest | zu viel |', '|---|---|---|---|---|',
         ...verletzungen.slice(0, 20).map((v) => `| ${v.anlass} | ${v.teil} | ${v.angeboten} | ${v.rest} | ${v.ueber} |`), '']
       : []),
@@ -360,7 +408,7 @@ async function main(): Promise<void> {
       ? ['## Fehler im Protokoll der App', '', '| Aufruf | Anzahl | Beispiel |', '|---|---|---|',
         ...fehlerLog.map((f) => `| ${f.kind} | ${f.n} | ${(f.beispiel ?? '').replace(/\|/g, '/')} |`), '']
       : []),
-    ...(shopMehr.length > 0
+    ...(shopMehr.length > 0 && !fest
       ? ['## Shop über Kontingent', '', ...shopMehr.map((v) => `- ${v.sku}: Shop ${v.shop}, Kontingent ${v.kontingent}, Buch ${v.buch}`), '']
       : []),
   ].join('\n')
@@ -369,7 +417,7 @@ async function main(): Promise<void> {
   mkdirSync(ordner, { recursive: true })
   const datei = join(ordner, `${new Date(tStart).toISOString().slice(0, 19).replace(/[:T]/g, '-')}.md`)
   writeFileSync(datei, bericht)
-  writeFileSync(datei.replace(/\.md$/, '.json'), JSON.stringify({ kaeufe, protokoll, verletzungen, vergleich, teilTabelle }, null, 1))
+  writeFileSync(datei.replace(/\.md$/, '.json'), JSON.stringify({ kaeufe, protokoll, verletzungen, vergleich, teilTabelle, stopps }, null, 1))
   console.log(`\n${bericht}\n\nBericht: ${datei}`)
   await sql.end()
   process.exit(bestanden ? 0 : 1)

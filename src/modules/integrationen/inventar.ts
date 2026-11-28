@@ -141,13 +141,14 @@ type AngebotZeile = AngebotMitBestand & ProbeFelder & KontingentFelder & { shopi
  * verknüpftes Angebot eines Artikels sind (die meldet der normale Weg).
  */
 async function zweitangeboteLaden(): Promise<AngebotZeile[]> {
-  return sql<AngebotZeile[]>`
+  // Die Soll-Menge wird EINMAL gerechnet (sie ist die teuerste Spalte) —
+  // `frei` startet als Kopie und wird danach zum Ziel der Meldung.
+  const zeilen = await sql<AngebotZeile[]>`
     select z.id as angebot_id, z.variant_id, coalesce(z.sku, v.sku) as sku,
            v.display_name as name, coalesce(z.produkt, 'Zweitangebot') as produkt,
            z.shopify_variant_id,
            z.shopify_inventory_item_gid as inventory_item_gid,
            shopify_soll_menge_zweitangebot(z.id) as soll,
-           shopify_soll_menge_zweitangebot(z.id) as frei,
            z.pushed_qty, z.buch_ab, z.push_fehler_qty,
            ist_made_to_order(z.variant_id) as mto,
            z.mto_eingerichtet_at is not null as eingerichtet,
@@ -163,15 +164,16 @@ async function zweitangeboteLaden(): Promise<AngebotZeile[]> {
     where v.active
       and not exists (select 1 from product_variants x where x.shopify_variant_id = z.shopify_variant_id)
     order by v.sku, z.produkt`
+  for (const z of zeilen) z.frei = z.soll
+  return zeilen
 }
 
 /** Alle Shopify-gekoppelten Varianten mit allem, was Kontingent und Meldung brauchen. */
 async function variantenLaden(): Promise<VarianteZeile[]> {
-  return sql<VarianteZeile[]>`
+  const zeilen = await sql<VarianteZeile[]>`
     select v.id as variant_id, v.sku, v.display_name as name, v.shopify_variant_id,
            v.shopify_inventory_item_gid as inventory_item_gid,
            shopify_soll_menge(v.id) as soll,
-           shopify_soll_menge(v.id) as frei,
            s.pushed_qty, s.buch_ab,
            ist_made_to_order(v.id) as mto,
            s.mto_eingerichtet_at is not null as eingerichtet,
@@ -189,6 +191,8 @@ async function variantenLaden(): Promise<VarianteZeile[]> {
     left join shopify_inventory_state s on s.variant_id = v.id
     where v.shopify_variant_id is not null and v.active
     order by v.sku`
+  for (const z of zeilen) z.frei = z.soll
+  return zeilen
 }
 
 /**
@@ -432,11 +436,13 @@ export async function pushInventar(): Promise<PushErgebnis> {
   if (varianten.length === 0 && angebote.length === 0) return leer
 
   const notAus = await notAusAktiv()
+  const mto = await madeToOrderEinstellung()
+  const fest = !notAus && mto.modus === 'fest'
   let lage: KontingentLage | null = null
   if (notAus) {
     for (const v of varianten) v.frei = 0
     for (const a of angebote) a.frei = 0
-  } else if ((await madeToOrderEinstellung()).modus === 'fest') {
+  } else if (fest) {
     // Feste Menge: keine Aufteilung, also auch kein Budget für Erhöhungen (lage bleibt leer).
     await festeMengeAnwenden(varianten, angebote)
   } else {
@@ -476,9 +482,24 @@ export async function pushInventar(): Promise<PushErgebnis> {
   // Ein Zweitangebot, dessen Menge Shopify schon einmal abgelehnt hat, versucht es erst mit neuer Menge wieder.
   const versuchen = <T extends { art: 'v' | 'z'; frei: number; fehlerMenge: number | null }>(liste: T[]) =>
     liste.filter((p) => p.art === 'v' || p.fehlerMenge === null || Math.floor(Number(p.fehlerMenge)) !== Math.floor(p.frei))
-  const senken = versuchen(plan.senken)
+  // Feste Menge (Schnellstopp, Entscheidungslog 2026-11-28):
+  // - „Auf 0" geht ABSOLUT und zuerst: ein Aufruf, den der Shop nie wegen
+  //   eines Kaufs dazwischen ablehnt — 0 kann nichts überverkaufen. (Im
+  //   Modus „aufgeteilt" bleibt es beim Senken mit Vergleichswert: dort
+  //   würde eine scheinbare Senkung Bestand freigeben, der anderswo erhöht
+  //   wird.)
+  // - Nach einem Verkauf wird NICHT wieder auf die feste Menge aufgefüllt:
+  //   das kostete einen Shop-Aufruf je Bestellung und im Ansturm das
+  //   Abruf-Kontingent, das der Stopp braucht. Aufgefüllt wird erst, wenn
+  //   das Angebot unter die Hälfte gefallen ist (oder wieder aufmacht).
+  const stopp = fest ? versuchen(plan.senken.filter((p) => Math.floor(p.frei) <= 0)) : []
+  const senken = versuchen(fest ? plan.senken.filter((p) => Math.floor(p.frei) > 0) : plan.senken)
   const erst = versuchen(plan.erst)
-  const heben = versuchen(plan.heben)
+  const heben = versuchen(
+    fest
+      ? plan.heben.filter((p) => Math.floor(p.frei) < mto.deckel || Math.round(Number(p.pushed_qty)) <= mto.deckel / 2)
+      : plan.heben,
+  )
 
   const ergebnis = {
     geprueft: varianten.length,
@@ -489,7 +510,7 @@ export async function pushInventar(): Promise<PushErgebnis> {
     angeboteAbgelehnt: 0,
     verschoben: 0,
   }
-  if (senken.length === 0 && erst.length === 0 && heben.length === 0) return ergebnis
+  if (stopp.length === 0 && senken.length === 0 && erst.length === 0 && heben.length === 0) return ergebnis
 
   const location = await locationGid()
   const fehlerArtikel: string[] = []
@@ -502,6 +523,15 @@ export async function pushInventar(): Promise<PushErgebnis> {
   // Buchstand je Angebot, fortgeschrieben mit dem, was der Shop wirklich annimmt.
   const buchNach = new Map<string, number>()
   for (const p of posten) buchNach.set(`${p.art}:${p.id}`, p.pushed_qty === null ? 0 : Math.round(Number(p.pushed_qty)))
+
+  // 0. Stopp (nur feste Menge): absolut auf 0, danach das Buch.
+  for (const block of inBloecken(stopp, 200)) {
+    const r = await blockSenden(block, INVENTAR_MUTATION, (teil) => bestandsInput(teil, location), 'inventorySetQuantities')
+    await buchSetzen(r.gesendet)
+    for (const p of r.gesendet) buchNach.set(`${p.art}:${p.id}`, 0)
+    fehlerArtikel.push(...(await ablehnungenMerken(r.abgelehnt)))
+    zaehlen(r.gesendet, r.abgelehnt)
+  }
 
   // 1. Senken: erst der Shop, dann das Buch — GESÄTTIGT und mit
   //    Vergleichswert. Erst nachsehen, was der Shop zeigt, dann höchstens
@@ -820,6 +850,89 @@ async function madeToOrderEinrichten(
     }
   }
   return fertig.length
+}
+
+// --- Schnellstopp -------------------------------------------------------------------
+
+/**
+ * Schnellstopp (Entscheidungslog 2026-11-28, Modus „feste Menge"): direkt
+ * nachdem eine Bestellung reserviert ist, gezielt sperren, was nicht mehr
+ * geht — ohne den vollen Abgleich abzuwarten.
+ *
+ * Der volle Abgleich rechnet jedes Shop-Angebot neu; in der Produktion
+ * dauerte das 5 bis 15 Sekunden, und so lange verkaufte der Shop die
+ * Angebote mit dem knappen Teil weiter. Hier wird nur gefragt, ob DIESE
+ * Artikel ein Teil unter die Schwelle gebracht haben
+ * (shop_stopp_kandidaten, 0147) — im Regelfall ein paar Millisekunden und
+ * kein Shop-Aufruf. Ist ein Teil knapp, gehen alle Angebote mit diesem
+ * Teil in EINEM Aufruf absolut auf 0: 0 kann nichts überverkaufen, darum
+ * braucht es weder den Shop-Stand noch einen Vergleichswert, und die
+ * Sperre des vollen Abgleichs muss nicht abgewartet werden.
+ *
+ * Wieder aufgemacht (Nachschub, Storno) wird nur vom vollen Abgleich. Im
+ * Modus „aufgeteilt" tut der Schnellstopp nichts — dort zählt der Shop
+ * jedes Kontingent selbst herunter.
+ *
+ * Rückgabe: Zahl der gesperrten Angebote.
+ */
+export async function schnellStopp(variantIds: (string | null | undefined)[]): Promise<number> {
+  const ids = [...new Set(variantIds.filter((id): id is string => Boolean(id)))]
+  if (ids.length === 0) return 0
+  const [lage] = await sql<{ modus: string | null; mto: string | null; not_aus: boolean | null }[]>`
+    select value ->> 'modus' as modus, value -> 'mto' ->> 'modus' as mto,
+           (value -> 'not_aus' ->> 'aktiv')::boolean as not_aus
+    from settings where key = 'shopify'`
+  if (lage?.modus !== 'schreiben' || lage.mto !== 'fest' || lage.not_aus === true) return 0
+
+  const kandidaten = await sql<{ art: 'v' | 'z'; id: string; inventory_item_gid: string | null }[]>`
+    select art, id, inventory_item_gid from shop_stopp_kandidaten(${ids}::uuid[])`
+  const posten: Posten[] = kandidaten
+    .filter((k) => k.inventory_item_gid)
+    .map((k) => ({ art: k.art, id: k.id, inventory_item_gid: k.inventory_item_gid, frei: 0 }))
+  if (posten.length === 0) return 0
+
+  const location = await locationGid()
+  const gestoppt: Posten[] = []
+  for (const block of inBloecken(posten, 200)) {
+    const r = await blockSenden(block, INVENTAR_MUTATION, (teil) => bestandsInput(teil, location), 'inventorySetQuantities')
+    await buchSetzen(r.gesendet)
+    await ablehnungenMerken(r.abgelehnt)
+    gestoppt.push(...r.gesendet)
+  }
+  // Fürs Auge (Shop-Verfügbarkeit): das Ziel dieser Angebote ist jetzt 0.
+  const v = gestoppt.filter((p) => p.art === 'v').map((p) => p.id)
+  const z = gestoppt.filter((p) => p.art === 'z').map((p) => p.id)
+  if (v.length > 0) {
+    await sql`update shopify_inventory_state set kontingent = 0, kontingent_at = now() where variant_id = any(${v}::uuid[])`
+  }
+  if (z.length > 0) {
+    await sql`update shopify_zweitangebote set kontingent = 0, kontingent_at = now() where id = any(${z}::uuid[])`
+  }
+  return gestoppt.length
+}
+
+/**
+ * Schnellstopp, der nie stört: für Aufrufer mitten in einem anderen Ablauf
+ * (Bestellimport, Shop-Regel geändert). Scheitert er — Shop gedrosselt,
+ * Verbindung weg —, holt der volle Abgleich es nach.
+ */
+export async function schnellStoppLeise(variantIds: (string | null | undefined)[]): Promise<number> {
+  try {
+    return await schnellStopp(variantIds)
+  } catch {
+    return 0
+  }
+}
+
+/** Schnellstopp für die Artikel einer eben importierten Bestellung — leise, wie schnellStoppLeise. */
+export async function schnellStoppNachBestellung(salesOrderId: string): Promise<number> {
+  try {
+    const artikel = await sql<{ variant_id: string }[]>`
+      select distinct variant_id from sales_order_lines where order_id = ${salesOrderId} and variant_id is not null`
+    return await schnellStopp(artikel.map((a) => a.variant_id))
+  } catch {
+    return 0
+  }
 }
 
 // --- Abgleich mit Sperre und Nachlauf ---------------------------------------------
