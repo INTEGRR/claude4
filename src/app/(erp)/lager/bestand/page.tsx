@@ -8,6 +8,7 @@ import { scrapProduct } from '../actions'
 import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { GroesseBehalten, Seiten } from '@/components/seiten'
+import { artikelPasst } from '@/modules/shared/artikel-suche'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,9 +45,7 @@ export default async function BestandPage({
     join product_templates pt on pt.id = pv.template_id
     join uoms u on u.id = pt.uom_id
     where pv.active and pt.active and pt.type = 'goods'
-      and (${q ?? null}::text is null
-           or coalesce(pv.display_name, pt.name) ilike ${'%' + (q ?? '') + '%'}
-           or coalesce(pv.sku, '') ilike ${'%' + (q ?? '') + '%'})
+      and ${artikelPasst(q)}
       -- Filter in der Abfrage (F3) — sonst wirkte er nur auf die aktuelle Seite.
       and (${filter ?? null}::text is distinct from 'unterdeckung' or forecasted_qty(pv.id) < 0)
     order by product

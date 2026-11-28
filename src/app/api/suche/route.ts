@@ -5,6 +5,7 @@ import { canAccess, schrittRollenErfuellt } from '@/modules/auth/permissions'
 import { registrierteAktion } from '@/modules/prozesse/registry'
 import { aktionErlaubt } from '@/modules/prozesse/torwaechter'
 import { formularFelder } from '@/modules/prozesse/schema-felder'
+import { artikelPasst } from '@/modules/shared/artikel-suche'
 
 interface SuchTreffer {
   label: string
@@ -142,9 +143,8 @@ export async function GET(request: Request) {
     for (const r of await sql<{ id: string; label: string; sku: string | null }[]>`
       select pv.id, variant_display_name(pv.id) as label, pv.sku
       from product_variants pv join product_templates pt on pt.id = pv.template_id
-      where pv.active and (pv.sku ilike ${muster} or pv.display_name ilike ${muster}
-         or pt.name ilike ${muster})
-      order by 2 limit 4`) {
+      where pv.active and pt.active and ${artikelPasst(q)}
+      order by 2 limit 8`) {
       treffer.push({
         label: r.sku ? `${r.label} · ${r.sku}` : r.label,
         hinweis: 'Produkt',

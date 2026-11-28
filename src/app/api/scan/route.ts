@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { sql } from '@/db/client'
 import { currentUser } from '@/modules/auth'
+import { canAccess } from '@/modules/auth/permissions'
+import { artikelPasst } from '@/modules/shared/artikel-suche'
 import { scanVarianten } from '@/modules/shared/scan'
 
 /**
@@ -10,9 +12,8 @@ import { scanVarianten } from '@/modules/shared/scan'
  * „WH/OUT/00003" ein „WH-OUT-00003" — shared/scan.ts).
  */
 export async function GET(request: Request) {
-  if (!(await currentUser())) {
-    return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
-  }
+  const user = await currentUser()
+  if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
 
   const code = new URL(request.url).searchParams.get('code')?.trim()
   if (!code) return NextResponse.json({ error: 'Kein Code' }, { status: 400 })
@@ -21,20 +22,20 @@ export async function GET(request: Request) {
   for (const kandidat of scanVarianten(code)) {
     const lookups: { url: string | null }[] = await sql`
       select url from (
-        select '/lager/' || id as url, 1 as rank from stock_pickings where number = ${kandidat}
+        select '/lager/' || id as url, 1 as rank from stock_pickings where number in (${kandidat}, upper(${kandidat}))
         union all
-        select '/verkauf/' || id, 2 from sales_orders where number = ${kandidat} or shopify_order_name = ${kandidat}
+        select '/verkauf/' || id, 2 from sales_orders where number in (${kandidat}, upper(${kandidat})) or shopify_order_name = ${kandidat}
         union all
-        select '/einkauf/' || id, 3 from purchase_orders where number = ${kandidat}
+        select '/einkauf/' || id, 3 from purchase_orders where number in (${kandidat}, upper(${kandidat}))
         union all
-        select '/fertigung/' || id, 4 from manufacturing_orders where number = ${kandidat}
+        select '/fertigung/' || id, 4 from manufacturing_orders where number in (${kandidat}, upper(${kandidat}))
         union all
         -- RMA-Nummer: wartet der Auftrag auf das Gerät, öffnet die Seite gleich
         -- das Formular „Gerät eingegangen" (Wareneingang per Scan).
         select '/reparatur/' || id
                || case when state in ('new', 'awaiting_device') then '?schritt=eingang' else '' end,
                5
-        from repair_orders where number = ${kandidat}
+        from repair_orders where number in (${kandidat}, upper(${kandidat}))
         union all
         -- Retouren-Sendungsnummer vom DHL-Label des Kundenpakets → derselbe Weg.
         select '/reparatur/' || rl.repair_order_id || '?schritt=eingang', 5
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
                || case when status in ('angefragt', 'genehmigt') then '?schritt=eingang'
                        else '' end,
                5
-        from retouren where nummer = ${kandidat}
+        from retouren where nummer in (${kandidat}, upper(${kandidat}))
         union all
         -- Retouren-Sendungsnummer einer Kunden-Rücksendung → derselbe Weg.
         select '/versand/retouren/' || rl.retoure_id || '?schritt=eingang', 5
@@ -56,15 +57,31 @@ export async function GET(request: Request) {
         union all
         -- Vorgangsnummer (z. B. aus der Bestätigungsmail einer Reparaturanfrage,
         -- die der Kunde auf den Karton schreibt) → der Vorgang selbst.
-        select '/vorgaenge/' || id, 5 from vorgaenge where number = ${kandidat}
+        select '/vorgaenge/' || id, 5 from vorgaenge where number in (${kandidat}, upper(${kandidat}))
         union all
         select '/produkte/variante/' || id, 6 from product_variants
-          where (barcode = ${kandidat} or sku = ${kandidat}) and active
+          where (lower(barcode) = lower(${kandidat}) or lower(sku) = lower(${kandidat})) and active
         union all
         select '/versand?sendung=' || shipment_number, 7 from shipments where shipment_number = ${kandidat}
       ) hits order by rank limit 1`
     url = lookups[0]?.url ?? null
     if (url) break
+  }
+
+  // Kein Beleg, kein Code: das Feld heißt „scannen oder suchen" — also Artikel
+  // suchen (Name, Artikelnummer, Barcode; jedes Wort, Schreibweise egal). Ein
+  // Treffer öffnet den Artikel, mehrere die Bestandsliste mit dieser Suche.
+  if (!url) {
+    const artikel = await sql<{ id: string }[]>`
+      select pv.id from product_variants pv join product_templates pt on pt.id = pv.template_id
+      where pv.active and pt.active and ${artikelPasst(code)}
+      limit 2`
+    if (artikel.length === 1) url = `/produkte/variante/${artikel[0].id}`
+    else if (artikel.length > 1) {
+      url = canAccess(user.rollen, 'lager', user.befugnisse)
+        ? `/lager/bestand?q=${encodeURIComponent(code)}`
+        : `/produkte?q=${encodeURIComponent(code)}`
+    }
   }
 
   if (!url) return NextResponse.json({ error: `Nichts gefunden zu "${code}"` }, { status: 404 })

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireArea } from '@/modules/auth'
 import { sql } from '@/db/client'
 import { ActionButton, ActionForm } from '@/components/action-button'
@@ -8,8 +9,15 @@ import { Auswahl } from '@/components/auswahl'
 
 export const dynamic = 'force-dynamic'
 
-export default async function InventurPage() {
+export default async function InventurPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ alle?: string }>
+}) {
   await requireArea('lager')
+  // Standard: nur Lagerware. Varianten, die erst auf Bestellung gebaut werden
+  // (Tastaturen), haben selten Bestand und verstopfen die Suche — auf Wunsch dazu.
+  const alle = (await searchParams).alle === '1'
   const counts = await sql<
     {
       id: string
@@ -38,6 +46,7 @@ export default async function InventurPage() {
            on_hand_qty(pv.id) as on_hand
     from product_variants pv join product_templates pt on pt.id = pv.template_id
     where pv.active and pt.active and pt.type = 'goods'
+      and (${alle} or not ist_made_to_order(pv.id))
     order by label limit 500`
 
   const open = counts.filter((c) => !c.applied_at)
@@ -55,7 +64,7 @@ export default async function InventurPage() {
           <div className="row">
             <label className="field" style={{ flex: 3 }}>
               <span>Produkt</span>
-              <Auswahl nachladen="variante-ware" name="variant_id" required defaultValue="">
+              <Auswahl nachladen={alle ? 'variante-ware' : 'variante-lager'} name="variant_id" required defaultValue="">
                 <option value="" disabled>— auswählen —</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id} data-suche={v.suche}>
@@ -73,6 +82,17 @@ export default async function InventurPage() {
             </div>
           </div>
         </ActionForm>
+        <p className="small muted" style={{ margin: '8px 0 0' }}>
+          Suche nach Name, Artikelnummer oder Barcode — Schreibweise und Reihenfolge der Wörter sind egal.{' '}
+          {alle ? (
+            <>Gezeigt werden alle Artikel. <Link href="/lager/inventur">Nur Lagerware zeigen</Link></>
+          ) : (
+            <>
+              Ausgeblendet sind Varianten, die erst auf Bestellung gebaut werden (Tastaturen).{' '}
+              <Link href="/lager/inventur?alle=1">Auch diese zeigen</Link>
+            </>
+          )}
+        </p>
       </Card>
 
       <Card title={`Offene Zählungen (${open.length})`} tight>

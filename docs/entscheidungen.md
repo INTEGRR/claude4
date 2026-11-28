@@ -9,6 +9,33 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Eine Suchregel für alle Artikelfelder, Scan-Feld sucht, Inventur ohne Tastaturen
+
+Fortsetzung des Inventurtags („alle Suchleisten … die sind ja sogar case
+sensitive", „in der Inventursuche braucht's auch einen Filter").
+
+- **Das Scan-Feld oben verglich Artikelnummern exakt** — `sw-gt-ly-001`
+  fand `SW-GT-LY-001` nicht, und trotz der Beschriftung „scannen oder
+  suchen" fand es nichts außer vollständigen Codes. Jetzt: Belegnummern und
+  Artikelnummern in jeder Schreibweise; ohne exakten Treffer sucht das Feld
+  nach Artikeln — ein Treffer öffnet den Artikel, mehrere die Bestandsliste
+  mit dieser Suche.
+- **Jedes Suchfeld suchte anders.** Die Produktliste kannte keine
+  Artikelnummer, die Bestandsliste keinen Barcode, überall musste die
+  Wortreihenfolge stimmen. Jetzt gilt eine Regel
+  (`src/modules/shared/artikel-suche.ts`): jedes Wort muss vorkommen — in
+  Produktname, Variantenname, Artikelnummer oder Barcode; Schreibweise und
+  Reihenfolge egal. Verwendet von Bestandsliste, Produktliste (über die
+  Nummern aller Varianten), Befehlsfeld (acht statt vier Treffer),
+  Auswahlfeldern und Scan-Feld.
+- **Inventur zeigt standardmäßig nur Lagerware.** Varianten, die erst auf
+  Bestellung gebaut werden (`ist_made_to_order` — rund 350 Tastatur-
+  Varianten), haben selten Bestand und verdeckten die Teile: „jade max"
+  lieferte sieben Treffer, sechs davon Tastaturen. Ein Link holt sie dazu.
+
+Nachweis: `tests/prozesse/artikel-suche.test.ts`. Doku:
+[module/lager.md](module/lager.md) „Inventur & Ausschuss".
+
 ## 2026-11-28 — Inventurtag: Suche nach Artikelnummer, Namen ziehen nach, KRNL führt die Artikelnummer
 
 Meldung des Betreibers während der Zählung: in der Inventur „funktionieren

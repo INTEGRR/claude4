@@ -12,6 +12,7 @@ import { hatRolle } from '@/modules/auth/permissions'
 import { Auswahl } from '@/components/auswahl'
 import { gesamtAus, seitenParameter } from '@/modules/shared/seiten'
 import { GroesseBehalten, Seiten } from '@/components/seiten'
+import { produktPasst } from '@/modules/shared/artikel-suche'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,8 +57,7 @@ export default async function ProduktePage({
     from product_templates pt
     join uoms u on u.id = pt.uom_id
     where pt.active = ${!archiv}
-      and (${q ?? null}::text is null or pt.name ilike ${'%' + (q ?? '') + '%'}
-           or pt.projekt ilike ${'%' + (q ?? '') + '%'})
+      and ${produktPasst(q)}
     order by pt.name limit ${seite.limit} offset ${seite.offset}`
   const gesamt = gesamtAus(rows)
 

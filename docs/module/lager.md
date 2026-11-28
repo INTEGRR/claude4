@@ -53,6 +53,8 @@ Je Vorgangsart: Reservierungsmethode (`at_confirm` Default, `manual` möglich), 
 
 - **Inventur**: Zeile (Ort, Variante, gezählte Menge) → **Anwenden** bucht Differenz gegen `Virtuell/Inventurdifferenz` und setzt On Hand auf den Zählwert. Warnung, wenn sich der Buchbestand zwischen Zählung und Anwenden geändert hat.
   Mehrbestand erreicht wartende Lieferungen und Fertigungskomponenten sofort (Live-Reservierung, siehe oben).
+  Das Auswahlfeld findet nach Name, Artikelnummer oder Barcode (jedes Wort, Schreibweise und Reihenfolge egal) und zeigt standardmäßig nur Lagerware: Varianten, die erst auf Bestellung gebaut werden (`ist_made_to_order`, die Tastaturen), sind ausgeblendet — „Auch diese zeigen" (`?alle=1`) holt sie dazu (seit 2026-11-28).
+- **Suche** (seit 2026-11-28): eine Regel für alle Artikel-Suchfelder (`src/modules/shared/artikel-suche.ts`) — Bestandsliste, Produktliste, Befehlsfeld, Auswahlfelder. Das Scan-Feld oben nimmt Artikelnummern in jeder Schreibweise; ohne exakten Code sucht es nach Artikeln: ein Treffer öffnet den Artikel, mehrere die Bestandsliste mit dieser Suche.
 - **Ausschuss**: eigenes Mini-Formular (Variante, Menge, Quellort) → Move nach `Virtuell/Ausschuss`; auch aus MO/Reparatur heraus aufrufbar.
 
 ## Barcode-Unterstützung

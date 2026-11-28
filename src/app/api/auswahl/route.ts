@@ -29,7 +29,9 @@ export async function GET(request: Request) {
              coalesce(pv.barcode, '') || ' ' || pt.name as suche
       from product_variants pv join product_templates pt on pt.id = pv.template_id
       where pv.active and pt.active
-        and (${art} <> 'variante-ware' or pt.type = 'goods')
+        and (${art} not in ('variante-ware', 'variante-lager') or pt.type = 'goods')
+        -- Lagerware (Inventur): ohne Varianten, die erst auf Bestellung gebaut werden.
+        and (${art} <> 'variante-lager' or not ist_made_to_order(pv.id))
         and (${art} <> 'variante-verkauf' or pt.can_be_sold)
         and (${art} <> 'variante-einkauf' or pt.can_be_purchased)
         and (select bool_and(lower(pt.name || ' ' || coalesce(pv.display_name, '') || ' ' || coalesce(pv.sku, '') || ' ' || coalesce(pv.barcode, '')) like m)
