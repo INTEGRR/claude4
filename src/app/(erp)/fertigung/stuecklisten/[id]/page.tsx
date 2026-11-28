@@ -22,6 +22,74 @@ import { kurzArtikel, kurzEinheiten } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
 
+/** Merkmal → Werte, in der Reihenfolge des Produkts. */
+function nachMerkmal<T extends { merkmal: string; wert: string }>(liste: readonly T[]): [string, T[]][] {
+  const gruppen = new Map<string, T[]>()
+  for (const x of liste) gruppen.set(x.merkmal, [...(gruppen.get(x.merkmal) ?? []), x])
+  return [...gruppen]
+}
+
+/**
+ * Die Bedingung einer Position als Satz (2026-11-28): „Switches = Jade Gaming
+ * und Keycaps = Founders oder Founders Split Space". Innerhalb eines Merkmals
+ * „oder", zwischen Merkmalen „und" — genau die Regel, nach der gerechnet wird.
+ */
+function Bedingung({ filter }: { filter: { merkmal: string; wert: string }[] }) {
+  if (filter.length === 0) return <span className="muted small">immer</span>
+  const gruppen = nachMerkmal(filter)
+  return (
+    <span className="bedingung">
+      {gruppen.map(([merkmal, werte], i) => (
+        <span key={merkmal} className="bedingung-teil">
+          {i > 0 && <span className="bedingung-und">und</span>}
+          <span className="bedingung-merkmal">{merkmal} =</span>{' '}
+          {werte.map((w, j) => (
+            <span key={w.wert}>
+              {j > 0 && <span className="bedingung-oder"> oder </span>}
+              <strong>{w.wert}</strong>
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** Bedingung bearbeiten: je Merkmal eine Zeile mit Häkchen — nichts angehakt heißt „egal". */
+function BedingungFelder({
+  ptavs,
+  gewaehlt,
+  teil,
+}: {
+  ptavs: { id: string; merkmal: string; wert: string }[]
+  gewaehlt: string[]
+  teil: string
+}) {
+  if (ptavs.length === 0) return null
+  return (
+    <fieldset className="bedingung-felder">
+      <legend>Wann wird {teil} verbaut?</legend>
+      <p className="small muted" style={{ margin: '0 0 8px' }}>
+        Nichts anhaken = <strong>immer</strong>, in jeder Variante. Sonst je Merkmal anhaken, bei welcher Wahl des
+        Kunden die Position gilt. Hakst du bei <strong>zwei Merkmalen</strong> etwas an, müssen <strong>beide</strong>{' '}
+        zutreffen.
+      </p>
+      {nachMerkmal(ptavs).map(([merkmal, werte]) => (
+        <div key={merkmal} className="bedingung-zeile">
+          <span className="bedingung-merkmal">{merkmal}</span>
+          <span className="bedingung-werte">
+            {werte.map((w) => (
+              <label key={w.id} className="check">
+                <input type="checkbox" name="ptav_ids" value={w.id} defaultChecked={gewaehlt.includes(w.id)} /> {w.wert}
+              </label>
+            ))}
+          </span>
+        </div>
+      ))}
+    </fieldset>
+  )
+}
+
 export default async function BomPage({
   params,
   searchParams,
@@ -63,7 +131,7 @@ export default async function BomPage({
       sku: string | null
       qty: number
       uom: string
-      filters: string[]
+      filters: { merkmal: string; wert: string }[]
       ptav_ids: string[]
       issue_method: string
       is_phantom: boolean
@@ -72,8 +140,8 @@ export default async function BomPage({
     select l.id, variant_display_name(l.component_variant_id) as component, pv.template_id, pv.sku, l.qty,
            u.name as uom, l.issue_method,
            resolve_kit(l.component_variant_id) is not null as is_phantom,
-           coalesce(array_agg(a.name || ': ' || av.name order by a.name)
-                    filter (where av.id is not null), '{}') as filters,
+           coalesce(jsonb_agg(jsonb_build_object('merkmal', a.name, 'wert', av.name) order by al.sequence, a.name, av.sequence)
+                    filter (where av.id is not null), '[]'::jsonb) as filters,
            coalesce(array_agg(f.ptav_id::text) filter (where f.ptav_id is not null), '{}') as ptav_ids
     from bom_lines l
     join product_variants pv on pv.id = l.component_variant_id
@@ -88,8 +156,8 @@ export default async function BomPage({
     order by l.sequence`
 
   // Attributwerte des Endprodukts - die Auswahl für "Auf Varianten anwenden".
-  const ptavs = await sql<{ id: string; label: string }[]>`
-    select ptav.id, a.name || ': ' || av.name as label
+  const ptavs = await sql<{ id: string; label: string; merkmal: string; wert: string }[]>`
+    select ptav.id, a.name || ': ' || av.name as label, a.name as merkmal, av.name as wert
     from product_template_attribute_lines al
     join product_attributes a on a.id = al.attribute_id
     join product_template_attribute_values ptav on ptav.line_id = al.id
@@ -222,10 +290,12 @@ export default async function BomPage({
 
       {ptavs.length > 0 && (
         <div className="notice info">
-          Dieses Produkt hat Varianten. Positionen ohne Auswahl bei „Auf Varianten anwenden“ gelten für{' '}
-          <strong>alle</strong> Varianten; mit Auswahl nur für die passenden — so kommt z. B. das weiße
-          Gehäuse nur in die weiße Tastatur. Wie in Odoo: je Attribut reicht einer der gewählten Werte, über
-          mehrere Attribute müssen alle passen („Plate: PC" und „Layout: ISO").
+          <strong>So liest sich die Spalte „Wird verbaut, wenn …":</strong> Dort steht, bei welcher Wahl des Kunden
+          eine Position in die Tastatur kommt. „Immer" = in jeder Variante. „Mounting Plate = FR4" = nur wenn
+          der Kunde FR4 wählt. Stehen zwei Merkmale da, müssen <strong>beide</strong> zutreffen: „Switches = Jade
+          Gaming <em>und</em> Keycaps = Founders Split Space" heißt, diese Menge Switches gilt nur für genau diese
+          Kombination — so bekommt das Split-Space-Layout seine zwei Switches mehr. Die Bedingung sagt nie, dass
+          ein Teil ein anderes ersetzt.
         </div>
       )}
 
@@ -263,7 +333,7 @@ export default async function BomPage({
                   <th className="num">Menge</th>
                   <th>Einheit</th>
                   <th>Verbrauch</th>
-                  <th>Auf Varianten anwenden</th>
+                  <th>Wird verbaut, wenn …</th>
                   <th />
                 </tr>
               </thead>
@@ -299,15 +369,7 @@ export default async function BomPage({
                       )}
                     </td>
                     <td>
-                      {l.filters.length === 0 ? (
-                        <span className="muted small">alle Varianten</span>
-                      ) : (
-                        <span className="actions">
-                          {l.filters.map((f) => (
-                            <span key={f} className="badge info">{f}</span>
-                          ))}
-                        </span>
-                      )}
+                      <Bedingung filter={l.filters} />
                     </td>
                     <td className="nowrap">
                       <span className="actions" style={{ justifyContent: 'flex-end' }}>
@@ -318,16 +380,7 @@ export default async function BomPage({
                               <span>Menge ({l.uom})</span>
                               <input type="number" name="qty" step="0.001" min="0.001" defaultValue={Number(l.qty)} required />
                             </label>
-                            {ptavs.length > 0 && (
-                              <label className="field">
-                                <span>Auf Varianten anwenden (leer = alle)</span>
-                                <Auswahl name="ptav_ids" multiple placeholder="alle Varianten" defaultValue={l.ptav_ids}>
-                                  {ptavs.map((p) => (
-                                    <option key={p.id} value={p.id}>{p.label}</option>
-                                  ))}
-                                </Auswahl>
-                              </label>
-                            )}
+                            <BedingungFelder ptavs={ptavs} gewaehlt={l.ptav_ids} teil={l.component} />
                             <label className="field">
                               <span>Andere Komponente (leer = bleibt)</span>
                               <Auswahl nachladen="variante" name="component_variant_id" defaultValue="">
@@ -377,20 +430,16 @@ export default async function BomPage({
                   <option value="manual">manuell erfassen</option>
                 </Auswahl>
               </label>
-              {ptavs.length > 0 && (
-                <label className="field" style={{ flex: 2 }}>
-                  <span>Auf Varianten anwenden (leer = alle)</span>
-                  <Auswahl name="ptav_ids" multiple placeholder="alle Varianten">
-                    {ptavs.map((p) => (
-                      <option key={p.id} value={p.id}>{p.label}</option>
-                    ))}
-                  </Auswahl>
-                </label>
-              )}
               <div className="shrink field">
                 <button className="primary" type="submit">Hinzufügen</button>
               </div>
             </div>
+            {ptavs.length > 0 && (
+              <details className="bedingung-neu">
+                <summary className="small">Nur bei bestimmter Wahl des Kunden verbauen (sonst: immer)</summary>
+                <BedingungFelder ptavs={ptavs} gewaehlt={[]} teil="die neue Position" />
+              </details>
+            )}
           </ActionForm>
         </div>
       </Card>

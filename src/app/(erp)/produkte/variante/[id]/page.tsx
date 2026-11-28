@@ -1,25 +1,33 @@
 import { requireArea } from '@/modules/auth'
-import { canWrite, hatRolle } from '@/modules/auth/permissions'
+import { canAccess, canWrite, hatRolle } from '@/modules/auth/permissions'
+import { ArtikelAktionen, ArtikelBestand, BewegungenKarte, EtikettKarte, VerwendungKarte } from '@/components/artikel-karten'
 import { Schublade } from '@/components/schublade'
 import { VorschlagKnopf } from '@/components/artikelnummer-vorschlag'
 import { artikelnummerVorschlag } from '@/modules/shared/artikelnummer'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { sql } from '@/db/client'
 import { ActionForm } from '@/components/action-button'
-import { Card, Empty, PageHeader, Stat, TableWrap } from '@/components/ui'
-import { barcodeSvg } from '@/modules/shared/barcode'
-import { dateTime, qty } from '@/modules/shared/format'
-import { setShopRegeln, setVariantCodes, varianteHerausloesen } from '../../actions'
+import { Card, PageHeader } from '@/components/ui'
+import {
+  artikelBestandSetzen, artikelFertigen, artikelNachbestellen, setShopRegeln, setVariantCodes, varianteHerausloesen,
+} from '../../actions'
 import { ShopRegelKarte } from '@/components/shop-regel-karte'
 import { artikeletikettenDrucken } from '../../../lager/actions'
 import { RecordComments } from '@/components/record-comments'
 
 export const dynamic = 'force-dynamic'
 
-export default async function VariantPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VariantPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ direkt?: string }>
+}) {
   const user = await requireArea('produkte')
   const { id } = await params
+  const direkt = (await searchParams).direkt === '1'
 
   const [variant] = await sql<
     {
@@ -39,10 +47,15 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
       geschwister: number
       stueckliste: boolean
       herausgeloest: boolean
+      aktiv: boolean
+      kaufbar: boolean
+      verkaufbar: boolean
+      gefertigt: boolean
     }[]
   >`
     select pv.id, pv.template_id, pt.name as product, pv.display_name, pv.sku, pv.barcode,
-           pv.shopify_variant_id, u.name as uom, pv.shop_herausgeloest as herausgeloest,
+           pv.shopify_variant_id, u.name as uom, pv.shop_herausgeloest as herausgeloest, (pv.active and pt.active) as aktiv,
+           pt.can_be_purchased as kaufbar, pt.can_be_sold as verkaufbar, pt.route_manufacture as gefertigt,
            (select count(*)::int from product_variants x where x.template_id = pv.template_id and x.active and x.id <> pv.id) as geschwister,
            exists (select 1 from boms b where b.active and (b.variant_id = pv.id or b.template_id = pv.template_id)) as stueckliste,
            on_hand_qty(pv.id) as on_hand, free_to_use(pv.id) as free,
@@ -54,35 +67,9 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
     where pv.id = ${id}`
 
   if (!variant) notFound()
-
-  const moves = await sql<
-    {
-      id: string
-      qty_done: number
-      src: string
-      dest: string
-      date_done: string
-      reference: string | null
-      picking_number: string | null
-      picking_id: string | null
-      mo_number: string | null
-      mo_id: string | null
-      repair_number: string | null
-      repair_id: string | null
-    }[]
-  >`
-    select m.id, m.qty_done, src.full_path as src, dst.full_path as dest, m.date_done, m.reference,
-           p.number as picking_number, p.id as picking_id,
-           mo.number as mo_number, mo.id as mo_id,
-           r.number as repair_number, r.id as repair_id
-    from stock_moves m
-    join stock_locations src on src.id = m.src_location_id
-    join stock_locations dst on dst.id = m.dest_location_id
-    left join stock_pickings p on p.id = m.picking_id
-    left join manufacturing_orders mo on mo.id = m.production_id
-    left join repair_orders r on r.id = m.repair_id
-    where m.variant_id = ${id} and m.state = 'done'
-    order by m.date_done desc limit 60`
+  // Ein Artikel ohne Varianten hat eine Seite: das Produkt (2026-11-28). Wer aus
+  // einer Liste kommt, landet dort — nicht auf der „Variante von sich selbst".
+  if (variant.geschwister === 0 && variant.aktiv && !direkt) redirect(`/produkte/${variant.template_id}`)
 
   const label = variant.display_name ?? variant.product
   const codeValue = variant.barcode ?? variant.sku
@@ -130,24 +117,28 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      <div className="grid-3" style={{ marginBottom: 16 }}>
-        <Stat label="Bestand" value={`${qty(variant.on_hand)} ${variant.uom}`} />
-        <Stat label="Frei verfügbar" value={qty(variant.free)} hint="abzüglich Reservierungen" />
-        <Stat
-          label="Prognose"
-          value={qty(variant.forecasted)}
-          hint={
-            <>
-              {Number(variant.forecasted) < 0 && (
-                <>
-                  <span className="led warn" /> Unterdeckung ·{' '}
-                </>
-              )}
-              {`+${qty(variant.incoming)} eingehend / −${qty(variant.outgoing)} ausgehend`}
-            </>
-          }
+      {variant.aktiv && (
+        <ArtikelAktionen
+          varianten={[{ id, name: label }]}
+          suche={variant.sku?.trim() || label}
+          name={label}
+          kaufbar={variant.kaufbar}
+          fertigbar={variant.gefertigt && variant.stueckliste}
+          verkaufbar={variant.verkaufbar}
+          imShop={Boolean(variant.shopify_variant_id)}
+          darf={{
+            lager: canWrite(user.rollen, 'lager', user.befugnisse),
+            einkauf: canWrite(user.rollen, 'einkauf', user.befugnisse),
+            fertigung: canWrite(user.rollen, 'fertigung', user.befugnisse),
+            verkaufSehen: canAccess(user.rollen, 'verkauf', user.befugnisse),
+            lagerSehen: canAccess(user.rollen, 'lager', user.befugnisse),
+          }}
+          bestandSetzen={artikelBestandSetzen}
+          nachbestellen={artikelNachbestellen}
+          fertigen={artikelFertigen}
         />
-      </div>
+      )}
+      <ArtikelBestand variantIds={[id]} uom={variant.uom} />
 
       <div className="grid-2">
         <Card title="Kennzeichnung">
@@ -183,88 +174,13 @@ export default async function VariantPage({ params }: { params: Promise<{ id: st
           </ActionForm>
         </Card>
 
-        <Card title="Etikett" actions={codeValue && <span className="mono-label">zum Drucken scannen</span>}>
-          {codeValue ? (
-            <div className="info-panel">
-              <div className="display-head">
-                <span>Etikett</span>
-                <span>{codeValue}</span>
-              </div>
-              {/* Der Barcode kommt schwarz auf transparent. Er sitzt daher auf
-                  einem hellen Feld (--display-bright ist in beiden Themes gleich),
-                  damit die Striche kontrastreich und scannbar bleiben. */}
-              <div
-                style={{
-                  textAlign: 'center',
-                  background: 'var(--display-bright)',
-                  padding: 12,
-                  borderRadius: 'var(--radius-sm)',
-                }}
-                dangerouslySetInnerHTML={{ __html: barcodeSvg(codeValue) }}
-              />
-            </div>
-          ) : (
-            <Empty>Hinterlege eine Artikelnummer oder einen Barcode, dann erscheint hier das Etikett.</Empty>
-          )}
-          {/* Drucken ist Lagerarbeit (lager.artikeletikett_drucken): am
-              Etikettendrucker des Arbeitsplatzes, sonst PDF im Browser. */}
-          {codeValue && canWrite(user.rollen, 'lager', user.befugnisse) && (
-            <ActionForm action={artikeletikettenDrucken} linkOeffnen behalten style={{ marginTop: 12 }}>
-              <input type="hidden" name="variant_id" value={id} />
-              <div className="row" style={{ alignItems: 'flex-end' }}>
-                <label className="field" style={{ maxWidth: 140, marginBottom: 0 }}>
-                  <span>Anzahl</span>
-                  <input type="number" name="anzahl" min="1" max="500" step="1" defaultValue={1} required />
-                </label>
-                <div className="shrink field" style={{ marginBottom: 0 }}>
-                  <button type="submit">Etiketten drucken</button>
-                </div>
-              </div>
-            </ActionForm>
-          )}
-        </Card>
+        <EtikettKarte variantId={id} code={codeValue} darfDrucken={canWrite(user.rollen, 'lager', user.befugnisse)} drucken={artikeletikettenDrucken} />
       </div>
 
       <ShopRegelKarte variantId={id} darf={canWrite(user.rollen, 'verkauf', user.befugnisse)} action={setShopRegeln} />
 
-      <Card title="Bewegungen" tight>
-        {moves.length === 0 ? (
-          <Empty>Noch keine Bewegungen.</Empty>
-        ) : (
-          <TableWrap>
-            <table>
-              <thead>
-                <tr>
-                  <th>Datum</th>
-                  <th>Von → Nach</th>
-                  <th className="num">Menge</th>
-                  <th>Beleg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {moves.map((m) => (
-                  <tr key={m.id}>
-                    <td className="nowrap small mono">{dateTime(m.date_done)}</td>
-                    <td className="small muted mono">{m.src} → {m.dest}</td>
-                    <td className="num">{qty(m.qty_done)}</td>
-                    <td className="mono small">
-                      {m.picking_id ? (
-                        <Link href={`/lager/${m.picking_id}`}>{m.picking_number}</Link>
-                      ) : m.mo_id ? (
-                        <Link href={`/fertigung/${m.mo_id}`}>{m.mo_number}</Link>
-                      ) : m.repair_id ? (
-                        <Link href={`/reparatur/${m.repair_id}`}>{m.repair_number}</Link>
-                      ) : (
-                        <span className="muted">{m.reference ?? '—'}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
-        )}
-      </Card>
+      <VerwendungKarte variantIds={[id]} />
+      <BewegungenKarte variantIds={[id]} />
       <RecordComments model="product_variant" recordId={id} path={`/produkte/variante/${id}`} />
     </>
   )

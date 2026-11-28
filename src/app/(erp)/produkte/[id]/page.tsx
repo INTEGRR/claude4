@@ -8,6 +8,9 @@ import { money, plural, qty } from '@/modules/shared/format'
 import {
   addAttribute,
   alleVariantenHerausloesen,
+  artikelBestandSetzen,
+  artikelFertigen,
+  artikelNachbestellen,
   addVendorPrice,
   deleteProduct,
   deleteVendorPrice,
@@ -18,7 +21,9 @@ import {
   updateProduct,
 } from '../actions'
 import { ShopRegelKarte } from '@/components/shop-regel-karte'
-import { canWrite, hatRolle } from '@/modules/auth/permissions'
+import { canAccess, canWrite, hatRolle } from '@/modules/auth/permissions'
+import { ArtikelAktionen, ArtikelBestand, BewegungenKarte, EtikettKarte, VerwendungKarte } from '@/components/artikel-karten'
+import { artikeletikettenDrucken } from '../../lager/actions'
 import { anlageLuecken } from '@/modules/shared/anlage-luecken'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { KLEINPAKET } from '@/modules/versand/regeln-logik'
@@ -91,9 +96,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       shopify_variant_id: string | null
       in_stueckliste: boolean
       werte: string | null
+      aktiv: boolean
     }[]
   >`
-    select pv.id, pv.display_name, pv.sku, pv.barcode, on_hand_qty(pv.id) as on_hand, pv.shopify_variant_id,
+    select pv.id, pv.display_name, pv.sku, pv.barcode, on_hand_qty(pv.id) as on_hand, pv.shopify_variant_id, pv.active as aktiv,
            exists (select 1 from bom_lines bl join boms b on b.id = bl.bom_id and b.active
                    where bl.component_variant_id = pv.id) as in_stueckliste,
            (select string_agg(av.name, ' ' order by al.sequence, a.name)
@@ -128,6 +134,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     join uom_categories c on c.id = u.category_id
     where u.active and c.id = (select category_id from uoms where id = ${tpl.uom_id})
     order by u.ratio`
+
+  // Ein Artikel ohne Varianten hat genau eine Seite — diese. `einzige` ist seine eine (technische) Variante.
+  const aktiveVarianten = variants.filter((v) => v.aktiv)
+  const einzige = aktiveVarianten.length === 1 ? aktiveVarianten[0] : null
 
   // Artikelnummer-Vorschlag (2026-11-28) für jede Variante ohne Nummer — nach dem Muster, untereinander eindeutig.
   const ohneNummer = tpl.active ? variants.filter((v) => !v.sku?.trim()) : []
@@ -260,6 +270,35 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div style={{ marginBottom: 12 }}>
         <TagEditor model="product_template" recordId={id} path={`/produkte/${id}`} />
       </div>
+
+      {/* Artikelseite (2026-11-28): Bestand auf einen Blick und die Schritte, die man am Artikel braucht. */}
+      {tpl.active && aktiveVarianten.length > 0 && (
+        <>
+          <ArtikelAktionen
+            varianten={aktiveVarianten.map((v) => ({ id: v.id, name: v.display_name ?? tpl.name }))}
+            suche={einzige?.sku?.trim() || tpl.name}
+            name={tpl.name}
+            kaufbar={tpl.can_be_purchased}
+            fertigbar={tpl.route_manufacture && boms.length > 0}
+            verkaufbar={tpl.can_be_sold}
+            imShop={variants.some((v) => v.shopify_variant_id)}
+            darf={{
+              lager: canWrite(user.rollen, 'lager', user.befugnisse),
+              einkauf: canWrite(user.rollen, 'einkauf', user.befugnisse),
+              fertigung: canWrite(user.rollen, 'fertigung', user.befugnisse),
+              verkaufSehen: canAccess(user.rollen, 'verkauf', user.befugnisse),
+              lagerSehen: canAccess(user.rollen, 'lager', user.befugnisse),
+            }}
+            bestandSetzen={artikelBestandSetzen}
+            nachbestellen={artikelNachbestellen}
+            fertigen={artikelFertigen}
+          />
+          {/* Tastaturen auf Bestellung haben keinen eigenen Bestand — die Zahlen stehen dann nur bei den Teilen. */}
+          {!(tpl.route_manufacture && boms.length > 0 && aktiveVarianten.length > 12) && (
+            <ArtikelBestand variantIds={aktiveVarianten.map((v) => v.id)} uom={tpl.uom} />
+          )}
+        </>
+      )}
 
       <div id="stammdaten" />
       <Card title="Eigenschaften">
@@ -658,7 +697,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
       )}
       <div id="varianten" />
-      <Card title={`Varianten (${variants.length})`} tight>
+      <Card title={einzige ? 'Artikelnummer und Barcode' : `Varianten (${variants.length})`} tight>
         {variants.length === 0 ? (
           <Empty>Keine Varianten.</Empty>
         ) : darfSchreiben ? (
@@ -689,7 +728,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <tr key={v.id}>
                       <td>
                         <input type="hidden" name="variant_id" value={v.id} />
-                        <Link href={`/produkte/variante/${v.id}`}>{v.display_name ?? tpl.name}</Link>
+                        {einzige ? (
+                          v.display_name ?? tpl.name
+                        ) : (
+                          <Link href={`/produkte/variante/${v.id}`}>{v.display_name ?? tpl.name}</Link>
+                        )}
                       </td>
                       <td>
                         <span className="actions" style={{ gap: 6, flexWrap: 'nowrap' }}>
@@ -745,7 +788,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 {variants.map((v) => (
                   <tr key={v.id}>
                     <td>
-                      <Link href={`/produkte/variante/${v.id}`}>{v.display_name ?? tpl.name}</Link>
+                      {einzige ? (
+                        v.display_name ?? tpl.name
+                      ) : (
+                        <Link href={`/produkte/variante/${v.id}`}>{v.display_name ?? tpl.name}</Link>
+                      )}
                     </td>
                     <td className="mono small">{v.sku ?? <span className="muted">—</span>}</td>
                     <td className="mono small">{v.barcode ?? <span className="muted">—</span>}</td>
@@ -757,6 +804,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </TableWrap>
         )}
       </Card>
+      {einzige && (
+        <>
+          <EtikettKarte
+            variantId={einzige.id}
+            code={einzige.barcode?.trim() || einzige.sku?.trim() || null}
+            darfDrucken={canWrite(user.rollen, 'lager', user.befugnisse)}
+            drucken={artikeletikettenDrucken}
+          />
+          <p className="small muted" style={{ margin: '-6px 0 14px' }}>
+            Shop-Verknüpfung von Hand setzen: <Link href={`/produkte/variante/${einzige.id}?direkt=1`}>technische Ansicht des Artikels</Link>.
+          </p>
+        </>
+      )}
+      <VerwendungKarte variantIds={aktiveVarianten.map((v) => v.id)} />
+      {einzige && <BewegungenKarte variantIds={[einzige.id]} />}
       <DokumenteKarte modell="product_template" recordId={id} />
       <RecordComments model="product_template" recordId={id} path={`/produkte/${id}`} />
     </>

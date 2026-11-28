@@ -105,3 +105,40 @@ export async function deleteVendorPrice(templateId: string, preisId: string): Pr
     parameter: { preis_id: preisId },
   })
 }
+
+/**
+ * Aktionsleiste am Artikel (2026-11-28): die häufigsten Schritte ohne Umweg.
+ * Jede ist eine Kette vorhandener Registry-Aktionen — hier lebt nur der Transport.
+ */
+
+/** Bestand setzen: Zählung erfassen und sofort buchen (wie Inventur → Erfassen → Buchen). */
+export async function artikelBestandSetzen(formData: FormData): Promise<ActionResult> {
+  const erfasst = await serverAktion('lager.zaehlung_erfassen', { formData, mitBeleg: true })
+  if (isActionError(erfasst)) return erfasst
+  const zaehlung = isActionInfo(erfasst) ? String((erfasst as { daten?: { recordId?: string } }).daten?.recordId ?? '') : ''
+  if (!zaehlung) return { error: 'Die Zählung konnte nicht erfasst werden.' }
+  const gebucht = await serverAktion('lager.zaehlung_buchen', { recordId: zaehlung })
+  if (isActionError(gebucht)) return gebucht
+  return { info: `Bestand auf ${String(formData.get('counted_qty') ?? '')} gesetzt und gebucht.` }
+}
+
+/** Nachbestellen: Bestellung (Entwurf) beim Lieferanten mit dieser einen Position — danach in die Bestellung. */
+export async function artikelNachbestellen(formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('einkauf.bestellung_mit_positionen', {
+    parameter: {
+      lieferant: String(formData.get('vendor_id') ?? ''),
+      positionen: [{ produkt: String(formData.get('variant_id') ?? ''), menge: Number(formData.get('menge') ?? 0) }],
+    },
+  })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
+  return ergebnis
+}
+
+/** Fertigen: Fertigungsauftrag (Entwurf) für diesen Artikel — danach in den Auftrag. */
+export async function artikelFertigen(formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('fertigung.auftrag_anlegen', { formData })
+  if (isActionError(ergebnis)) return ergebnis
+  if (isActionInfo(ergebnis) && ergebnis.link) redirect(ergebnis.link)
+  return ergebnis
+}

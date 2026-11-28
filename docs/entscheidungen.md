@@ -9,6 +9,54 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Ein Artikel, eine Seite — mit Aktionsleiste; Stücklisten-Bedingung als Satz
+
+Zwei Rückmeldungen des Betreibers vom Inventurtag:
+
+**„Ich lande in einer Variante eines Produkts, das gar keine Varianten hat
+… im Produkt selbst kann ich nur löschen."** Technisch hat jedes Produkt
+mindestens eine Variante (sie ist der lagerfähige Artikel); alle Listen
+verlinken auf sie. Für einen Artikel ohne Varianten war das eine zweite
+Seite mit zwei Feldern, und auf der Produktseite fehlten Bestand und jede
+sinnvolle Aktion.
+
+- **Ein Artikel ohne Varianten hat genau eine Seite: das Produkt.** Die
+  Variantenseite leitet dorthin um (mit `?direkt=1` bleibt sie erreichbar —
+  für die Shop-Verknüpfung von Hand). Die Produktseite zeigt dann, was
+  bisher nur die Variante hatte: Bestand/frei/Prognose, Etikett mit Druck,
+  Bewegungen.
+- **Aktionsleiste am Artikel** (Produkt- und Variantenseite), nach dem
+  Vorbild der Odoo-Produktmaske: „Bestand setzen" (Zählung erfassen und
+  buchen), „Nachbestellen" (Bestellung als Entwurf beim Lieferanten der
+  Preisliste), „Fertigen" (Fertigungsauftrag als Entwurf), dazu die Wege
+  zu Bestandsliste, Meldebestand, offenen Bestellungen und
+  Fertigungsaufträgen, Shop-Verfügbarkeit und Zuordnungen. Gezeigt wird
+  nur, was zum Artikel passt und was der Benutzer darf.
+- **Keine neuen Aktionen:** die Knöpfe sind Ketten vorhandener
+  Registry-Aktionen (`lager.zaehlung_erfassen` + `lager.zaehlung_buchen`,
+  `einkauf.bestellung_mit_positionen`, `fertigung.auftrag_anlegen`) — über
+  den Torwächter, mit denselben Rechten und Prüfungen.
+- **„Verwendet in"**: die Stücklisten, in denen der Artikel steckt, mit
+  Menge und ob die Position für alle oder bestimmte Varianten gilt.
+
+**„Warum stehen bei den HE-Switches die Founders-Keycaps drin? … das ist
+kryptisch."** Die Schilder an einer Stücklistenposition sind Bedingungen:
+zwischen zwei Merkmalen gilt UND, innerhalb eines Merkmals ODER („105
+Switches bei Jade Gaming UND Keycaps Founders; 107 bei Jade Gaming UND
+Split Space"). Das stand nirgends — zwei Schilder nebeneinander lasen sich
+wie eine Liste.
+
+- Die Spalte heißt jetzt „Wird verbaut, wenn …" und schreibt die Bedingung
+  als Satz: „Switches = Jade Gaming **und** Keycaps = Founders"; ohne
+  Bedingung „immer".
+- „Ändern" und „Hinzufügen" zeigen je Merkmal eine Zeile mit Häkchen statt
+  einer Mehrfachauswahl aller Werte durcheinander, mit dem Satz dazu, was
+  nichts/eins/zwei angehakte Merkmale bedeuten. Die Rechenregel ist
+  unverändert.
+
+Doku: [module/stammdaten.md](module/stammdaten.md),
+[module/fertigung.md](module/fertigung.md).
+
 ## 2026-11-28 — Artikelnummern: KRNL schlägt nach dem Muster vor, Shop-Zählnummern zählen nicht
 
 Betreiber beim Aufräumen: „SH-Nummern vollkommen egal, kommen alle raus —
