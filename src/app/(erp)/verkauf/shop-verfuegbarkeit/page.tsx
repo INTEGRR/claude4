@@ -408,7 +408,8 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
           : modus === 'probe'
             ? 'Probelauf: nichts geht an den Shop — was gemeldet würde, zeigt die Debug-Box unten rechts.'
             : 'Shopify steht auf „nur lesen" — hier lässt sich alles vorbereiten, gemeldet wird erst nach dem Umschalten.'}{' '}
-        Shop-Stand zuletzt gelesen: {daten.zuletztGelesen ? dateTime(daten.zuletztGelesen) : 'noch nie'}.
+        Shop-Stand zuletzt gelesen: {daten.zuletztGelesen ? dateTime(daten.zuletztGelesen) : 'noch nie'}.{' '}
+        <Link href="/integrationen/bestandsabgleich">Alle Shop-Varianten in einer Liste</Link>
       </div>
 
       <div className="actions" style={{ margin: '0 0 12px' }} role="navigation" aria-label="Ansicht">

@@ -396,6 +396,13 @@ export const LABELS = {
     temp: 'Aushilfe',
     apprentice: 'Auszubildende(r)',
   },
+  // Produktstatus im Shop (Shopify), wie ihn der Shop-Stand liefert.
+  shop_produkt: {
+    ACTIVE: 'aktiv',
+    UNLISTED: 'nur per Link',
+    DRAFT: 'Entwurf',
+    ARCHIVED: 'archiviert',
+  },
 } as const
 
 export type LabelArt = keyof typeof LABELS

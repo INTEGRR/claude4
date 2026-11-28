@@ -9,6 +9,37 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Bestandsabgleich als vollständige Liste: jede Shop-Variante mit KRNL-Meldung und Shop-Stand
+
+Der Betreiber am Abend vor dem Scharfschalten: „Die Liste unter
+Integrationen, Bestandsabgleich mit Shopify, hätte ich gerne komplett vor
+mir liegen, damit ich sehe, was wir mit allen Produkten melden würden und
+was in Shopify steht." Ziel: der Shop soll nach dem Scharfschalten aussehen
+wie jetzt, dazu kommen nur die neuen Tastaturen.
+
+Die Karte auf der Integrationen-Seite zeigte nur Abweichungen (höchstens
+50, ohne Produktnamen und ohne Grund), die Shop-Verfügbarkeit ist nach
+Artikeln und Teilen gegliedert — keine von beiden ist die eine Liste zum
+Durchgehen.
+
+- **Neue Seite `/integrationen/bestandsabgleich`**, verlinkt aus der Karte
+  und aus der Shop-Verfügbarkeit: alle verknüpften Varianten und
+  Zweitangebote, gruppiert nach Produkt, mit „Shop zeigt", „KRNL meldet",
+  Vergleich und Grund. Filter: alle, nur Abweichungen, nur Kaufbares; Suche.
+- **Der Vergleich fragt, was sich für Kunden ändert**, nicht ob zwei Zahlen
+  gleich sind: „ginge aus dem Verkauf", „ginge in den Verkauf", „andere
+  Menge" (nur Lagerartikel), „gleich", „im Shop nicht sichtbar". Bei
+  Tastaturen zählt nur kaufbar oder nicht — 999 gegen 98 ist keine
+  Abweichung. Ein Angebot, das der Shop ohne Bestand weiterverkauft, geht
+  durch eine 0 von KRNL nicht aus dem Verkauf.
+- Nur lesend, dieselben Zahlen wie der Abgleich (`kontingent`, sonst
+  `shopify_soll_menge`). Statt eines Schalters „nur ein Projekt melden"
+  (verworfen, Eintrag „Schnellstopp") werden die Abweichungen anhand dieser
+  Liste einzeln behoben.
+
+Nachweis: `tests/bestandsliste.test.ts`. Doku:
+[module/integrationen.md](module/integrationen.md) „Bestandsabgleich".
+
 ## 2026-11-28 — Versandabsender: auf dem Label steht das Lager, nicht der Firmensitz
 
 Der Betreiber nach dem ersten Test-Label: „In KRNL muss ich eine

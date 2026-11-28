@@ -797,6 +797,10 @@ export default async function IntegrationenPage() {
             <code className="mono">inventory_levels/update</code> meldet Handänderungen im Shop.
           </div>
         )}
+        <p className="small" style={{ margin: '12px 0 0' }}>
+          <Link href="/integrationen/bestandsabgleich">Vollständige Liste: alle Shop-Varianten mit KRNL-Meldung und Shop-Stand</Link>
+          {abweichungen.length >= 50 ? ' — oben stehen nur die ersten 50 Abweichungen.' : ''}
+        </p>
       </Card>
 
       <Card title="Ausgehende Aufträge (Outbox)" tight>

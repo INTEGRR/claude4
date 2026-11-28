@@ -230,6 +230,18 @@ Shopify"; seit 2026-11-28 sauber getrennt):
   wird je Angebot mit dessen eigener Stückliste; am Teil ist nichts zu
   pflegen.
 
+**Vollständige Liste** (seit 2026-11-28): Integrationen →
+„Bestandsabgleich mit Shopify" → „Vollständige Liste"
+(`/integrationen/bestandsabgleich`, auch aus der Shop-Verfügbarkeit
+verlinkt). Jede verknüpfte Variante und jedes Zweitangebot mit „Shop zeigt",
+„KRNL meldet", dem Vergleich und dem Grund der Menge (Engpass-Teil, freier
+Bestand, „aus", Sperre). Die Karte auf der Integrationen-Seite zeigt weiter
+nur Abweichungen, höchstens 50. Einordnung
+(`bestandsliste-logik.ts`): bei Tastaturen zählt nur kaufbar oder nicht (die
+feste Menge ist keine Bestandszahl), bei Lagerartikeln auch die Zahl;
+Entwürfe und archivierte Shop-Produkte gelten nicht als Abweichung. Nur
+lesend.
+
 **Schnellstopp (feste Menge, seit 2026-11-28).** Der Stopp hängt an der
 Bestellung selbst, nicht am vollen Abgleich:
 
