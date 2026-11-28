@@ -241,12 +241,25 @@ KRNL    ──200, Content-Type: application/liquid──▶ Shopify rendert im 
   Markup wie das Kontaktformular eines Dawn-Themes (`color-background-1`,
   `page-width page-width--narrow`, `field`/`field__input`/`field__label`,
   `select__select`, `button`), dazu dessen Stylesheet per
-  `{{ 'section-contact-form.css' | asset_url | stylesheet_tag }}`. Eigenes CSS
-  nur für Layout-Rückfälle — keine eigenen Farben oder Schriften (die
-  ersten Fassung mit festen Rückfallfarben war im dunklen Theme
-  unlesbar). Keine Assets oder absoluten URLs unseres Hosts, kein
-  Systemname, keine Marke. Den Shopnamen liefert `{{ shop.name | escape }}`.
-  Kunden werden **geduzt** wie im Shop, ohne Fachbegriffe.
+  `{{ 'section-contact-form.css' | asset_url | stylesheet_tag }}`. Keine
+  festen Farben oder Schriften (die erste Fassung mit festen Rückfallfarben
+  war im dunklen Theme unlesbar). Keine Assets oder absoluten URLs unseres
+  Hosts, kein Systemname, keine Marke. Den Shopnamen liefert
+  `{{ shop.name | escape }}`. Kunden werden **geduzt** wie im Shop, ohne
+  Fachbegriffe.
+- **Grundkleid für jedes Theme** (seit 2026-11-28). Der Shop läuft seit dem
+  Rebranding auf dem Theme „Impact"; die Dawn-Klassen gibt es dort nicht,
+  `section-contact-form.css` liefert 404 — das Formular stand ohne Rand, mit
+  rohen weißen Feldern und dem Label hinter dem Feld. `shop-seiten.ts` bringt
+  darum ein eigenes, schlichtes Aussehen mit (`GRUNDKLEID`): mittige Spalte,
+  Label über dem Feld, Felder mit Rahmen — Schrift und Farben weiter vom
+  Theme geerbt (`inherit`, `currentColor`, `transparent`). Die Regeln stehen
+  in `:where(…)` und haben kein Klassengewicht: ein Theme, das die Klassen
+  kennt, überschreibt sie und sieht aus wie zuvor. Maße in px/em, weil die
+  Themes die Wurzelgröße verschieden setzen. Gilt für Reparaturformular und
+  Retourenportal (beide über `shopSeite`). Der Wächter in
+  `tests/shop-proxy.test.ts` lässt eigenes CSS zu, aber keine festen Farben
+  außer dem Rot der Fehlermeldung.
 - **Liquid-Injection ist ausgeschlossen.** Jeder Wert aus Kundeneingabe oder
   Datenbank wird HTML-escaped **und** `{`, `}`, `%` werden als
   `&#123;` `&#125;` `&#37;` geschrieben — ein getipptes `{{ … }}` oder

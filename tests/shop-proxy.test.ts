@@ -271,7 +271,8 @@ describe('App Proxy: Seiten sind selbsttragend und verraten nichts', () => {
 
   // Im Kleid des Themes (Betreiber 2026-10-01): Markup wie das
   // Kontaktformular (Dawn), keine eigenen Farben oder Schriften — sonst
-  // dunkle Schrift auf dunklem Theme.
+  // dunkle Schrift auf dunklem Theme. Seit 2026-11-28 dazu ein Grundkleid
+  // für Themes, die diese Klassen nicht kennen (Impact).
   const THEME_KLASSEN = new Set([
     'color-background-1', 'gradient', 'contact', 'page-width', 'page-width--narrow', 'main-page-title',
     'page-title', 'h0', 'rte', 'caption', 'isolate', 'contact__fields', 'contact__button', 'field',
@@ -285,8 +286,16 @@ describe('App Proxy: Seiten sind selbsttragend und verraten nichts', () => {
       assert.ok(html.includes('class="contact page-width page-width--narrow"'))
       const klassen = [...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/))
       for (const k of klassen) assert.ok(THEME_KLASSEN.has(k) || k.startsWith('rp-'), k)
+      // Grundkleid (2026-11-28): eigenes CSS ja — aber nichts Festes. Farbe und
+      // Schrift erbt die Seite vom Theme (inherit, currentColor, transparent,
+      // Systemfarben der Auswahlliste); einzige feste Farbe ist das Rot der
+      // Fehlermeldung. Sonst stünde wieder dunkle Schrift auf dunklem Theme.
       const stil = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
-      assert.ok(!/(^|[;{])\s*(color|background|font|border)[a-z-]*\s*:/.test(stil), `eigene Optik im CSS: ${stil}`)
+      const erlaubt = /^(inherit|transparent|none|0|currentColor|Canvas|CanvasText|#e5484d|\d+px|\.?\d+em|1px solid currentColor|color-mix\(in srgb,currentColor \d+%,transparent\))$/
+      for (const [, eigenschaft, wert] of stil.matchAll(/(?:^|[;{])\s*((?:color|background|font|border)[a-z-]*)\s*:\s*([^;}]+)/g)) {
+        assert.ok(erlaubt.test(wert.trim()), `feste Optik im CSS: ${eigenschaft}:${wert}`)
+      }
+      assert.ok(stil.includes(':where(.rp) input:where(.field__input)'), 'Grundkleid ohne Klassengewicht — ein Theme mit eigenen Regeln gewinnt')
     }
     assert.ok(formular.includes(THEME_CSS), 'Formular lädt das Kontaktformular-CSS des Themes')
     assert.ok(!nichtGefundenSeite('/apps/reparatur').includes('asset_url'), 'Hinweisseiten ohne Liquid')

@@ -92,11 +92,53 @@ export function reparaturShopUrl(env: Record<string, string | undefined> = proce
 }
 
 /**
- * Nur Layout-Rückfälle (falls das Theme section-contact-form.css nicht hat)
- * und der unsichtbare Honigtopf — Farben, Schriften, Felder und Knopf kommen
- * vom Theme.
+ * Grundkleid für JEDES Theme (2026-11-28): Das Markup trägt die Klassen des
+ * Dawn-Kontaktformulars. Seit dem neuen Shop-Theme (Impact) gibt es diese
+ * Klassen dort nicht mehr — die Seite stand ohne Rand, mit rohen weißen
+ * Feldern und dem Label hinter dem Feld. Diese Regeln geben dem Formular ein
+ * eigenes, schlichtes Aussehen, das Schrift und Farben vom Theme erbt
+ * (hell wie dunkel).
+ *
+ * Alles in `:where(…)`: die Regeln haben damit KEIN Gewicht. Ein Theme, das
+ * die Klassen kennt (Dawn), überschreibt sie mit jeder eigenen Regel und
+ * sieht aus wie zuvor. Maße in px/em, nicht rem — die Themes setzen die
+ * Wurzelgröße verschieden (Dawn 10px, Impact 16px).
+ */
+const FELDER =
+  ':where(.rp) input:where(.field__input),:where(.rp) textarea:where(.field__input),:where(.rp) select:where(.select__select)'
+
+const GRUNDKLEID = [
+  ':where(.rp .contact){box-sizing:border-box;max-width:760px;margin-left:auto;margin-right:auto;padding-left:20px;padding-right:20px}',
+  // Label steht im Markup NACH dem Feld (schwebendes Label bei Dawn) — hier darüber.
+  ':where(.rp .field){display:flex;flex-direction:column-reverse;gap:6px}',
+  ':where(.rp .field__label,.rp .form__label){display:block;font-size:.9em;opacity:.75}',
+  // Die Felder selbst mit dem Gewicht EINES Elementnamens: genug gegen den
+  // Grundabgleich eines Themes (`input{padding:0}`), zu wenig gegen jede
+  // Klassenregel (Dawns `.field__input`).
+  `${FELDER}{box-sizing:border-box;width:100%;min-height:48px;padding:12px 14px;` +
+    'font:inherit;color:inherit;background:transparent;border:1px solid currentColor;' +
+    'border-color:color-mix(in srgb,currentColor 35%,transparent);border-radius:8px}',
+  `${FELDER.split(',').map((f) => `${f}:focus`).join(',')}{outline:none;border-color:currentColor;box-shadow:inset 0 0 0 1px currentColor}`,
+  // Der Platzhalter wiederholt das Label (Dawn blendet ihn selbst aus).
+  `${FELDER.split(',').map((f) => `${f}::placeholder`).join(',')}{color:transparent}`,
+  ':where(.rp) textarea:where(.text-area){min-height:160px;resize:vertical}',
+  // Die aufgeklappte Liste zeichnet das Betriebssystem: Systemfarben, nicht die geerbte Schriftfarbe.
+  ':where(.rp .select__select option){color:CanvasText;background:Canvas}',
+  ':where(.rp .caption){font-size:.9em;opacity:.75}',
+  ':where(.rp .form__message){display:block;font-size:.9em}',
+  ':where(.rp .rp-fehler,.rp .form__message[role=alert]){color:#e5484d}',
+  ':where(.rp .contact__button){margin-top:20px}',
+  // Im Impact-Theme ist `.select` das Auswahlfeld selbst (Rahmen, feste Höhe) —
+  // hier ist es nur die Hülle um Feld und Pfeil.
+  '.rp div.select{display:block;height:auto;min-height:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none}',
+].join('')
+
+/**
+ * Layout-Regeln, die in jedem Theme gelten, und der unsichtbare Honigtopf —
+ * Farben, Schriften und der Knopf kommen vom Theme.
  */
 const STIL = [
+  GRUNDKLEID,
   '.rp .contact__fields{display:grid;grid-template-columns:1fr;column-gap:2rem}',
   '@media screen and (min-width:750px){.rp .contact__fields{grid-template-columns:repeat(2,1fr)}}',
   '.rp .field{margin-bottom:1.5rem}',
@@ -202,7 +244,10 @@ function fehlerZeile(name: AnfrageFeld, d: FormularDaten): string {
 
 /** Feld wie im Kontaktformular des Themes: Eingabe, dann schwebendes Label (braucht placeholder). */
 function eingabe(name: AnfrageFeld, d: FormularDaten, o: FeldOptionen = {}): string {
+  // Feld und Meldung in EINER Hülle: im zweispaltigen Raster steht die
+  // Meldung so unter ihrem Feld, nicht in der nächsten Zeile unter dem linken.
   return (
+    '<div class="rp-feld">' +
     '<div class="field">' +
     `<input class="field__input" type="${o.typ ?? 'text'}" ${attribute(name, d)} ` +
     `value="${liquidSicher(d.werte[name] ?? '')}" placeholder="${liquidSicher(B[name])}"` +
@@ -211,7 +256,8 @@ function eingabe(name: AnfrageFeld, d: FormularDaten, o: FeldOptionen = {}): str
     '>' +
     `<label class="field__label" for="rp-${name}">${beschriftungText(name, o.optional)}</label>` +
     '</div>' +
-    fehlerZeile(name, d)
+    fehlerZeile(name, d) +
+    '</div>'
   )
 }
 

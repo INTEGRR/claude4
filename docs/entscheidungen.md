@@ -9,6 +9,39 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Shop-Formulare: eigenes Grundkleid, weil der Shop das Theme gewechselt hat
+
+Revidiert die Regel vom 2026-10-01 („im Kleid des Themes, kein eigenes
+CSS außer Layout-Rückfällen") in einem Punkt.
+
+Der Betreiber mit einem Bildschirmfoto des Reparaturformulars im Shop: „Und
+was ist hier passiert?" — die Seite ohne Rand, rohe weiße Felder, das Label
+hinter dem Feld. An KRNL hatte sich nichts geändert: der Shop läuft seit dem
+Rebranding auf dem Theme „Impact" (aus der Seite gelesen:
+`Anvil_rebranding_theme_prod`, Schema Impact 7.2.0). Das Formular trägt die
+Klassen des Dawn-Kontaktformulars; die gibt es in Impact nicht, und
+`section-contact-form.css` liefert dort 404. Das Retourenportal nutzt
+dieselben Bausteine und war genauso betroffen.
+
+- **Die Formulare bringen ein eigenes Grundkleid mit** (`GRUNDKLEID` in
+  `modules/reparatur/shop-seiten.ts`): mittige Spalte, Label über dem Feld,
+  Felder mit Rahmen und Innenabstand, Fehlermeldung unter ihrem Feld.
+- **Weiter keine festen Farben oder Schriften** — die Seite erbt vom Theme
+  (`inherit`, `currentColor`, `transparent`, Systemfarben für die
+  aufgeklappte Auswahlliste). Einzige feste Farbe: das Rot der
+  Fehlermeldung. Der Grund von damals gilt unverändert: feste Farben waren
+  im dunklen Theme unlesbar.
+- **Ohne Klassengewicht** (`:where(…)`): ein Theme, das die Dawn-Klassen
+  kennt, überschreibt das Grundkleid mit jeder eigenen Regel. Ein
+  Theme-Wechsel in die andere Richtung bricht die Seite damit auch nicht.
+- Verworfen: das Markup auf die Klassen von Impact umzuschreiben. Das hielte
+  genau bis zum nächsten Theme-Wechsel.
+
+Geprüft gegen die echte Shop-Seite (ihr HTML und Stylesheet geladen, altes
+und neues Formular darin gerendert, Desktop und Handy). Wächter:
+`tests/shop-proxy.test.ts` (eigenes CSS erlaubt, feste Farben nicht). Doku:
+[website.md](website.md) „Im Shop (App Proxy)".
+
 ## 2026-11-28 — Schnellstopp: die feste Menge sperrt mit der Bestellung, nicht erst mit dem vollen Abgleich
 
 Revidiert am Eintrag darunter („Feste Menge") zwei Sätze: „Nach einem Kauf
