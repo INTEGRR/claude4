@@ -270,6 +270,36 @@ export const PRODUKTE = {
     revalidate: ['/produkte', '/produkte/:ergebnis', '/produkte/variante/:id'],
   },
 
+  'produkte.varianten_herausloesen': {
+    label: 'Alle Varianten als eigene Produkte führen',
+    bereich: 'produkte',
+    nurAdmin: true,
+    ki: true,
+    beschreibung:
+      'Macht aus JEDER Variante eines Produkts ein eigenes Produkt (record_id = product_templates.id) — für ' +
+      'Teile, die in Stücklisten stecken (Switches, Gehäuse, Plates, PCBs): ein Teil, ein Artikel. Jede ' +
+      'Variante behält ihre ID: Bestand, Zählungen, Lagerbewegungen, Stücklistenzeilen, Belege und ' +
+      'Artikelnummer bleiben unverändert an ihr. namen ist optional (Varianten-ID → neuer Produktname); ' +
+      'ohne Angabe heißt das Produkt „<Produktname> <Attributwerte>". Lieferantenpreise und Schlagworte ' +
+      'des alten Produkts gehen auf alle neuen über, das alte Produkt wird archiviert. Shop-Verknüpfungen ' +
+      'bleiben — im Shop sind die Artikel weiter Varianten des alten Produkts; Titel und Preise werden ' +
+      'dann in keiner Richtung abgeglichen. Nicht für gefertigte Produkte mit Stückliste.',
+    bindung: 'beleg',
+    prozessfrei: true,
+    schema: z.object({
+      namen: z.record(z.string(), z.string().trim().max(200)).optional().describe('Varianten-ID → Name des neuen Produkts'),
+    }),
+    zusammenfassung: () => 'Alle Varianten als eigene Produkte führen',
+    formdata: (fd) => {
+      const namen: Record<string, string> = {}
+      for (const [k, v] of fd.entries()) {
+        if (k.startsWith('name:') && String(v).trim()) namen[k.slice(5)] = String(v).trim()
+      }
+      return { namen }
+    },
+    revalidate: ['/produkte', '/produkte/:id'],
+  },
+
   'produkte.produkt_loeschen': {
     label: 'Produkt löschen',
     bereich: 'produkte',

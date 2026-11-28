@@ -9,6 +9,40 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Ein Teil, ein Artikel: alle Varianten eines Produkts als eigene Produkte
+
+Regel des Betreibers: „Alle Switches sollen einzelne Artikel sein … auch
+Mounting Plates usw., alles eigene, sobald sie in Stücklisten sind. Die
+Verknüpfungen zu Shopify machen wir später." Anlass: am Inventurtag waren
+Varianten eines Sammelprodukts („GATERON Switches (Typ: …)") in Suche,
+Zählung und Listen schwer zu greifen.
+
+Stand der Produktion (gelesen): von 59 Teilen in aktiven Stücklisten sind
+47 schon eigene Artikel; 12 hängen als Varianten an drei Sammelprodukten
+(GATERON G Pro 3.0 Switches, ANVIL Native 75 Case, NATIVE 75 Hot Swap PCB).
+
+- **Neue Aktion `produkte.varianten_herausloesen`** (nur Admin, Knopf am
+  Produkt): löst jede Variante heraus — derselbe Kern wie das einzelne
+  Herauslösen (0143): die Variante behält ihre ID, also Bestand, Zählungen,
+  Bewegungen, Stücklistenzeilen, Belege und Artikelnummer. Der Name ist je
+  Variante vorbelegt und änderbar.
+- **Das alte Produkt wird archiviert, nicht gelöscht**: seine Chronik
+  bleibt, und es steht für das Shop-Produkt, dessen Varianten die Artikel
+  im Shop weiter sind. Lieferantenpreise und Schlagworte, die am Produkt
+  als Ganzem hingen, gehen auf jedes neue über.
+- **Shopify bleibt, wie es ist.** Die Kopplung hängt an der Variante und
+  zieht mit um (`shop_herausgeloest`): Bestand und Bestellungen laufen
+  weiter, Titel und Preise werden nicht mehr abgeglichen. Es gibt nichts
+  nachzuverknüpfen — „später" entfällt, solange im Shop nichts umgebaut wird.
+- **Kein Automatismus.** Das Produkt zeigt einen Hinweis, sobald eine seiner
+  Varianten in einer Stückliste steckt; aufgeteilt wird per Knopf — die
+  Namen der neuen Artikel sind eine Entscheidung des Betreibers.
+- Nicht für gefertigte Produkte mit Stückliste (Tastaturen): deren Varianten
+  sind Konfigurationen, keine Teile.
+
+Nachweis: `tests/prozesse/anlegen-helfer.test.ts` („alle Varianten auf
+einmal"). Doku: [module/stammdaten.md](module/stammdaten.md).
+
 ## 2026-11-28 — Eine Suchregel für alle Artikelfelder, Scan-Feld sucht, Inventur ohne Tastaturen
 
 Fortsetzung des Inventurtags („alle Suchleisten … die sind ja sogar case

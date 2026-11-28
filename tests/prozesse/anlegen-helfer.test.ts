@@ -324,6 +324,54 @@ describe('Variante als eigenes Produkt herauslösen (0143)', () => {
     await assert.rejects(aktion('produkte.variante_herausloesen', board.id, { name: 'Board einzeln' }), /hat eine Stückliste/)
     await assert.rejects(aktion('produkte.variante_herausloesen', v.cherry, { name: '  ' }))
   })
+
+  test('alle Varianten auf einmal: ein Teil, ein Artikel — Bestand, Stückliste, Shop-Kopplung und Lieferantenpreis bleiben', async () => {
+    // GATERON Switches hat noch Yellow und Brown; Brown steckt in einer Stückliste und ist gezählt.
+    const alt = await h.sql<{ id: string; name: string }[]>`
+      select id, display_name as name from product_variants where template_id = ${v.gateron} and active order by display_name`
+    const [brown, yellow] = alt
+    await h.sql`update product_variants set sku = 'SW-GT-TB-T', shopify_variant_id = 'gid://shopify/ProductVariant/brown' where id = ${brown.id}`
+    const [ort] = await h.sql<{ id: string }[]>`select id from stock_locations where full_path = 'WH/Stock'`
+    const [z] = await h.sql<{ id: string }[]>`
+      insert into inventory_counts (location_id, variant_id, counted_qty, book_qty, note)
+      values (${ort.id}, ${brown.id}, 8800, 0, 'Test') returning id`
+    await h.sql`select inventory_apply(${z.id}, 'test')`
+    await aktion('fertigung.stueckliste_position_hinzufuegen', v.bomC, { component_variant_id: brown.id, qty: 85, ptav_ids: [] })
+    const [lieferant] = await h.sql<{ id: string }[]>`
+      insert into partners (name, is_vendor) values ('Gateron Ltd.', true) returning id`
+    await h.sql`insert into vendor_prices (vendor_id, template_id, price, min_qty) values (${lieferant.id}, ${v.gateron}, 0.21, 1000)`
+
+    const e = await aktion('produkte.varianten_herausloesen', v.gateron, { namen: { [yellow.id]: 'Gateron G Pro 3.0 Yellow' } })
+    assert.match(e.text ?? '', /2 eigene Produkte aus „GATERON Switches".*archiviert.*Im Shop bleibt 1 Artikel Variante von/)
+    const nach = await h.sql<
+      { id: string; name: string; produkt: string; aktiv: boolean; sku: string | null; bestand: number; in_stl: number; herausgeloest: boolean; preise: number }[]
+    >`
+      select pv.id, pv.display_name as name, pt.name as produkt, pt.active as aktiv, pv.sku, on_hand_qty(pv.id)::float as bestand,
+             (select count(*)::int from bom_lines l where l.component_variant_id = pv.id) as in_stl, pv.shop_herausgeloest as herausgeloest,
+             (select count(*)::int from vendor_prices vp where vp.template_id = pt.id) as preise
+      from product_variants pv join product_templates pt on pt.id = pv.template_id
+      where pv.id = any(${[brown.id, yellow.id]}::uuid[]) order by pv.display_name`
+    assert.deepEqual(nach.map((x) => ({ ...x })), [
+      // ohne Namensangabe: Produktname + Attributwert; dieselbe Varianten-ID wie vorher
+      { id: brown.id, name: 'GATERON Switches Brown', produkt: 'GATERON Switches Brown', aktiv: true, sku: 'SW-GT-TB-T', bestand: 8800, in_stl: 1, herausgeloest: true, preise: 1 },
+      { id: yellow.id, name: 'Gateron G Pro 3.0 Yellow', produkt: 'Gateron G Pro 3.0 Yellow', aktiv: true, sku: null, bestand: 0, in_stl: 0, herausgeloest: false, preise: 1 },
+    ])
+    const [huelle] = await h.sql<{ active: boolean; varianten: number }[]>`
+      select active, (select count(*)::int from product_variants x where x.template_id = pt.id) as varianten
+      from product_templates pt where id = ${v.gateron}`
+    assert.deepEqual({ ...huelle }, { active: false, varianten: 0 }, 'das alte Produkt bleibt als archivierte Hülle')
+
+    // Ein Shop-Update zum alten Shop-Produkt benennt keines der neuen Produkte um.
+    const { vorlageDesShopProdukts } = await import('../../src/modules/integrationen/produkt-import-logik.ts')
+    const verknuepft = await h.sql<{ template_id: string; herausgeloest: boolean }[]>`
+      select template_id, shop_herausgeloest as herausgeloest from product_variants where shopify_variant_id = 'gid://shopify/ProductVariant/brown'`
+    assert.equal(vorlageDesShopProdukts(verknuepft), null)
+
+    await assert.rejects(aktion('produkte.varianten_herausloesen', v.gateron, {}), /nicht gefunden oder archiviert/)
+    const [einzel] = await h.sql<{ template_id: string }[]>`select template_id from product_variants where id = ${brown.id}`
+    await assert.rejects(aktion('produkte.varianten_herausloesen', einzel.template_id, {}), /nur eine Variante/)
+    await assert.rejects(aktion('produkte.varianten_herausloesen', v.c, {}), /hat eine Stückliste/)
+  })
 })
 
 describe('Release per Knopfdruck: Shop-Projekt und Verkauf starten/stoppen', () => {

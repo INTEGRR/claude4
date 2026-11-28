@@ -1,3 +1,4 @@
+import type { TransactionSql } from 'postgres'
 import { sql, tx } from '@/db/client'
 import { shopifyConfigured } from '@/modules/integrationen/shopify'
 import { type ProduktEingabe, produktAnlegen } from '../../ki/produkt-anlegen.ts'
@@ -250,69 +251,156 @@ export async function variantenCodes(
  * Stücklistenzeilen und Belege hängen weiter an ihr. Das alte Produkt
  * verliert den Attributwert, die Shop-Verknüpfung bleibt an der Variante.
  */
+interface Herausgeloest {
+  neu: string
+  v: { template_id: string; produkt: string; alt_name: string; price_extra: number; im_shop: boolean; geschwister: number; stueckliste: boolean }
+}
+
+/**
+ * Kern des Herauslösens (0143): die Variante behält ihre ID und zieht auf ein
+ * neues Produkt um. `auchLetzte`: die Sammel-Aktion löst alle Varianten —
+ * die einzelne Aktion verweigert die letzte (dann reicht Umbenennen).
+ */
+async function herausloesenIn(
+  t: TransactionSql,
+  variantId: string,
+  name: string,
+  actor: string,
+  auchLetzte = false,
+): Promise<Herausgeloest> {
+  const [v] = await t<Herausgeloest['v'][]>`
+    select pv.template_id, pt.name as produkt, variant_display_name(pv.id) as alt_name, pv.price_extra::float,
+           pv.shopify_variant_id is not null as im_shop,
+           (select count(*)::int from product_variants x where x.template_id = pv.template_id and x.active and x.id <> pv.id) as geschwister,
+           exists (select 1 from boms b where b.active and (b.variant_id = pv.id or b.template_id = pv.template_id)) as stueckliste
+    from product_variants pv join product_templates pt on pt.id = pv.template_id
+    where pv.id = ${variantId} and pv.active
+    for update of pv`
+  if (!v) throw new Error('Variante nicht gefunden oder archiviert')
+  if (v.geschwister === 0 && !auchLetzte) {
+    throw new Error(`${v.alt_name} ist die einzige Variante von „${v.produkt}" — das Produkt einfach umbenennen.`)
+  }
+  if (v.stueckliste) {
+    throw new Error(`„${v.produkt}" hat eine Stückliste — Varianten eines gefertigten Produkts lassen sich nicht herauslösen.`)
+  }
+
+  const [neu] = await t<{ id: string }[]>`
+    insert into product_templates (
+      name, type, uom_id, purchase_uom_id, list_price, standard_cost, weight_g, invoice_policy, bill_policy,
+      route_mto, route_manufacture, route_buy, can_be_sold, can_be_purchased, category_id, sale_delay,
+      hs_code, country_of_origin, sale_tax_id, purchase_tax_id, description_purchase, description_picking,
+      responsible_id, tracking, kleinpaket, platzbedarf, shop_modus)
+    select ${name}, type, uom_id, purchase_uom_id, list_price + ${v.price_extra}, standard_cost, weight_g, invoice_policy, bill_policy,
+      route_mto, route_manufacture, route_buy, can_be_sold, can_be_purchased, category_id, sale_delay,
+      hs_code, country_of_origin, sale_tax_id, purchase_tax_id, description_purchase, description_picking,
+      responsible_id, tracking, kleinpaket, platzbedarf, shop_modus
+    from product_templates where id = ${v.template_id}
+    returning id`
+
+  const werte = await t<{ ptav_id: string }[]>`
+    delete from product_variant_attribute_values where variant_id = ${variantId} returning ptav_id`
+  await t`
+    update product_variants
+       set template_id = ${neu.id}, price_extra = 0, shop_herausgeloest = ${v.im_shop}
+     where id = ${variantId}`
+  await t`select refresh_variant_display_name(${variantId})`
+  // Lieferantenpreise der Variante ziehen mit.
+  await t`update vendor_prices set template_id = ${neu.id} where variant_id = ${variantId}`
+  // Der Attributwert am alten Produkt entfällt, wenn ihn keine Variante mehr trägt —
+  // sonst erzeugte „Varianten erzeugen" die herausgelöste Kombination neu.
+  await t`
+    delete from product_template_attribute_values ptav
+    where ptav.id = any(${werte.map((w) => w.ptav_id)}::uuid[])
+      and not exists (select 1 from product_variant_attribute_values a where a.ptav_id = ptav.id)`
+
+  await t`select log_event('product_template', ${neu.id}, 'note',
+    ${`Aus „${v.produkt}" herausgelöst (vorher: ${v.alt_name})${v.im_shop ? ' — im Shop weiter Variante von „' + v.produkt + '"' : ''}`}, ${actor})`
+  await t`select log_event('product_template', ${v.template_id}, 'note',
+    ${`Variante herausgelöst: ${v.alt_name} ist jetzt das eigene Produkt „${name}"`}, ${actor})`
+  return { neu: neu.id, v }
+}
+
 export async function varianteHerausloesen(p: { name: string }, ctx: AktionsKontext): Promise<AktionsErgebnis> {
-  const variantId = ctx.recordId!
   const name = p.name.trim()
-  const ergebnis = await tx(async (t) => {
-    const [v] = await t<
-      { template_id: string; produkt: string; alt_name: string; price_extra: number; im_shop: boolean; geschwister: number; stueckliste: boolean }[]
-    >`
-      select pv.template_id, pt.name as produkt, variant_display_name(pv.id) as alt_name, pv.price_extra::float,
-             pv.shopify_variant_id is not null as im_shop,
-             (select count(*)::int from product_variants x where x.template_id = pv.template_id and x.active and x.id <> pv.id) as geschwister,
-             exists (select 1 from boms b where b.active and (b.variant_id = pv.id or b.template_id = pv.template_id)) as stueckliste
-      from product_variants pv join product_templates pt on pt.id = pv.template_id
-      where pv.id = ${variantId} and pv.active
-      for update of pv`
-    if (!v) throw new Error('Variante nicht gefunden oder archiviert')
-    if (v.geschwister === 0) {
-      throw new Error(`${v.alt_name} ist die einzige Variante von „${v.produkt}" — das Produkt einfach umbenennen.`)
-    }
-    if (v.stueckliste) {
-      throw new Error(`„${v.produkt}" hat eine Stückliste — Varianten eines gefertigten Produkts lassen sich nicht herauslösen.`)
-    }
-
-    const [neu] = await t<{ id: string }[]>`
-      insert into product_templates (
-        name, type, uom_id, purchase_uom_id, list_price, standard_cost, weight_g, invoice_policy, bill_policy,
-        route_mto, route_manufacture, route_buy, can_be_sold, can_be_purchased, category_id, sale_delay,
-        hs_code, country_of_origin, sale_tax_id, purchase_tax_id, description_purchase, description_picking,
-        responsible_id, tracking, kleinpaket, platzbedarf, shop_modus)
-      select ${name}, type, uom_id, purchase_uom_id, list_price + ${v.price_extra}, standard_cost, weight_g, invoice_policy, bill_policy,
-        route_mto, route_manufacture, route_buy, can_be_sold, can_be_purchased, category_id, sale_delay,
-        hs_code, country_of_origin, sale_tax_id, purchase_tax_id, description_purchase, description_picking,
-        responsible_id, tracking, kleinpaket, platzbedarf, shop_modus
-      from product_templates where id = ${v.template_id}
-      returning id`
-
-    const werte = await t<{ ptav_id: string }[]>`
-      delete from product_variant_attribute_values where variant_id = ${variantId} returning ptav_id`
-    await t`
-      update product_variants
-         set template_id = ${neu.id}, price_extra = 0, shop_herausgeloest = ${v.im_shop}
-       where id = ${variantId}`
-    await t`select refresh_variant_display_name(${variantId})`
-    // Lieferantenpreise der Variante ziehen mit.
-    await t`update vendor_prices set template_id = ${neu.id} where variant_id = ${variantId}`
-    // Der Attributwert am alten Produkt entfällt, wenn ihn keine Variante mehr trägt —
-    // sonst erzeugte „Varianten erzeugen" die herausgelöste Kombination neu.
-    await t`
-      delete from product_template_attribute_values ptav
-      where ptav.id = any(${werte.map((w) => w.ptav_id)}::uuid[])
-        and not exists (select 1 from product_variant_attribute_values a where a.ptav_id = ptav.id)`
-
-    await t`select log_event('product_template', ${neu.id}, 'note',
-      ${`Aus „${v.produkt}" herausgelöst (vorher: ${v.alt_name})${v.im_shop ? ' — im Shop weiter Variante von „' + v.produkt + '"' : ''}`}, ${ctx.actor})`
-    await t`select log_event('product_template', ${v.template_id}, 'note',
-      ${`Variante herausgelöst: ${v.alt_name} ist jetzt das eigene Produkt „${name}"`}, ${ctx.actor})`
-    return { neu: neu.id, v }
-  })
+  const ergebnis = await tx((t) => herausloesenIn(t, ctx.recordId!, name, ctx.actor))
   return {
     recordId: ergebnis.neu,
     link: `/produkte/${ergebnis.neu}`,
     text:
       `„${name}" ist jetzt ein eigenes Produkt (vorher ${ergebnis.v.alt_name}). Bestand, Stücklisten und Belege hängen unverändert daran.` +
       (ergebnis.v.im_shop ? ` Im Shop bleibt es Variante von „${ergebnis.v.produkt}"; Titel und Preise werden nicht abgeglichen.` : ''),
+  }
+}
+
+/**
+ * Alle Varianten eines Produkts als eigene Produkte (2026-11-28): „ein Teil,
+ * ein Artikel" für alles, was in Stücklisten steckt. Lieferantenpreise und
+ * Schlagworte des alten Produkts gehen auf jedes neue über; das alte Produkt
+ * bleibt als archivierte Hülle (seine Chronik, und im Shop das Produkt, dessen
+ * Varianten die Artikel dort weiter sind).
+ */
+export async function variantenHerausloesen(
+  p: { namen?: Record<string, string> },
+  ctx: AktionsKontext,
+): Promise<AktionsErgebnis> {
+  const templateId = ctx.recordId!
+  const ergebnis = await tx(async (t) => {
+    const [pt] = await t<{ name: string }[]>`
+      select name from product_templates where id = ${templateId} and active for update`
+    if (!pt) throw new Error('Produkt nicht gefunden oder archiviert')
+    const varianten = await t<{ id: string; vorschlag: string }[]>`
+      select pv.id, ${pt.name} || coalesce(' ' || (
+               select string_agg(av.name, ' ' order by al.sequence, a.name)
+               from product_variant_attribute_values pvav
+               join product_template_attribute_values ptav on ptav.id = pvav.ptav_id
+               join product_template_attribute_lines al on al.id = ptav.line_id
+               join product_attributes a on a.id = al.attribute_id
+               join product_attribute_values av on av.id = ptav.value_id
+               where pvav.variant_id = pv.id), '') as vorschlag
+      from product_variants pv where pv.template_id = ${templateId} and pv.active
+      order by pv.display_name`
+    if (varianten.length < 2) {
+      throw new Error(`„${pt.name}" hat nur eine Variante — es ist schon ein eigener Artikel.`)
+    }
+    const namen = varianten.map((v) => p.namen?.[v.id]?.trim() || v.vorschlag)
+    const doppelt = namen.find((n, i) => namen.indexOf(n) !== i)
+    if (doppelt) throw new Error(`Der Name „${doppelt}" ist doppelt vergeben — jedes neue Produkt braucht einen eigenen Namen.`)
+
+    const neue: string[] = []
+    let imShop = 0
+    for (const [i, v] of varianten.entries()) {
+      const r = await herausloesenIn(t, v.id, namen[i], ctx.actor, true)
+      neue.push(r.neu)
+      if (r.v.im_shop) imShop += 1
+    }
+    // Was am alten Produkt als Ganzem hing, gilt für jedes der neuen.
+    await t`
+      insert into vendor_prices (vendor_id, template_id, min_qty, price, currency, lead_time_days, vendor_product_code,
+                                 sequence, discount, date_start, date_end, product_name, angebot_staffel_id, vertrag_id)
+      select vp.vendor_id, n.id, vp.min_qty, vp.price, vp.currency, vp.lead_time_days, vp.vendor_product_code,
+             vp.sequence, vp.discount, vp.date_start, vp.date_end, vp.product_name, vp.angebot_staffel_id, vp.vertrag_id
+      from vendor_prices vp cross join unnest(${neue}::uuid[]) as n(id)
+      where vp.template_id = ${templateId} and vp.variant_id is null`
+    await t`
+      insert into product_tag_links (template_id, tag_id)
+      select n.id, l.tag_id from product_tag_links l cross join unnest(${neue}::uuid[]) as n(id)
+      where l.template_id = ${templateId}
+      on conflict do nothing`
+    await t`update product_templates set active = false where id = ${templateId}`
+    await t`select log_event('product_template', ${templateId}, 'note',
+      ${`Alle ${varianten.length} Varianten sind jetzt eigene Produkte — dieses Produkt ist archiviert.`}, ${ctx.actor})`
+    return { anzahl: varianten.length, namen, imShop, name: pt.name }
+  })
+  return {
+    recordId: templateId,
+    link: '/produkte',
+    text:
+      `${ergebnis.anzahl} eigene Produkte aus „${ergebnis.name}": ${ergebnis.namen.join(', ')}. ` +
+      'Bestand, Zählungen, Stücklisten und Belege hängen unverändert an den Artikeln; das alte Produkt ist archiviert.' +
+      (ergebnis.imShop > 0
+        ? ` Im Shop ${ergebnis.imShop === 1 ? 'bleibt 1 Artikel Variante' : `bleiben ${ergebnis.imShop} Artikel Varianten`} von „${ergebnis.name}"; Bestand und Bestellungen laufen weiter, Titel und Preise werden nicht abgeglichen.`
+        : ''),
+    daten: { produkte: ergebnis.anzahl },
   }
 }
 

@@ -76,6 +76,13 @@ export async function varianteHerausloesen(variantId: string, formData: FormData
   return ergebnis
 }
 
+/** Alle Varianten eines Produkts als eigene Produkte — danach in die Produktliste. */
+export async function alleVariantenHerausloesen(templateId: string, formData: FormData): Promise<ActionResult> {
+  const ergebnis = await serverAktion('produkte.varianten_herausloesen', { recordId: templateId, formData })
+  if (isActionError(ergebnis)) return ergebnis
+  redirect('/produkte')
+}
+
 export async function restoreProduct(templateId: string): Promise<ActionResult> {
   return serverAktion('produkte.produkt_wiederherstellen', { recordId: templateId })
 }

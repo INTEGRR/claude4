@@ -280,6 +280,7 @@ export const AUSFUEHRUNG = {
   'produkte.variante_codes': produkte.varianteCodes,
   'produkte.varianten_codes': produkte.variantenCodes,
   'produkte.shop_projekt_setzen': produkte.shopProjektSetzen,
+  'produkte.varianten_herausloesen': produkte.variantenHerausloesen,
   'produkte.auflage_setzen': produkte.auflageSetzen,
   'produkte.variante_herausloesen': produkte.varianteHerausloesen,
   'produkte.produkt_loeschen': produkte.produktLoeschen,

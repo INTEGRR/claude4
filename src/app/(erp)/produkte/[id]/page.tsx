@@ -7,6 +7,7 @@ import { Card, Empty, PageHeader, TableWrap } from '@/components/ui'
 import { money, plural, qty } from '@/modules/shared/format'
 import {
   addAttribute,
+  alleVariantenHerausloesen,
   addVendorPrice,
   deleteProduct,
   deleteVendorPrice,
@@ -25,6 +26,7 @@ import { RecordComments } from '@/components/record-comments'
 import { DokumenteKarte } from '@/components/dokumente'
 import { TagEditor } from '@/components/tag-editor'
 import { Auswahl } from '@/components/auswahl'
+import { Schublade } from '@/components/schublade'
 import { kurzKategorie, kurzLieferant } from '@/app/(erp)/kurzanlage'
 
 export const dynamic = 'force-dynamic'
@@ -85,10 +87,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       barcode: string | null
       on_hand: number
       shopify_variant_id: string | null
+      in_stueckliste: boolean
+      werte: string | null
     }[]
   >`
-    select id, display_name, sku, barcode, on_hand_qty(id) as on_hand, shopify_variant_id
-    from product_variants where template_id = ${id} and (active or not ${tpl.active}) order by display_name`
+    select pv.id, pv.display_name, pv.sku, pv.barcode, on_hand_qty(pv.id) as on_hand, pv.shopify_variant_id,
+           exists (select 1 from bom_lines bl join boms b on b.id = bl.bom_id and b.active
+                   where bl.component_variant_id = pv.id) as in_stueckliste,
+           (select string_agg(av.name, ' ' order by al.sequence, a.name)
+              from product_variant_attribute_values pvav
+              join product_template_attribute_values ptav on ptav.id = pvav.ptav_id
+              join product_template_attribute_lines al on al.id = ptav.line_id
+              join product_attributes a on a.id = al.attribute_id
+              join product_attribute_values av on av.id = ptav.value_id
+             where pvav.variant_id = pv.id) as werte
+    from product_variants pv where pv.template_id = ${id} and (pv.active or not ${tpl.active}) order by pv.display_name`
 
   const attributes = await sql<{ attribute: string; values: string[] }[]>`
     select a.name as attribute,
@@ -599,6 +612,38 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           unten auf den Namen klicken — oder gesammelt unter{' '}
           <Link href="/verkauf/shop-verfuegbarkeit?ansicht=artikel">Shop-Verfügbarkeit → Teile und Artikel</Link>.
         </p>
+      )}
+      {/* Ein Teil, ein Artikel (2026-11-28): Varianten, die in Stücklisten stecken, als eigene Produkte führen. */}
+      {hatRolle(user.rollen, 'admin') && tpl.active && variants.length > 1 && boms.length === 0 && (
+        <div className={variants.some((v) => v.in_stueckliste) ? 'notice warn' : undefined} style={{ marginBottom: 12 }}>
+          {variants.some((v) => v.in_stueckliste) && (
+            <p style={{ margin: '0 0 8px' }}>
+              {plural(variants.filter((v) => v.in_stueckliste).length, 'Variante steckt', 'Varianten stecken')} in
+              Stücklisten. Teile sollen eigene Artikel sein — als Varianten eines Sammelprodukts sind sie in Suche,
+              Inventur und Listen schwer zu greifen.
+            </p>
+          )}
+          <Schublade id="alle-herausloesen" knopf="Alle Varianten als eigene Artikel führen" knopfKlasse="" titel={`„${tpl.name}" in eigene Artikel aufteilen`}>
+            <ActionForm action={alleVariantenHerausloesen.bind(null, id)}>
+              <p className="small" style={{ marginTop: 0 }}>
+                Jede Variante wird ein eigenes Produkt. Bestand, Zählungen, Lagerbewegungen, Stücklisten, Belege und
+                Artikelnummern bleiben unverändert an den Artikeln; „{tpl.name}" wird archiviert.
+                {variants.some((v) => v.shopify_variant_id) &&
+                  ' Im Shop ändert sich nichts: die Artikel bleiben dort Varianten dieses Produkts, Bestand und Bestellungen laufen weiter — Titel und Preise werden nicht mehr abgeglichen.'}
+              </p>
+              {variants.map((v) => (
+                <label key={v.id} className="field">
+                  <span>
+                    {v.display_name}
+                    {v.sku ? ` · ${v.sku}` : ''}
+                  </span>
+                  <input name={`name:${v.id}`} required maxLength={200} defaultValue={`${tpl.name}${v.werte ? ` ${v.werte}` : ''}`} />
+                </label>
+              ))}
+              <button className="primary" type="submit">In {variants.length} Artikel aufteilen</button>
+            </ActionForm>
+          </Schublade>
+        </div>
       )}
       <div id="varianten" />
       <Card title={`Varianten (${variants.length})`} tight>
