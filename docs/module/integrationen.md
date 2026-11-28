@@ -239,8 +239,11 @@ Bestand, „aus", Sperre). Die Karte auf der Integrationen-Seite zeigt weiter
 nur Abweichungen, höchstens 50. Einordnung
 (`bestandsliste-logik.ts`): bei Tastaturen zählt nur kaufbar oder nicht (die
 feste Menge ist keine Bestandszahl), bei Lagerartikeln auch die Zahl;
-Entwürfe und archivierte Shop-Produkte gelten nicht als Abweichung. Nur
-lesend.
+Entwürfe und archivierte Shop-Produkte gelten nicht als Abweichung. Die
+Liste ist nach dem Status des Shop-Produkts gruppiert (Aktiv, Nur per Link,
+Entwurf, Archiviert), darin nach Produkt; Zweitangebote tragen den Status
+seit 0148 (`shopify_zweitangebote.shop_status`, gefüllt beim Lesen des
+Shop-Stands). Nur lesend.
 
 **Schnellstopp (feste Menge, seit 2026-11-28).** Der Stopp hängt an der
 Bestellung selbst, nicht am vollen Abgleich:
@@ -603,6 +606,10 @@ Filtern rein in `shop-artikel-liste.ts` (Test `tests/shop-artikel-liste.test.ts`
     dem vollen Bestand). Dieselben Felder stehen mit ausgeschriebener
     Erklärung auch am Produkt bzw. an der Variante (Karte
     „Shop-Verfügbarkeit", `components/shop-regel-karte.tsx`).
+    Weil die Sperre damit ganze Tastaturen aus dem Verkauf nimmt, steht seit
+    2026-11-28 an beiden Stellen, an denen sie gesetzt wird, ein sichtbarer
+    Hinweis mit der Zahl der betroffenen Tastaturen; wer nur den
+    Einzelartikel meint, nimmt „Nicht einzeln verkaufen".
   - **Artikel / Variante**: `shop_modus` auto (berechnet), **immer**
     (Deckel — Switch-Tester; der 3D-Druck ist schnell nachgebaut), **aus**
     (0 — Black Week Editions); die Variante überstimmt den Artikel.

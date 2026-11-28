@@ -70,7 +70,7 @@ export async function bestandsliste(): Promise<{ zeilen: BestandZeile[]; gelesen
     select pv.id, pv.template_id, coalesce(z.produkt, 'Zweitangebot') as produkt,
            coalesce(nullif(z.sku, ''), pv.display_name) as variante, coalesce(nullif(z.sku, ''), nullif(pv.sku, '')) as sku,
            ist_made_to_order(pv.id) as mto, true as zweitangebot,
-           null as status, z.shop_qty::float as shop, z.shop_verkaufbar as verkaufbar, null as policy, null as tracked,
+           z.shop_status as status, z.shop_qty::float as shop, z.shop_verkaufbar as verkaufbar, null as policy, null as tracked,
            coalesce(z.kontingent, shopify_soll_menge_zweitangebot(z.id))::float as krnl,
            case when z.shop_modus = 'aus' or shop_modus_von(pv.id) = 'aus' then 'steht in KRNL auf „aus"'
                 when z.shop_modus = 'immer' then 'steht in KRNL auf „immer verfügbar"'

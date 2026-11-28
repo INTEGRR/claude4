@@ -17,6 +17,15 @@ const TEXT: Record<Einordnung, { wort: string; ton: string; hinweis: string }> =
   unsichtbar: { wort: 'im Shop nicht sichtbar', ton: 'neutral', hinweis: 'Entwurf oder archiviert' },
 }
 
+/** Abschnitte der Liste: der Status des Shop-Produkts — er entscheidet, ob Kunden das Angebot überhaupt sehen. */
+const ABSCHNITTE: { status: string | null; ton: string; text: string }[] = [
+  { status: 'ACTIVE', ton: 'success', text: 'im Shop sichtbar und kaufbar' },
+  { status: 'UNLISTED', ton: 'info', text: 'nicht in Listen und Suche, mit direktem Link kaufbar' },
+  { status: 'DRAFT', ton: 'neutral', text: 'für Kunden nicht sichtbar — was KRNL meldet, ändert im Shop nichts Sichtbares' },
+  { status: 'ARCHIVED', ton: 'neutral', text: 'für Kunden nicht sichtbar' },
+  { status: null, ton: 'warn', text: 'der Shop-Stand dieses Angebots wurde noch nicht gelesen (läuft viertelstündlich)' },
+]
+
 const FILTER = [
   { wert: 'alle', text: 'Alle' },
   { wert: 'abweichung', text: 'Nur Abweichungen' },
@@ -49,11 +58,18 @@ export default async function BestandsabgleichPage({
 
   const zahl = (e: Einordnung) => zeilen.filter((z) => z.einordnung === e).length
   const gezeigt = zeilen.filter((z) => passt(z, zeige, q))
-  const gruppen = new Map<string, BestandZeile[]>()
-  for (const z of gezeigt) {
-    const schluessel = `${z.zweitangebot ? 'z' : 'v'}:${z.produkt}`
-    gruppen.set(schluessel, [...(gruppen.get(schluessel) ?? []), z])
-  }
+  // Erst nach Shop-Status, darin nach Produkt.
+  const bekannt = new Set(ABSCHNITTE.map((a) => a.status))
+  const abschnitte = ABSCHNITTE.map((a) => {
+    const gruppen = new Map<string, BestandZeile[]>()
+    for (const z of gezeigt) {
+      const status = bekannt.has(z.status) ? z.status : null
+      if (status !== a.status) continue
+      const schluessel = `${z.zweitangebot ? 'z' : 'v'}:${z.produkt}`
+      gruppen.set(schluessel, [...(gruppen.get(schluessel) ?? []), z])
+    }
+    return { ...a, gruppen, zahl: [...gruppen.values()].reduce((n, g) => n + g.length, 0) }
+  }).filter((a) => a.zahl > 0)
   const link = (wert: string) => {
     const p = new URLSearchParams()
     if (wert !== 'alle') p.set('zeige', wert)
@@ -127,52 +143,64 @@ export default async function BestandsabgleichPage({
                   <th>Warum diese Menge</th>
                 </tr>
               </thead>
-              {[...gruppen.entries()].map(([schluessel, gruppe]) => {
-                const erste = gruppe[0]
-                const abweichend = gruppe.filter((z) => z.einordnung !== 'gleich' && z.einordnung !== 'unsichtbar').length
-                return (
-                  <tbody key={schluessel}>
-                    <tr>
-                      <th colSpan={6} style={{ textAlign: 'left', paddingTop: 16 }}>
-                        {erste.zweitangebot ? (
-                          <>{erste.produkt} <span className="small muted">— weiteres Shop-Angebot</span></>
-                        ) : (
-                          <Link href={`/produkte/${erste.template_id}`}>{erste.produkt}</Link>
-                        )}{' '}
-                        <span className="small muted">
-                          · {erste.mto ? 'Tastatur (auf Bestellung gebaut)' : 'Lagerartikel'}
-                          {erste.status ? ` · im Shop ${label('shop_produkt', erste.status)}` : ''} · {plural(gruppe.length, 'Variante', 'Varianten')}
-                          {abweichend > 0 ? ` · ${plural(abweichend, 'Abweichung', 'Abweichungen')}` : ''}
-                        </span>
-                      </th>
-                    </tr>
-                    {gruppe.map((z, i) => (
-                      <tr key={`${z.variant_id}-${i}`}>
-                        <td>
-                          <Link href={`/produkte/variante/${z.variant_id}?direkt=1`}>{z.variante || z.produkt}</Link>
-                        </td>
-                        <td className="mono small">{z.sku ?? '—'}</td>
-                        <td className="num">
-                          {z.shop === null ? '—' : qty(z.shop)}
-                          {z.ohneBestand && <div className="small muted">verkauft ohne Bestand</div>}
-                        </td>
-                        <td className="num">{qty(z.krnl)}</td>
-                        <td>
-                          <span className={`badge ${TEXT[z.einordnung].ton}`} title={TEXT[z.einordnung].hinweis}>
-                            {TEXT[z.einordnung].wort}
+              {abschnitte.map((abschnitt) => (
+                <tbody key={abschnitt.status ?? 'unbekannt'}>
+                  <tr>
+                    <th colSpan={6} style={{ textAlign: 'left', paddingTop: 22 }}>
+                      <span className={`badge ${abschnitt.ton}`}>
+                        {abschnitt.status ? label('shop_produkt', abschnitt.status) : 'Status noch nicht gelesen'}
+                      </span>{' '}
+                      <span className="small muted">
+                        {plural(abschnitt.zahl, 'Angebot', 'Angebote')} · {abschnitt.text}
+                      </span>
+                    </th>
+                  </tr>
+                  {[...abschnitt.gruppen.entries()].flatMap(([schluessel, gruppe]) => {
+                    const erste = gruppe[0]
+                    const abweichend = gruppe.filter((z) => z.einordnung !== 'gleich' && z.einordnung !== 'unsichtbar').length
+                    return [
+                      <tr key={schluessel}>
+                        <th colSpan={6} style={{ textAlign: 'left', paddingTop: 12 }}>
+                          {erste.zweitangebot ? (
+                            <>{erste.produkt} <span className="small muted">— weiteres Shop-Angebot</span></>
+                          ) : (
+                            <Link href={`/produkte/${erste.template_id}`}>{erste.produkt}</Link>
+                          )}{' '}
+                          <span className="small muted">
+                            · {erste.mto ? 'Tastatur (auf Bestellung gebaut)' : 'Lagerartikel'} · {plural(gruppe.length, 'Variante', 'Varianten')}
+                            {abweichend > 0 ? ` · ${plural(abweichend, 'Abweichung', 'Abweichungen')}` : ''}
                           </span>
-                        </td>
-                        <td className="small">{z.grund}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                )
-              })}
+                        </th>
+                      </tr>,
+                      ...gruppe.map((z, i) => (
+                        <tr key={`${schluessel}-${z.variant_id}-${i}`}>
+                          <td>
+                            <Link href={`/produkte/variante/${z.variant_id}?direkt=1`}>{z.variante || z.produkt}</Link>
+                          </td>
+                          <td className="mono small">{z.sku ?? '—'}</td>
+                          <td className="num">
+                            {z.shop === null ? '—' : qty(z.shop)}
+                            {z.ohneBestand && <div className="small muted">verkauft ohne Bestand</div>}
+                          </td>
+                          <td className="num">{qty(z.krnl)}</td>
+                          <td>
+                            <span className={`badge ${TEXT[z.einordnung].ton}`} title={TEXT[z.einordnung].hinweis}>
+                              {TEXT[z.einordnung].wort}
+                            </span>
+                          </td>
+                          <td className="small">{z.grund}</td>
+                        </tr>
+                      )),
+                    ]
+                  })}
+                </tbody>
+              ))}
             </table>
           </TableWrap>
         )}
         <p className="small muted" style={{ margin: '12px 0 0' }}>
-          {plural(gezeigt.length, 'Angebot', 'Angebote')} gezeigt von {qty(zeilen.length)}. Bei Tastaturen zählt nur kaufbar
+          {plural(gezeigt.length, 'Angebot', 'Angebote')} gezeigt von {qty(zeilen.length)}, gruppiert nach dem Status des
+          Shop-Produkts (Aktiv, Nur per Link, Entwurf). Entwürfe zählen nie als Abweichung. Bei Tastaturen zählt nur kaufbar
           oder nicht — die feste Menge ist keine Bestandszahl. „Engpass" nennt das Teil, das als erstes ausgeht.
         </p>
       </Card>

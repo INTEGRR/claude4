@@ -542,7 +542,8 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
             <p className="small muted" style={{ margin: '6px 0 0' }}>
               <strong>Nicht einzeln verkaufen</strong> (nur Shopartikel): der Artikel wird im Shop nicht einzeln
               angeboten; Tastaturen, die ihn brauchen, sind nicht betroffen. <strong>Für den Shop sperren:</strong>{' '}
-              der Artikel zählt für den Shop als 0 — auch jede Tastatur, die ihn braucht, ist dann ausverkauft.{' '}
+              der Artikel zählt für den Shop als 0 — <strong>auch jede Tastatur, die ihn braucht, ist dann
+              ausverkauft</strong> (an der Regel steht, wie viele es sind).{' '}
               <strong>Aus unter N:</strong> Notreserve — für den Shop zählt nur, was über N liegt, im Einzelverkauf
               und in Tastaturen. Nur bei Shopartikeln und nur für den Einzelverkauf: <strong>Rückhalt</strong> — so
               viele Stück bleiben der Fertigung; <strong>höchstens</strong> — nie mehr gleichzeitig im Shop anbieten.
@@ -632,6 +633,11 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
                               >
                                 <input type="checkbox" name="zurueckhalten" defaultChecked={z.zurueck} /> für den Shop sperren
                               </label>
+                              {z.stuecklisten > 0 && (
+                                <span className="small" role="note" style={{ color: 'var(--warn)' }}>
+                                  Achtung: sperrt auch {plural(z.stuecklisten, 'Tastatur', 'Tastaturen')}
+                                </span>
+                              )}
                               <button type="submit" className="small">
                                 OK
                               </button>

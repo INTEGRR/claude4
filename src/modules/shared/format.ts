@@ -398,10 +398,10 @@ export const LABELS = {
   },
   // Produktstatus im Shop (Shopify), wie ihn der Shop-Stand liefert.
   shop_produkt: {
-    ACTIVE: 'aktiv',
-    UNLISTED: 'nur per Link',
+    ACTIVE: 'Aktiv',
+    UNLISTED: 'Nur per Link',
     DRAFT: 'Entwurf',
-    ARCHIVED: 'archiviert',
+    ARCHIVED: 'Archiviert',
   },
 } as const
 

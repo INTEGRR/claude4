@@ -4,7 +4,7 @@ import { ActionForm } from '@/components/action-button'
 import { Auswahl } from '@/components/auswahl'
 import { Card } from '@/components/ui'
 import type { ActionResult } from '@/modules/shared/action'
-import { qty } from '@/modules/shared/format'
+import { plural, qty } from '@/modules/shared/format'
 
 /**
  * Shop-Regeln eines Artikels direkt am Produkt bzw. Material (0142,
@@ -107,9 +107,17 @@ export async function ShopRegelKarte({
             <span>
               <strong>Für den Shop sperren</strong>
               <span className="small muted" style={{ display: 'block' }}>
-                Der Artikel zählt für den Shop als 0 — auch jede Tastatur, die ihn braucht, ist dann ausverkauft. Die
-                Fertigung sieht weiter den echten Bestand.
+                Der Artikel zählt für den Shop als 0. Die Fertigung sieht weiter den echten Bestand.
               </span>
+              {v.tastaturen > 0 ? (
+                <span className="small" role="note" style={{ display: 'block', color: 'var(--warn)' }}>
+                  Achtung: Damit {v.tastaturen === 1 ? 'ist' : 'sind'} auch {plural(v.tastaturen, 'Shop-Tastatur', 'Shop-Tastaturen')} ausverkauft
+                  — jede Variante, die dieses Teil braucht.
+                  {v.im_shop ? ' Soll nur der Einzelartikel aus dem Shop: „Nicht einzeln verkaufen" nehmen.' : ''}
+                </span>
+              ) : (
+                <span className="small muted" style={{ display: 'block' }}>Steckt in keiner Shop-Tastatur — betrifft nur diesen Artikel.</span>
+              )}
             </span>
           </label>
           <div className="row" style={{ marginBottom: 0 }}>

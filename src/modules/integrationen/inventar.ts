@@ -1052,7 +1052,8 @@ export async function shopStandHolen(): Promise<{
         ergebnis.zweitangebote++
         await sql`
           update shopify_zweitangebote
-          set shop_qty = ${n.inventoryQuantity}, shop_seen_at = now(), shop_verkaufbar = ${n.availableForSale}
+          set shop_qty = ${n.inventoryQuantity}, shop_seen_at = now(), shop_verkaufbar = ${n.availableForSale},
+              shop_status = ${n.product.status ?? null}
           where shopify_variant_id = ${n.id}`
         continue
       }

@@ -9,6 +9,46 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Bestandsliste nach Shop-Status gruppiert; Entwürfe sind nie eine Abweichung
+
+Ergänzt den Eintrag „Bestandsabgleich als vollständige Liste" vom selben
+Tag. Der Betreiber nach dem ersten Blick: „Wenn in Shopify was auf Draft
+steht, ist es nicht ‚ginge aus dem Verkauf'. Hinweis active, draft, link
+access fehlt. Gruppieren bitte."
+
+- **Ursache:** Für Zweitangebote (z. B. die alten „Black Week Editions")
+  merkte sich KRNL den Status des Shop-Produkts nicht. Ohne Status galten
+  sie als sichtbar — ein Entwurf mit Menge im Shop und 0 von KRNL stand als
+  „ginge aus dem Verkauf".
+- **Migration 0148:** `shopify_zweitangebote.shop_status`, gefüllt beim
+  Lesen des Shop-Stands (viertelstündlich und von Hand), wie bei den
+  verknüpften Varianten.
+- **Die Liste ist nach dem Status gruppiert:** Aktiv, Nur per Link, Entwurf,
+  Archiviert, „Status noch nicht gelesen" — mit Schild und einem Satz, was
+  der Status für Kunden bedeutet. Entwürfe und Archiviertes zählen nie als
+  Abweichung. Die Beschriftungen stehen in `LABELS.shop_produkt`.
+
+Doku: [module/integrationen.md](module/integrationen.md).
+
+## 2026-11-28 — „Für den Shop sperren" warnt sichtbar: die Tastaturen mit dem Teil sind auch weg
+
+Der Betreiber, nachdem der Unterschied zu „Nicht einzeln verkaufen" erklärt
+war: „Für den Shop sperren — Warnhinweis (Parent-Artikel auch weg)." Die
+Folge stand bisher nur im Hilfetext bzw. im Tooltip; wer die 90er-Packung
+eines Switches aus dem Shop nehmen will und „sperren" anhakt, nimmt damit
+jede Tastatur mit diesem Switch aus dem Verkauf.
+
+- An beiden Stellen, an denen die Sperre gesetzt wird (Karte
+  „Shop-Verfügbarkeit" am Artikel, Zeile in Verkauf → Shop-Verfügbarkeit →
+  „Teile und Artikel"), steht ein sichtbarer Hinweis in Warnfarbe mit der
+  Zahl der betroffenen Shop-Tastaturen — und am Artikel der Verweis auf
+  „Nicht einzeln verkaufen", wenn nur der Einzelartikel gemeint ist.
+- Keine Rückfrage beim Speichern: dasselbe Formular speichert auch Schwelle,
+  Rückhalt und Höchstmenge, und der Knopf „Ausverkauft setzen" im Abverkauf
+  nutzt die Sperre mit Absicht.
+
+Doku: [module/integrationen.md](module/integrationen.md).
+
 ## 2026-11-28 — Bestandsabgleich als vollständige Liste: jede Shop-Variante mit KRNL-Meldung und Shop-Stand
 
 Der Betreiber am Abend vor dem Scharfschalten: „Die Liste unter
