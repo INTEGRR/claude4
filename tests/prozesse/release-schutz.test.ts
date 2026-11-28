@@ -427,3 +427,58 @@ describe('Kontingent und Buch — geteilte Teile werden nie doppelt angeboten', 
     assert.match(log.message, /Nicht voll gedeckt — es fehlen: 2 × /)
   })
 })
+
+// --- Feste Menge (Entscheidungslog 2026-11-28) ------------------------------------
+describe('Feste Menge — wie früher in Odoo: voll anbieten, bei der Schwelle alles mit dem Teil auf 0', () => {
+  const drei = (): number[] => [shop('F1'), shop('F2'), shop('F3')]
+
+  test('jede Variante bekommt den Deckel — ohne Aufteilung', async () => {
+    // Frisches Trio mit eigenem Gehäuse; die Tastaturen von oben abkoppeln.
+    fakeBestandLeeren()
+    await h.sql`update product_variants set shopify_variant_id = null where shopify_variant_id is not null`
+    gehaeuse = await rohartikel('Gehäuse fest', 12)
+    await tastatur('F1', 9201, 85000)
+    await tastatur('F2', 9202, 85000)
+    await tastatur('F3', 9203, 85000)
+    await h.sql`update settings set value = value || ${h.sql.json({ mto: { modus: 'fest', puffer: 2, deckel: 999 } })}::jsonb where key = 'shopify'`
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999], '12 Gehäuse, drei Tastaturen — jede zeigt voll')
+    await h.sql`update shopify_inventory_state set buch_ab = buch_ab - interval '1 minute'`
+  })
+
+  test('ein Kauf: die Variante wird wieder aufgefüllt, die anderen bleiben', async () => {
+    const einlesen = kaufen('F1', 1)!
+    assert.equal(shop('F1'), 998)
+    await einlesen()
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999])
+    assert.equal(await gehaeuseFrei(), 11)
+  })
+
+  test('Puffer erreicht: nur noch 2 baubar — alle drei gehen auf 0; Nachschub hebt sie wieder', async () => {
+    await gehaeuseFreiSetzen(2)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [0, 0, 0])
+    await gehaeuseFreiSetzen(40)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999])
+  })
+
+  test('Schwelle am Teil („aus unter 10"): fällt das Gehäuse darunter, sind alle Varianten mit dem Gehäuse aus', async () => {
+    await aktion('verkauf.shop_variante_setzen', undefined, { variant_id: gehaeuse, oos_unter: 10 })
+    await gehaeuseFreiSetzen(13)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [999, 999, 999], '13 frei bei Schwelle 10: 4 nutzbar, über dem Puffer')
+    await gehaeuseFreiSetzen(9)
+    await inventarAbgleichen()
+    assert.deepEqual(drei(), [0, 0, 0], 'unter der Schwelle: alle drei aus')
+  })
+
+  test('zurück auf „aufgeteilt": die Summe ist wieder der freie Bestand', async () => {
+    await aktion('verkauf.shop_variante_setzen', undefined, { variant_id: gehaeuse, oos_unter: null })
+    await h.sql`update settings set value = value || ${h.sql.json({ mto: { modus: 'baubar', puffer: 0, deckel: 99 } })}::jsonb where key = 'shopify'`
+    await gehaeuseFreiSetzen(12)
+    await inventarAbgleichen()
+    assert.equal(drei().reduce((a, b) => a + b, 0), 12)
+  })
+})

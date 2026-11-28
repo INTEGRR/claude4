@@ -214,6 +214,20 @@ verfügbare Menge (`free_to_use`: Bestand minus Reservierungen an internen
 Orten, abgerundet auf ganze Stücke), für **Made-to-Order** die baubare Menge
 (Abschnitt darunter).
 
+**Zwei Arten zu melden** (Einstellungen → Anbindungen → „Made-to-Order an
+Shopify"; seit 2026-11-28 sauber getrennt):
+
+- **aufgeteilt** (Standard): geteilte Teile werden als Kontingent auf die
+  Angebote verteilt (0136) — die Summe übersteigt nie den freien Bestand,
+  Shopify stoppt von selbst bei 0. Bei vielen Varianten je Teil stehen nur
+  wenige Stück je Variante.
+- **feste Menge** („wie früher in Odoo"): keine Aufteilung. Jedes Angebot
+  bekommt den Deckel (z. B. 999), solange mehr als der Puffer baubar ist und
+  jedes Teil über seiner Schwelle liegt („ausverkauft unter N" am Teil).
+  Darunter gehen alle Angebote mit diesem Teil auf 0. Der Stopp kommt von
+  KRNL, Sekunden nach der Bestellung — was bis dahin zu viel verkauft wird,
+  ist überverkauft; Puffer und Schwellen decken das ab.
+
 - **Push**: Outbox-Job `shopify_inventory_push`, angestoßen über
   `inventar_abgleich_anstossen()` — **nach jeder importierten
   Shopify-Bestellung (auch Storno) sofort** (der Webhook arbeitet den Job

@@ -291,8 +291,8 @@ export default async function SchnittstellenPage() {
             <label className="field">
               <span>Meldung</span>
               <Auswahl name="modus" defaultValue={mto.modus}>
-                <option value="baubar">baubare Menge − Puffer (höchstens Deckel)</option>
-                <option value="fest">fest der Deckel, solange mehr als der Puffer baubar ist</option>
+                <option value="baubar">aufgeteilt: baubare Menge, geteilte Teile werden auf die Varianten verteilt (kein Überverkauf)</option>
+                <option value="fest">feste Menge: jede Variante bekommt den Deckel — fällt ein Teil unter die Schwelle, gehen alle Varianten mit diesem Teil auf 0</option>
               </Auswahl>
             </label>
             <label className="field shrink">
@@ -309,9 +309,13 @@ export default async function SchnittstellenPage() {
           </div>
         </ActionForm>
         <p className="small muted" style={{ margin: '8px 0 12px' }}>
-          Der Puffer fängt die Sekunden zwischen Bestellung und Abgleich ab — für Releases und Aktionen
-          gern höher stellen. „baubar" ist sicherer als „fest": Shopify zieht bei jeder Bestellung selbst ab und
-          stoppt bei 0, auch bevor KRNL neu gemeldet hat.
+          <strong>Aufgeteilt</strong> verspricht nie mehr, als da ist: Shopify zählt jede Variante selbst herunter
+          und stoppt bei 0 — dafür stehen bei vielen Varianten nur wenige Stück je Variante. <strong>Feste Menge</strong>{' '}
+          (wie früher in Odoo) zeigt jede Variante mit dem Deckel, solange das Material reicht: mehr als der Puffer
+          baubar und jedes Teil über seiner Schwelle („ausverkauft unter N" am Teil). Darunter gehen alle Varianten
+          mit diesem Teil auf 0 — nach der nächsten Bestellung, das dauert Sekunden, nicht Millisekunden. Was in
+          diesen Sekunden noch verkauft wird, ist überverkauft: Puffer und Schwellen so wählen, dass sie den Ansturm
+          dieser Sekunden abdecken.
         </p>
         {mtoZeilen.length === 0 ? (
           <p className="small muted" style={{ margin: 0 }}>Keine Shopify-gekoppelten Made-to-Order-Artikel.</p>

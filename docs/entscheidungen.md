@@ -9,6 +9,47 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Feste Menge an Shopify: ohne Aufteilung, bei der Schwelle alles mit dem Teil auf 0
+
+Der Betreiber zur Aufteilung (Kontingent, 0136), die je Variante nur 1–3
+Stück meldet, obwohl Material für Dutzende da ist: „Das ist sehr kacke.
+Daher war die Logik in Odoo damals: alles in Shopify auf 999 setzen, und
+sobald ein Material die Schwelle unterschreitet, alle Varianten, die das
+Material in der Stückliste haben, out of stock setzen."
+
+Den Modus „fest" gab es als Einstellung schon (0100: der Deckel, solange
+mehr als der Puffer baubar ist) — aber seit 0136 lag die Aufteilung immer
+obendrauf und schnitt die 99 wieder auf 1–3 herunter.
+
+- **Im Modus „fest" wird nicht mehr aufgeteilt.** Jedes Angebot bekommt
+  `shopify_soll_menge`: den Deckel (z. B. 999), solange mehr als der Puffer
+  baubar ist — gerechnet mit `shop_frei`, also mit den Schwellen der Teile
+  („ausverkauft unter N"). Fällt ein Teil darunter, gehen alle Angebote auf
+  0, die es in der Stückliste haben. Nach einem Kauf füllt KRNL die
+  Variante wieder auf.
+- **Der Standard bleibt „aufgeteilt".** Umgeschaltet wird in Einstellungen
+  → Anbindungen → „Made-to-Order an Shopify"; dort stehen auch Puffer und
+  Deckel. Der Modus ist eine Entscheidung des Betreibers, kein Automatismus.
+- **Der Preis, ausdrücklich:** bei fester Menge liegt die Summe der
+  Angebote über dem Bestand. Shopify stoppt nicht von selbst; den Stopp
+  setzt KRNL, nachdem die Bestellung angekommen, reserviert und neu
+  gerechnet ist — Sekunden, nicht Millisekunden (Webhook-Zustellung von
+  Shopify, Einlesen, Meldung). Was in diesen Sekunden über den Rest hinaus
+  verkauft wird, ist überverkauft. Puffer und Teile-Schwellen müssen den
+  Ansturm dieser Sekunden abdecken.
+- **Verworfen: der Haken „weiterverkaufen ohne Bestand" je Variante.**
+  Gleiche Wirkung, aber ein neuer Schreibweg in die Shop-Produkte — am
+  Vorabend des Releases nicht neu zu bauen; die feste Menge läuft über den
+  vorhandenen Bestandsweg.
+- Lagerartikel im Einzelverkauf melden im Modus „fest" ihren eigenen freien
+  Bestand (ohne Abzug dessen, was Tastaturen daraus brauchen) — auch hier
+  schützt nur die Schwelle am Teil.
+
+Nachweis: `tests/prozesse/release-schutz.test.ts` („Feste Menge"): voll je
+Variante, Auffüllen nach Kauf, alle auf 0 bei Puffer und bei Teile-Schwelle,
+Rückweg auf „aufgeteilt". Doku:
+[module/integrationen.md](module/integrationen.md) „Bestandsabgleich".
+
 ## 2026-11-28 — Shop-Verfügbarkeit: „In jeder Variante verbaut" statt „Gemeinsame Teile"
 
 Frage des Betreibers: „Warum zählt das grüne Gehäuse zu den gemeinsamen

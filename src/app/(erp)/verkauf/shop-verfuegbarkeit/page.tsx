@@ -387,11 +387,19 @@ export default async function ShopVerfuegbarkeitPage({ searchParams }: { searchP
         </details>
       )}
       <div className={modus === 'schreiben' ? 'notice info' : 'notice warn'}>
-        Geteilte Teile werden als Kontingent auf die Angebote verteilt — die Summe übersteigt nie den freien
-        Bestand. Deckel je Tastatur:{' '}
-        {mto.modus === 'fest'
-          ? `${mto.deckel}, solange mehr als ${mto.puffer} baubar`
-          : `baubar − ${mto.puffer}, höchstens ${mto.deckel}`}{' '}
+        {mto.modus === 'fest' ? (
+          <>
+            <strong>Feste Menge:</strong> jede verfügbare Variante bekommt {mto.deckel} — ohne Aufteilung. Sind nur
+            noch {mto.puffer} oder weniger baubar oder fällt ein Teil unter seine Schwelle („aus unter N"), gehen
+            alle Varianten mit diesem Teil auf 0. Das greift Sekunden nach der Bestellung — was bis dahin verkauft
+            wird, ist überverkauft.
+          </>
+        ) : (
+          <>
+            <strong>Aufgeteilt:</strong> geteilte Teile werden als Kontingent auf die Angebote verteilt — die Summe
+            übersteigt nie den freien Bestand. Deckel je Tastatur: baubar − {mto.puffer}, höchstens {mto.deckel}.
+          </>
+        )}{' '}
         (<Link href="/einstellungen/anbindungen">ändern</Link>).{' '}
         {modus === 'schreiben'
           ? 'Shopify ist scharf: jede Änderung hier geht sofort an den Shop.'

@@ -17,6 +17,7 @@ import {
   meldungPlanen,
 } from './inventar-logik'
 import { type Abnehmer, kontingentVerteilen } from './kontingent-logik'
+import { madeToOrderEinstellung } from './made-to-order'
 import { zweitangebotMerken } from './zweitangebote'
 
 /**
@@ -228,7 +229,17 @@ async function kontingentAnwenden(varianten: VarianteZeile[], angebote: AngebotZ
   for (const v of varianten) v.frei = kontingent.get(`v:${v.variant_id}`) ?? 0
   for (const a of angebote) a.frei = kontingent.get(`z:${a.angebot_id}`) ?? 0
 
-  // Fürs Auge (Shop-Verfügbarkeit): das Kontingent je Angebot festhalten.
+  await zielFesthalten(varianten, angebote)
+  return {
+    pool,
+    bedarf: new Map(abnehmer.map((a) => [a.id, a.bedarf])),
+    gewicht: new Map(abnehmer.map((a) => [a.id, a.gewicht])),
+    ausEigen,
+  }
+}
+
+/** Fürs Auge (Shop-Verfügbarkeit): das Ziel je Angebot festhalten. */
+async function zielFesthalten(varianten: VarianteZeile[], angebote: AngebotZeile[]): Promise<void> {
   if (varianten.length > 0) {
     await sql`
       insert into shopify_inventory_state (variant_id, kontingent, kontingent_at)
@@ -243,12 +254,22 @@ async function kontingentAnwenden(varianten: VarianteZeile[], angebote: AngebotZ
       from unnest(${angebote.map((a) => a.angebot_id)}::uuid[], ${angebote.map((a) => a.frei)}::int[]) as x(id, k)
       where z.id = x.id and z.kontingent is distinct from x.k`
   }
-  return {
-    pool,
-    bedarf: new Map(abnehmer.map((a) => [a.id, a.bedarf])),
-    gewicht: new Map(abnehmer.map((a) => [a.id, a.gewicht])),
-    ausEigen,
-  }
+}
+
+/**
+ * Feste Menge (Entscheidungslog 2026-11-28, „wie früher in Odoo"): im Modus
+ * „fest" wird NICHT aufgeteilt. Jedes Angebot bekommt, was es allein bekäme
+ * (shopify_soll_menge: der Deckel, solange das Material über Puffer und
+ * Teile-Schwellen liegt, sonst 0). Fällt ein Teil unter seine Schwelle,
+ * gehen damit alle Angebote auf 0, die es in der Stückliste haben. Der
+ * Preis: die Summe der Angebote liegt über dem Bestand — was zwischen dem
+ * Unterschreiten und der nächsten Meldung verkauft wird, ist überverkauft.
+ * Dafür sind die Schwellen da.
+ */
+async function festeMengeAnwenden(varianten: VarianteZeile[], angebote: AngebotZeile[]): Promise<void> {
+  for (const v of varianten) v.frei = Math.max(Math.floor(Number(v.soll)), 0)
+  for (const a of angebote) a.frei = Math.max(Math.floor(Number(a.soll)), 0)
+  await zielFesthalten(varianten, angebote)
 }
 
 /** Was die Meldung von der Kontingent-Rechnung wissen muss, um Erhöhungen zu decken. */
@@ -415,6 +436,9 @@ export async function pushInventar(): Promise<PushErgebnis> {
   if (notAus) {
     for (const v of varianten) v.frei = 0
     for (const a of angebote) a.frei = 0
+  } else if ((await madeToOrderEinstellung()).modus === 'fest') {
+    // Feste Menge: keine Aufteilung, also auch kein Budget für Erhöhungen (lage bleibt leer).
+    await festeMengeAnwenden(varianten, angebote)
   } else {
     lage = await kontingentAnwenden(varianten, angebote)
   }
