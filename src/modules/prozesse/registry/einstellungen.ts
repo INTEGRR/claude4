@@ -91,7 +91,8 @@ export const EINSTELLUNGEN = {
     prozessfrei: true,
     beschreibung:
       'Speichert Name und Anschrift der Firma (settings.company) — genutzt von ' +
-      'Belegen, Absenderadressen und der Sidebar.',
+      'Belegen, Absenderadressen und der Sidebar. Optional ein abweichender ' +
+      'Versandabsender (Lager/Halle) für die Versandlabels.',
     bindung: 'frei',
     schema: z.object({
       name: z.string().min(1).max(120),
@@ -114,6 +115,14 @@ export const EINSTELLUNGEN = {
       iban: z.string().trim().max(42).optional(),
       bic: z.string().trim().max(16).optional(),
       bank: z.string().trim().max(80).optional(),
+      // Versandabsender (2026-11-28): Lager/Halle, wenn sie nicht am Firmensitz
+      // liegt — steht als Absender auf dem Label, dorthin kommen Rückläufer.
+      // Leer = Firmensitz.
+      versand_name: z.string().trim().max(120).optional(),
+      versand_street: z.string().trim().max(120).optional(),
+      versand_house: z.string().trim().max(20).optional(),
+      versand_zip: z.string().trim().max(12).optional(),
+      versand_city: z.string().trim().max(80).optional(),
     }),
     zusammenfassung: (p) => `Firma ${p.name}`,
     formdata: (fd) => ({
@@ -136,6 +145,11 @@ export const EINSTELLUNGEN = {
       iban: fd.has('iban') ? String(fd.get('iban') ?? '').replace(/\s+/g, '').toUpperCase() : undefined,
       bic: fd.has('bic') ? String(fd.get('bic') ?? '').trim().toUpperCase() : undefined,
       bank: fd.has('bank') ? String(fd.get('bank') ?? '').trim() : undefined,
+      versand_name: fd.has('versand_name') ? String(fd.get('versand_name') ?? '').trim() : undefined,
+      versand_street: fd.has('versand_street') ? String(fd.get('versand_street') ?? '').trim() : undefined,
+      versand_house: fd.has('versand_house') ? String(fd.get('versand_house') ?? '').trim() : undefined,
+      versand_zip: fd.has('versand_zip') ? String(fd.get('versand_zip') ?? '').trim() : undefined,
+      versand_city: fd.has('versand_city') ? String(fd.get('versand_city') ?? '').trim() : undefined,
     }),
     revalidate: ['/einstellungen', '/'],
   },

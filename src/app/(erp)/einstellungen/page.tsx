@@ -27,6 +27,11 @@ interface Firma {
   iban: string
   bic: string
   bank: string
+  versand_name: string
+  versand_street: string
+  versand_house: string
+  versand_zip: string
+  versand_city: string
 }
 
 async function firmaSpeichern(formData: FormData) {
@@ -96,6 +101,33 @@ export default async function FirmaPage() {
             <label className="field">
               <span>Land (ISO alpha-3)</span>
               <input className="mono" name="country" defaultValue={firma.country ?? 'DEU'} maxLength={3} required />
+            </label>
+          </div>
+          <p className="small muted" style={{ margin: '12px 0 4px' }}>
+            <strong>Versandabsender</strong> — nur ausfüllen, wenn das Lager nicht am Firmensitz liegt. Diese Adresse
+            steht dann als Absender auf den Versandlabels, und dorthin kommt Unzustellbares zurück. Rechnungen und
+            Angebote zeigen weiter den Firmensitz. Gilt, sobald Straße, PLZ und Ort ausgefüllt sind.
+          </p>
+          <div className="row">
+            <label className="field" style={{ flex: 2 }}>
+              <span>Name auf dem Label</span>
+              <input name="versand_name" defaultValue={firma.versand_name ?? ''} placeholder={firma.name ?? 'wie Firma'} />
+            </label>
+            <label className="field" style={{ flex: 2 }}>
+              <span>Straße (Lager)</span>
+              <input name="versand_street" defaultValue={firma.versand_street ?? ''} />
+            </label>
+            <label className="field">
+              <span>Hausnummer</span>
+              <input name="versand_house" defaultValue={firma.versand_house ?? ''} />
+            </label>
+            <label className="field">
+              <span>PLZ</span>
+              <input name="versand_zip" defaultValue={firma.versand_zip ?? ''} />
+            </label>
+            <label className="field">
+              <span>Ort</span>
+              <input name="versand_city" defaultValue={firma.versand_city ?? ''} />
             </label>
           </div>
           <div className="row">

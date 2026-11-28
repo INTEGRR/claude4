@@ -9,6 +9,30 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Versandabsender: auf dem Label steht das Lager, nicht der Firmensitz
+
+Der Betreiber nach dem ersten Test-Label: „In KRNL muss ich eine
+Rücksendeadresse eintragen, denn auf dem Label steht der Firmensitz, nicht
+die Adresse der Halle."
+
+Der Absender kam aus `settings.company` — derselben Anschrift, die auf
+Rechnungen und Angeboten stehen muss. Sie umzuschreiben hätte die Belege
+verfälscht.
+
+- **Eigener Versandabsender in den Firmendaten** (`versand_name`,
+  `versand_street`, `versand_house`, `versand_zip`, `versand_city`; Aktion
+  `einstellungen.firma_speichern`, Einstellungen → Firma). Leer = Firmensitz.
+- **Gilt, sobald Straße, PLZ und Ort gesetzt sind** — eine halbe Adresse
+  wird nie mit dem Firmensitz gemischt (`modules/versand/absender.ts`).
+  Land, Telefon und E-Mail bleiben die der Firma; der Name auf dem Label
+  ist frei, sonst der Firmenname.
+- **Nur Versandlabels.** Belege zeigen weiter den Firmensitz. Retourenlabels
+  haben ihr Ziel bei DHL (Retourenempfänger im Geschäftskundenportal) — das
+  muss der Betreiber dort auf die Halle stellen.
+
+Nachweis: `tests/versand-absender.test.ts`. Doku:
+[module/versand.md](module/versand.md).
+
 ## 2026-11-28 — Shop-Formulare: eigenes Grundkleid, weil der Shop das Theme gewechselt hat
 
 Revidiert die Regel vom 2026-10-01 („im Kleid des Themes, kein eigenes

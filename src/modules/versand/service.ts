@@ -22,6 +22,7 @@ import {
 } from './dhl'
 import { brauchtZoll } from './dhl-codes'
 import { type AdressPruefung, adresseEinzeilig, fehlendeAdressfelder } from './dhl-validierung'
+import { type FirmaAdresse, versandAbsender } from './absender'
 import { billingNumberForProduct } from './regeln-logik'
 import { vorschlaegeFuerPickings } from './regeln'
 import { money } from '@/modules/shared/format'
@@ -53,12 +54,7 @@ async function storeLabel(name: string, base64: string): Promise<string | null> 
   }
 }
 
-interface CompanySettings {
-  name: string
-  street: string
-  house: string
-  zip: string
-  city: string
+interface CompanySettings extends FirmaAdresse {
   country: string
   email?: string
   phone?: string
@@ -67,8 +63,9 @@ interface CompanySettings {
 async function companySettings(): Promise<CompanySettings> {
   const [row] = await sql<{ value: CompanySettings }[]>`
     select value from settings where key = 'company'`
-  return row.value
+  return versandAbsender(row.value)
 }
+
 
 export interface CreateLabelResult {
   shipmentId: string

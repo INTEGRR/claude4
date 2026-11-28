@@ -34,6 +34,11 @@ export async function firmaSpeichern(
     iban?: string
     bic?: string
     bank?: string
+    versand_name?: string
+    versand_street?: string
+    versand_house?: string
+    versand_zip?: string
+    versand_city?: string
   },
   _ctx: AktionsKontext,
 ): Promise<AktionsErgebnis> {

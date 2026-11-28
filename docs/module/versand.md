@@ -565,6 +565,7 @@ Fehlermeldung nennt die gesendete ID.
 - **Sendungsliste**: alle Sendungen mit Status-Filter; Fehler-Feed (fehlgeschlagene Fulfillment-Jobs, DHL-Warnings).
 - **Querverweise (2026-10-01)**: Kunde → Kontakt in Versandbereit-, Sendungs-, Retouren- und Kommissionierliste; Auftrag → Verkauf, Lieferung → Transfer, Reparatur → Reparaturauftrag; die Hinweisleiste „gelabelt, nicht ausgebucht" verlinkt die Lieferungen, „Gewichte fehlen" die Varianten. Wartet eine Lieferung beim Kommissionieren auf die Fertigung, führen die MO-Nummern zu `/fertigung?auftrag=<id>`.
 - **Einstellungen**: DHL-Zugangsdaten-Check (Test-Call), Abrechnungsnummern je Produkt, Default-Produkt/-Format, Absenderadresse (`shipperRef`), Status-Tag an/aus.
+- **Absender auf dem Label** (seit 2026-11-28): Standard ist der Firmensitz (Einstellungen → Firma). Liegt das Lager woanders, dort den **Versandabsender** eintragen (Name, Straße, Hausnummer, PLZ, Ort) — er steht dann auf jedem Versandlabel, und dorthin schickt DHL Unzustellbares zurück. Gilt, sobald Straße, PLZ und Ort gesetzt sind (`modules/versand/absender.ts`); Rechnungen und Angebote zeigen weiter den Firmensitz. Für **Retourenlabels** (Kunde schickt zurück) gilt diese Adresse nicht: deren Ziel ist der Retourenempfänger im DHL-Geschäftskundenportal.
 
 ## Abnahmekriterien
 
