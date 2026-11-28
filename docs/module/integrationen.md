@@ -243,7 +243,9 @@ Entwürfe und archivierte Shop-Produkte gelten nicht als Abweichung. Die
 Liste ist nach dem Status des Shop-Produkts gruppiert (Aktiv, Nur per Link,
 Entwurf, Archiviert), darin nach Produkt; Zweitangebote tragen den Status
 seit 0148 (`shopify_zweitangebote.shop_status`, gefüllt beim Lesen des
-Shop-Stands). Nur lesend.
+Shop-Stands). Ein Angebot, das beim Lesen des Shop-Stands nicht mehr
+vorkommt (im Shop gelöscht, in KRNL noch verknüpft), steht im Abschnitt „Im
+Shop nicht mehr gefunden" und zählt nicht als Abweichung. Nur lesend.
 
 **Schnellstopp (feste Menge, seit 2026-11-28).** Der Stopp hängt an der
 Bestellung selbst, nicht am vollen Abgleich:

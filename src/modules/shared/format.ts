@@ -402,6 +402,8 @@ export const LABELS = {
     UNLISTED: 'Nur per Link',
     DRAFT: 'Entwurf',
     ARCHIVED: 'Archiviert',
+    // Kein Shopify-Status: beim letzten Lesen des Shop-Stands kam das Angebot nicht mehr vor.
+    FEHLT: 'Im Shop nicht mehr gefunden',
   },
 } as const
 

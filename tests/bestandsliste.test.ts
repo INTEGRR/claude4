@@ -33,6 +33,10 @@ test('Entwurf und archiviert sehen Kunden nicht — keine Abweichung', () => {
   assert.equal(z({ status: 'ARCHIVED', shopKaufbar: false, shop: 0, krnl: 12 }), 'unsichtbar')
 })
 
+test('im Shop gelöscht (beim letzten Lesen nicht mehr dabei): keine Abweichung, auch mit alter Menge', () => {
+  assert.equal(z({ status: 'FEHLT', shopKaufbar: false, shop: 998, krnl: 0 }), 'unsichtbar')
+})
+
 test('der Shop verkauft ohne Bestand weiter: eine 0 von KRNL nimmt das Angebot nicht aus dem Verkauf', () => {
   assert.equal(z({ ohneBestand: true, shop: -1, krnl: 0 }), 'gleich')
 })

@@ -14,7 +14,7 @@ const TEXT: Record<Einordnung, { wort: string; ton: string; hinweis: string }> =
   nur_shop: { wort: 'ginge aus dem Verkauf', ton: 'danger', hinweis: 'im Shop kaufbar, KRNL würde 0 melden' },
   nur_krnl: { wort: 'ginge in den Verkauf', ton: 'warn', hinweis: 'im Shop ausverkauft, KRNL würde eine Menge melden' },
   menge: { wort: 'andere Menge', ton: 'info', hinweis: 'Lagerartikel: bleibt kaufbar, die Zahl ändert sich' },
-  unsichtbar: { wort: 'im Shop nicht sichtbar', ton: 'neutral', hinweis: 'Entwurf oder archiviert' },
+  unsichtbar: { wort: 'im Shop nicht sichtbar', ton: 'neutral', hinweis: 'Entwurf, archiviert oder im Shop nicht mehr vorhanden' },
 }
 
 /** Abschnitte der Liste: der Status des Shop-Produkts — er entscheidet, ob Kunden das Angebot überhaupt sehen. */
@@ -23,6 +23,7 @@ const ABSCHNITTE: { status: string | null; ton: string; text: string }[] = [
   { status: 'UNLISTED', ton: 'info', text: 'nicht in Listen und Suche, mit direktem Link kaufbar' },
   { status: 'DRAFT', ton: 'neutral', text: 'für Kunden nicht sichtbar — was KRNL meldet, ändert im Shop nichts Sichtbares' },
   { status: 'ARCHIVED', ton: 'neutral', text: 'für Kunden nicht sichtbar' },
+  { status: 'FEHLT', ton: 'neutral', text: 'beim letzten Lesen des Shop-Stands nicht mehr dabei — im Shop vermutlich gelöscht, KRNL hält nur noch die alte Verknüpfung' },
   { status: null, ton: 'warn', text: 'der Shop-Stand dieses Angebots wurde noch nicht gelesen (läuft viertelstündlich)' },
 ]
 

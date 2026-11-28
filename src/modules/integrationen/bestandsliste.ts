@@ -26,8 +26,16 @@ interface Roh {
   policy: string | null
   tracked: boolean | null
   krnl: number
+  gesehen: Date | null
   grund: string
 }
+
+/**
+ * Der Shop-Stand wird viertelstündlich komplett gelesen. Ein Angebot, das
+ * dabei deutlich länger nicht mehr vorkam als der Rest, gibt es im Shop
+ * nicht mehr (gelöscht) — KRNL hält nur noch die alte Verknüpfung.
+ */
+const NICHT_MEHR_GESEHEN_MS = 40 * 60 * 1000
 
 export async function bestandsliste(): Promise<{ zeilen: BestandZeile[]; gelesen: string | null }> {
   const roh = await sql<Roh[]>`
@@ -37,7 +45,7 @@ export async function bestandsliste(): Promise<{ zeilen: BestandZeile[]; gelesen
              exists (select 1 from shop_option_sperren sp
                      join product_variant_attribute_values a on a.variant_id = pv.id and a.ptav_id = sp.ptav_id
                      where sp.template_id = pv.template_id) as gesperrt,
-             s.shop_qty, s.shop_verkaufbar, s.shop_policy, s.shop_tracked, s.shop_status,
+             s.shop_qty, s.shop_verkaufbar, s.shop_policy, s.shop_tracked, s.shop_status, s.shop_seen_at,
              coalesce(s.kontingent, shopify_soll_menge(pv.id)) as krnl,
              pv.shop_nicht_einzeln, pv.shop_zurueckhalten, pv.shop_rueckhalt, pv.shop_hoechstmenge, pv.shop_oos_unter
       from product_variants pv
@@ -49,7 +57,7 @@ export async function bestandsliste(): Promise<{ zeilen: BestandZeile[]; gelesen
            coalesce(nullif(regexp_replace(v.display_name, '^.*\\(([^()]*)\\)\\s*$', '\\1'), v.display_name), '') as variante,
            nullif(v.sku, '') as sku, v.mto, false as zweitangebot,
            v.shop_status as status, v.shop_qty::float as shop, v.shop_verkaufbar as verkaufbar,
-           v.shop_policy as policy, v.shop_tracked as tracked, v.krnl::float as krnl,
+           v.shop_policy as policy, v.shop_tracked as tracked, v.krnl::float as krnl, v.shop_seen_at as gesehen,
            case when v.modus = 'aus' then 'steht in KRNL auf „aus"'
                 when v.modus = 'immer' then 'steht in KRNL auf „immer verfügbar"'
                 when v.gesperrt then 'Option gesperrt'
@@ -71,7 +79,7 @@ export async function bestandsliste(): Promise<{ zeilen: BestandZeile[]; gelesen
            coalesce(nullif(z.sku, ''), pv.display_name) as variante, coalesce(nullif(z.sku, ''), nullif(pv.sku, '')) as sku,
            ist_made_to_order(pv.id) as mto, true as zweitangebot,
            z.shop_status as status, z.shop_qty::float as shop, z.shop_verkaufbar as verkaufbar, null as policy, null as tracked,
-           coalesce(z.kontingent, shopify_soll_menge_zweitangebot(z.id))::float as krnl,
+           coalesce(z.kontingent, shopify_soll_menge_zweitangebot(z.id))::float as krnl, z.shop_seen_at as gesehen,
            case when z.shop_modus = 'aus' or shop_modus_von(pv.id) = 'aus' then 'steht in KRNL auf „aus"'
                 when z.shop_modus = 'immer' then 'steht in KRNL auf „immer verfügbar"'
                 else 'wie ' || pv.display_name end as grund
@@ -83,10 +91,15 @@ export async function bestandsliste(): Promise<{ zeilen: BestandZeile[]; gelesen
   const [stand] = await sql<{ gelesen: string | null }[]>`
     select max(shop_seen_at)::text as gelesen from shopify_inventory_state`
 
+  const letzterStand = stand?.gelesen ? new Date(stand.gelesen).getTime() : null
   const zeilen = roh.map((r): BestandZeile => {
     const shop = r.shop === null ? null : Math.round(Number(r.shop))
     const krnl = Math.max(Math.floor(Number(r.krnl)), 0)
-    const sichtbar = r.status !== 'DRAFT' && r.status !== 'ARCHIVED'
+    // Beim letzten Lesen nicht mehr dabei: im Shop gelöscht — zählt wie „nicht sichtbar".
+    const fehlt = letzterStand !== null && r.gesehen !== null &&
+      letzterStand - new Date(r.gesehen).getTime() > NICHT_MEHR_GESEHEN_MS
+    if (fehlt) r.status = 'FEHLT'
+    const sichtbar = r.status !== 'DRAFT' && r.status !== 'ARCHIVED' && r.status !== 'FEHLT'
     const ohneBestand = r.policy === 'CONTINUE' || r.tracked === false
     const shopKaufbar = sichtbar && (r.verkaufbar ?? (ohneBestand || (shop ?? 0) > 0))
     return {

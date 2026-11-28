@@ -13,7 +13,7 @@ export type Einordnung =
   | 'nur_krnl'
   /** Lagerartikel, beide kaufbar, andere Zahl. */
   | 'menge'
-  /** Entwurf oder archiviert: Kunden sehen das Angebot nicht. */
+  /** Entwurf, archiviert oder im Shop nicht mehr vorhanden: Kunden sehen das Angebot nicht. */
   | 'unsichtbar'
 
 export interface BestandZeile {
@@ -26,7 +26,7 @@ export interface BestandZeile {
   /** Auftragsgefertigt (Tastatur) — sonst Lagerartikel. */
   mto: boolean
   zweitangebot: boolean
-  /** Shop: Produktstatus (ACTIVE, UNLISTED, DRAFT, ARCHIVED) oder null, wenn nie gelesen. */
+  /** Shop: Produktstatus (ACTIVE, UNLISTED, DRAFT, ARCHIVED), FEHLT = beim letzten Lesen nicht mehr dabei, null = nie gelesen. */
   status: string | null
   shop: number | null
   shopKaufbar: boolean
@@ -50,7 +50,7 @@ export function einordnen(z: {
   mto: boolean
   ohneBestand: boolean
 }): Einordnung {
-  if (z.status === 'DRAFT' || z.status === 'ARCHIVED') return 'unsichtbar'
+  if (z.status === 'DRAFT' || z.status === 'ARCHIVED' || z.status === 'FEHLT') return 'unsichtbar'
   const krnlKaufbar = z.krnl > 0 || z.ohneBestand
   if (z.shopKaufbar && !krnlKaufbar) return 'nur_shop'
   if (!z.shopKaufbar && krnlKaufbar) return 'nur_krnl'

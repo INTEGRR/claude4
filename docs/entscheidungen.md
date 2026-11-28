@@ -9,6 +9,35 @@ Eintrag mit Verweis auf den alten. Neueste zuerst.
 Format: `## JJJJ-MM-TT — Titel`, dann kurz: was entschieden, warum, wo
 umgesetzt/dokumentiert.
 
+## 2026-11-28 — Bestandsliste: was es im Shop nicht mehr gibt, ist keine Abweichung
+
+Am Abend des Scharfschaltens (Shopify seit 19:26 Uhr auf „schreiben", 388
+Varianten gemeldet) zwei Funde zu Angeboten, die im Shop gelöscht wurden,
+in KRNL aber noch verknüpft waren:
+
+- Die zehn Zweitangebote „Black Week Editions" kamen beim Lesen des
+  Shop-Stands seit Stunden nicht mehr vor, standen in der Liste aber mit
+  ihrer alten Menge als „ginge aus dem Verkauf".
+- Der Artikel „Cherry MX2A Silent Red" war noch mit einer gelöschten
+  Shop-Variante verknüpft: Shopify lehnte seine Menge ab („inventory item
+  could not be found"), und der Abgleich-Job endete deshalb jede Minute als
+  fehlgeschlagen — alle anderen Mengen gingen trotzdem durch.
+
+Entschieden:
+
+- **Die Liste führt solche Angebote als „Im Shop nicht mehr gefunden"**
+  (eigener Abschnitt, keine Abweichung): ein Angebot gilt so, wenn es
+  40 Minuten länger nicht gelesen wurde als der jüngste Shop-Stand — der
+  wird viertelstündlich komplett gelesen (`bestandsliste.ts`).
+- **Betrieb:** die tote Verknüpfung des Silent Red auf Meldung des
+  Betreibers direkt in der Datenbank gelöst (Ereignisleiste am Artikel);
+  Bestand und Stücklisten unberührt.
+- **Offen:** Der Abgleich sollte eine im Shop gelöschte Variante selbst
+  erkennen und überspringen, statt als Ganzes fehlzuschlagen. Bis dahin
+  zeigt die Liste, welche Verknüpfung tot ist.
+
+Nachweis: `tests/bestandsliste.test.ts`.
+
 ## 2026-11-28 — Bestandsliste nach Shop-Status gruppiert; Entwürfe sind nie eine Abweichung
 
 Ergänzt den Eintrag „Bestandsabgleich als vollständige Liste" vom selben
